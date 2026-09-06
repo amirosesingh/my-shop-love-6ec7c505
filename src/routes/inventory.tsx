@@ -72,7 +72,8 @@ export const Route = createFileRoute("/inventory")({
       { title: "Inventory — Northwind POS" },
       {
         name: "description",
-        content: "Track stock levels, costs, margins and reorder alerts for every product in the store.",
+        content:
+          "Track stock levels, costs, margins and reorder alerts for every product in the store.",
       },
       { property: "og:title", content: "Inventory — Northwind POS" },
       { property: "og:description", content: "Stock levels, costs and reorder alerts." },
@@ -128,7 +129,7 @@ function Inventory() {
 
   const canEdit = can("can_add_new_product");
   const canPrice = can("can_edit_product_price");
-  
+
   const canBulk = can("can_bulk_edit_products");
   const canMerge = can("can_merge_products");
   const canEcom = canPrice;
@@ -147,9 +148,9 @@ function Inventory() {
   const [groupFilter, setGroupFilter] = useState("all");
   const [subFilter, setSubFilter] = useState("all");
   const [bulkCategory, setBulkCategory] = useState("");
-  
+
   const [logTarget, setLogTarget] = useState<Product | null>(null);
-  
+
   const [skuOverride, setSkuOverride] = useState(false);
   const autoSku = readSkuSettings().mode === "auto";
   const categories = useCategories();
@@ -201,13 +202,11 @@ function Inventory() {
       if (subFilter !== "all" && (p.subCategory ?? "") !== subFilter) return false;
       if (!needle) return true;
       // Cheapest fields first — most searches stop on the name.
-      return (
-        `${p.name} ${p.sku} ${p.barcode} ${(p.barcodes ?? []).join(" ")} ${(p.variants ?? [])
-          .map((v) => `${v.code} ${v.label ?? ""}`)
-          .join(" ")} ${p.category} ${p.group ?? ""} ${p.subCategory ?? ""}`
-          .toLowerCase()
-          .includes(needle)
-      );
+      return `${p.name} ${p.sku} ${p.barcode} ${(p.barcodes ?? []).join(" ")} ${(p.variants ?? [])
+        .map((v) => `${v.code} ${v.label ?? ""}`)
+        .join(" ")} ${p.category} ${p.group ?? ""} ${p.subCategory ?? ""}`
+        .toLowerCase()
+        .includes(needle);
     });
   }, [
     state.products,
@@ -251,7 +250,6 @@ function Inventory() {
     return { lowStock: low, stockValue: value };
   }, [state.products, currentStore.id]);
 
-
   return (
     <AppShell>
       <div className="space-y-5 p-6">
@@ -261,7 +259,6 @@ function Inventory() {
             <p className="text-sm text-muted-foreground">
               {state.products.length} products ·{" "}
               {showStockValue && (
-
                 <>
                   stock value <span className="numeric">{money(stockValue)}</span> ·{" "}
                 </>
@@ -294,259 +291,267 @@ function Inventory() {
               <FileSpreadsheet className="size-4" /> Export to Excel
             </Button>
             {canEdit && (
-            <Dialog
-              open={!!draft}
-              onOpenChange={(o) => setDraft(o ? (draft ?? blank(currentStore.id)) : null)}
-            >
-              <DialogTrigger asChild>
-                <Button onClick={() => setDraft(blank(currentStore.id))}>
-                  <Plus className="size-4" /> New product
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>{draft?.name ? "Edit product" : "New product"}</DialogTitle>
-                </DialogHeader>
-                {draft && (
-                  <div className="grid grid-cols-2 gap-3">
-                    <Field label="Name" className="col-span-2">
-                      <Input
-                        value={draft.name}
-                        onChange={(e) => setDraft({ ...draft, name: e.target.value })}
-                      />
-                    </Field>
-                    <Field label="SKU">
-                      <Input
-                        value={draft.sku}
-                        readOnly={autoSku && !skuOverride}
-                        placeholder={autoSku ? peekSku(state.products.map((p) => p.sku)) : ""}
-                        onChange={(e) => setDraft({ ...draft, sku: e.target.value })}
-                      />
-                      {autoSku && (
-                        <button
-                          type="button"
-                          className="mt-1 text-[11px] text-muted-foreground underline"
-                          onClick={() => setSkuOverride((v) => !v)}
-                        >
-                          {skuOverride ? "Use automatic number" : "Override this code"}
-                        </button>
-                      )}
-                    </Field>
-                    <Field label="Barcode">
-                      <Input
-                        value={draft.barcode}
-                        onChange={(e) => setDraft({ ...draft, barcode: e.target.value })}
-                      />
-                    </Field>
-                    <Field label="Category">
-                      <ThemedSelect
-                        value={draft.category || NONE}
-                        ariaLabel="Category"
-                        placeholder="Choose a category"
-                        onChange={(v) => setDraft({ ...draft, category: v === NONE ? "" : v })}
-                        options={pickerOptions(categoryNames, draft?.category)}
-                      />
-                    </Field>
-                    <Field label="Group">
-                      <ThemedSelect
-                        value={draft.group || NONE}
-                        ariaLabel="Group"
-                        placeholder="Choose a group"
-                        onChange={(v) => setDraft({ ...draft, group: v === NONE ? "" : v })}
-                        options={pickerOptions(groupNames, draft?.group)}
-                      />
-                    </Field>
-                    <Field label="Sub-category">
-                      <ThemedSelect
-                        value={draft.subCategory || NONE}
-                        ariaLabel="Sub-category"
-                        placeholder="Choose a sub-category"
-                        onChange={(v) => setDraft({ ...draft, subCategory: v === NONE ? "" : v })}
-                        options={pickerOptions(subNames, draft?.subCategory)}
-                      />
-                    </Field>
-                    <Field label="Unit of measure">
-                      <ThemedSelect
-                        value={draft.unit ?? "pcs"}
-                        onChange={(v) => setDraft({ ...draft, unit: v })}
-                        ariaLabel="Unit of measure"
-                        options={selectableUnits(units, draft.unit).map((u) => ({
-                          value: u.code,
-                          label: `${u.code} · ${u.name}${u.allowDecimal ? " (decimal)" : ""}`,
-                        }))}
-                      />
-                    </Field>
-                    <Field label="Barcode variants" className="col-span-2">
-                      <div className="flex flex-wrap gap-1">
-                        {(draft.variants ?? []).map((v) => (
-                          <Badge
-                            key={v.code}
-                            variant="outline"
-                            className="numeric gap-1 text-[11px]"
-                          >
-                            {v.code}
-                            {v.label ? ` · ${v.label}` : ""}
-                            <button
-                              type="button"
-                              className="text-destructive"
-                              aria-label={`Remove variant ${v.code}`}
-                              onClick={() =>
-                                setDraft({
-                                  ...draft,
-                                  variants: (draft.variants ?? []).filter(
-                                    (x) => x.code !== v.code,
-                                  ),
-                                })
-                              }
-                            >
-                              ×
-                            </button>
-                          </Badge>
-                        ))}
-                        {(draft.barcodes ?? []).map((code) => (
-                          <Badge key={code} variant="outline" className="numeric gap-1 text-[11px]">
-                            {code}
-                            <button
-                              type="button"
-                              className="text-destructive"
-                              aria-label={`Remove barcode ${code}`}
-                              onClick={() =>
-                                setDraft({
-                                  ...draft,
-                                  barcodes: (draft.barcodes ?? []).filter((b) => b !== code),
-                                })
-                              }
-                            >
-                              ×
-                            </button>
-                          </Badge>
-                        ))}
-                      </div>
-                      <div className="mt-1 flex gap-2">
+              <Dialog
+                open={!!draft}
+                onOpenChange={(o) => setDraft(o ? (draft ?? blank(currentStore.id)) : null)}
+              >
+                <DialogTrigger asChild>
+                  <Button onClick={() => setDraft(blank(currentStore.id))}>
+                    <Plus className="size-4" /> New product
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>{draft?.name ? "Edit product" : "New product"}</DialogTitle>
+                  </DialogHeader>
+                  {draft && (
+                    <div className="grid grid-cols-2 gap-3">
+                      <Field label="Name" className="col-span-2">
                         <Input
-                          value={aliasDraft}
-                          placeholder="Scan or type another barcode for this item"
-                          onChange={(e) => setAliasDraft(e.target.value)}
-                          onKeyDown={(e) => {
-                            if (e.key !== "Enter") return;
-                            e.preventDefault();
-                            const code = aliasDraft.trim();
-                            if (!code) return;
-                            const problem = checkCodeAvailable(state.products, code, draft.id);
-                            if (problem) {
-                              toast.error(problem);
-                              return;
-                            }
+                          value={draft.name}
+                          onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+                        />
+                      </Field>
+                      <Field label="SKU">
+                        <Input
+                          value={draft.sku}
+                          readOnly={autoSku && !skuOverride}
+                          placeholder={autoSku ? peekSku(state.products.map((p) => p.sku)) : ""}
+                          onChange={(e) => setDraft({ ...draft, sku: e.target.value })}
+                        />
+                        {autoSku && (
+                          <button
+                            type="button"
+                            className="mt-1 text-[11px] text-muted-foreground underline"
+                            onClick={() => setSkuOverride((v) => !v)}
+                          >
+                            {skuOverride ? "Use automatic number" : "Override this code"}
+                          </button>
+                        )}
+                      </Field>
+                      <Field label="Barcode">
+                        <Input
+                          value={draft.barcode}
+                          onChange={(e) => setDraft({ ...draft, barcode: e.target.value })}
+                        />
+                      </Field>
+                      <Field label="Category">
+                        <ThemedSelect
+                          value={draft.category || NONE}
+                          ariaLabel="Category"
+                          placeholder="Choose a category"
+                          onChange={(v) => setDraft({ ...draft, category: v === NONE ? "" : v })}
+                          options={pickerOptions(categoryNames, draft?.category)}
+                        />
+                      </Field>
+                      <Field label="Group">
+                        <ThemedSelect
+                          value={draft.group || NONE}
+                          ariaLabel="Group"
+                          placeholder="Choose a group"
+                          onChange={(v) => setDraft({ ...draft, group: v === NONE ? "" : v })}
+                          options={pickerOptions(groupNames, draft?.group)}
+                        />
+                      </Field>
+                      <Field label="Sub-category">
+                        <ThemedSelect
+                          value={draft.subCategory || NONE}
+                          ariaLabel="Sub-category"
+                          placeholder="Choose a sub-category"
+                          onChange={(v) => setDraft({ ...draft, subCategory: v === NONE ? "" : v })}
+                          options={pickerOptions(subNames, draft?.subCategory)}
+                        />
+                      </Field>
+                      <Field label="Unit of measure">
+                        <ThemedSelect
+                          value={draft.unit ?? "pcs"}
+                          onChange={(v) => setDraft({ ...draft, unit: v })}
+                          ariaLabel="Unit of measure"
+                          options={selectableUnits(units, draft.unit).map((u) => ({
+                            value: u.code,
+                            label: `${u.code} · ${u.name}${u.allowDecimal ? " (decimal)" : ""}`,
+                          }))}
+                        />
+                      </Field>
+                      <Field label="Barcode variants" className="col-span-2">
+                        <div className="flex flex-wrap gap-1">
+                          {(draft.variants ?? []).map((v) => (
+                            <Badge
+                              key={v.code}
+                              variant="outline"
+                              className="numeric gap-1 text-[11px]"
+                            >
+                              {v.code}
+                              {v.label ? ` · ${v.label}` : ""}
+                              <button
+                                type="button"
+                                className="text-destructive"
+                                aria-label={`Remove variant ${v.code}`}
+                                onClick={() =>
+                                  setDraft({
+                                    ...draft,
+                                    variants: (draft.variants ?? []).filter(
+                                      (x) => x.code !== v.code,
+                                    ),
+                                  })
+                                }
+                              >
+                                ×
+                              </button>
+                            </Badge>
+                          ))}
+                          {(draft.barcodes ?? []).map((code) => (
+                            <Badge
+                              key={code}
+                              variant="outline"
+                              className="numeric gap-1 text-[11px]"
+                            >
+                              {code}
+                              <button
+                                type="button"
+                                className="text-destructive"
+                                aria-label={`Remove barcode ${code}`}
+                                onClick={() =>
+                                  setDraft({
+                                    ...draft,
+                                    barcodes: (draft.barcodes ?? []).filter((b) => b !== code),
+                                  })
+                                }
+                              >
+                                ×
+                              </button>
+                            </Badge>
+                          ))}
+                        </div>
+                        <div className="mt-1 flex gap-2">
+                          <Input
+                            value={aliasDraft}
+                            placeholder="Scan or type another barcode for this item"
+                            onChange={(e) => setAliasDraft(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key !== "Enter") return;
+                              e.preventDefault();
+                              const code = aliasDraft.trim();
+                              if (!code) return;
+                              const problem = checkCodeAvailable(state.products, code, draft.id);
+                              if (problem) {
+                                toast.error(problem);
+                                return;
+                              }
+                              setDraft({
+                                ...draft,
+                                variants: [
+                                  ...(draft.variants ?? []).filter((v) => v.code !== code),
+                                  { code, label: variantLabel.trim() || undefined },
+                                ],
+                              });
+                              setAliasDraft("");
+                              setVariantLabel("");
+                            }}
+                          />
+                          <Input
+                            value={variantLabel}
+                            placeholder="Label (colour, size, pack)"
+                            className="w-56"
+                            onChange={(e) => setVariantLabel(e.target.value)}
+                          />
+                        </div>
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                          Press Enter in the barcode box to add. Codes already used anywhere in the
+                          catalogue are refused, and every variant scans to this product.
+                        </p>
+                      </Field>
+                      <Field label="Tax rate %">
+                        <Input
+                          className="numeric"
+                          value={draft.taxRate * 100}
+                          onChange={(e) =>
+                            setDraft({ ...draft, taxRate: (Number(e.target.value) || 0) / 100 })
+                          }
+                        />
+                      </Field>
+                      <Field label="Price">
+                        <Input
+                          disabled={!canPrice}
+                          className="numeric"
+                          value={draft.price}
+                          onChange={(e) =>
+                            setDraft({ ...draft, price: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </Field>
+                      <Field label="E-com price">
+                        <Input
+                          disabled={!canPrice}
+                          className="numeric"
+                          value={draft.ecomPrice ?? 0}
+                          onChange={(e) =>
+                            setDraft({ ...draft, ecomPrice: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </Field>
+                      <Field label="Cost">
+                        <Input
+                          disabled={!canPrice}
+                          className="numeric"
+                          value={draft.cost}
+                          onChange={(e) =>
+                            setDraft({ ...draft, cost: Number(e.target.value) || 0 })
+                          }
+                        />
+                      </Field>
+                      <Field label={`Stock · ${currentStore.code}`}>
+                        <Input
+                          className="numeric"
+                          value={stockAt(draft, currentStore.id)}
+                          onChange={(e) =>
                             setDraft({
                               ...draft,
-                              variants: [
-                                ...(draft.variants ?? []).filter((v) => v.code !== code),
-                                { code, label: variantLabel.trim() || undefined },
-                              ],
-                            });
-                            setAliasDraft("");
-                            setVariantLabel("");
-                          }}
+                              stockByStore: {
+                                ...draft.stockByStore,
+                                [currentStore.id]: Number(e.target.value) || 0,
+                              },
+                            })
+                          }
                         />
+                      </Field>
+                      <Field label="Reorder level">
                         <Input
-                          value={variantLabel}
-                          placeholder="Label (colour, size, pack)"
-                          className="w-56"
-                          onChange={(e) => setVariantLabel(e.target.value)}
+                          className="numeric"
+                          value={draft.reorderLevel}
+                          onChange={(e) =>
+                            setDraft({ ...draft, reorderLevel: Number(e.target.value) || 0 })
+                          }
                         />
-                      </div>
-                      <p className="mt-1 text-[11px] text-muted-foreground">
-                        Press Enter in the barcode box to add. Codes already used anywhere in the
-                        catalogue are refused, and every variant scans to this product.
-                      </p>
-                    </Field>
-                    <Field label="Tax rate %">
-                      <Input
-                        className="numeric"
-                        value={draft.taxRate * 100}
-                        onChange={(e) =>
-                          setDraft({ ...draft, taxRate: (Number(e.target.value) || 0) / 100 })
+                      </Field>
+                    </div>
+                  )}
+                  <DialogFooter>
+                    <Button
+                      onClick={async () => {
+                        if (!draft?.name.trim()) {
+                          toast.error("Product name is required");
+                          return;
                         }
-                      />
-                    </Field>
-                    <Field label="Price">
-                      <Input
-                        disabled={!canPrice}
-                        className="numeric"
-                        value={draft.price}
-                        onChange={(e) => setDraft({ ...draft, price: Number(e.target.value) || 0 })}
-                      />
-                    </Field>
-                    <Field label="E-com price">
-                      <Input
-                        disabled={!canPrice}
-                        className="numeric"
-                        value={draft.ecomPrice ?? 0}
-                        onChange={(e) =>
-                          setDraft({ ...draft, ecomPrice: Number(e.target.value) || 0 })
+                        const sku =
+                          draft.sku.trim() ||
+                          (autoSku ? nextSku(state.products.map((p) => p.sku)) : "");
+                        try {
+                          // Saved only once the write is confirmed stored.
+                          const target = await upsertProduct({ ...draft, sku });
+                          setDraft(null);
+                          setSkuOverride(false);
+                          toast.success(`Product saved — ${commitLabel(target).toLowerCase()}`);
+                        } catch (e) {
+                          notifyError(e, "Saving the product");
                         }
-                      />
-                    </Field>
-                    <Field label="Cost">
-                      <Input
-                        disabled={!canPrice}
-                        className="numeric"
-                        value={draft.cost}
-                        onChange={(e) => setDraft({ ...draft, cost: Number(e.target.value) || 0 })}
-                      />
-                    </Field>
-                    <Field label={`Stock · ${currentStore.code}`}>
-                      <Input
-                        className="numeric"
-                        value={stockAt(draft, currentStore.id)}
-                        onChange={(e) =>
-                          setDraft({
-                            ...draft,
-                            stockByStore: {
-                              ...draft.stockByStore,
-                              [currentStore.id]: Number(e.target.value) || 0,
-                            },
-                          })
-                        }
-                      />
-                    </Field>
-                    <Field label="Reorder level">
-                      <Input
-                        className="numeric"
-                        value={draft.reorderLevel}
-                        onChange={(e) =>
-                          setDraft({ ...draft, reorderLevel: Number(e.target.value) || 0 })
-                        }
-                      />
-                    </Field>
-                  </div>
-                )}
-                <DialogFooter>
-                  <Button
-                    onClick={async () => {
-                      if (!draft?.name.trim()) {
-                        toast.error("Product name is required");
-                        return;
-                      }
-                      const sku =
-                        draft.sku.trim() ||
-                        (autoSku ? nextSku(state.products.map((p) => p.sku)) : "");
-                      try {
-                        // Saved only once the write is confirmed stored.
-                        const target = await upsertProduct({ ...draft, sku });
-                        setDraft(null);
-                        setSkuOverride(false);
-                        toast.success(`Product saved — ${commitLabel(target).toLowerCase()}`);
-                      } catch (e) {
-                        notifyError(e, "Saving the product");
-                      }
-                    }}
-                  >
-                    Save product
-                  </Button>
-                </DialogFooter>
-              </DialogContent>
-            </Dialog>
+                      }}
+                    >
+                      Save product
+                    </Button>
+                  </DialogFooter>
+                </DialogContent>
+              </Dialog>
             )}
           </div>
         </header>
@@ -700,9 +705,7 @@ function Inventory() {
                 <TableHead className="w-10">
                   <Checkbox
                     checked={allShownSelected}
-                    onCheckedChange={(v) =>
-                      setSelected(v ? pageRows.map((p) => p.id) : [])
-                    }
+                    onCheckedChange={(v) => setSelected(v ? pageRows.map((p) => p.id) : [])}
                     aria-label="Select all products"
                   />
                 </TableHead>
@@ -778,7 +781,7 @@ function Inventory() {
                             : ""
                         }`}
                       >
-                      {stockAt(p, currentStore.id)} in stock
+                        {stockAt(p, currentStore.id)} in stock
                       </Badge>
                     </div>
                   </TableCell>
@@ -807,28 +810,28 @@ function Inventory() {
                       <History className="size-4" />
                     </Button>
                     {canEdit && (
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      disabled={deleting.includes(p.id)}
-                      title={deleting.includes(p.id) ? "Checking sales history…" : "Delete"}
-                      onClick={async () => {
-                        setDeleting((d) => [...d, p.id]);
-                        try {
-                          const failed = await removeProduct(p.id);
-                          if (failed.length) setBlocked(failed);
-                          else toast.success("Product removed");
-                        } finally {
-                          setDeleting((d) => d.filter((id) => id !== p.id));
-                        }
-                      }}
-                    >
-                      {deleting.includes(p.id) ? (
-                        <Loader2 className="size-4 animate-spin text-muted-foreground" />
-                      ) : (
-                        <Trash2 className="size-4 text-destructive" />
-                      )}
-                    </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        disabled={deleting.includes(p.id)}
+                        title={deleting.includes(p.id) ? "Checking sales history…" : "Delete"}
+                        onClick={async () => {
+                          setDeleting((d) => [...d, p.id]);
+                          try {
+                            const failed = await removeProduct(p.id);
+                            if (failed.length) setBlocked(failed);
+                            else toast.success("Product removed");
+                          } finally {
+                            setDeleting((d) => d.filter((id) => id !== p.id));
+                          }
+                        }}
+                      >
+                        {deleting.includes(p.id) ? (
+                          <Loader2 className="size-4 animate-spin text-muted-foreground" />
+                        ) : (
+                          <Trash2 className="size-4 text-destructive" />
+                        )}
+                      </Button>
                     )}
                     {canEdit && p.archived && (
                       <Button size="sm" variant="outline" onClick={() => restoreProducts([p.id])}>

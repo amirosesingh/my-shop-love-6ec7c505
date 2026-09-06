@@ -82,10 +82,7 @@ function fieldReader(raw: Record<string, unknown>) {
  * Duplicate codes inside the same file are reported rather than saved twice,
  * and a row that matches a catalogue item is marked as a restock.
  */
-export function planImport(
-  records: Record<string, unknown>[],
-  catalogue: Product[],
-): ParsedImport {
+export function planImport(records: Record<string, unknown>[], catalogue: Product[]): ParsedImport {
   // One pass over the catalogue builds the lookup, instead of scanning the
   // whole catalogue once per row.
   const byCode = new Map<string, Product>();

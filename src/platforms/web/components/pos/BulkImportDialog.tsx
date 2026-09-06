@@ -321,7 +321,9 @@ export function BulkImportDialog({
                       Row {e.line}: {e.reason}
                     </p>
                   ))}
-                  {skipped.length > 4 && <p>+{skipped.length - 4} more — full list in the report</p>}
+                  {skipped.length > 4 && (
+                    <p>+{skipped.length - 4} more — full list in the report</p>
+                  )}
                 </div>
               )}
 

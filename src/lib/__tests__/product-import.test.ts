@@ -102,12 +102,12 @@ describe("planImport", () => {
   });
 
   it("tolerates untidy headers", () => {
-    const plan = planImport([{ " Barcode ": "888", "Product": "x", "NAME": "Tea", "Price": 3 }], []);
+    const plan = planImport([{ " Barcode ": "888", Product: "x", NAME: "Tea", Price: 3 }], []);
     expect(plan.rows[0]).toMatchObject({ barcode: "888", name: "Tea", price: 3 });
   });
 
   it("falls back to a cost when the file has none", () => {
-    const plan = planImport([row({ cost: "" , price: "10" })], []);
+    const plan = planImport([row({ cost: "", price: "10" })], []);
     expect(plan.rows[0].cost).toBe(6);
   });
 });

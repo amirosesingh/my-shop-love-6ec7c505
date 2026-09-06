@@ -64,7 +64,13 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { ScrollArea } from "@/components/ui/scroll-area";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Separator } from "@/components/ui/separator";
 import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from "@/components/ui/sheet";
@@ -74,20 +80,35 @@ import { reserveBillNumber } from "@/lib/bill-number";
 import { useAuth } from "@/lib/pos-auth";
 import { productVisibleAt } from "@/lib/branch-policy";
 import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
-import { BOOKING_TIMING_LABELS, bookingRulesOf, type BookingPaymentTiming } from "@/core/types/pos-types";
+import {
+  BOOKING_TIMING_LABELS,
+  bookingRulesOf,
+  type BookingPaymentTiming,
+} from "@/core/types/pos-types";
 import { useUserPermissions } from "@/lib/pos-permissions";
 import { useVisibility } from "@/lib/ui-visibility";
 import { useUiScale } from "@/lib/use-ui-scale";
-import {
-  discountLabel,
-  loadMemberVouchers,
-  scopeLabel,
-} from "@/lib/coupons";
-import type { Booking, CartLine, DiscountType, IntakeCharge, PaymentMethod, Sale } from "@/core/types/pos-types";
+import { discountLabel, loadMemberVouchers, scopeLabel } from "@/lib/coupons";
+import type {
+  Booking,
+  CartLine,
+  DiscountType,
+  IntakeCharge,
+  PaymentMethod,
+  Sale,
+} from "@/core/types/pos-types";
 import { applyCombo, intakeTotals, newJobTag } from "@/lib/booking-charges";
 import type { Payment } from "@/core/types/pos-types";
 import { TenderSplit } from "@/platforms/web/components/pos/TenderSplit";
-import { lineUnitDiscount, methodLabel, paymentsLabel, paymentsTotal, PAYMENT_LABELS, r2, validateTenders } from "@/core/types/pos-types";
+import {
+  lineUnitDiscount,
+  methodLabel,
+  paymentsLabel,
+  paymentsTotal,
+  PAYMENT_LABELS,
+  r2,
+  validateTenders,
+} from "@/core/types/pos-types";
 import { activePaymentTypes, tenderIcon, usePaymentTypes } from "@/core/types/payment-types";
 import { NO_SALE_REASON_MAX, NO_SALE_REASON_MIN, recordNoSale } from "@/lib/drawer-events";
 
@@ -100,13 +121,21 @@ import { parseAmount, parsePositiveAmount } from "@/core/pricing/amount";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { evaluatePromotions, focLine } from "@/lib/pos-promotions";
 import { clearCartDraft, loadCartDraft, saveCartDraft } from "@/lib/cart-draft";
-import { openCashDrawer, printSaleReceipt, printShiftReport, saleReceiptPreview } from "@/lib/pos-print";
+import {
+  openCashDrawer,
+  printSaleReceipt,
+  printShiftReport,
+  saleReceiptPreview,
+} from "@/lib/pos-print";
 import { ShiftCloseDialog } from "@/platforms/web/components/pos/ShiftCloseDialog";
 import { logSystemAction } from "@/lib/system-audit";
-import { openCustomerDisplay, publishDisplay, toDisplayLine, type DisplaySnapshot } from "@/lib/customer-display";
+import {
+  openCustomerDisplay,
+  publishDisplay,
+  toDisplayLine,
+  type DisplaySnapshot,
+} from "@/lib/customer-display";
 import { MemberHistoryDialog } from "@/platforms/web/components/pos/MemberHistoryDialog";
-
-
 
 export const Route = createFileRoute("/")({
   validateSearch: (
@@ -165,9 +194,11 @@ function Register() {
   /** Parks the open ticket; filled in once the held-orders hook exists. */
   const parkTicket = useRef<(() => { id: string } | null) | null>(null);
   /** The single-use grant claimed when a ticket comes back approved. */
-  const claimedGrant = useRef<{ requestId: string; grantToken: string; amount: number | null } | null>(
-    null,
-  );
+  const claimedGrant = useRef<{
+    requestId: string;
+    grantToken: string;
+    amount: number | null;
+  } | null>(null);
   const askManager = async (request: GateRequest) => {
     const snapshot = ticketSnapshot.current();
     const res = await authorize({
@@ -261,7 +292,7 @@ function Register() {
 
   const [billWidth, setBillWidth] = usePanelWidth("pos.register.billWidth", 420);
   const [deckWidth, setDeckWidth] = usePanelWidth("pos.register.deckWidth", 288);
-  
+
   /** Calculator-style discount pad: index of the cart line, or "bill". */
   const [padTarget, setPadTarget] = useState<number | "bill" | null>(null);
 
@@ -400,10 +431,7 @@ function Register() {
   // One pass over the catalogue instead of one per render — the search dialog
   // gets the same array back until the catalogue or the branch actually change.
   const visibleProducts = useMemo(
-    () =>
-      state.products.filter((p) =>
-        productVisibleAt(state.settings, p, state.currentStoreId),
-      ),
+    () => state.products.filter((p) => productVisibleAt(state.settings, p, state.currentStoreId)),
     [state.products, state.settings, state.currentStoreId],
   );
 
@@ -411,7 +439,6 @@ function Register() {
     () => state.members.find((m) => m.id === memberId) ?? null,
     [state.members, memberId],
   );
-
 
   /* ── Sticky ticket ──────────────────────────────────────────────────────
      The open ticket is stored per store so a refresh, a trip to another page
@@ -434,7 +461,8 @@ function Register() {
     setMemberId(draft.memberId);
     setCoupon((draft.coupon as typeof coupon) ?? null);
     if (draft.billNo) setBillNo(draft.billNo);
-    if (kept.length < draft.lines.length) toast.info("Some items on the saved ticket are no longer in the catalogue");
+    if (kept.length < draft.lines.length)
+      toast.info("Some items on the saved ticket are no longer in the catalogue");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [draftStore, state.products.length]);
 
@@ -470,17 +498,13 @@ function Register() {
       .catch((err) => {
         // Leave the header blank: checkout reserves the number again and will
         // stop the sale if the counter still cannot be stored.
-        toast.error(
-          err instanceof Error ? err.message : "Could not reserve a bill number.",
-        );
+        toast.error(err instanceof Error ? err.message : "Could not reserve a bill number.");
       });
     return () => {
       cancelled = true;
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lines.length, billNo, currentStore.id]);
-
-
 
   const taxSettings = state.settings.tax;
   // Promotions run against the subtotal after line-level discounts.
@@ -504,7 +528,6 @@ function Register() {
     r2(promo.promoDiscount + billCouponDiscount),
   );
   const pointsEarned = member ? Math.max(0, Math.round(totals.total * promo.pointsRate)) : 0;
-
 
   // Keep the qualifying FOC freebie in sync with the open ticket.
   const focId = promo.foc ? `${promo.foc.promo.id}:${promo.foc.product.id}:${promo.foc.qty}` : "";
@@ -661,7 +684,6 @@ function Register() {
         .slice(0, 5)
     : [];
 
-
   /** Adds the product matching a scanned/typed code to the ticket. */
   function scanCode(raw: string) {
     const code = raw.trim();
@@ -753,115 +775,116 @@ function Register() {
     transferRef: "",
   });
 
-  const { saving, lastSale, setLastSale, completeSale, bookAndPayLater, sendSaleOnWhatsApp } = useCheckout({
-    getActiveShift: () => activeShift,
-    getCurrentStore: () => currentStore,
-    getActiveCashier: () => activeCashier,
-    requirePermission,
-    getAuthorization: () =>
-      claimedGrant.current
-        ? { requestId: claimedGrant.current.requestId, approvedBy: null }
-        : null,
-    getLines: () => lines,
-    getTotals: () => totals,
-    getMember: () => member,
-    getMemberId: () => memberId,
-    getCoupon: () => coupon,
-    getVoucherToken: () => voucherToken,
-    getExchangeRef: () => exchangeRef,
-    getPointsEarned: () => pointsEarned,
-    getBillNo: () => billNo,
-    resetCart,
-    setLines,
-    setMemberId,
-    setVoucherToken,
-    getMethod: () => method,
-    getTendered: () => tendered,
-    getTransferRef: () => transferRef,
-    getTenderRef: () => tenderRef,
-    getTenderRefNote: () => tenderRefNote,
-    getBankName: () => bankName,
-    getTenders: () => tenders,
-    getActiveMethodName: () => activeMethodName,
-    getNeedsTenderRef: () => needsTenderRef,
-    resetTender,
-    bookingIntake: {
-      bookOpen,
-      setBookOpen,
-      deposit,
-      setDeposit,
-      depositMethod,
-      setDepositMethod,
-      dueDate,
-      setDueDate,
-      bookName,
-      setBookName,
-      bookPhone,
-      setBookPhone,
-      bookNote,
-      setBookNote,
-      serviceId,
-      setServiceId,
-      customService,
-      setCustomService,
-      payTiming,
-      setPayTiming,
-      bookMode,
-      setBookMode,
-      racketModel,
-      setRacketModel,
-      stringType,
-      setStringType,
-      tensionMain,
-      setTensionMain,
-      tensionCross,
-      setTensionCross,
-      tensionUnit,
-      setTensionUnit,
-      grommetNotes,
-      setGrommetNotes,
-      jobNotes,
-      setJobNotes,
-      promisedAt,
-      setPromisedAt,
-      stencil,
-      setStencil,
-      overgrip,
-      setOvergrip,
-      jobTag,
-      setJobTag,
-      bookingHubOpen,
-      setBookingHubOpen,
-      editBookingId,
-      setEditBookingId,
-      notifyWhatsApp,
-      setNotifyWhatsApp,
-      intakeCharges,
-      setIntakeCharges,
-      liabilityOk,
-      setLiabilityOk,
-      bookMemberQuery,
-      setBookMemberQuery,
-      racketProductId,
-      setRacketProductId,
-      racketCustomerOwned,
-      setRacketCustomerOwned,
-      stringProductId,
-      setStringProductId,
-      stringCustomerOwned,
-      setStringCustomerOwned,
-      labourUnlocked,
-      setLabourUnlocked,
-      labourReason,
-      setLabourReason,
-      resetJobCard,
-    },
-    getWaNumber: () => waNumber,
-    setWaNumber,
-    setWaSending,
-    cartSnapshot,
-    getDisplayBase: () => displayBase,
-  });
+  const { saving, lastSale, setLastSale, completeSale, bookAndPayLater, sendSaleOnWhatsApp } =
+    useCheckout({
+      getActiveShift: () => activeShift,
+      getCurrentStore: () => currentStore,
+      getActiveCashier: () => activeCashier,
+      requirePermission,
+      getAuthorization: () =>
+        claimedGrant.current
+          ? { requestId: claimedGrant.current.requestId, approvedBy: null }
+          : null,
+      getLines: () => lines,
+      getTotals: () => totals,
+      getMember: () => member,
+      getMemberId: () => memberId,
+      getCoupon: () => coupon,
+      getVoucherToken: () => voucherToken,
+      getExchangeRef: () => exchangeRef,
+      getPointsEarned: () => pointsEarned,
+      getBillNo: () => billNo,
+      resetCart,
+      setLines,
+      setMemberId,
+      setVoucherToken,
+      getMethod: () => method,
+      getTendered: () => tendered,
+      getTransferRef: () => transferRef,
+      getTenderRef: () => tenderRef,
+      getTenderRefNote: () => tenderRefNote,
+      getBankName: () => bankName,
+      getTenders: () => tenders,
+      getActiveMethodName: () => activeMethodName,
+      getNeedsTenderRef: () => needsTenderRef,
+      resetTender,
+      bookingIntake: {
+        bookOpen,
+        setBookOpen,
+        deposit,
+        setDeposit,
+        depositMethod,
+        setDepositMethod,
+        dueDate,
+        setDueDate,
+        bookName,
+        setBookName,
+        bookPhone,
+        setBookPhone,
+        bookNote,
+        setBookNote,
+        serviceId,
+        setServiceId,
+        customService,
+        setCustomService,
+        payTiming,
+        setPayTiming,
+        bookMode,
+        setBookMode,
+        racketModel,
+        setRacketModel,
+        stringType,
+        setStringType,
+        tensionMain,
+        setTensionMain,
+        tensionCross,
+        setTensionCross,
+        tensionUnit,
+        setTensionUnit,
+        grommetNotes,
+        setGrommetNotes,
+        jobNotes,
+        setJobNotes,
+        promisedAt,
+        setPromisedAt,
+        stencil,
+        setStencil,
+        overgrip,
+        setOvergrip,
+        jobTag,
+        setJobTag,
+        bookingHubOpen,
+        setBookingHubOpen,
+        editBookingId,
+        setEditBookingId,
+        notifyWhatsApp,
+        setNotifyWhatsApp,
+        intakeCharges,
+        setIntakeCharges,
+        liabilityOk,
+        setLiabilityOk,
+        bookMemberQuery,
+        setBookMemberQuery,
+        racketProductId,
+        setRacketProductId,
+        racketCustomerOwned,
+        setRacketCustomerOwned,
+        stringProductId,
+        setStringProductId,
+        stringCustomerOwned,
+        setStringCustomerOwned,
+        labourUnlocked,
+        setLabourUnlocked,
+        labourReason,
+        setLabourReason,
+        resetJobCard,
+      },
+      getWaNumber: () => waNumber,
+      setWaNumber,
+      setWaSending,
+      cartSnapshot,
+      getDisplayBase: () => displayBase,
+    });
 
   const displayKey = JSON.stringify({
     l: lines.map((l) => [l.productId, l.qty, l.discount, l.discountType, l.foc, l.credit]),
@@ -890,12 +913,12 @@ function Register() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [payOpen, method, transferRef, displayKey]);
 
-
-  const serviceTypes = (state.settings.integrations.serviceTypes ?? []).filter((s2) => s2.active && s2.name.trim());
+  const serviceTypes = (state.settings.integrations.serviceTypes ?? []).filter(
+    (s2) => s2.active && s2.name.trim(),
+  );
   const pickedService = serviceTypes.find((s2) => s2.id === serviceId) ?? null;
   const stringingService = serviceTypes.find((s2) => s2.isStringingJob) ?? null;
   const racketMode = bookMode === "racket";
-
 
   /** Master lists an admin curates in booking settings. */
   const racketModelList = state.settings.integrations.racketModels ?? [];
@@ -1040,7 +1063,9 @@ function Register() {
       toast.error("That booking is no longer on file");
       return;
     }
-    setLines((ls) => ls.map((l) => (l.bookingId === editBookingId ? { ...l, job: updated.job } : l)));
+    setLines((ls) =>
+      ls.map((l) => (l.bookingId === editBookingId ? { ...l, job: updated.job } : l)),
+    );
     setBookOpen(false);
     resetJobCard();
     setBookMode("cart");
@@ -1078,7 +1103,9 @@ function Register() {
     setRacketCustomerOwned(on);
     if (!on) return;
     setRacketProductId("");
-    setIntakeCharges((rows) => rows.filter((r) => !(r.kind === "accessory" && /^racket/i.test(r.name))));
+    setIntakeCharges((rows) =>
+      rows.filter((r) => !(r.kind === "accessory" && /^racket/i.test(r.name))),
+    );
   }
 
   async function pickStringProduct(id: string) {
@@ -1092,7 +1119,9 @@ function Register() {
           toast.error(`${p.name} is out of stock at ${currentStore.name}`);
           return;
         }
-        const reason = window.prompt(`${p.name} shows no stock here. Reason for using it anyway?`)?.trim();
+        const reason = window
+          .prompt(`${p.name} shows no stock here. Reason for using it anyway?`)
+          ?.trim();
         if (!reason) {
           toast.error("A reason is required to use out-of-stock string");
           return;
@@ -1117,7 +1146,9 @@ function Register() {
     if (!on) return;
     setStringProductId("");
     setIntakeCharges((rows) =>
-      rows.map((r) => (r.kind === "string" ? { ...r, price: 0, customerProvided: true, productId: undefined } : r)),
+      rows.map((r) =>
+        r.kind === "string" ? { ...r, price: 0, customerProvided: true, productId: undefined } : r,
+      ),
     );
   }
 
@@ -1159,22 +1190,21 @@ function Register() {
     0,
     state.settings.integrations.categoryMap,
   );
-  const serviceCharge = racketMode
-    ? intake.subtotal
-    : 0;
+  const serviceCharge = racketMode ? intake.subtotal : 0;
   const bookingTotal = r2(totals.total + serviceCharge);
   /* Live deposit breakdown shown on the booking form: what the branch demands
      up front, what the cashier is taking now, and what is left to collect. */
   const bookingMinDeposit = Math.min(minDepositFor(bookingTotal), bookingTotal);
   const bookingPaidNow =
-    payTiming === "collection" ? 0 : payTiming === "now" ? bookingTotal : r2(Math.max(0, Number(deposit || 0)));
+    payTiming === "collection"
+      ? 0
+      : payTiming === "now"
+        ? bookingTotal
+        : r2(Math.max(0, Number(deposit || 0)));
   const bookingBalance = r2(Math.max(0, bookingTotal - bookingPaidNow));
   const bookingDepositShort = bookingMinDeposit > 0 && bookingPaidNow + 0.001 < bookingMinDeposit;
 
-
   /* ── Operation deck helpers ─────────────────────────────────────── */
-
-
 
   /** Arriving from the Hold tickets screen with ?resume=<id>. */
   const { resume, booking: bookingFlow } = Route.useSearch();
@@ -1195,11 +1225,13 @@ function Register() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [bookingFlow]);
 
-
   const splitShares = useMemo(() => {
     const cents = Math.round(balanceDue * 100);
     const base = Math.floor(cents / splitWays);
-    return Array.from({ length: splitWays }, (_, i) => (base + (i < cents - base * splitWays ? 1 : 0)) / 100);
+    return Array.from(
+      { length: splitWays },
+      (_, i) => (base + (i < cents - base * splitWays ? 1 : 0)) / 100,
+    );
   }, [balanceDue, splitWays]);
 
   /** Provisional receipt rendered from the live ticket for the overlay. */
@@ -1223,7 +1255,9 @@ function Register() {
           pointsEarned,
           cashier: activeCashier,
           createdAt: new Date().toISOString(),
-          ...(exchangeRef ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit } : {}),
+          ...(exchangeRef
+            ? { exchangeOfReceiptNo: exchangeRef, exchangeCredit: totals.credit }
+            : {}),
         }
       : lastSale;
     return source ? saleReceiptPreview(source, member, "sale") : "";
@@ -1234,21 +1268,23 @@ function Register() {
 
   const slot_catalog = (
     <>
-          <CatalogPanel
-            storeName={currentStore.name}
-            shiftOpen={!!activeShift}
-            onOpenCatalog={() => setCatalogOpen(true)}
-            onOpenCustomerDisplay={visible("register.customerDisplay") ? openCustomerDisplay : undefined}
-            onOpenShift={() => setOpenShiftOpen(true)}
-            onCloseShift={
-              visible("register.closeShift")
-                ? async () => {
-                    if (!(await requirePermission("can_close_shift"))) return;
-                    setCloseShiftOpen(true);
-                  }
-                : undefined
-            }
-          />
+      <CatalogPanel
+        storeName={currentStore.name}
+        shiftOpen={!!activeShift}
+        onOpenCatalog={() => setCatalogOpen(true)}
+        onOpenCustomerDisplay={
+          visible("register.customerDisplay") ? openCustomerDisplay : undefined
+        }
+        onOpenShift={() => setOpenShiftOpen(true)}
+        onCloseShift={
+          visible("register.closeShift")
+            ? async () => {
+                if (!(await requirePermission("can_close_shift"))) return;
+                setCloseShiftOpen(true);
+              }
+            : undefined
+        }
+      />
     </>
   );
 
@@ -1335,7 +1371,12 @@ function Register() {
             <Repeat className="size-4" /> Exchange
           </Button>
         )}
-        <Button variant="ghost" size="sm" disabled={!lines.length} onClick={() => void clearCart("clear")}>
+        <Button
+          variant="ghost"
+          size="sm"
+          disabled={!lines.length}
+          onClick={() => void clearCart("clear")}
+        >
           <Trash2 className="size-4" /> Clear
         </Button>
       </div>
@@ -1344,251 +1385,276 @@ function Register() {
 
   const slot_scanBar = (
     <>
-              <div className="min-w-0" data-scan-focus>
-                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">Scan barcode</Label>
-                <div className="mt-2">
-                  <ScanBar onScan={scanCode} />
-                </div>
-              </div>
+      <div className="min-w-0" data-scan-focus>
+        <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          Scan barcode
+        </Label>
+        <div className="mt-2">
+          <ScanBar onScan={scanCode} />
+        </div>
+      </div>
     </>
   );
 
   const slot_memberSearch = (
     <>
-              <div className="min-w-0">
-                <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
-                  Search loyalty member
-                </Label>
-                {member ? (
-                  <div className="mt-2 flex items-center gap-2 rounded-md border border-accent/50 bg-accent/10 px-3 py-2">
-                    <BadgeCheck className="size-4 shrink-0 text-accent" />
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-medium">{member.name}</p>
-                      <p className="numeric text-[11px] text-muted-foreground">
-                        {member.code} · {member.tier} · {member.points} pts · {member.phone}
-                      </p>
-                    </div>
+      <div className="min-w-0">
+        <Label className="text-[11px] uppercase tracking-wide text-muted-foreground">
+          Search loyalty member
+        </Label>
+        {member ? (
+          <div className="mt-2 flex items-center gap-2 rounded-md border border-accent/50 bg-accent/10 px-3 py-2">
+            <BadgeCheck className="size-4 shrink-0 text-accent" />
+            <div className="min-w-0 flex-1">
+              <p className="truncate text-sm font-medium">{member.name}</p>
+              <p className="numeric text-[11px] text-muted-foreground">
+                {member.code} · {member.tier} · {member.points} pts · {member.phone}
+              </p>
+            </div>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7 shrink-0"
+              aria-label="Purchase history"
+              onClick={() => setHistoryMemberId(memberId)}
+            >
+              <History className="size-3.5" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-7 shrink-0"
+              aria-label="Detach member"
+              onClick={() => setMemberId(null)}
+            >
+              <X className="size-3.5" />
+            </Button>
+          </div>
+        ) : null}
+        {member && memberVouchers.length ? (
+          <Button
+            variant="outline"
+            size="sm"
+            className="mt-2 h-8 w-full text-xs"
+            onClick={() => setVoucherPickerOpen(true)}
+          >
+            <TicketPercent className="size-3.5" /> Vouchers ({memberVouchers.length})
+          </Button>
+        ) : null}
+        {member ? null : (
+          <>
+            <div className="mt-2 flex items-center gap-2">
+              <div className="relative min-w-0 flex-1">
+                <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  ref={memberInputRef}
+                  value={memberQuery}
+                  onChange={(e) => setMemberQuery(e.target.value)}
+                  placeholder="Phone number or name…"
+                  className="h-10 pl-8 text-sm"
+                />
+              </div>
+              <Button
+                variant="outline"
+                className="h-10 shrink-0"
+                onClick={() => setQuickMemberOpen(true)}
+              >
+                <UserPlus className="size-4" />
+                <span className="hidden sm:inline">New member</span>
+              </Button>
+            </div>
+            <div className="mt-2 space-y-1">
+              {memberMatches.map((m) => (
+                <div
+                  key={m.id}
+                  className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-xs font-medium">{m.name}</p>
+                    <p className="numeric text-[11px] text-muted-foreground">
+                      {m.phone} · {m.points} pts · {m.tier}
+                    </p>
+                  </div>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px]"
+                    onClick={() => setHistoryMemberId(m.id)}
+                  >
+                    <History className="size-3" /> History
+                  </Button>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    className="h-7 text-[11px]"
+                    onClick={() => attachMember(m)}
+                  >
+                    <UserPlus className="size-3" /> Attach
+                  </Button>
+                </div>
+              ))}
+              {memberQuery.trim() && !memberMatches.length && (
+                <div className="space-y-2 py-1">
+                  <p className="text-[11px] text-muted-foreground">
+                    No member matches “{memberQuery}”.
+                  </p>
+                  <div className="flex flex-wrap gap-2">
                     <Button
-                      size="icon"
-                      variant="ghost"
-                      className="size-7 shrink-0"
-                      aria-label="Purchase history"
-                      onClick={() => setHistoryMemberId(memberId)}
+                      size="sm"
+                      variant="outline"
+                      className="h-7 text-[11px]"
+                      onClick={() => {
+                        setMemberQuery("");
+                        memberInputRef.current?.focus();
+                      }}
                     >
-                      <History className="size-3.5" />
+                      <Search className="size-3" /> Search again
                     </Button>
                     <Button
-                      size="icon"
-                      variant="ghost"
-                      className="size-7 shrink-0"
-                      aria-label="Detach member"
-                      onClick={() => setMemberId(null)}
+                      size="sm"
+                      className="h-7 text-[11px]"
+                      onClick={() => setQuickMemberOpen(true)}
                     >
-                      <X className="size-3.5" />
+                      <UserPlus className="size-3" /> Enroll new member
                     </Button>
                   </div>
-                ) : null}
-                {member && memberVouchers.length ? (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    className="mt-2 h-8 w-full text-xs"
-                    onClick={() => setVoucherPickerOpen(true)}
-                  >
-                    <TicketPercent className="size-3.5" /> Vouchers ({memberVouchers.length})
-                  </Button>
-                ) : null}
-                {member ? null : (
-                  <>
-                    <div className="mt-2 flex items-center gap-2">
-                      <div className="relative min-w-0 flex-1">
-                        <Search className="absolute left-3 top-1/2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                          ref={memberInputRef}
-                          value={memberQuery}
-                          onChange={(e) => setMemberQuery(e.target.value)}
-                          placeholder="Phone number or name…"
-                          className="h-10 pl-8 text-sm"
-                        />
-                      </div>
-                      <Button
-                        variant="outline"
-                        className="h-10 shrink-0"
-                        onClick={() => setQuickMemberOpen(true)}
-                      >
-                        <UserPlus className="size-4" />
-                        <span className="hidden sm:inline">New member</span>
-                      </Button>
-                    </div>
-                    <div className="mt-2 space-y-1">
-                      {memberMatches.map((m) => (
-                        <div key={m.id} className="flex items-center gap-2 rounded-md border border-border px-2 py-1.5">
-                          <div className="min-w-0 flex-1">
-                            <p className="truncate text-xs font-medium">{m.name}</p>
-                            <p className="numeric text-[11px] text-muted-foreground">
-                              {m.phone} · {m.points} pts · {m.tier}
-                            </p>
-                          </div>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-[11px]"
-                            onClick={() => setHistoryMemberId(m.id)}
-                          >
-                            <History className="size-3" /> History
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            className="h-7 text-[11px]"
-                            onClick={() => attachMember(m)}
-                          >
-                            <UserPlus className="size-3" /> Attach
-                          </Button>
-                        </div>
-                      ))}
-                      {memberQuery.trim() && !memberMatches.length && (
-                        <div className="space-y-2 py-1">
-                          <p className="text-[11px] text-muted-foreground">
-                            No member matches “{memberQuery}”.
-                          </p>
-                          <div className="flex flex-wrap gap-2">
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              className="h-7 text-[11px]"
-                              onClick={() => {
-                                setMemberQuery("");
-                                memberInputRef.current?.focus();
-                              }}
-                            >
-                              <Search className="size-3" /> Search again
-                            </Button>
-                            <Button
-                              size="sm"
-                              className="h-7 text-[11px]"
-                              onClick={() => setQuickMemberOpen(true)}
-                            >
-                              <UserPlus className="size-3" /> Enroll new member
-                            </Button>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-                  </>
-                )}
-              </div>
+                </div>
+              )}
+            </div>
+          </>
+        )}
+      </div>
     </>
   );
 
   const slot_cartLines = (
     <>
-          <ScrollArea className="min-h-0 flex-1">
-            <div className="divide-y divide-border">
-              {lines.map((l, i) => (
-                <div
-                  key={`${l.credit ? "C" : "S"}-${l.productId}-${i}`}
-                  className={`px-4 py-3 ${l.credit ? "bg-accent/5" : ""}`}
-                >
-                  <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-3">
-                    <div className="min-w-0 flex-1">
-                      <div className="truncate text-sm font-medium">
-                        {l.name}
-                        {l.credit && (
-                          <Badge variant="outline" className="ml-2 text-[10px]">
-                            credit
-                          </Badge>
-                        )}
-                        {l.foc && <Badge className="ml-2 bg-success/15 text-[10px] text-success">FREE PROMO</Badge>}
-                        {l.bookingRef && (
-                          <Badge variant="outline" className="ml-2 text-[10px]">
-                            {l.bookingRef}
-                          </Badge>
-                        )}
-                      </div>
-                      {l.bookingId && (
-                        <div className="mt-1 flex flex-wrap items-center gap-1">
-                          {[
-                            l.job?.racketModel,
-                            l.job?.stringType,
-                            l.job?.tensionMain || l.job?.tensionCross
-                              ? `${l.job?.tensionMain ?? "—"}x${l.job?.tensionCross ?? l.job?.tensionMain ?? "—"} ${l.job?.tensionUnit ?? "lb"}`
-                              : "",
-                            l.job?.stencil ? "stencil" : "",
-                            l.job?.overgrip ? "overgrip" : "",
-                            l.job?.promisedAt ? `ready ${new Date(l.job.promisedAt).toLocaleString()}` : "",
-                          ]
-                            .filter(Boolean)
-                            .map((chip) => (
-                              <Badge key={chip as string} variant="secondary" className="text-[10px] font-normal">
-                                {chip}
-                              </Badge>
-                            ))}
-                          <button
-                            type="button"
-                            className="text-[11px] text-primary underline-offset-2 hover:underline"
-                            onClick={() => editBookingSpecs(l.bookingId!)}
-                          >
-                            Edit specs
-                          </button>
-                        </div>
-                      )}
-                      <p className="numeric text-[11px] text-muted-foreground">
-                        {money(l.price)} · tax {(l.taxRate * 100).toFixed(0)}%
-                      </p>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-1">
-                      <Button size="icon" variant="outline" className="size-8" onClick={() => void setQty(i, -1)}>
-                        <Minus className="size-3" />
-                      </Button>
-                      <span className="numeric w-7 text-center text-sm">{l.qty}</span>
-                      <Button size="icon" variant="outline" className="size-8" onClick={() => void setQty(i, 1)}>
-                        <Plus className="size-3" />
-                      </Button>
-                    </div>
-                    <span
-                      className={`numeric col-span-2 shrink-0 text-right text-sm font-semibold sm:col-span-1 sm:w-24 ${l.credit ? "text-accent" : ""}`}
-                    >
-                      {money((l.price - lineUnitDiscount(l)) * l.qty)}
-                    </span>
+      <ScrollArea className="min-h-0 flex-1">
+        <div className="divide-y divide-border">
+          {lines.map((l, i) => (
+            <div
+              key={`${l.credit ? "C" : "S"}-${l.productId}-${i}`}
+              className={`px-4 py-3 ${l.credit ? "bg-accent/5" : ""}`}
+            >
+              <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2 sm:grid-cols-[minmax(0,1fr)_auto_auto] sm:gap-3">
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-medium">
+                    {l.name}
+                    {l.credit && (
+                      <Badge variant="outline" className="ml-2 text-[10px]">
+                        credit
+                      </Badge>
+                    )}
+                    {l.foc && (
+                      <Badge className="ml-2 bg-success/15 text-[10px] text-success">
+                        FREE PROMO
+                      </Badge>
+                    )}
+                    {l.bookingRef && (
+                      <Badge variant="outline" className="ml-2 text-[10px]">
+                        {l.bookingRef}
+                      </Badge>
+                    )}
                   </div>
-                  {!l.credit && !l.foc && !discountAllowed && (
-                    <div className="mt-2 flex justify-end">
+                  {l.bookingId && (
+                    <div className="mt-1 flex flex-wrap items-center gap-1">
+                      {[
+                        l.job?.racketModel,
+                        l.job?.stringType,
+                        l.job?.tensionMain || l.job?.tensionCross
+                          ? `${l.job?.tensionMain ?? "—"}x${l.job?.tensionCross ?? l.job?.tensionMain ?? "—"} ${l.job?.tensionUnit ?? "lb"}`
+                          : "",
+                        l.job?.stencil ? "stencil" : "",
+                        l.job?.overgrip ? "overgrip" : "",
+                        l.job?.promisedAt
+                          ? `ready ${new Date(l.job.promisedAt).toLocaleString()}`
+                          : "",
+                      ]
+                        .filter(Boolean)
+                        .map((chip) => (
+                          <Badge
+                            key={chip as string}
+                            variant="secondary"
+                            className="text-[10px] font-normal"
+                          >
+                            {chip}
+                          </Badge>
+                        ))}
                       <button
-                        onClick={() => void unlockDiscounts()}
-                        className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+                        type="button"
+                        className="text-[11px] text-primary underline-offset-2 hover:underline"
+                        onClick={() => editBookingSpecs(l.bookingId!)}
                       >
-                        Discount locked · supervisor override
+                        Edit specs
                       </button>
                     </div>
                   )}
-                  {!l.credit && !l.foc && discountAllowed && (
-                    <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-                      <span className="truncate text-[11px] text-muted-foreground">Disc</span>
-                      <ActionButton
-                        layout="inline"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setPadTarget(i)}
-                        className="numeric h-10 min-h-10 max-w-full shrink-0 justify-center gap-2 px-3 text-[11px]"
-                        label={
-                          l.discount
-                            ? `${l.discount}${(l.discountType ?? "amount") === "percent" ? "%" : ""}`
-                            : "Add discount"
-                        }
-                        icon={<Percent className="size-4" />}
-                      />
-                    </div>
-                  )}
+                  <p className="numeric text-[11px] text-muted-foreground">
+                    {money(l.price)} · tax {(l.taxRate * 100).toFixed(0)}%
+                  </p>
                 </div>
-              ))}
-              {!lines.length && (
-                <p className="px-4 py-12 text-center text-sm text-muted-foreground">
-                  Tap a product to start the ticket.
-                </p>
+                <div className="flex shrink-0 items-center gap-1">
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="size-8"
+                    onClick={() => void setQty(i, -1)}
+                  >
+                    <Minus className="size-3" />
+                  </Button>
+                  <span className="numeric w-7 text-center text-sm">{l.qty}</span>
+                  <Button
+                    size="icon"
+                    variant="outline"
+                    className="size-8"
+                    onClick={() => void setQty(i, 1)}
+                  >
+                    <Plus className="size-3" />
+                  </Button>
+                </div>
+                <span
+                  className={`numeric col-span-2 shrink-0 text-right text-sm font-semibold sm:col-span-1 sm:w-24 ${l.credit ? "text-accent" : ""}`}
+                >
+                  {money((l.price - lineUnitDiscount(l)) * l.qty)}
+                </span>
+              </div>
+              {!l.credit && !l.foc && !discountAllowed && (
+                <div className="mt-2 flex justify-end">
+                  <button
+                    onClick={() => void unlockDiscounts()}
+                    className="text-[11px] text-muted-foreground underline-offset-2 hover:underline"
+                  >
+                    Discount locked · supervisor override
+                  </button>
+                </div>
+              )}
+              {!l.credit && !l.foc && discountAllowed && (
+                <div className="mt-2 grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
+                  <span className="truncate text-[11px] text-muted-foreground">Disc</span>
+                  <ActionButton
+                    layout="inline"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setPadTarget(i)}
+                    className="numeric h-10 min-h-10 max-w-full shrink-0 justify-center gap-2 px-3 text-[11px]"
+                    label={
+                      l.discount
+                        ? `${l.discount}${(l.discountType ?? "amount") === "percent" ? "%" : ""}`
+                        : "Add discount"
+                    }
+                    icon={<Percent className="size-4" />}
+                  />
+                </div>
               )}
             </div>
-          </ScrollArea>
+          ))}
+          {!lines.length && (
+            <p className="px-4 py-12 text-center text-sm text-muted-foreground">
+              Tap a product to start the ticket.
+            </p>
+          )}
+        </div>
+      </ScrollArea>
     </>
   );
 
@@ -1614,19 +1680,25 @@ function Register() {
         </div>
       )}
       <Row label="Subtotal" value={money(totals.subtotal)} />
-      {totals.credit > 0 && <Row label={`Store credit #${exchangeRef ?? ""}`} value={`-${money(totals.credit)}`} />}
+      {totals.credit > 0 && (
+        <Row label={`Store credit #${exchangeRef ?? ""}`} value={`-${money(totals.credit)}`} />
+      )}
       {!discountAllowed && (
         <button
           onClick={() => void unlockDiscounts()}
           className="flex w-full min-w-0 items-center justify-between gap-3 text-muted-foreground"
         >
           <span className="min-w-0 truncate">Bill discount</span>
-          <span className="shrink-0 text-[11px] underline-offset-2 hover:underline">locked · supervisor override</span>
+          <span className="shrink-0 text-[11px] underline-offset-2 hover:underline">
+            locked · supervisor override
+          </span>
         </button>
       )}
       {/* Label left, control flush right — sized by its own content so it can
           never push past the panel edge. */}
-      <div className={`flex w-full min-w-0 items-center justify-between gap-3 ${discountAllowed ? "" : "hidden"}`}>
+      <div
+        className={`flex w-full min-w-0 items-center justify-between gap-3 ${discountAllowed ? "" : "hidden"}`}
+      >
         <span className="min-w-0 flex-1 truncate text-muted-foreground">Bill discount</span>
         <ActionButton
           layout="inline"
@@ -1634,15 +1706,25 @@ function Register() {
           size="sm"
           onClick={() => setPadTarget("bill")}
           className="numeric h-10 min-h-10 max-w-full shrink-0 justify-center gap-2 px-3 text-xs"
-          label={cartDiscount ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}` : "Add discount"}
+          label={
+            cartDiscount
+              ? `${cartDiscount}${cartDiscountType === "percent" ? "%" : ""}`
+              : "Add discount"
+          }
           icon={<Percent className="size-4" />}
         />
       </div>
-      {promo.promoDiscount > 0 && <Row label="Promotion discount" value={`-${money(promo.promoDiscount)}`} />}
+      {promo.promoDiscount > 0 && (
+        <Row label="Promotion discount" value={`-${money(promo.promoDiscount)}`} />
+      )}
       <Row label="Discount applied" value={`-${money(totals.discount)}`} />
       {taxSettings.enabled && !!totals.tax && (
         <Row
-          label={taxSettings.mode === "inclusive" ? `Tax ${taxSettings.rate}% (included)` : `Tax ${taxSettings.rate}%`}
+          label={
+            taxSettings.mode === "inclusive"
+              ? `Tax ${taxSettings.rate}% (included)`
+              : `Tax ${taxSettings.rate}%`
+          }
           value={money(totals.tax)}
         />
       )}
@@ -1696,8 +1778,12 @@ function Register() {
 
   const atom_balanceDue = (
     <div className="flex h-full min-w-0 items-center justify-between gap-3 px-4">
-      <span className="text-base font-semibold">{refundDue > 0 ? "Refund due" : "Balance due"}</span>
-      <span className={`numeric text-2xl font-bold ${refundDue > 0 ? "text-accent" : "text-primary"}`}>
+      <span className="text-base font-semibold">
+        {refundDue > 0 ? "Refund due" : "Balance due"}
+      </span>
+      <span
+        className={`numeric text-2xl font-bold ${refundDue > 0 ? "text-accent" : "text-primary"}`}
+      >
         {money(refundDue > 0 ? refundDue : balanceDue)}
       </span>
     </div>
@@ -1745,8 +1831,6 @@ function Register() {
     </div>
   );
 
-
-
   const atom_reprintDeck = lastSale ? (
     <div className="flex flex-wrap items-center gap-2 px-3 py-2">
       {can("can_reprint_bill") && (
@@ -1759,7 +1843,11 @@ function Register() {
           disabled={tillLocked}
           disabledReason={tillLocked ? lockedReason : undefined}
           onClick={() => {
-            printSaleReceipt(lastSale, state.members.find((m) => m.id === lastSale.memberId) ?? null, "duplicate");
+            printSaleReceipt(
+              lastSale,
+              state.members.find((m) => m.id === lastSale.memberId) ?? null,
+              "duplicate",
+            );
             logTicketEvent(TICKET_ACTIONS.reprinted, {
               saleId: lastSale.id,
               receiptNo: lastSale.receiptNo,
@@ -1840,7 +1928,6 @@ function Register() {
     </div>
   );
 
-
   const atom_actHold =
     visible("register.holdOrder") && lines.length > 0 ? (
       <div className="flex h-full min-w-0 items-center px-1">
@@ -1906,7 +1993,10 @@ function Register() {
     <div className="space-y-1 px-2 py-1">
       <div className="flex items-center justify-between">
         <p className="text-[11px] text-muted-foreground">Held orders</p>
-        <Link to="/holds" className="flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline">
+        <Link
+          to="/holds"
+          className="flex items-center gap-1.5 text-[11px] font-medium text-primary hover:underline"
+        >
           Held bills
           <span className="numeric inline-flex min-w-5 items-center justify-center rounded-full bg-primary px-1.5 text-[10px] font-bold text-primary-foreground">
             {held.length}
@@ -1968,7 +2058,9 @@ function Register() {
     <div className="flex h-full min-w-0 items-center justify-between gap-3 rounded-md border border-border px-3 py-2">
       <Label htmlFor="live-receipt" className="text-xs leading-tight">
         Live receipt preview
-        <span className="block text-[11px] font-normal text-muted-foreground">Opens as an overlay</span>
+        <span className="block text-[11px] font-normal text-muted-foreground">
+          Opens as an overlay
+        </span>
       </Label>
       <Switch id="live-receipt" checked={receiptPreview} onCheckedChange={setReceiptPreview} />
     </div>
@@ -2022,102 +2114,103 @@ function Register() {
     <AppShell>
       <ZoomCanvas>
         <RegisterActionsProvider handlers={registerActionHandlers}>
-        <RegisterWorkspace
-          terminalKey={terminalKey}
-          slots={{
-            catalog: slot_catalog,
-            billNumber: atom_billNumber,
-            shiftBadge: atom_shiftBadge,
-            actExchange: atom_actExchange,
-            actClear: atom_actClear,
-            scanBar: slot_scanBar,
-            memberSearch: slot_memberSearch,
-            cartLines: slot_cartLines,
-            totalsBlock: atom_totalsBlock,
-            balanceDue: atom_balanceDue,
-            actCharge: atom_actCharge,
-            actBooking: atom_actBooking,
-            reprintDeck: atom_reprintDeck,
-            actHold: atom_actHold,
-            actVoid: atom_actVoid,
-            actCoupon: atom_actCoupon,
-            actSplit: atom_actSplit,
-            heldList: atom_heldList,
-            actDrawer: atom_actDrawer,
-            receiptToggle: atom_receiptToggle,
-          }}
-          classic={
-      <div className="pos-scaled flex h-full min-h-0 min-w-0 flex-col overflow-hidden lg:flex-row">
-        {/* ── LEFT: product catalog (hidden on narrow windows) ─────────── */}
-        <section className="hidden min-h-0 w-full min-w-0 flex-1 flex-col gap-3 border-b border-border p-4 lg:flex lg:border-b-0">
-          {slot_catalog}
-        </section>
+          <RegisterWorkspace
+            terminalKey={terminalKey}
+            slots={{
+              catalog: slot_catalog,
+              billNumber: atom_billNumber,
+              shiftBadge: atom_shiftBadge,
+              actExchange: atom_actExchange,
+              actClear: atom_actClear,
+              scanBar: slot_scanBar,
+              memberSearch: slot_memberSearch,
+              cartLines: slot_cartLines,
+              totalsBlock: atom_totalsBlock,
+              balanceDue: atom_balanceDue,
+              actCharge: atom_actCharge,
+              actBooking: atom_actBooking,
+              reprintDeck: atom_reprintDeck,
+              actHold: atom_actHold,
+              actVoid: atom_actVoid,
+              actCoupon: atom_actCoupon,
+              actSplit: atom_actSplit,
+              heldList: atom_heldList,
+              actDrawer: atom_actDrawer,
+              receiptToggle: atom_receiptToggle,
+            }}
+            classic={
+              <div className="pos-scaled flex h-full min-h-0 min-w-0 flex-col overflow-hidden lg:flex-row">
+                {/* ── LEFT: product catalog (hidden on narrow windows) ─────────── */}
+                <section className="hidden min-h-0 w-full min-w-0 flex-1 flex-col gap-3 border-b border-border p-4 lg:flex lg:border-b-0">
+                  {slot_catalog}
+                </section>
 
+                {/* Drag bar — widens the bill column, Excel style. */}
+                <ColumnResizer
+                  width={billWidth}
+                  onWidth={setBillWidth}
+                  min={320}
+                  max={760}
+                  label="Resize the bill column"
+                />
 
-        {/* Drag bar — widens the bill column, Excel style. */}
-        <ColumnResizer
-          width={billWidth}
-          onWidth={setBillWidth}
-          min={320}
-          max={760}
-          label="Resize the bill column"
-        />
+                {/* ── CENTER: active bill (drag the bar to resize) ──────────────── */}
+                <section
+                  className="flex min-h-0 w-full flex-col bg-sidebar lg:w-[var(--bill-w)] lg:min-w-[var(--bill-w)] lg:max-w-[var(--bill-w)] lg:shrink-0"
+                  style={{ ["--bill-w" as string]: `${billWidth}px` }}
+                >
+                  {slot_billHeader}
 
-        {/* ── CENTER: active bill (drag the bar to resize) ──────────────── */}
-        <section
-          className="flex min-h-0 w-full flex-col bg-sidebar lg:w-[var(--bill-w)] lg:min-w-[var(--bill-w)] lg:max-w-[var(--bill-w)] lg:shrink-0"
-          style={{ ["--bill-w" as string]: `${billWidth}px` }}
-        >
-          {slot_billHeader}
+                  <div className="@container border-b border-border px-4 py-3">
+                    <div className="grid grid-cols-1 items-start gap-3 @[38rem]:grid-cols-2">
+                      {slot_scanBar}
+                      {slot_memberSearch}
+                    </div>
+                  </div>
 
-          <div className="@container border-b border-border px-4 py-3">
-            <div className="grid grid-cols-1 items-start gap-3 @[38rem]:grid-cols-2">
-              {slot_scanBar}
-              {slot_memberSearch}
-            </div>
-          </div>
+                  {slot_cartLines}
 
-          {slot_cartLines}
+                  {slot_billFooter}
+                </section>
 
-          {slot_billFooter}
-        </section>
-
-        {/* ── RIGHT: operation deck. Below lg it collapses into a bar under
+                {/* ── RIGHT: operation deck. Below lg it collapses into a bar under
             the totals so it can never overlap the Charge buttons. ───────── */}
-        <ColumnResizer
-          width={deckWidth}
-          onWidth={setDeckWidth}
-          min={220}
-          max={560}
-          label="Resize the register actions column"
-        />
+                <ColumnResizer
+                  width={deckWidth}
+                  onWidth={setDeckWidth}
+                  min={220}
+                  max={560}
+                  label="Resize the register actions column"
+                />
 
-        <aside
-          className="@container flex w-full shrink-0 flex-col border-t border-border bg-background lg:w-[var(--deck-w)] lg:border-l lg:border-t-0"
-          style={{ ["--deck-w" as string]: `${deckWidth}px` }}
-        >
-          <button
-            type="button"
-            onClick={() => setDeckOpen((v) => !v)}
-            aria-expanded={deckOpen}
-            className="flex shrink-0 items-center justify-between gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground lg:hidden"
-          >
-            <span>Register actions</span>
-            <ChevronUp className={`size-4 transition-transform ${deckOpen ? "" : "rotate-180"}`} />
-          </button>
-          <div
-            className={`${deckOpen ? "flex" : "hidden"} max-h-[45vh] min-h-0 flex-col gap-3 overflow-y-auto p-3 pt-0 lg:flex lg:max-h-none lg:pt-3`}
-          >
-            {/* Card 1 · transaction actions */}
-            {slot_transactionActions}
+                <aside
+                  className="@container flex w-full shrink-0 flex-col border-t border-border bg-background lg:w-[var(--deck-w)] lg:border-l lg:border-t-0"
+                  style={{ ["--deck-w" as string]: `${deckWidth}px` }}
+                >
+                  <button
+                    type="button"
+                    onClick={() => setDeckOpen((v) => !v)}
+                    aria-expanded={deckOpen}
+                    className="flex shrink-0 items-center justify-between gap-2 px-3 py-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground lg:hidden"
+                  >
+                    <span>Register actions</span>
+                    <ChevronUp
+                      className={`size-4 transition-transform ${deckOpen ? "" : "rotate-180"}`}
+                    />
+                  </button>
+                  <div
+                    className={`${deckOpen ? "flex" : "hidden"} max-h-[45vh] min-h-0 flex-col gap-3 overflow-y-auto p-3 pt-0 lg:flex lg:max-h-none lg:pt-3`}
+                  >
+                    {/* Card 1 · transaction actions */}
+                    {slot_transactionActions}
 
-            {/* Card 2 · device & printing */}
-            {slot_devicePrinting}
-          </div>
-        </aside>
-      </div>
-          }
-        />
+                    {/* Card 2 · device & printing */}
+                    {slot_devicePrinting}
+                  </div>
+                </aside>
+              </div>
+            }
+          />
         </RegisterActionsProvider>
         {/* Unknown scans and manual lookups land in the search & add modal. */}
         <ProductSearchDialog
@@ -2226,7 +2319,9 @@ function Register() {
             {couponScope === "item" && (
               <div className="max-h-40 space-y-1 overflow-auto rounded-md border border-border p-2">
                 {lines.filter((l) => !l.credit && !l.foc).length === 0 && (
-                  <p className="text-[11px] text-muted-foreground">No eligible items in the cart.</p>
+                  <p className="text-[11px] text-muted-foreground">
+                    No eligible items in the cart.
+                  </p>
                 )}
                 {lines
                   .filter((l) => !l.credit && !l.foc)
@@ -2235,7 +2330,9 @@ function Register() {
                       key={l.productId}
                       onClick={() => setCouponLine(l.productId)}
                       className={`flex w-full items-center justify-between rounded px-2 py-1 text-left text-xs ${
-                        couponLine === l.productId ? "bg-primary text-primary-foreground" : "hover:bg-muted"
+                        couponLine === l.productId
+                          ? "bg-primary text-primary-foreground"
+                          : "hover:bg-muted"
                       }`}
                     >
                       <span className="truncate">{l.name}</span>
@@ -2245,8 +2342,8 @@ function Register() {
               </div>
             )}
             <p className="text-[11px] text-muted-foreground">
-              Codes match an active promotion by name. Every application, its scope and the item it touched are written
-              to the audit trail with a timestamp.
+              Codes match an active promotion by name. Every application, its scope and the item it
+              touched are written to the audit trail with a timestamp.
             </p>
           </div>
           <DialogFooter>
@@ -2272,11 +2369,19 @@ function Register() {
             <div className="space-y-1">
               <Label>Split between</Label>
               <div className="flex items-center gap-2">
-                <Button size="icon" variant="outline" onClick={() => setSplitWays((n) => Math.max(2, n - 1))}>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setSplitWays((n) => Math.max(2, n - 1))}
+                >
                   <Minus className="size-3" />
                 </Button>
                 <span className="numeric w-10 text-center text-lg font-semibold">{splitWays}</span>
-                <Button size="icon" variant="outline" onClick={() => setSplitWays((n) => Math.min(12, n + 1))}>
+                <Button
+                  size="icon"
+                  variant="outline"
+                  onClick={() => setSplitWays((n) => Math.min(12, n + 1))}
+                >
                   <Plus className="size-3" />
                 </Button>
                 <span className="text-sm text-muted-foreground">guests</span>
@@ -2339,11 +2444,14 @@ function Register() {
                     <div
                       key={s.id}
                       className={`flex items-center justify-between rounded-md border px-3 py-2 text-sm ${
-                        s.id === currentStore.id ? "border-primary/50 bg-primary/10" : "border-border"
+                        s.id === currentStore.id
+                          ? "border-primary/50 bg-primary/10"
+                          : "border-border"
                       }`}
                     >
                       <span>
-                        {s.name} <span className="text-[11px] text-muted-foreground">({s.code})</span>
+                        {s.name}{" "}
+                        <span className="text-[11px] text-muted-foreground">({s.code})</span>
                       </span>
                       <span
                         className={`numeric font-semibold ${
@@ -2361,7 +2469,8 @@ function Register() {
                 })}
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Stock counts are shared company-wide. Financial metrics stay locked to {currentStore.name}.
+                Stock counts are shared company-wide. Financial metrics stay locked to{" "}
+                {currentStore.name}.
               </p>
             </div>
           )}
@@ -2373,12 +2482,15 @@ function Register() {
         <DialogContent>
           <DialogHeader>
             <DialogTitle>
-              {refundDue > 0 ? `Refund customer · ${money(refundDue)}` : `Take payment · ${money(balanceDue)}`}
+              {refundDue > 0
+                ? `Refund customer · ${money(refundDue)}`
+                : `Take payment · ${money(balanceDue)}`}
             </DialogTitle>
           </DialogHeader>
           {exchangeRef && (
             <p className="rounded-md border border-accent/40 bg-accent/10 px-3 py-2 text-xs">
-              Store credit of {money(totals.credit)} from bill #{exchangeRef} applied to this ticket.
+              Store credit of {money(totals.credit)} from bill #{exchangeRef} applied to this
+              ticket.
             </p>
           )}
           <div className="grid grid-cols-5 gap-2">
@@ -2438,10 +2550,19 @@ function Register() {
           {method === "cash" && refundDue === 0 && (
             <div className="space-y-2">
               <Label>Cash tendered</Label>
-              <Input value={tendered} onChange={(e) => setTendered(e.target.value)} className="numeric h-12 text-xl" />
+              <Input
+                value={tendered}
+                onChange={(e) => setTendered(e.target.value)}
+                className="numeric h-12 text-xl"
+              />
               <div className="flex gap-2">
                 {[balanceDue, 20, 50, 100].map((v, i) => (
-                  <Button key={i} variant="outline" size="sm" onClick={() => setTendered(v.toFixed(2))}>
+                  <Button
+                    key={i}
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setTendered(v.toFixed(2))}
+                  >
                     {money(v)}
                   </Button>
                 ))}
@@ -2480,8 +2601,8 @@ function Register() {
           {method === "bank_transfer" && (
             <div className="space-y-2 rounded-md border border-border p-3">
               <p className="text-xs text-muted-foreground">
-                The customer screen is now showing your bank details and WhatsApp QR code so the shopper can transfer{" "}
-                {money(balanceDue)}.
+                The customer screen is now showing your bank details and WhatsApp QR code so the
+                shopper can transfer {money(balanceDue)}.
               </p>
               <div className="numeric space-y-0.5 text-sm">
                 {state.settings.payment.bankName && <p>{state.settings.payment.bankName}</p>}
@@ -2500,18 +2621,23 @@ function Register() {
           )}
 
           <DialogFooter className="items-center gap-2">
-            {refundDue === 0 && tenders.length > 0 && validateTenders(balanceDue, tenders).error && (
-              <span className="mr-auto text-[11px] font-medium text-destructive">
-                {validateTenders(balanceDue, tenders).error}
-              </span>
-            )}
+            {refundDue === 0 &&
+              tenders.length > 0 &&
+              validateTenders(balanceDue, tenders).error && (
+                <span className="mr-auto text-[11px] font-medium text-destructive">
+                  {validateTenders(balanceDue, tenders).error}
+                </span>
+              )}
             <Button variant="outline" onClick={() => setPayOpen(false)}>
               Cancel
             </Button>
             <Button
               onClick={completeSale}
               disabled={
-                saving || (refundDue === 0 && tenders.length > 0 && !!validateTenders(balanceDue, tenders).error)
+                saving ||
+                (refundDue === 0 &&
+                  tenders.length > 0 &&
+                  !!validateTenders(balanceDue, tenders).error)
               }
             >
               {saving ? "Saving…" : "Complete & print"}
@@ -2619,9 +2745,11 @@ function Register() {
           {billHit && (
             <div className="space-y-3">
               <p className="numeric text-xs text-muted-foreground">
-                {billHit.receiptNo} · {new Date(billHit.createdAt).toLocaleString()} · {money(billHit.total)} ·{" "}
-                {billHit.cashier}
-                {billHit.exchangedToReceiptNo ? ` · already exchanged to ${billHit.exchangedToReceiptNo}` : ""}
+                {billHit.receiptNo} · {new Date(billHit.createdAt).toLocaleString()} ·{" "}
+                {money(billHit.total)} · {billHit.cashier}
+                {billHit.exchangedToReceiptNo
+                  ? ` · already exchanged to ${billHit.exchangedToReceiptNo}`
+                  : ""}
               </p>
               <Separator />
               <div className="max-h-64 space-y-1 overflow-y-auto">
@@ -2637,7 +2765,9 @@ function Register() {
                         type="checkbox"
                         aria-label={`Exchange ${l.name}`}
                         checked={picked > 0}
-                        onChange={(e) => setPicks((p) => ({ ...p, [idx]: e.target.checked ? l.qty : 0 }))}
+                        onChange={(e) =>
+                          setPicks((p) => ({ ...p, [idx]: e.target.checked ? l.qty : 0 }))
+                        }
                         className="size-4 accent-[var(--primary)]"
                       />
                       <div className="min-w-0 flex-1">
@@ -2663,8 +2793,8 @@ function Register() {
                 })}
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Returned items are credited even when their stock at {currentStore.name} is 0 — the stock is added back
-                on completion.
+                Returned items are credited even when their stock at {currentStore.name} is 0 — the
+                stock is added back on completion.
               </p>
             </div>
           )}
@@ -2695,7 +2825,9 @@ function Register() {
               }}
             >
               <span className="font-semibold">🏸 Racket service / stringing</span>
-              <span className="text-xs opacity-80">Racket + string specs, tension, stencil, job tag</span>
+              <span className="text-xs opacity-80">
+                Racket + string specs, tension, stencil, job tag
+              </span>
             </Button>
             <Button
               variant="outline"
@@ -2706,7 +2838,9 @@ function Register() {
               }}
             >
               <span className="font-semibold">🛒 Standard / general booking</span>
-              <span className="text-xs text-muted-foreground">Reserve cart items with a deposit and pickup date</span>
+              <span className="text-xs text-muted-foreground">
+                Reserve cart items with a deposit and pickup date
+              </span>
             </Button>
             <Button
               variant="ghost"
@@ -2737,7 +2871,9 @@ function Register() {
           }
         >
           <DialogHeader>
-            <DialogTitle>{racketMode ? "Racket / stringing booking" : "Book & pay later"}</DialogTitle>
+            <DialogTitle>
+              {racketMode ? "Racket / stringing booking" : "Book & pay later"}
+            </DialogTitle>
           </DialogHeader>
           <div
             className={`-mr-2 flex-1 overflow-y-auto pr-2 ${
@@ -2767,7 +2903,8 @@ function Register() {
               </div>
               {bookingDepositShort && (
                 <p className="mt-1 rounded bg-destructive/10 px-2 py-1 text-[11px] font-medium text-destructive">
-                  This branch needs at least {money(bookingMinDeposit)} up front — {money(bookingPaidNow)} entered.
+                  This branch needs at least {money(bookingMinDeposit)} up front —{" "}
+                  {money(bookingPaidNow)} entered.
                 </p>
               )}
               <p className="mt-1 text-[11px] text-muted-foreground">
@@ -2850,54 +2987,61 @@ function Register() {
                 {intakeCharges.map((c, i) => {
                   const lockedLabour = c.kind === "labor" && !labourUnlocked;
                   return (
-                  <div key={i} className="grid grid-cols-[7rem_minmax(0,1fr)_6rem_1.5rem] items-center gap-1.5">
-                    <ThemedSelect
-                      ariaLabel="Charge type"
-                      value={c.kind}
-                      onChange={(v) =>
-                        setIntakeCharges((rows) =>
-                          rows.map((r, j) => (j === i ? { ...r, kind: v as IntakeCharge["kind"] } : r)),
-                        )
-                      }
-                      options={[
-                        { value: "labor", label: "Labour" },
-                        { value: "string", label: "String" },
-                        { value: "grip", label: "Grip" },
-                        { value: "accessory", label: "Add-on" },
-                      ]}
-                    />
-                    <Input
-                      placeholder="Description"
-                      value={c.name}
-                      onChange={(e) =>
-                        setIntakeCharges((rows) =>
-                          rows.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)),
-                        )
-                      }
-                    />
-                    <Input
-                      className="numeric text-right"
-                      inputMode="decimal"
-                      placeholder="0.00"
-                      disabled={lockedLabour || !!c.customerProvided}
-                      value={c.price ? String(c.price) : ""}
-                      onChange={(e) =>
-                        setIntakeCharges((rows) =>
-                          rows.map((r, j) =>
-                            j === i ? { ...r, price: Math.max(0, Number(e.target.value) || 0) } : r,
-                          ),
-                        )
-                      }
-                    />
-                    <button
-                      type="button"
-                      aria-label="Remove charge"
-                      className="text-muted-foreground hover:text-destructive"
-                      onClick={() => setIntakeCharges((rows) => rows.filter((_, j) => j !== i))}
+                    <div
+                      key={i}
+                      className="grid grid-cols-[7rem_minmax(0,1fr)_6rem_1.5rem] items-center gap-1.5"
                     >
-                      ×
-                    </button>
-                  </div>
+                      <ThemedSelect
+                        ariaLabel="Charge type"
+                        value={c.kind}
+                        onChange={(v) =>
+                          setIntakeCharges((rows) =>
+                            rows.map((r, j) =>
+                              j === i ? { ...r, kind: v as IntakeCharge["kind"] } : r,
+                            ),
+                          )
+                        }
+                        options={[
+                          { value: "labor", label: "Labour" },
+                          { value: "string", label: "String" },
+                          { value: "grip", label: "Grip" },
+                          { value: "accessory", label: "Add-on" },
+                        ]}
+                      />
+                      <Input
+                        placeholder="Description"
+                        value={c.name}
+                        onChange={(e) =>
+                          setIntakeCharges((rows) =>
+                            rows.map((r, j) => (j === i ? { ...r, name: e.target.value } : r)),
+                          )
+                        }
+                      />
+                      <Input
+                        className="numeric text-right"
+                        inputMode="decimal"
+                        placeholder="0.00"
+                        disabled={lockedLabour || !!c.customerProvided}
+                        value={c.price ? String(c.price) : ""}
+                        onChange={(e) =>
+                          setIntakeCharges((rows) =>
+                            rows.map((r, j) =>
+                              j === i
+                                ? { ...r, price: Math.max(0, Number(e.target.value) || 0) }
+                                : r,
+                            ),
+                          )
+                        }
+                      />
+                      <button
+                        type="button"
+                        aria-label="Remove charge"
+                        className="text-muted-foreground hover:text-destructive"
+                        onClick={() => setIntakeCharges((rows) => rows.filter((_, j) => j !== i))}
+                      >
+                        ×
+                      </button>
+                    </div>
                   );
                 })}
                 <div className="flex flex-wrap items-center justify-between gap-2 text-[11px]">
@@ -2932,7 +3076,9 @@ function Register() {
                     key={t}
                     onClick={() => setPayTiming(t)}
                     className={`flex-1 px-2 py-2 text-xs ${
-                      payTiming === t ? "bg-primary/15 text-primary" : "text-muted-foreground hover:text-foreground"
+                      payTiming === t
+                        ? "bg-primary/15 text-primary"
+                        : "text-muted-foreground hover:text-foreground"
                     }`}
                   >
                     {BOOKING_TIMING_LABELS[t]}
@@ -2944,7 +3090,13 @@ function Register() {
               <div className="space-y-1">
                 <Label>Deposit taken now</Label>
                 <Input
-                  value={payTiming === "now" ? bookingTotal.toFixed(2) : payTiming === "collection" ? "0.00" : deposit}
+                  value={
+                    payTiming === "now"
+                      ? bookingTotal.toFixed(2)
+                      : payTiming === "collection"
+                        ? "0.00"
+                        : deposit
+                  }
                   disabled={payTiming !== "deposit"}
                   onChange={(e) => setDeposit(e.target.value)}
                   placeholder="0.00"
@@ -3061,7 +3213,11 @@ function Register() {
                 </div>
                 <div className="space-y-1">
                   <Label>Phone</Label>
-                  <Input value={bookPhone} onChange={(e) => setBookPhone(e.target.value)} className="numeric" />
+                  <Input
+                    value={bookPhone}
+                    onChange={(e) => setBookPhone(e.target.value)}
+                    className="numeric"
+                  />
                 </div>
               </div>
             </div>
@@ -3116,11 +3272,19 @@ function Register() {
                   </div>
                   <div className="flex flex-wrap items-center gap-4 text-xs">
                     <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={stencil} onChange={(e) => setStencil(e.target.checked)} />
+                      <input
+                        type="checkbox"
+                        checked={stencil}
+                        onChange={(e) => setStencil(e.target.checked)}
+                      />
                       Stencil the string
                     </label>
                     <label className="flex items-center gap-2">
-                      <input type="checkbox" checked={overgrip} onChange={(e) => setOvergrip(e.target.checked)} />
+                      <input
+                        type="checkbox"
+                        checked={overgrip}
+                        onChange={(e) => setOvergrip(e.target.checked)}
+                      />
                       Replace overgrip
                     </label>
                     {jobTag && <Badge variant="outline">Job tag {jobTag}</Badge>}
@@ -3213,7 +3377,9 @@ function Register() {
                       }`}
                     >
                       <div className="flex items-center justify-between gap-2">
-                        <p className="text-xs font-medium">Service &amp; high-tension liability terms</p>
+                        <p className="text-xs font-medium">
+                          Service &amp; high-tension liability terms
+                        </p>
                         {highTension ? (
                           <span className="rounded border border-warning/60 px-2 py-0.5 text-[10px] uppercase tracking-wide text-warning">
                             High tension
@@ -3243,7 +3409,9 @@ function Register() {
             {!racketMode && bookingRules.serviceTerms.trim() ? (
               <div className="space-y-2 rounded-md border border-border bg-muted/30 p-3">
                 <p className="text-xs font-medium">Booking terms &amp; conditions</p>
-                <p className="text-[11px] leading-snug text-muted-foreground">{bookingRules.serviceTerms}</p>
+                <p className="text-[11px] leading-snug text-muted-foreground">
+                  {bookingRules.serviceTerms}
+                </p>
                 <label className="flex items-start gap-2 text-xs">
                   <input
                     type="checkbox"
@@ -3258,11 +3426,16 @@ function Register() {
           {racketMode && (
             <div className="flex items-center justify-between gap-4 border-t border-border pt-2 text-sm">
               <span className="text-muted-foreground">
-                Charges total <span className="numeric font-semibold text-foreground">{money(bookingTotal)}</span>
+                Charges total{" "}
+                <span className="numeric font-semibold text-foreground">{money(bookingTotal)}</span>
               </span>
               <span className="text-muted-foreground">
-                Paying now <span className="numeric font-semibold text-foreground">{money(bookingPaidNow)}</span> ·
-                Balance <span className="numeric font-semibold text-primary">{money(bookingBalance)}</span>
+                Paying now{" "}
+                <span className="numeric font-semibold text-foreground">
+                  {money(bookingPaidNow)}
+                </span>{" "}
+                · Balance{" "}
+                <span className="numeric font-semibold text-primary">{money(bookingBalance)}</span>
               </span>
             </div>
           )}
@@ -3291,7 +3464,11 @@ function Register() {
                 (!racketMode && !!bookingRules.serviceTerms.trim() && !liabilityOk)
               }
             >
-              {saving ? "Saving…" : racketMode ? "Save job & print ticket" : "Save pay-later booking"}
+              {saving
+                ? "Saving…"
+                : racketMode
+                  ? "Save job & print ticket"
+                  : "Save pay-later booking"}
             </Button>
           </DialogFooter>
         </DialogContent>
@@ -3408,14 +3585,20 @@ function Register() {
                           ? ` · until ${new Date(v.voucher.expiresAt ?? v.campaign.expiresAt!).toLocaleDateString()}`
                           : ""}
                       </p>
-                      {usable ? null : <p className="text-[11px] text-destructive">{preview.reason}</p>}
+                      {usable ? null : (
+                        <p className="text-[11px] text-destructive">{preview.reason}</p>
+                      )}
                     </div>
-                    <span className="numeric shrink-0 text-sm font-semibold">−{money(preview.value)}</span>
+                    <span className="numeric shrink-0 text-sm font-semibold">
+                      −{money(preview.value)}
+                    </span>
                   </button>
                 );
               })}
             {!memberVouchers.length ? (
-              <p className="py-4 text-center text-sm text-muted-foreground">This member has no live vouchers.</p>
+              <p className="py-4 text-center text-sm text-muted-foreground">
+                This member has no live vouchers.
+              </p>
             ) : null}
           </div>
           <DialogFooter>
@@ -3442,7 +3625,11 @@ function Register() {
         onOpenChange={(o) => !o && setPadTarget(null)}
         title={padTarget === "bill" ? "Bill discount" : "Line discount"}
         value={
-          padTarget === "bill" ? cartDiscount : typeof padTarget === "number" ? (lines[padTarget]?.discount ?? 0) : 0
+          padTarget === "bill"
+            ? cartDiscount
+            : typeof padTarget === "number"
+              ? (lines[padTarget]?.discount ?? 0)
+              : 0
         }
         type={
           padTarget === "bill"
@@ -3476,9 +3663,14 @@ function Register() {
             // Limits come from the database rule set; anything beyond them
             // needs a manager PIN verified on the server.
             const overLimit =
-              t === "percent" ? v > rules.max_cashier_discount_percent : v > rules.max_cart_discount_amount;
+              t === "percent"
+                ? v > rules.max_cashier_discount_percent
+                : v > rules.max_cart_discount_amount;
             const stacking =
-              !rules.allow_discount_stacking && !!coupon && v > 0 && (target === "bill" || typeof target === "number");
+              !rules.allow_discount_stacking &&
+              !!coupon &&
+              v > 0 &&
+              (target === "bill" || typeof target === "number");
 
             if (stacking) {
               toast.error(
