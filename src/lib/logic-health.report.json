@@ -1,6 +1,6 @@
 {
-  "generatedAt": "2026-09-06T05:33:12.814Z",
-  "filesScanned": 601,
+  "generatedAt": "2026-09-06T06:37:18.999Z",
+  "filesScanned": 603,
   "counts": {
     "critical": 4,
     "warning": 2,
@@ -773,9 +773,9 @@
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/lib/db-health.ts:240:No failure handling",
+      "id": "src/lib/db-health.ts:308:No failure handling",
       "file": "src/lib/db-health.ts",
-      "line": 240,
+      "line": 308,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "runDbHealth() awaits work without a try/catch.",
@@ -944,9 +944,9 @@
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/lib/pos-auth.tsx:1014:No failure handling",
+      "id": "src/lib/pos-auth.tsx:1063:No failure handling",
       "file": "src/lib/pos-auth.tsx",
-      "line": 1014,
+      "line": 1063,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "read() awaits work without a try/catch.",
