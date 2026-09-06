@@ -21,6 +21,8 @@ import { applyStockDeltaBatch } from "@/lib/stock-recovery";
 import { canRelay, relayStores } from "@/core/api/sync-relay";
 import { isOperationalTable } from "@/lib/pos-auth-route";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "@/lib/keyset";
+import { readAllPages } from "@/lib/paged-read";
+
 import { isLinkedRecordError, usageBlock, type ProductUsage } from "@/lib/product-delete";
 import type {
   AppSettings,
@@ -899,8 +901,28 @@ export async function loadCloudState(): Promise<CloudSlice> {
   }
 
   const [products, members, sales, promotions, settings, stores, shifts] = await Promise.all([
-    supabase.from("products").select("*").is("deleted_at", null).order("name"),
-    supabase.from("members").select("*").is("deleted_at", null).order("created_at"),
+    // Whole-catalogue reads are paged: a single request is capped at 1,000
+    // rows by the database, which used to hide every item past the first
+    // thousand without reporting anything.
+    readAllPages<Row>((from, to) =>
+      supabase
+        .from("products")
+        .select("*", { count: "exact" })
+        .is("deleted_at", null)
+        .order("name")
+        .order("id")
+        .range(from, to),
+    ),
+    readAllPages<Row>((from, to) =>
+      supabase
+        .from("members")
+        .select("*", { count: "exact" })
+        .is("deleted_at", null)
+        .order("created_at")
+        .order("id")
+        .range(from, to),
+    ),
+
     (async () => {
       const read = () =>
         supabase
@@ -915,7 +937,16 @@ export async function loadCloudState(): Promise<CloudSlice> {
       }
       return first;
     })(),
-    supabase.from("promotions").select("*").is("deleted_at", null).order("created_at"),
+    readAllPages<Row>((from, to) =>
+      supabase
+        .from("promotions")
+        .select("*", { count: "exact" })
+        .is("deleted_at", null)
+        .order("created_at")
+        .order("id")
+        .range(from, to),
+    ),
+
     supabase.from("pos_settings").select("*").eq("id", 1).maybeSingle(),
     // The stores table only exists once supabase/schema.sql has been applied; a
     // missing table must not stop the till from loading. Supabase query
@@ -930,8 +961,17 @@ export async function loadCloudState(): Promise<CloudSlice> {
           const relayed = await relayStores();
           if (relayed.ok) return { data: (relayed.rows as Row[] | undefined) ?? [] };
         }
-        const direct = await supabase.from("stores").select("*").is("deleted_at", null).order("name");
-        if (!direct.error) return { data: (direct.data as Row[] | null) ?? [] };
+        const direct = await readAllPages<Row>((from, to) =>
+          supabase
+            .from("stores")
+            .select("*", { count: "exact" })
+            .is("deleted_at", null)
+            .order("name")
+            .order("id")
+            .range(from, to),
+        );
+        if (!direct.error) return { data: direct.data ?? [] };
+
         // Registered terminals and staff sessions can still recover through
         // the server relay when a direct RLS read is unavailable.
         if (canRelay()) {

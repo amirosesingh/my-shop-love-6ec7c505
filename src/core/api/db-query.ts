@@ -14,18 +14,26 @@ import { effectiveDatabaseMode, isConnectionError } from "@/core/local-db/db-mod
 import { readSnapshot } from "@/lib/offline-snapshot";
 import { lastHealth } from "@/core/activation/connection-health";
 import { noteVersions } from "@/lib/row-versions";
+import { readAllPages } from "@/lib/paged-read";
+
 import type { Row } from "@/lib/sync-outbox";
 
 /** Table names are dynamic here, so the generated row types do not apply. */
 type LooseSelect = {
-  select: (columns: string) => LooseFilter;
+  select: (columns: string, opts?: { count?: "exact" }) => LooseFilter;
 };
-type LooseFilter = PromiseLike<{ data: unknown; error: { message: string } | null }> & {
+type LooseFilter = PromiseLike<{
+  data: unknown;
+  error: { message: string } | null;
+  count?: number | null;
+}> & {
   eq: (column: string, value: unknown) => LooseFilter;
   in: (column: string, values: unknown[]) => LooseFilter;
   order: (column: string, opts: { ascending: boolean }) => LooseFilter;
   limit: (n: number) => LooseFilter;
+  range: (from: number, to: number) => LooseFilter;
 };
+
 
 const from = (table: string) =>
   (supabaseExternal as unknown as { from: (t: string) => LooseSelect }).from(table);
@@ -95,18 +103,39 @@ async function runQuery(
     if (rows) return { rows, source: "local" };
   }
   try {
-    let q = from(table).select(options.columns ?? "*");
-    for (const [k, v] of Object.entries(options.match ?? {})) q = q.eq(k, v);
-    if (options.in) q = q.in(options.in.column, options.in.values);
-    if (options.orderBy)
-      q = q.order(options.orderBy.column, { ascending: options.orderBy.ascending ?? true });
-    if (options.limit) q = q.limit(options.limit);
-    const { data, error } = await q;
-    if (error) throw new Error(error.message);
+    const build = (start: number, end: number) => {
+      let q = from(table).select(options.columns ?? "*", { count: "exact" });
+      for (const [k, v] of Object.entries(options.match ?? {})) q = q.eq(k, v);
+      if (options.in) q = q.in(options.in.column, options.in.values);
+      if (options.orderBy)
+        q = q.order(options.orderBy.column, { ascending: options.orderBy.ascending ?? true });
+      // A deterministic tie-break, or rows can shift between windows.
+      q = q.order("id", { ascending: true });
+      return q.range(start, end) as PromiseLike<{
+
+        data: Row[] | null;
+        error: { message: string } | null;
+        count?: number | null;
+      }>;
+    };
+    // A caller that asked for a capped read gets exactly that; an uncapped
+    // read is paged so the database's 1,000-row response cap cannot silently
+    // truncate a whole table.
+    let data: Row[] | null;
+    if (options.limit) {
+      const res = await build(0, options.limit - 1);
+      if (res.error) throw new Error(res.error.message);
+      data = res.data;
+    } else {
+      const res = await readAllPages<Row>(build);
+      if (res.error) throw new Error(res.error.message);
+      data = res.data;
+    }
     // Remember what version the central copy is on, so a later edit from this
     // till can say which version it was working from.
     noteVersions(table, data);
     return { rows: (data as Row[]) ?? [], source: "cloud" };
+
   } catch (e) {
     const rows = cached();
     // Only a connection-class failure may fall back: a refusal or a bad query
