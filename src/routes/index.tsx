@@ -261,7 +261,7 @@ function Register() {
 
   const [billWidth, setBillWidth] = usePanelWidth("pos.register.billWidth", 420);
   const [deckWidth, setDeckWidth] = usePanelWidth("pos.register.deckWidth", 288);
-  const [category, setCategory] = useState("All");
+  
   /** Calculator-style discount pad: index of the cart line, or "bill". */
   const [padTarget, setPadTarget] = useState<number | "bill" | null>(null);
 
