@@ -52,6 +52,19 @@ export type PosRules = {
   require_pin_shift_close: boolean;
   require_pin_edit_tenders: boolean;
   require_pin_terminal_reset: boolean;
+  /* F · what may be approved while the line is down */
+  allow_offline_approvals: boolean;
+  offline_approval_requires_pin: boolean;
+  online_only_refund: boolean;
+  online_only_void_cart: boolean;
+  online_only_void_line: boolean;
+  online_only_reduce_qty: boolean;
+  online_only_manual_discount: boolean;
+  online_only_price_override: boolean;
+  online_only_stock_adjustment: boolean;
+  online_only_shift_close: boolean;
+  online_only_edit_tenders: boolean;
+  online_only_terminal_reset: boolean;
 };
 
 export type PosRuleKey = keyof PosRules;
