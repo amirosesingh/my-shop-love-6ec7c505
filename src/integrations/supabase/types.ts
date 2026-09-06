@@ -1778,6 +1778,7 @@ export type Database = {
         Row: {
           allow_discount_stacking: boolean | null
           allow_multiple_shifts_per_terminal: boolean | null
+          allow_offline_approvals: boolean
           allow_tax_exemption: boolean | null
           auto_lock_timeout_seconds: number | null
           block_shift_close_on_hold: boolean | null
@@ -1788,6 +1789,17 @@ export type Database = {
           max_cashier_discount_percent: number | null
           max_drawer_cash_limit: number | null
           max_refund_days_limit: number | null
+          offline_approval_requires_pin: boolean
+          online_only_edit_tenders: boolean
+          online_only_manual_discount: boolean
+          online_only_price_override: boolean
+          online_only_reduce_qty: boolean
+          online_only_refund: boolean
+          online_only_shift_close: boolean
+          online_only_stock_adjustment: boolean
+          online_only_terminal_reset: boolean
+          online_only_void_cart: boolean
+          online_only_void_line: boolean
           prevent_below_cost_sale: boolean | null
           prevent_negative_stock_sale: boolean | null
           require_counted_cash_on_close: boolean | null
@@ -1822,6 +1834,7 @@ export type Database = {
         Insert: {
           allow_discount_stacking?: boolean | null
           allow_multiple_shifts_per_terminal?: boolean | null
+          allow_offline_approvals?: boolean
           allow_tax_exemption?: boolean | null
           auto_lock_timeout_seconds?: number | null
           block_shift_close_on_hold?: boolean | null
@@ -1832,6 +1845,17 @@ export type Database = {
           max_cashier_discount_percent?: number | null
           max_drawer_cash_limit?: number | null
           max_refund_days_limit?: number | null
+          offline_approval_requires_pin?: boolean
+          online_only_edit_tenders?: boolean
+          online_only_manual_discount?: boolean
+          online_only_price_override?: boolean
+          online_only_reduce_qty?: boolean
+          online_only_refund?: boolean
+          online_only_shift_close?: boolean
+          online_only_stock_adjustment?: boolean
+          online_only_terminal_reset?: boolean
+          online_only_void_cart?: boolean
+          online_only_void_line?: boolean
           prevent_below_cost_sale?: boolean | null
           prevent_negative_stock_sale?: boolean | null
           require_counted_cash_on_close?: boolean | null
@@ -1866,6 +1890,7 @@ export type Database = {
         Update: {
           allow_discount_stacking?: boolean | null
           allow_multiple_shifts_per_terminal?: boolean | null
+          allow_offline_approvals?: boolean
           allow_tax_exemption?: boolean | null
           auto_lock_timeout_seconds?: number | null
           block_shift_close_on_hold?: boolean | null
@@ -1876,6 +1901,17 @@ export type Database = {
           max_cashier_discount_percent?: number | null
           max_drawer_cash_limit?: number | null
           max_refund_days_limit?: number | null
+          offline_approval_requires_pin?: boolean
+          online_only_edit_tenders?: boolean
+          online_only_manual_discount?: boolean
+          online_only_price_override?: boolean
+          online_only_reduce_qty?: boolean
+          online_only_refund?: boolean
+          online_only_shift_close?: boolean
+          online_only_stock_adjustment?: boolean
+          online_only_terminal_reset?: boolean
+          online_only_void_cart?: boolean
+          online_only_void_line?: boolean
           prevent_below_cost_sale?: boolean | null
           prevent_negative_stock_sale?: boolean | null
           require_counted_cash_on_close?: boolean | null
