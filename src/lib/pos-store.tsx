@@ -112,6 +112,18 @@ import {
   type SettingsSectionId,
 } from "./settings-sections";
 import { schedulePersist } from "./pos-persist";
+import {
+  batches,
+  DEFAULT_BATCH_SIZE,
+  importFailureReason,
+  type ImportProductsOptions,
+  type ImportProductsResult,
+  type ImportRow,
+} from "./product-import";
+import { productCodes } from "./product-lookup";
+import { nextSku, readSkuSettings } from "./sku";
+
+
 
 const KEY = "pos-state-v2";
 
@@ -298,6 +310,12 @@ type Ctx = {
 
   deleteBooking: (id: string, reason: string) => Promise<void>;
   upsertProduct: (product: Product) => Promise<CommitTarget>;
+  /** Save a whole spreadsheet of products in batches, accounting for every row. */
+  importProducts: (
+    rows: ImportRow[],
+    options?: ImportProductsOptions,
+  ) => Promise<ImportProductsResult>;
+
   removeProduct: (id: string) => Promise<BlockedDelete[]>;
   removeProducts: (ids: string[]) => Promise<BlockedDelete[]>;
   patchProducts: (ids: string[], patch: Partial<Product>) => void;
@@ -1796,6 +1814,182 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
+   * Saves a whole spreadsheet of products in batches.
+   *
+   * A large import used to save one item at a time, which meant thousands of
+   * separate database round trips, audit entries and screen updates back to
+   * back — enough to make the till unusable and to leave the job half done. It
+   * now goes out in groups: the same branch-ownership, catalogue and audit
+   * rules apply, they are simply applied to a group instead of to a single row.
+   *
+   * Each group is reported back as soon as it is genuinely stored, so an
+   * interrupted import knows exactly where it got to.
+   */
+  const importProducts = useCallback(
+    async (rows: ImportRow[], options: ImportProductsOptions = {}): Promise<ImportProductsResult> => {
+      const size = options.batchSize ?? DEFAULT_BATCH_SIZE;
+      const storeId = stateRef.current.currentStoreId;
+      const skipKeys = new Set(options.alreadyDone ?? []);
+      const todo = rows.filter((r) => !skipKeys.has(r.key));
+
+      const result: ImportProductsResult = {
+        created: 0,
+        restocked: 0,
+        failed: [],
+        pending: [],
+        savedKeys: [],
+      };
+      if (!todo.length) return result;
+
+      const privateCatalogue = branchPolicy(stateRef.current.settings, storeId).privateCatalogue;
+      const autoSku = readSkuSettings().mode === "auto";
+      // One running list of codes, so the auto numbering never has to re-scan
+      // the catalogue per row.
+      const skuPool = stateRef.current.products.map((p) => p.sku);
+      const storeIds = stateRef.current.stores.map((s) => s.id);
+
+      // Index the catalogue once for the whole import.
+      const byCode = new Map<string, Product>();
+      for (const p of stateRef.current.products) {
+        for (const code of productCodes(p)) if (!byCode.has(code)) byCode.set(code, p);
+      }
+
+      const newOwners: Record<string, string> = {};
+      let done = 0;
+
+      for (const group of batches(todo, size)) {
+        const records: Product[] = [];
+        const createdInGroup: ImportRow[] = [];
+        const restockedInGroup: ImportRow[] = [];
+
+        for (const row of group) {
+          const hit = byCode.get(row.key);
+          if (hit) {
+            const record: Product = {
+              ...hit,
+              stockByStore: {
+                ...hit.stockByStore,
+                [storeId]: (hit.stockByStore?.[storeId] ?? 0) + row.stock,
+              },
+              customPoints: row.customPoints || hit.customPoints,
+            };
+            for (const id of storeIds) {
+              if (record.stockByStore[id] === undefined) record.stockByStore[id] = 0;
+            }
+            records.push(record);
+            restockedInGroup.push(row);
+            byCode.set(row.key, record);
+          } else {
+            const sku = autoSku ? nextSku(skuPool) : row.barcode;
+            skuPool.push(sku);
+            const record: Product = {
+              id: crypto.randomUUID(),
+              name: row.name,
+              sku,
+              barcode: row.barcode,
+              category: row.category,
+              price: row.price,
+              cost: row.cost,
+              ecomPrice: row.price,
+              ecomVisible: false,
+              stockByStore: Object.fromEntries(
+                storeIds.map((id) => [id, id === storeId ? row.stock : 0]),
+              ),
+              reorderLevel: 10,
+              taxRate: 0.05,
+              customPoints: row.customPoints,
+              ...(privateCatalogue ? { ownerStoreId: storeId } : {}),
+            };
+            if (privateCatalogue) newOwners[record.id] = storeId;
+            records.push(record);
+            createdInGroup.push(row);
+            byCode.set(row.key, record);
+          }
+        }
+
+        try {
+          // Nothing on screen says "saved" until the database has it.
+          await db.commitProducts(records);
+        } catch (e) {
+          const reason = importFailureReason(e);
+          for (const row of group) {
+            result.failed.push({
+              line: row.line,
+              barcode: row.barcode,
+              name: row.name,
+              reason,
+            });
+          }
+          done += group.length;
+          options.onProgress?.(done, todo.length);
+          if (options.stopOnBatchFailure) {
+            for (const row of todo.slice(done)) {
+              result.pending.push({
+                line: row.line,
+                barcode: row.barcode,
+                name: row.name,
+                reason: "Not attempted — the import stopped after a failed batch",
+              });
+            }
+            break;
+          }
+          continue;
+        }
+
+        result.created += createdInGroup.length;
+        result.restocked += restockedInGroup.length;
+        const keys = group.map((r) => r.key);
+        result.savedKeys.push(...keys);
+
+        // One trail entry per batch instead of one per row; the import report
+        // keeps the line-by-line detail.
+        logger.log("inventory_edit", "Products imported", "inventory", {
+          importId: options.importId ?? null,
+          storeId,
+          created: createdInGroup.length,
+          restocked: restockedInGroup.length,
+          lines: `${group[0]?.line}-${group[group.length - 1]?.line}`,
+          names: group.slice(0, 5).map((r) => r.name),
+        });
+
+        const merged = new Map(records.map((p) => [p.id, p]));
+        setState((s) => {
+          const next = s.products.map((p) => merged.get(p.id) ?? p);
+          const known = new Set(s.products.map((p) => p.id));
+          const fresh = records.filter((p) => !known.has(p.id));
+          return { ...s, products: fresh.length ? [...fresh, ...next] : next };
+        });
+
+        done += group.length;
+        options.onProgress?.(done, todo.length);
+        options.onBatchSaved?.(keys, {
+          created: result.created,
+          restocked: result.restocked,
+        });
+        // Hand the screen back between batches so the window stays alive.
+        await new Promise((r) => setTimeout(r, 0));
+      }
+
+      if (Object.keys(newOwners).length) {
+        updateSettingsRef.current?.({
+          integrations: {
+            ...stateRef.current.settings.integrations,
+            productOwners: {
+              ...(stateRef.current.settings.integrations.productOwners ?? {}),
+              ...newOwners,
+            },
+          },
+        });
+      }
+
+      return result;
+    },
+    [],
+  );
+
+
+
+  /**
    * Deletes products that the database will actually let go of.
    *
    * Anything still referenced by past bills or paperwork is kept on screen and
@@ -2734,6 +2928,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
     setBookingJobStatus,
     updateBookingSpecs,
     upsertProduct,
+    importProducts,
+
     removeProduct,
     syncProducts,
     removeProducts,

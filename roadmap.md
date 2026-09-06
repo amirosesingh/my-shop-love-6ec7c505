@@ -48,3 +48,17 @@
 
 
 - Emergency codes admin screen (/settings/emergency-codes): tills escrow their recovery secret encrypted; owner-only reveal returns only the live six digits; per-company master salt replaces the build-time salt. (v1.3.99)
+
+## Performance & import overhaul (v1.3.156) — in progress
+- [x] Import engine rebuilt: `src/lib/product-import.ts` (parse/validate/dedupe in one pass),
+      `src/lib/import-journal.ts` (resume notebook), `importProducts` batch saver in the store
+- [x] Bulk import dialog: batched progress, resume of an interrupted run, row-level result
+      (created / restocked / skipped / failed / pending) + downloadable report, capped preview
+- [x] Inventory screen: debounced search, memoised row/selection/stock passes
+- [x] Till screen: removed a dead full-catalogue filter running on every render; memoised the
+      visible-product list and member lookup
+- [ ] Local barcode/code lookup index and virtualised product lists
+- [ ] Report/dashboard aggregation moved database-side
+- [ ] Startup: name the failing step instead of "POS did not start correctly"
+- [ ] Sync worker consolidation, realtime subscription dedupe, timer/listener leak sweep
+- [ ] 1,700-row import stress measurement + before/after report

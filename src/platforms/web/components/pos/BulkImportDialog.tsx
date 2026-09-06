@@ -1,9 +1,15 @@
-import { useRef, useState } from "react";
-import { AlertTriangle, CheckCircle2, Download, FileSpreadsheet, UploadCloud } from "lucide-react";
+import { useCallback, useRef, useState } from "react";
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Download,
+  FileSpreadsheet,
+  RotateCcw,
+  UploadCloud,
+} from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
-import { nextSku, readSkuSettings } from "@/lib/sku";
 import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
@@ -20,32 +26,18 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { money, stockAt, usePos } from "@/lib/pos-store";
-import { resolveByBarcode } from "@/lib/product-lookup";
-import type { Product } from "@/core/types/pos-types";
-
-export type ImportRow = {
-  barcode: string;
-  name: string;
-  price: number;
-  cost: number;
-  category: string;
-  stock: number;
-  customPoints: number;
-  existing: boolean;
-};
-
-type ErrorRow = { row: number; reason: string };
-
-const HEADERS = [
-  "barcode",
-  "name",
-  "price",
-  "cost",
-  "category",
-  "stock_quantity",
-  "custom_points",
-] as const;
+import { money, usePos } from "@/lib/pos-store";
+import {
+  DEFAULT_BATCH_SIZE,
+  IMPORT_HEADERS,
+  describeOutcome,
+  outcomeReportRows,
+  planImport,
+  type ImportOutcome,
+  type ImportRow,
+  type RejectedRow,
+} from "@/lib/product-import";
+import { clearRun, findUnfinished, saveRun, type ImportRun } from "@/lib/import-journal";
 
 const TEMPLATE_ROWS = [
   ["8901234500011", "Colombian Whole Bean 1kg", 24, 14.5, "Coffee", 40, 2],
@@ -53,17 +45,15 @@ const TEMPLATE_ROWS = [
   ["8901234500035", "Cold Brew Concentrate 500ml", 9.75, 4.4, "Drinks", 60, 1],
 ];
 
+/** Only this many rows are drawn in the preview; a big file must not freeze it. */
+const PREVIEW_LIMIT = 100;
+
 function templateSheet() {
-  const ws = XLSX.utils.aoa_to_sheet([[...HEADERS], ...TEMPLATE_ROWS]);
+  const ws = XLSX.utils.aoa_to_sheet([[...IMPORT_HEADERS], ...TEMPLATE_ROWS]);
   const wb = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(wb, ws, "Products");
   return wb;
 }
-
-const num = (v: unknown) => {
-  const n = Number(String(v ?? "").replace(/[^0-9.\-]/g, ""));
-  return Number.isFinite(n) ? n : 0;
-};
 
 export function BulkImportDialog({
   open,
@@ -72,142 +62,161 @@ export function BulkImportDialog({
   open: boolean;
   onOpenChange: (o: boolean) => void;
 }) {
-  const { state, currentStore, upsertProduct } = usePos();
+  const { state, currentStore, importProducts } = usePos();
   const inputRef = useRef<HTMLInputElement>(null);
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
-  const [parsing, setParsing] = useState(false);
+  const [busy, setBusy] = useState<"" | "reading" | "saving">("");
   const [rows, setRows] = useState<ImportRow[] | null>(null);
-  const [errors, setErrors] = useState<ErrorRow[]>([]);
-  const [summary, setSummary] = useState<{ added: number; updated: number; errors: ErrorRow[] } | null>(
-    null,
-  );
+  const [skipped, setSkipped] = useState<RejectedRow[]>([]);
+  const [outcome, setOutcome] = useState<ImportOutcome | null>(null);
+  const [resume, setResume] = useState<ImportRun | null>(null);
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState("");
 
-  function reset() {
+  const reset = useCallback(() => {
     setRows(null);
-    setErrors([]);
+    setSkipped([]);
     setProgress(0);
     setProgressLabel("");
-    setParsing(false);
+    setBusy("");
     setFileName("");
-  }
+    setResume(null);
+  }, []);
 
   function downloadTemplate(kind: "xlsx" | "csv") {
-    const wb = templateSheet();
-    XLSX.writeFile(wb, `inventory-import-template.${kind}`, { bookType: kind });
+    XLSX.writeFile(templateSheet(), `inventory-import-template.${kind}`, { bookType: kind });
+  }
+
+  function downloadReport(o: ImportOutcome) {
+    const ws = XLSX.utils.aoa_to_sheet(outcomeReportRows(o));
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Rows not imported");
+    XLSX.writeFile(wb, `import-report-${o.importId.slice(0, 8)}.xlsx`);
   }
 
   async function handleFile(file: File) {
     setFileName(file.name);
-    setParsing(true);
+    setBusy("reading");
     setRows(null);
-    setErrors([]);
-    setSummary(null);
-    setProgress(2);
-    setProgressLabel("Reading file…");
+    setSkipped([]);
+    setOutcome(null);
+    setProgress(4);
+    setProgressLabel("Reading the file…");
 
     let records: Record<string, unknown>[] = [];
     try {
       const buf = await file.arrayBuffer();
+      // Let the reading message paint before the parser takes the thread.
+      await new Promise((r) => setTimeout(r, 0));
       const wb = XLSX.read(buf, { type: "array" });
       const sheet = wb.Sheets[wb.SheetNames[0]];
       records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
     } catch {
-      setParsing(false);
+      setBusy("");
       toast.error("Could not read that file — use the .xlsx or .csv template");
       return;
     }
 
-    const parsed: ImportRow[] = [];
-    const bad: ErrorRow[] = [];
-    const total = records.length || 1;
+    setProgress(60);
+    setProgressLabel(`Checking ${records.length} rows…`);
+    await new Promise((r) => setTimeout(r, 0));
 
-    for (let i = 0; i < records.length; i++) {
-      const raw = records[i];
-      const key = (k: string) =>
-        Object.entries(raw).find(([h]) => h.trim().toLowerCase().replace(/\s+/g, "_") === k)?.[1];
-      const barcode = String(key("barcode") ?? key("sku") ?? "").trim();
-      const name = String(key("name") ?? "").trim();
-      if (!barcode || !name) {
-        bad.push({ row: i + 2, reason: !barcode ? "Missing barcode" : "Missing product name" });
-      } else {
-        const price = num(key("price"));
-        parsed.push({
-          barcode,
-          name,
-          price,
-          cost: num(key("cost")) || Number((price * 0.6).toFixed(2)),
-          category: String(key("category") ?? "Imported").trim() || "Imported",
-          stock: Math.round(num(key("stock_quantity"))),
-          customPoints: num(key("custom_points")),
-          existing: !!resolveByBarcode(state.products, barcode),
-        });
-      }
-      const pct = Math.round(((i + 1) / total) * 100);
-      setProgress(pct);
-      setProgressLabel(`Importing row ${i + 1} of ${records.length}… ${pct}% complete`);
-      // yield to the browser so the progress bar paints live
-      if (i % 5 === 0) await new Promise((r) => setTimeout(r, 12));
-    }
+    // One pass over the file, one pass over the catalogue — no per-row scans.
+    const plan = planImport(records, state.products);
 
-    setParsing(false);
-    setErrors(bad);
-    setRows(parsed);
-    if (!parsed.length) toast.error("No valid product rows found in that file");
+    setProgress(100);
+    setBusy("");
+    setSkipped(plan.skipped);
+    setRows(plan.rows);
+    setResume(findUnfinished(file.name, currentStore.id) ?? null);
+    if (!plan.rows.length) toast.error("No usable product rows found in that file");
   }
 
-  function confirm() {
+  async function run(continueRun: ImportRun | null) {
     if (!rows?.length) return;
-    let added = 0;
-    let updated = 0;
-    for (const r of rows) {
-      const hit = resolveByBarcode(state.products, r.barcode);
-      if (hit) {
-        upsertProduct({
-          ...hit,
-          stockByStore: {
-            ...hit.stockByStore,
-            [currentStore.id]: stockAt(hit, currentStore.id) + r.stock,
-          },
-          customPoints: r.customPoints || hit.customPoints,
-        });
-        updated += 1;
-      } else {
-        const product: Product = {
-          id: crypto.randomUUID(),
-          name: r.name,
-          sku:
-            readSkuSettings().mode === "auto"
-              ? nextSku(state.products.map((p) => p.sku))
-              : r.barcode,
-          barcode: r.barcode,
-          category: r.category,
-          price: r.price,
-          cost: r.cost,
-          ecomPrice: r.price,
-          ecomVisible: false,
-          stockByStore: Object.fromEntries(
-            state.stores.map((s) => [s.id, s.id === currentStore.id ? r.stock : 0]),
-          ),
-          reorderLevel: 10,
-          taxRate: 0.05,
-          customPoints: r.customPoints,
-        };
-        upsertProduct(product);
-        added += 1;
-      }
+    const importId = continueRun?.importId ?? crypto.randomUUID();
+    const startedAt = continueRun?.startedAt ?? new Date().toISOString();
+    const done = new Set(continueRun?.done ?? []);
+    const total = rows.length + skipped.length;
+
+    setBusy("saving");
+    setProgress(0);
+    setProgressLabel(`Saving ${rows.length - done.size} products…`);
+
+    const journal: ImportRun = {
+      importId,
+      fileName,
+      storeId: currentStore.id,
+      startedAt,
+      updatedAt: startedAt,
+      total,
+      created: continueRun?.created ?? 0,
+      restocked: continueRun?.restocked ?? 0,
+      done: [...done],
+      skipped,
+      failed: [],
+      pending: [],
+    };
+    saveRun(journal);
+
+    const result = await importProducts(rows, {
+      importId,
+      batchSize: DEFAULT_BATCH_SIZE,
+      alreadyDone: [...done],
+      onProgress: (saved, count) => {
+        const pct = Math.round((saved / Math.max(1, count)) * 100);
+        setProgress(pct);
+        setProgressLabel(`Saved ${saved} of ${count} products… ${pct}%`);
+      },
+      // Written down as each batch lands, so a crash never loses the trail.
+      onBatchSaved: (keys, totals) => {
+        journal.done.push(...keys);
+        journal.created = (continueRun?.created ?? 0) + totals.created;
+        journal.restocked = (continueRun?.restocked ?? 0) + totals.restocked;
+        saveRun(journal);
+      },
+    });
+
+    const finished: ImportOutcome = {
+      importId,
+      fileName,
+      startedAt,
+      finishedAt: new Date().toISOString(),
+      total,
+      created: journal.created,
+      restocked: journal.restocked,
+      skipped,
+      failed: result.failed,
+      pending: result.pending,
+    };
+    journal.failed = result.failed;
+    journal.pending = result.pending;
+    if (!result.failed.length && !result.pending.length) {
+      journal.finishedAt = finished.finishedAt;
+      saveRun(journal);
+      clearRun(importId);
+    } else {
+      saveRun(journal);
     }
-    setSummary({ added, updated, errors });
-    toast.success(`Imported ${rows.length} rows · ${added} new, ${updated} restocked`);
+
+    setBusy("");
+    setOutcome(finished);
+    if (result.failed.length || result.pending.length) {
+      toast.error(describeOutcome(finished));
+    } else {
+      toast.success(describeOutcome(finished));
+    }
   }
+
+  const preview = rows?.slice(0, PREVIEW_LIMIT) ?? [];
 
   return (
     <>
       <Dialog
-        open={open && !summary}
+        open={open && !outcome}
         onOpenChange={(o) => {
+          if (busy) return; // never close mid-save
           if (!o) reset();
           onOpenChange(o);
         }}
@@ -220,7 +229,7 @@ export function BulkImportDialog({
             </DialogDescription>
           </DialogHeader>
 
-          {!rows && !parsing && (
+          {!rows && !busy && (
             <>
               <div
                 onDragOver={(e) => {
@@ -262,46 +271,62 @@ export function BulkImportDialog({
                   onClick={() => downloadTemplate("xlsx")}
                   className="text-xs text-primary underline-offset-4 hover:underline"
                 >
-                  📥 Download Excel template (.xlsx)
+                  Download Excel template (.xlsx)
                 </button>
                 <button
                   onClick={() => downloadTemplate("csv")}
                   className="text-xs text-primary underline-offset-4 hover:underline"
                 >
-                  📥 Download CSV template
+                  Download CSV template
                 </button>
               </div>
               <p className="text-[11px] text-muted-foreground">
-                Expected headers: {HEADERS.join(" · ")}
+                Expected headers: {IMPORT_HEADERS.join(" · ")}
               </p>
             </>
           )}
 
-          {parsing && (
+          {busy && (
             <div className="space-y-2">
               <p className="flex items-center gap-2 text-sm text-success">
-                <FileSpreadsheet className="size-4" /> {progressLabel || "Parsing spreadsheet data…"}
+                <FileSpreadsheet className="size-4" /> {progressLabel}
               </p>
               <Progress value={progress} className="h-2 [&>div]:bg-success" />
+              <p className="text-[11px] text-muted-foreground">
+                Keep this window open — progress is written down as it goes, so an interruption
+                never loses what was already saved.
+              </p>
             </div>
           )}
 
-          {rows && (
+          {rows && !busy && (
             <div className="space-y-3">
               <p className="text-xs text-muted-foreground">
-                {fileName} · {rows.length} valid rows
-                {errors.length ? ` · ${errors.length} rows with errors` : ""}
+                {fileName} · {rows.length} rows ready
+                {skipped.length ? ` · ${skipped.length} rows cannot be imported` : ""}
               </p>
-              {errors.length > 0 && (
-                <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                  {errors.slice(0, 4).map((e) => (
-                    <p key={e.row}>
-                      Row {e.row}: {e.reason}
-                    </p>
-                  ))}
-                  {errors.length > 4 && <p>+{errors.length - 4} more…</p>}
+
+              {resume && (
+                <div className="rounded-md border border-warning/40 bg-warning/10 px-3 py-2 text-xs">
+                  An earlier run of this file stopped after {resume.done.length} rows. Continue and
+                  only the remaining {Math.max(0, rows.length - resume.done.length)} are saved —
+                  nothing is created twice.
                 </div>
               )}
+
+              {skipped.length > 0 && (
+                <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
+                  {skipped.slice(0, 4).map((e) => (
+                    <p key={e.line}>
+                      Row {e.line}: {e.reason}
+                    </p>
+                  ))}
+                  {skipped.length > 4 && (
+                    <p>+{skipped.length - 4} more — full list in the report</p>
+                  )}
+                </div>
+              )}
+
               <div className="max-h-72 overflow-y-auto rounded-lg border border-border">
                 <Table>
                   <TableHeader>
@@ -317,8 +342,8 @@ export function BulkImportDialog({
                     </TableRow>
                   </TableHeader>
                   <TableBody>
-                    {rows.map((r, i) => (
-                      <TableRow key={`${r.barcode}-${i}`}>
+                    {preview.map((r) => (
+                      <TableRow key={`${r.key}-${r.line}`}>
                         <TableCell className="numeric">{r.barcode}</TableCell>
                         <TableCell className="font-medium">{r.name}</TableCell>
                         <TableCell className="text-muted-foreground">{r.category}</TableCell>
@@ -334,6 +359,12 @@ export function BulkImportDialog({
                   </TableBody>
                 </Table>
               </div>
+              {rows.length > PREVIEW_LIMIT && (
+                <p className="text-[11px] text-muted-foreground">
+                  Showing the first {PREVIEW_LIMIT} of {rows.length} rows. All of them are imported.
+                </p>
+              )}
+
               <div className="flex justify-between gap-2">
                 <Button variant="outline" onClick={reset}>
                   Choose another file
@@ -341,9 +372,10 @@ export function BulkImportDialog({
                 <Button
                   className="bg-success text-background hover:bg-success/90"
                   disabled={!rows.length}
-                  onClick={confirm}
+                  onClick={() => void run(resume)}
                 >
-                  <Download className="size-4" /> Confirm Bulk Add {rows.length} Items
+                  <Download className="size-4" />
+                  {resume ? "Continue import" : `Import ${rows.length} items`}
                 </Button>
               </div>
             </div>
@@ -351,12 +383,12 @@ export function BulkImportDialog({
         </DialogContent>
       </Dialog>
 
-      {/* Import summary */}
+      {/* Import result — every row accounted for */}
       <Dialog
-        open={!!summary}
+        open={!!outcome}
         onOpenChange={(o) => {
           if (!o) {
-            setSummary(null);
+            setOutcome(null);
             reset();
             onOpenChange(false);
           }
@@ -364,41 +396,60 @@ export function BulkImportDialog({
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>Import summary</DialogTitle>
+            <DialogTitle>Import result</DialogTitle>
           </DialogHeader>
-          {summary && (
+          {outcome && (
             <div className="space-y-3 text-sm">
               <p className="flex items-center gap-2 text-success">
                 <CheckCircle2 className="size-4" />
-                {summary.added + summary.updated} records inserted successfully
+                {describeOutcome(outcome)}
               </p>
               <ul className="space-y-1 text-muted-foreground">
-                <li className="numeric">New products created: {summary.added}</li>
-                <li className="numeric">Existing products restocked: {summary.updated}</li>
-                <li className="numeric">Error rows skipped: {summary.errors.length}</li>
+                <li className="numeric">Rows in the file: {outcome.total}</li>
+                <li className="numeric">New products created: {outcome.created}</li>
+                <li className="numeric">Existing products restocked: {outcome.restocked}</li>
+                <li className="numeric">Skipped: {outcome.skipped.length}</li>
+                <li className="numeric">Failed: {outcome.failed.length}</li>
+                <li className="numeric">Still pending: {outcome.pending.length}</li>
               </ul>
-              {summary.errors.length > 0 && (
+
+              {(outcome.failed.length > 0 || outcome.pending.length > 0) && (
                 <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                   <p className="flex items-center gap-1 font-semibold">
-                    <AlertTriangle className="size-3.5" /> Rows not imported
+                    <AlertTriangle className="size-3.5" /> Not saved
                   </p>
-                  {summary.errors.map((e) => (
-                    <p key={e.row}>
-                      Row {e.row}: {e.reason}
+                  {[...outcome.failed, ...outcome.pending].slice(0, 8).map((e) => (
+                    <p key={`${e.line}-${e.reason}`}>
+                      Row {e.line} ({e.barcode}): {e.reason}
                     </p>
                   ))}
+                  {outcome.failed.length + outcome.pending.length > 8 && (
+                    <p>+{outcome.failed.length + outcome.pending.length - 8} more in the report</p>
+                  )}
                 </div>
               )}
-              <Button
-                className="w-full"
-                onClick={() => {
-                  setSummary(null);
-                  reset();
-                  onOpenChange(false);
-                }}
-              >
-                Done
-              </Button>
+
+              <div className="flex gap-2">
+                {outcome.skipped.length + outcome.failed.length + outcome.pending.length > 0 && (
+                  <Button
+                    variant="outline"
+                    className="flex-1"
+                    onClick={() => downloadReport(outcome)}
+                  >
+                    <RotateCcw className="size-4" /> Download row report
+                  </Button>
+                )}
+                <Button
+                  className="flex-1"
+                  onClick={() => {
+                    setOutcome(null);
+                    reset();
+                    onOpenChange(false);
+                  }}
+                >
+                  Done
+                </Button>
+              </div>
             </div>
           )}
         </DialogContent>
