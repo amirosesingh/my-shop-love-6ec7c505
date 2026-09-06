@@ -572,6 +572,12 @@ export function TerminalTokens({
                 <TableRow key={t.id} className="hover:bg-muted/40">
                   <TableCell className="font-medium">
                     {t.deviceName}
+                    <span
+                      title={t.id}
+                      className="block font-mono text-[11px] font-normal text-muted-foreground"
+                    >
+                      ID {t.id.slice(0, 8)}
+                    </span>
                     {t.claimedByDevice && (
                       <span className="block max-w-[14rem] truncate text-xs font-normal text-muted-foreground">
                         {t.claimedByDevice}
