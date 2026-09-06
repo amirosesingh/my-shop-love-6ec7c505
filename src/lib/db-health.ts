@@ -236,6 +236,70 @@ async function probeTable(entry: {
   return probe;
 }
 
+/**
+ * The activation routines the till needs before it can be given a branch.
+ * Each is called with an id that belongs to no terminal, so nothing is
+ * claimed or changed — only the presence and shape of the routine is proven.
+ */
+const NO_TERMINAL = "00000000-0000-0000-0000-000000000000";
+
+async function activationChecks(): Promise<HeaderCheck[]> {
+  const rpc = supabaseExternal as unknown as {
+    rpc: (fn: string, args: Record<string, unknown>) => PromiseLike<{ error: unknown }>;
+  };
+  const probes: { label: string; fn: string; args: Record<string, unknown> }[] = [
+    { label: "Activation lookup", fn: "terminal_token_status", args: { p_token_id: NO_TERMINAL } },
+    {
+      label: "Activation claim",
+      fn: "terminal_token_claim",
+      args: {
+        p_token_id: NO_TERMINAL,
+        p_device: null,
+        p_proof_hash: null,
+        p_platform: null,
+        p_os: null,
+      },
+    },
+    {
+      label: "Terminal check-in",
+      fn: "terminal_token_heartbeat",
+      args: { p_token_id: NO_TERMINAL, p_activate: false, p_version: null, p_synced: false },
+    },
+  ];
+
+  const out: HeaderCheck[] = [];
+  for (const probe of probes) {
+    try {
+      const { error } = await rpc.rpc(probe.fn, probe.args);
+      const err = error as { code?: string; message?: string } | null;
+      if (!err) {
+        out.push({ label: probe.label, ok: true, detail: "Up to date" });
+        continue;
+      }
+      const code = err.code ?? "";
+      const message = err.message ?? "";
+      if (code === "PGRST203" || /could not choose the best candidate/i.test(message)) {
+        out.push({
+          label: probe.label,
+          ok: false,
+          detail: "This database holds two versions of this routine. Run supabase/schema.sql on it.",
+        });
+      } else if (code === "PGRST202") {
+        out.push({
+          label: probe.label,
+          ok: false,
+          detail: "This routine is out of date or missing. Run supabase/schema.sql on this database.",
+        });
+      } else {
+        out.push({ label: probe.label, ok: false, detail: explainError(err) });
+      }
+    } catch (e) {
+      out.push({ label: probe.label, ok: false, detail: (e as Error).message });
+    }
+  }
+  return out;
+}
+
 /** Run the whole check. Safe to run at any time — nothing is modified. */
 export async function runDbHealth(): Promise<DbHealthReport> {
   const session = (await supabaseExternal.auth.getSession()).data.session;
@@ -275,6 +339,15 @@ export async function runDbHealth(): Promise<DbHealthReport> {
         : "No — sign in or activate this till",
     },
   ];
+
+  header.push(...(await activationChecks()));
+  header.push({
+    label: "Ready to trade",
+    ok: !!terminal?.locationId && !!(session || terminal?.tokenId),
+    detail: terminal?.locationId
+      ? "This device has a branch and an identity"
+      : "No branch yet — check the activation routines above before re-activating",
+  });
 
   const tables: TableProbe[] = [];
   for (const entry of await probeList()) tables.push(await probeTable(entry));
