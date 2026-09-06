@@ -5,6 +5,7 @@
  *
  *   node scripts/bump-version.cjs          # bump patch
  *   node scripts/bump-version.cjs --write  # only regenerate src/version.ts
+ *   node scripts/bump-version.cjs --set 1.2.3
  */
 const fs = require("node:fs");
 const path = require("node:path");
@@ -15,8 +16,16 @@ const versionPath = path.join(root, "src", "version.ts");
 
 const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
 const writeOnly = process.argv.includes("--write");
+const setAt = process.argv.indexOf("--set");
+const requested = setAt >= 0 ? process.argv[setAt + 1] : "";
 
-if (!writeOnly) {
+if (requested) {
+  if (!/^\d+\.\d+\.\d+$/.test(requested)) {
+    throw new Error(`Invalid release version: ${requested}`);
+  }
+  pkg.version = requested;
+  fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
+} else if (!writeOnly) {
   const [major = 1, minor = 0, patch = 0] = String(pkg.version || "1.0.0")
     .split(".")
     .map((n) => Number.parseInt(n, 10) || 0);

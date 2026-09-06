@@ -18,7 +18,7 @@ const { withoutWebEnv } = require("./web-only-env.cjs");
 
 const root = path.resolve(__dirname, "..");
 
-const DEFAULT_URL = "https://updatecms.luckycharmsdnbhd.com/pos-app/";
+const DEFAULT_URL = "https://updatecms.luckycharmsdnbhd.com/pos-app/latest/";
 const url = (process.env.POS_UPDATE_URL || "").trim() || DEFAULT_URL;
 if (!process.env.POS_UPDATE_URL) {
   console.log(`POS_UPDATE_URL is not set — baking in the default feed ${url}`);
@@ -58,4 +58,3 @@ if (!fs.existsSync(path.join(desktopOut, "server", "index.mjs"))) {
 run("electron-builder", ["--win", "nsis", "--publish", "never"]);
 
 console.log("✓ Windows installer ready in release/");
-
