@@ -95,18 +95,38 @@ async function runQuery(
     if (rows) return { rows, source: "local" };
   }
   try {
-    let q = from(table).select(options.columns ?? "*");
-    for (const [k, v] of Object.entries(options.match ?? {})) q = q.eq(k, v);
-    if (options.in) q = q.in(options.in.column, options.in.values);
-    if (options.orderBy)
-      q = q.order(options.orderBy.column, { ascending: options.orderBy.ascending ?? true });
-    if (options.limit) q = q.limit(options.limit);
-    const { data, error } = await q;
-    if (error) throw new Error(error.message);
+    const build = (from: number, to: number) => {
+      let q = from_(table).select(options.columns ?? "*", { count: "exact" });
+      for (const [k, v] of Object.entries(options.match ?? {})) q = q.eq(k, v);
+      if (options.in) q = q.in(options.in.column, options.in.values);
+      if (options.orderBy)
+        q = q.order(options.orderBy.column, { ascending: options.orderBy.ascending ?? true });
+      // A deterministic tie-break, or rows can shift between windows.
+      q = q.order("id", { ascending: true });
+      return q.range(from, to) as PromiseLike<{
+        data: Row[] | null;
+        error: { message: string } | null;
+        count?: number | null;
+      }>;
+    };
+    // A caller that asked for a capped read gets exactly that; an uncapped
+    // read is paged so the database's 1,000-row response cap cannot silently
+    // truncate a whole table.
+    let data: Row[] | null;
+    if (options.limit) {
+      const res = await build(0, options.limit - 1);
+      if (res.error) throw new Error(res.error.message);
+      data = res.data;
+    } else {
+      const res = await readAllPages<Row>(build);
+      if (res.error) throw new Error(res.error.message);
+      data = res.data;
+    }
     // Remember what version the central copy is on, so a later edit from this
     // till can say which version it was working from.
     noteVersions(table, data);
     return { rows: (data as Row[]) ?? [], source: "cloud" };
+
   } catch (e) {
     const rows = cached();
     // Only a connection-class failure may fall back: a refusal or a bad query
