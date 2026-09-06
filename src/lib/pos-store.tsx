@@ -207,6 +207,9 @@ const bumpItems = (
     return item ? bump(p, storeId, sign * item.qty) : p;
   });
 
+/** Where the first read of the shop's data has got to. */
+export type LoadPhase = "loading" | "ready" | "stalled" | "failed";
+
 type Ctx = {
   ready: boolean;
   /**
