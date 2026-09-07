@@ -1624,6 +1624,18 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
       }
       const result = await bridge.writeBatch(context, ops);
       if (!result.ok) throw new Error(result.error ?? `${context} could not be stored locally`);
+      const mirrorEntries = ops.flatMap((op) =>
+        op.kind === "insert" || op.kind === "upsert"
+          ? [{ entity: op.table, rows: op.rows as Record<string, unknown>[] }]
+          : [],
+      );
+      if (mirrorEntries.length && bridge.localMirrorBatch) {
+        const shadow = await bridge.localMirrorBatch(mirrorEntries);
+        const expected = mirrorEntries.reduce((total, entry) => total + entry.rows.length, 0);
+        if (!shadow.ok || Number(shadow.written ?? 0) !== expected) {
+          throw new Error(shadow.error ?? "The embedded SQLite transaction copy was incomplete");
+        }
+      }
       setCloudDirect(false);
       // `pos:write[-batch]` already wakes the Electron worker. This second
       // signal also covers alternate/test bridges and is deliberately detached:

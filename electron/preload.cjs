@@ -117,6 +117,7 @@ contextBridge.exposeInMainWorld("pos", {
      the branch SQL Server outbox — there is deliberately no second queue. */
   localInfo: () => invoke("local:info"),
   localMirror: (entity, rows) => invoke("local:mirror", entity, rows),
+  localMirrorBatch: (entries) => invoke("local:mirror-batch", entries),
   localList: (entity, limit) => invoke("local:list", entity, limit),
   localAuditLog: (entry) => invoke("local:audit-log", entry),
   localAuditList: (limit) => invoke("local:audit-list", limit),
