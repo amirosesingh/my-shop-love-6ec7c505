@@ -155,7 +155,7 @@
     "publish": [
       {
         "provider": "generic",
-        "url": "https://updatecms.luckycharmsdnbhd.com/pos-app/",
+        "url": "https://updatecms.luckycharmsdnbhd.com/pos-app/latest/",
         "channel": "latest"
       }
     ],

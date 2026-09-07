@@ -18,10 +18,11 @@ describe("platform wording for a total failure", () => {
   beforeEach(() => vi.resetModules());
   afterEach(() => vi.resetModules());
 
-  it("names both databases on the Windows till", async () => {
+  it("names the required local SQL database on the Windows till", async () => {
     vi.doMock("@/platform-config/platform", () => ({ isNative: () => false, isElectron: () => true }));
     const { unreachableMessage } = await import("@/core/local-db/db-mode");
-    expect(unreachableMessage()).toMatch(/local database server or online database/);
+    expect(unreachableMessage()).toMatch(/Local Database Required/);
+    expect(unreachableMessage()).not.toMatch(/online database/);
   });
 
   it("names the server relay on the phone and in a browser", async () => {

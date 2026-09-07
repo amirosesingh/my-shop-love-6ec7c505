@@ -44,18 +44,25 @@ describe("database mode", () => {
     expect(preferredDatabaseMode()).toBe("online");
   });
 
-  it("writes online when online mode is chosen and the connection is up", () => {
-    setPreferredDatabaseMode("online");
+  it("does not let a browser choose unsupported local storage", () => {
+    setPreferredDatabaseMode("local");
+    expect(preferredDatabaseMode()).toBe("online");
     expect(effectiveDatabaseMode()).toBe("online");
   });
 
-  it("fails over to local on a till without changing the chosen mode", () => {
+  it("does not let a Windows till bypass its local ledger", () => {
     asDesktop();
     setPreferredDatabaseMode("online");
+    expect(preferredDatabaseMode()).toBe("local");
+    expect(effectiveDatabaseMode()).toBe("local");
+  });
+
+  it("stays local-first on a till across connection changes", () => {
+    asDesktop();
     noteConnectionLost();
     expect(effectiveDatabaseMode()).toBe("local");
-    expect(preferredDatabaseMode()).toBe("online");
+    expect(preferredDatabaseMode()).toBe("local");
     noteConnectionRestored();
-    expect(effectiveDatabaseMode()).toBe("online");
+    expect(effectiveDatabaseMode()).toBe("local");
   });
 });

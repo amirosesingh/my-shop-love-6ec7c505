@@ -4,21 +4,6 @@ on:
   push:
     branches: [main]
     tags: ["v*"]
-    # Windows-only paths: a change confined to src/platforms/mobile must not
-    # rebuild the desktop installer. TODO: add code-signing once a Windows
-    # certificate is available; the build is currently unsigned.
-    paths:
-      - "src/core/**"
-      - "src/platform-config/**"
-      - "src/platforms/windows/**"
-      - "src/lib/**"
-      - "src/components/**"
-      - "src/routes/**"
-      - "electron/**"
-      - "scripts/desktop-release.cjs"
-      - "vite.config.ts"
-      - "package.json"
-      - ".github/workflows/desktop-release.yml"
   workflow_dispatch:
 
 concurrency:
@@ -30,7 +15,7 @@ permissions:
 
 jobs:
   build-windows:
-    if: "!contains(github.event.head_commit.message, '[skip ci]')"
+    if: "github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/v') || contains(github.event.head_commit.message, '[release]')"
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -46,7 +31,6 @@ jobs:
       - name: Install dependencies
         run: npm install
 
-
       - name: Resolve release identity
         id: meta
         shell: bash
@@ -55,11 +39,15 @@ jobs:
           short=$(echo "$GITHUB_SHA" | cut -c1-7)
           if [ "${{ startsWith(github.ref, 'refs/tags/') }}" = "true" ]; then
             tag="${{ github.ref_name }}"
+            if [ "$tag" != "v$version" ]; then
+              echo "Tag $tag does not match package version v$version"; exit 1
+            fi
           else
             tag="v$version"
           fi
           {
             echo "version=$version"
+            echo "build_number=$(git rev-list --count HEAD)"
             echo "tag=$tag"
             echo "commit=$GITHUB_SHA"
             echo "release_id=$tag-$short"
@@ -93,6 +81,10 @@ jobs:
           for f in release/*.exe release/*.exe.blockmap release/latest.yml release/release.json; do
             cp "$f" upload/
           done
+          v="${{ steps.meta.outputs.version }}"
+          base="https://updatecms.luckycharmsdnbhd.com/pos-app"
+          epoch=$(node -e "const m=/BUNDLE_EPOCH\s*=\s*(\d+)/.exec(require('fs').readFileSync('src/lib/bundle-epoch.ts','utf8'));if(!m){process.exit(1)}console.log(m[1])")
+          node -e "const fs=require('fs');fs.writeFileSync('upload/manifest.json',JSON.stringify({version:'$v',buildNumber:Number('${{ steps.meta.outputs.build_number }}'),releaseNotes:'Release $v',apkUrl:'$base/latest/android/NorthwindPOS-$v.apk',bundleUrl:'$base/latest/android/web/web-$v.zip',bundleEpoch:Number('$epoch'),windowsUrl:'$base/latest/LovablePOS%20Setup%20$v.exe'}))"
           ls -la upload
 
       - name: Deploy to Cloudflare R2
@@ -114,17 +106,16 @@ jobs:
           # Stable pointers the tills poll.
           # --delete clears anything left behind by earlier releases
           # (win-unpacked/ and friends) on the next run.
-          # The Android release owns latest/android/** and latest/manifest.json,
-          # so they are excluded from the prune — otherwise a Windows release
-          # silently deletes the APK the phones are told to download.
+          # Android owns latest/android/**, so it is excluded from the prune.
+          # Both release jobs publish the same cross-platform manifest for the
+          # same commit, making their completion order irrelevant. Excluding
+          # the folder also prevents Windows from deleting Android artefacts.
           aws s3 sync upload s3://updatelccms/pos-app/latest \
             --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" --delete \
-            --exclude "android/*" --exclude "manifest.json"
-          # Tills already in the field read the top-level path, so the same
-          # allowlisted files are mirrored there (without --delete, which
-          # would wipe releases/ and latest/).
-          aws s3 sync upload s3://updatelccms/pos-app \
-            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache"
+            --exclude "android/*"
+          aws s3 cp upload/manifest.json s3://updatelccms/pos-app/manifest.json \
+            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" \
+            --content-type "application/json"
 
       - name: Remove build scratch left in the bucket by earlier releases
         shell: bash
@@ -164,6 +155,7 @@ jobs:
           done
 
       - name: Attach installer to the GitHub release
+        if: ${{ startsWith(github.ref, 'refs/tags/v') }}
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
