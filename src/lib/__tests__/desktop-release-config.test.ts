@@ -20,6 +20,9 @@ describe("desktop release configuration", () => {
     const version = read(".github/workflows/version-release.yml");
     expect(version).toContain("version=$(node scripts/bump-version.cjs)");
     expect(version).toContain("[release]");
+    expect(version).toContain("actions: write");
+    expect(version).toContain("gh workflow run desktop-release.yml --ref main");
+    expect(version).toContain("gh workflow run android-apk.yml --ref main");
     expect(desktop).toContain("contains(github.event.head_commit.message, '[release]')");
     expect(android).toContain("contains(github.event.head_commit.message, '[release]')");
     expect(desktop).not.toContain("GITHUB_RUN_NUMBER");
