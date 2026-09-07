@@ -4,6 +4,7 @@ import { readFileSync } from "node:fs";
 const read = (file: string) => readFileSync(file, "utf8");
 
 describe("Electron durable business persistence", () => {
+  it("does not report a committed SQL transaction as failed when its SQLite projection fails", () => {
   it("atomically shadows related transaction rows in embedded SQLite", () => {
     const sqlite = read("electron/db/sqlite.cjs");
     const gateway = read("src/core/api/pos-db.ts");
@@ -11,6 +12,10 @@ describe("Electron durable business persistence", () => {
     expect(sqlite).toContain("return tx(() =>");
     expect(sqlite).toContain("INSERT INTO mirror (entity, id, payload, updated_at)");
     expect(gateway).toContain("bridge.localMirrorBatch(mirrorEntries)");
+    expect(gateway).toContain('entity: "sqlite_business_batch"');
+    expect(gateway).not.toContain(
+      'throw new Error(shadow.error ?? "The embedded SQLite transaction copy was incomplete")',
+    );
     expect(gateway).toContain("embedded SQLite transaction copy was incomplete");
   });
 

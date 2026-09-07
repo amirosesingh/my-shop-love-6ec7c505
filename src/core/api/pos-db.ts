@@ -1630,6 +1630,27 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
           : [],
       );
       if (mirrorEntries.length && bridge.localMirrorBatch) {
+        // SQL Server has already committed at this point. SQLite is currently
+        // only a secondary projection, so its failure must not turn a durable
+        // sale into an apparent failed checkout and invite the cashier to take
+        // payment again. Record the degraded mirror for diagnostics; Phase 1B
+        // will make SQLite the primary transaction/outbox boundary.
+        try {
+          const shadow = await bridge.localMirrorBatch(mirrorEntries);
+          const expected = mirrorEntries.reduce((total, entry) => total + entry.rows.length, 0);
+          if (!shadow.ok || Number(shadow.written ?? 0) !== expected) {
+            recordDiagnostic({
+              kind: "local_mirror_failed",
+              entity: "sqlite_business_batch",
+              code: reasonCode(shadow.error ?? "incomplete SQLite mirror batch"),
+            });
+          }
+        } catch (shadowError) {
+          recordDiagnostic({
+            kind: "local_mirror_failed",
+            entity: "sqlite_business_batch",
+            code: reasonCode(shadowError),
+          });
         const shadow = await bridge.localMirrorBatch(mirrorEntries);
         const expected = mirrorEntries.reduce((total, entry) => total + entry.rows.length, 0);
         if (!shadow.ok || Number(shadow.written ?? 0) !== expected) {
