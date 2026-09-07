@@ -19,11 +19,13 @@ export type RulesLogEvent =
   | "POS_RULES_PENDING_ABANDONED";
 
 export function logRules(event: RulesLogEvent, fields: Record<string, string | number>): void {
+  // Routine refreshes happen every minute and need no browser-console noise.
+  // Keep only actionable failures visible to operators and support staff.
+  if (event !== "POS_RULES_LOAD_FAILED") return;
   const line = Object.entries(fields)
     .filter(([, v]) => v !== "" && v !== undefined && v !== null)
     .map(([k, v]) => `${k}=${v}`)
     .join(" ");
   const text = line ? `${event} ${line}` : event;
-  if (event === "POS_RULES_LOAD_FAILED") console.warn(text);
-  else console.info(text);
+  console.warn(text);
 }
