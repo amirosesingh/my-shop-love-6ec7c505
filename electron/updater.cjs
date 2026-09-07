@@ -19,7 +19,7 @@ const netHttp = require("./net.cjs");
 const SIX_HOURS = 6 * 60 * 60 * 1000;
 
 /** Update folder used when nothing else is configured or baked in. */
-const DEFAULT_FEED_URL = "https://updatecms.luckycharmsdnbhd.com/pos-app/";
+const DEFAULT_FEED_URL = "https://updatecms.luckycharmsdnbhd.com/pos-app/latest/";
 
 /** How many times a failed check or download is retried before giving up. */
 const ATTEMPTS = 3;
@@ -390,11 +390,19 @@ async function publishedHash(version) {
   const sidecar = await fetchText(`${base}/${file}.sha512`);
   if (sidecar && sidecar.trim()) return sidecar.trim().split(/\s+/)[0];
 
-  const manifest = await fetchText(`${base}/${encodeURIComponent(version)}.yml`);
-  if (!manifest) return null;
-  // Only trust the entry that actually names this artifact.
-  if (!manifest.includes(artifact(version))) return null;
-  return /^\s*sha512:\s*(.+)\s*$/m.exec(manifest)?.[1]?.trim().replace(/^["']|["']$/g, "") ?? null;
+  // The stable feed publishes electron-builder's latest.yml. Some providers
+  // additionally retain a version-named manifest, so support that as a
+  // fallback for rollbacks without requiring it for normal updates.
+  for (const name of ["latest.yml", `${encodeURIComponent(version)}.yml`]) {
+    const manifest = await fetchText(`${base}/${name}`);
+    if (!manifest || !manifest.includes(artifact(version))) continue;
+    const hash = /^\s*sha512:\s*(.+)\s*$/m
+      .exec(manifest)?.[1]
+      ?.trim()
+      .replace(/^["']|["']$/g, "");
+    if (hash) return hash;
+  }
+  return null;
 }
 
 /** base64 sha512 of a file, in the same encoding electron-builder publishes. */

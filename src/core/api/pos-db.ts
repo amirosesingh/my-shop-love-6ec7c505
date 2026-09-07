@@ -1610,38 +1610,31 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
     return noteCommitTarget("cloud");
   }
 
-  // Windows desktop with a local SQL Server present.
+  // Windows desktop commits to local SQL first. The IPC batch is one SQL
+  // transaction and marks every changed row pending before it resolves. The
+  // Electron worker then pushes those rows to the central database immediately
+  // when it can, or keeps retrying after connectivity returns. Keeping this as
+  // one path avoids the worst cloud-first failure window: the cloud accepting a
+  // payment while the till loses the response before its local copy is written.
   const bridge = localDb();
   if (bridge) {
-    // Desktop is always cloud first. Local SQL is a durable fallback only for
-    // connection-class cloud failures; validation and permission errors remain visible.
     try {
-      await runBatchLive(context, cloudOps);
-      await applyStockDeltas(deltas);
-      noteConnectionRestored();
-      setCloudDirect(false);
-      void mirrorToLocal(context, ops);
-      return noteCommitTarget("cloud");
-    } catch (cloud) {
-      if (!isConnectionError(cloud)) throw cloud;
-      noteConnectionLost();
-      try {
-        const result = bridge.writeBatch
-          ? await bridge.writeBatch(context, ops)
-          : await (async () => {
-              for (const op of ops) {
-                const res = await bridge.write(context, op);
-                if (!res.ok) return res;
-              }
-              return { ok: true };
-            })();
-        if (!result.ok) throw new Error(result.error ?? `${context} could not be stored locally`);
-        setCloudDirect(false);
-        if (bridge.push) void bridge.push();
-        return noteCommitTarget("local");
-      } catch (local) {
-        throw new AllTargetsFailed(context, local);
+      if (!bridge.writeBatch) {
+        throw new Error("This desktop build cannot commit an atomic local SQL batch. Update the app.");
       }
+      const result = await bridge.writeBatch(context, ops);
+      if (!result.ok) throw new Error(result.error ?? `${context} could not be stored locally`);
+      setCloudDirect(false);
+      // `pos:write[-batch]` already wakes the Electron worker. This second
+      // signal also covers alternate/test bridges and is deliberately detached:
+      // central latency must never hold up a locally durable till transaction.
+      if (bridge.push) void bridge.push();
+      return noteCommitTarget("local");
+    } catch (local) {
+      // A desktop transaction is successful only after local SQL commits. Do
+      // not bypass a broken till database with a cloud-only write: doing so
+      // would make the terminal's offline ledger incomplete and unrecoverable.
+      throw new AllTargetsFailed(context, local);
     }
   }
 

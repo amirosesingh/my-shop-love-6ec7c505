@@ -1,13 +1,9 @@
 /**
  * Where this till reads and writes: the online database, or the local one.
  *
- * "Online only" sends every change straight to the central database. "Local
- * first" stores it on this machine (local SQL Server on Windows, the on-disk
- * queue in a browser) and pushes it up in the background.
- *
- * If the chosen mode is online and the connection drops, the app fails over to
- * local on its own. The stored preference is never changed by a failover, so
- * the till returns to online working the moment the internet is back.
+ * Web and Android are online-only and send every change straight to the central
+ * database. Windows stores every change in its local SQL Server transaction
+ * first, then the Electron worker synchronizes it to the central database.
  */
 import { isOnlineOnly } from "@/lib/live-mode";
 import { hasFeature } from "@/platform-config/features";
@@ -39,33 +35,32 @@ export function subscribeDatabaseMode(listener: Listener) {
 }
 
 /**
- * A till keeps trading when the line drops, so the Windows shell is
- * local-first and reconciles in the background. The browser console has no
- * local database engine, so it stays online-first with local failover.
+ * A Windows till is local-first and reconciles in the background. Browser and
+ * Android clients have no local business database and remain online-only.
  */
 export const defaultDatabaseMode = (): DatabaseMode => (hasFeature("localDb") ? "local" : "online");
 
-/** The mode the operator picked (ignoring any temporary failover). */
+/** The mode fixed by the running platform. */
 export function preferredDatabaseMode(): DatabaseMode {
-  if (!isBrowser()) return defaultDatabaseMode();
-  const raw = window.localStorage.getItem(KEY);
-  return raw === "online" || raw === "local" ? raw : defaultDatabaseMode();
+  return defaultDatabaseMode();
 }
 
 export function setPreferredDatabaseMode(mode: DatabaseMode) {
-  if (!isBrowser()) return;
-  window.localStorage.setItem(KEY, mode);
-  if (mode === "local") failingOver = false;
+  // Kept as a compatibility seam for older callers and stored preferences.
+  // Platform policy is no longer operator-selectable: Windows is local-first;
+  // web and Android are online-only.
+  if (isBrowser()) window.localStorage.removeItem(KEY);
+  if (mode === defaultDatabaseMode()) failingOver = false;
   notify();
 }
 
-/** True when the phone build pins the mode and the switch cannot be used. */
-export const databaseModeLocked = (): boolean => isOnlineOnly();
+/** Platform policy pins the mode on every build. */
+export const databaseModeLocked = (): boolean => true;
 
-/** Has the app dropped to local working because the connection failed? */
+/** Whether the central connection monitor currently reports a lost line. */
 export const isFailingOver = (): boolean => failingOver;
 
-/** Is the till bypassing local storage and writing straight to the cloud? */
+/** Whether an online-only client most recently wrote directly to the cloud. */
 export const isCloudDirect = (): boolean => cloudDirect;
 
 export function setCloudDirect(on: boolean) {
@@ -77,19 +72,19 @@ export function setCloudDirect(on: boolean) {
 /**
  * Wording for a total failure, in the operator's terms for this platform.
  *
- * The phone is a live client of the central server, so there is no local
- * database to mention; Windows and the browser have both targets.
+ * Web and Android are live clients of the central server. Windows must commit
+ * to local SQL before its worker can synchronize the change centrally.
  */
 export function unreachableMessage(): string {
   return isOnlineOnly()
     ? "Shift cannot be opened: Central server relay is offline. Please contact an administrator."
-    : "Database Connection Required: Unable to reach the local database server or online database. " +
-        "Please check your network connection.";
+    : "Local Database Required: Unable to save to this terminal's SQL database. " +
+        "Please check the local database connection.";
 }
 
 /**
- * Raised only when neither this terminal nor the central database would take
- * the change. Nothing was written; the caller must stop and tell the operator.
+ * Raised when the platform's required durable target refuses a change. Nothing
+ * was written; the caller must stop and tell the operator.
  */
 export class AllTargetsFailed extends Error {
   readonly context: string;
@@ -101,14 +96,14 @@ export class AllTargetsFailed extends Error {
   }
 }
 
-/** Called when an online write could not reach the central database. */
+/** Called when the central connection monitor loses its line. */
 export function noteConnectionLost() {
   if (failingOver) return;
   failingOver = true;
   notify();
 }
 
-/** Called when the connection is back so online working resumes. */
+/** Called when the central connection monitor sees the line return. */
 export function noteConnectionRestored() {
   if (!failingOver) return;
   failingOver = false;
@@ -118,21 +113,17 @@ export function noteConnectionRestored() {
 const online = () => !isBrowser() || window.navigator.onLine;
 
 /**
- * Where writes should actually go right now — the chosen mode, unless the
- * connection is down, in which case local keeps the till trading.
+ * Where writes go on this platform: central for live clients, local SQL for
+ * the Windows till.
  */
 export function effectiveDatabaseMode(): DatabaseMode {
-  if (isOnlineOnly()) return "online";
-  if (preferredDatabaseMode() === "local") return "local";
-  return online() && !failingOver ? "online" : "local";
+  return isOnlineOnly() ? "online" : "local";
 }
 
 /** Short wording for the status pill. */
 export function databaseModeLabel(): string {
   if (cloudDirect) return "Cloud direct";
-  if (databaseModeLocked()) return "Online";
-  if (preferredDatabaseMode() === "local") return "Local";
-  return effectiveDatabaseMode() === "local" ? "Online (local failover)" : "Online";
+  return effectiveDatabaseMode() === "local" ? "Local first" : "Online";
 }
 
 /** Network-class failures mean "try local", unlike a refusal from the database. */
