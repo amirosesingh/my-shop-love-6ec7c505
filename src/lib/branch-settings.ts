@@ -58,6 +58,7 @@ export async function loadBranchSettings(ids: ScopeIds): Promise<BranchSettingsS
         const rows = await dbRouter.query("settings_overrides", {
           columns: "section,patch",
           match: { scope: tier, scope_id: scopeId },
+          orderBy: { column: "section", ascending: true },
         });
         return { tier, rows: rows as unknown as OverrideRow[] };
       }),
@@ -69,7 +70,10 @@ export async function loadBranchSettings(ids: ScopeIds): Promise<BranchSettingsS
         }
       }
     }
-    const locks = await dbRouter.query("settings_locks", { columns: "section,locked" });
+    const locks = await dbRouter.query("settings_locks", {
+      columns: "section,locked",
+      orderBy: { column: "section", ascending: true },
+    });
     for (const row of locks as unknown as LockRow[]) {
       state.locks[row.section as SettingsSectionId] = !!row.locked;
     }
