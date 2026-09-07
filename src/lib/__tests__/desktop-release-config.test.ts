@@ -14,13 +14,29 @@ describe("desktop release configuration", () => {
     );
   });
 
-  it("assigns a new build version before resolving release metadata", () => {
-    const workflow = read(".github/workflows/desktop-release.yml");
-    expect(workflow).toContain("Assign automatic build version");
-    expect(workflow.indexOf("Assign automatic build version")).toBeLessThan(
-      workflow.indexOf("Resolve release identity"),
-    );
-    expect(workflow).toContain('node scripts/bump-version.cjs --set "$version"');
+  it("builds Windows and Android from the same committed release version", () => {
+    const desktop = read(".github/workflows/desktop-release.yml");
+    const android = read(".github/workflows/android-apk.yml");
+    const version = read(".github/workflows/version-release.yml");
+    expect(version).toContain("version=$(node scripts/bump-version.cjs)");
+    expect(version).toContain("[release]");
+    expect(desktop).toContain("contains(github.event.head_commit.message, '[release]')");
+    expect(android).toContain("contains(github.event.head_commit.message, '[release]')");
+    expect(desktop).not.toContain("GITHUB_RUN_NUMBER");
+    expect(android).not.toContain("ANDROID_VERSION_CODE: ${{ github.run_number }}");
+  });
+
+  it("publishes the same complete cross-platform manifest from either release job", () => {
+    for (const path of [
+      ".github/workflows/desktop-release.yml",
+      ".github/workflows/android-apk.yml",
+    ]) {
+      const workflow = read(path);
+      expect(workflow).toContain("apkUrl");
+      expect(workflow).toContain("bundleUrl");
+      expect(workflow).toContain("windowsUrl");
+      expect(workflow).toContain("s3://updatelccms/pos-app/manifest.json");
+    }
   });
 
   it("can verify the normal installer from latest.yml", () => {
