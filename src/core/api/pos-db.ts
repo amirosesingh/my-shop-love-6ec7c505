@@ -1651,6 +1651,10 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
             entity: "sqlite_business_batch",
             code: reasonCode(shadowError),
           });
+        const shadow = await bridge.localMirrorBatch(mirrorEntries);
+        const expected = mirrorEntries.reduce((total, entry) => total + entry.rows.length, 0);
+        if (!shadow.ok || Number(shadow.written ?? 0) !== expected) {
+          throw new Error(shadow.error ?? "The embedded SQLite transaction copy was incomplete");
         }
       }
       setCloudDirect(false);

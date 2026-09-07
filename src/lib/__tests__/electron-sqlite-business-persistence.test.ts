@@ -5,6 +5,7 @@ const read = (file: string) => readFileSync(file, "utf8");
 
 describe("Electron durable business persistence", () => {
   it("does not report a committed SQL transaction as failed when its SQLite projection fails", () => {
+  it("atomically shadows related transaction rows in embedded SQLite", () => {
     const sqlite = read("electron/db/sqlite.cjs");
     const gateway = read("src/core/api/pos-db.ts");
     expect(sqlite).toContain("function mirrorBatch(entries)");
@@ -15,6 +16,7 @@ describe("Electron durable business persistence", () => {
     expect(gateway).not.toContain(
       'throw new Error(shadow.error ?? "The embedded SQLite transaction copy was incomplete")',
     );
+    expect(gateway).toContain("embedded SQLite transaction copy was incomplete");
   });
 
   it("keeps the desktop state projection and cloud snapshot out of localStorage", () => {
