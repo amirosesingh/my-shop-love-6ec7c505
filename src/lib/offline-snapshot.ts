@@ -9,6 +9,8 @@ import type { CloudSlice } from "@/core/api/pos-db";
 import { isOnlineOnly } from "./live-mode";
 
 const KEY = "pos.offline.snapshot.v1";
+let memory: Snapshot | null = null;
+let hydrated = false;
 
 const isBrowser = () => typeof window !== "undefined";
 
@@ -41,26 +43,32 @@ function normalise(raw: Partial<Snapshot>): Snapshot {
 export function writeSnapshot(slice: CloudSlice) {
   // Android is live-only and the web build is cloud-only: nothing is kept.
   if (!canSnapshot()) return;
+  memory = normalise({ ...slice, savedAt: new Date().toISOString() });
+  const bridge = (window as unknown as {
+    pos?: { setSetting?: (key: string, value: string | null) => Promise<unknown> };
+  }).pos;
+  const pending = bridge?.setSetting?.(KEY, JSON.stringify(memory));
+  if (pending) void pending.catch(() => undefined);
+}
+
+/** Load the desktop snapshot from the embedded SQLite key/value table once. */
+export async function hydrateSnapshot(): Promise<void> {
+  if (!canSnapshot() || hydrated) return;
+  hydrated = true;
+  const bridge = (window as unknown as {
+    pos?: { getSetting?: (key: string) => Promise<{ ok?: boolean; value?: string | null }> };
+  }).pos;
   try {
-    window.localStorage.setItem(
-      KEY,
-      JSON.stringify({ ...slice, savedAt: new Date().toISOString() }),
-    );
+    const stored = await bridge?.getSetting?.(KEY);
+    memory = stored?.value ? normalise(JSON.parse(stored.value) as Partial<Snapshot>) : null;
   } catch {
-    /* storage full — the terminal simply falls back to the cloud next boot */
+    memory = null;
   }
 }
 
 export function readSnapshot(): Snapshot | null {
   if (!canSnapshot()) return null;
-  try {
-    const raw = window.localStorage.getItem(KEY);
-    if (!raw) return null;
-    return normalise(JSON.parse(raw) as Partial<Snapshot>);
-  } catch {
-    clearSnapshot();
-    return null;
-  }
+  return memory;
 }
 
 export function snapshotSavedAt(): string | null {
@@ -68,5 +76,11 @@ export function snapshotSavedAt(): string | null {
 }
 
 export function clearSnapshot() {
-  if (isBrowser()) window.localStorage.removeItem(KEY);
+  memory = null;
+  if (!canSnapshot()) return;
+  const bridge = (window as unknown as {
+    pos?: { setSetting?: (key: string, value: string | null) => Promise<unknown> };
+  }).pos;
+  const pending = bridge?.setSetting?.(KEY, null);
+  if (pending) void pending.catch(() => undefined);
 }

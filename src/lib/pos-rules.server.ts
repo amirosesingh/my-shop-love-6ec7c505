@@ -105,6 +105,18 @@ export type RulesResult = {
   /** Content stamp of the rule set, so a till can tell one version from another. */
   revision: string;
   fetchedAt: number;
+  storeId: string;
+  rowVersion: number;
+  updatedAt: string | null;
+  updatedBy: string | null;
+};
+
+type RulesSnapshotRow = {
+  rules?: unknown;
+  store_id?: unknown;
+  row_version?: unknown;
+  updated_at?: unknown;
+  updated_by?: unknown;
 };
 
 /** Classify a raw database/transport error without leaking credentials. */
@@ -148,14 +160,18 @@ export function rulesRevision(rules: PosRules): string {
  */
 export async function loadRulesResult(storeId: string): Promise<RulesResult> {
   try {
-    const json = await rpc<unknown>("pos_rules_get", { _store_id: storeId || "" });
-    const rules = normalizeRules(json);
+    const json = await rpc<RulesSnapshotRow>("pos_rules_snapshot", { _store_id: storeId || "" });
+    const rules = normalizeRules(json?.rules);
     return {
       rules,
       source: "database",
       failure: "none",
       revision: rulesRevision(rules),
       fetchedAt: Date.now(),
+      storeId: String(json?.store_id ?? storeId ?? ""),
+      rowVersion: Math.max(0, Number(json?.row_version) || 0),
+      updatedAt: typeof json?.updated_at === "string" ? json.updated_at : null,
+      updatedBy: typeof json?.updated_by === "string" ? json.updated_by : null,
     };
   } catch (e) {
     const message = (e as Error).message.slice(0, 300);
@@ -166,6 +182,10 @@ export async function loadRulesResult(storeId: string): Promise<RulesResult> {
       failure: classifyRulesFailure(message),
       revision: "",
       fetchedAt: Date.now(),
+      storeId: storeId || "",
+      rowVersion: 0,
+      updatedAt: null,
+      updatedBy: null,
     };
   }
 }
@@ -179,31 +199,22 @@ export async function saveRules(
   storeId: string,
   patch: Partial<PosRules>,
   accessToken: string,
-): Promise<PosRules> {
-  // The caller was already proved to be a supervisor on the server. The
-  // routine re-checks for a signed-in supervisor, which the service role is
-  // not, so the branch row is written directly with service rights.
-  try {
-    const { serviceRest } = await import("@/core/api/pos-relay.server");
-    const res = await serviceRest("pos_store_settings?on_conflict=store_id", {
-      method: "POST",
-      body: JSON.stringify([{ store_id: storeId || "", ...patch }]),
-      prefer: "return=minimal,resolution=merge-duplicates",
-    });
-    if (!res.ok) throw new Error((await res.text()).slice(0, 400) || "Could not save rules");
-    return await loadRules(storeId);
-  } catch (e) {
-    // No service key on this deployment: fall back to the supervisor's own
-    // session, which the routine accepts.
-    const body = { _store_id: storeId || "", _patch: patch };
-    const res = await fetch(`${supabaseConfig().url}/rest/v1/rpc/pos_rules_save`, {
-      method: "POST",
-      headers: headers(accessToken),
-      body: JSON.stringify(body),
-    });
-    if (!res.ok) throw new Error((await res.text()).slice(0, 400) || (e as Error).message);
-    return normalizeRules(await res.json());
-  }
+  expectedVersion: number,
+): Promise<RulesResult> {
+  const body = {
+    _store_id: storeId || "",
+    _patch: patch,
+    _expected_version: expectedVersion,
+  };
+  const res = await fetch(`${supabaseConfig().url}/rest/v1/rpc/pos_rules_save`, {
+    method: "POST",
+    headers: headers(accessToken),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error((await res.text()).slice(0, 400) || "Could not save rules");
+  // The RPC result is canonical effective rules. Re-read the small snapshot so
+  // the editor also receives the exact version it must use for its next save.
+  return await loadRulesResult(storeId);
 }
 
 export async function verifyManagerPinInDb(

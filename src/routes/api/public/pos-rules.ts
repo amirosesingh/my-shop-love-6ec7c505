@@ -54,6 +54,9 @@ async function handlePost(request: Request): Promise<Response> {
       failure: loaded.failure,
       revision: loaded.revision,
       fetchedAt: loaded.fetchedAt,
+      rowVersion: loaded.rowVersion,
+      updatedAt: loaded.updatedAt,
+      updatedBy: loaded.updatedBy,
       rules: loaded.rules,
     });
   } catch (e) {
