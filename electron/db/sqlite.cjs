@@ -140,7 +140,7 @@ const TOMBSTONE_TABLES = [
  * stock, shifts, the queued rows waiting to be sent and the terminal's own
  * settings are never rebuilt or cleared.
  */
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 /** What the file on disk says it is. 0 for a database from before versioning. */
 function schemaVersion() {
@@ -175,6 +175,10 @@ function migrate() {
     add("last_error_at", "TEXT");
     add("synced_at", "TEXT");
     if (!have.has("updated_at")) db.exec(`ALTER TABLE ${table} ADD COLUMN updated_at TEXT`);
+  }
+  const rules = columnsOf("pos_store_settings");
+  if (rules.size && !rules.has("base_version")) {
+    db.exec(`ALTER TABLE pos_store_settings ADD COLUMN base_version INTEGER`);
   }
 
   // 2. Idempotency key on the transaction tables.
@@ -308,6 +312,31 @@ function mirror(entity, rows) {
       stmt.run(entity, String(row?.id ?? row?.key ?? uuid()), JSON.stringify(row), at);
     }
     return rows.length;
+  });
+}
+
+/** Persist a related business transaction in one SQLite transaction. */
+function mirrorBatch(entries) {
+  if (!ready() || !Array.isArray(entries) || !entries.length) return 0;
+  const at = nowIso();
+  return tx(() => {
+    const stmt = db.prepare(
+      `INSERT INTO mirror (entity, id, payload, updated_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT(entity, id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`,
+    );
+    let written = 0;
+    for (const entry of entries) {
+      const entity = String(entry?.entity ?? "").trim();
+      if (!entity || !Array.isArray(entry?.rows)) continue;
+      for (const row of entry.rows) {
+        const fallbackId = entity === "pos_store_settings" ? String(row?.store_id ?? "global") || "global" : "";
+        const id = String(row?.id ?? row?.key ?? fallbackId).trim();
+        if (!id) throw new Error(`SQLite mirror row for ${entity} has no stable id`);
+        stmt.run(entity, id, JSON.stringify(row), at);
+        written += 1;
+      }
+    }
+    return written;
   });
 }
 
@@ -680,6 +709,7 @@ module.exports = {
   relationalHealth,
   setScope,
   mirror,
+  mirrorBatch,
   listMirror,
   counts,
   logAudit,
