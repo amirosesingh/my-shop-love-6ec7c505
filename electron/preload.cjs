@@ -113,8 +113,8 @@ contextBridge.exposeInMainWorld("pos", {
   getConfig: (key) => invoke("config:get", key),
   setConfig: (key, value) => invoke("config:set", key, value),
   resetConfig: () => invoke("config:reset"),
-  /* embedded local database (mirror + audit ledger). Offline sales live in
-     the branch SQL Server outbox — there is deliberately no second queue. */
+  /* Embedded SQLite recovery database. Business batches and their durable
+     upload intent are committed together before the SQL Server projection. */
   localInfo: () => invoke("local:info"),
   localMirror: (entity, rows) => invoke("local:mirror", entity, rows),
   localMirrorBatch: (entries) => invoke("local:mirror-batch", entries),

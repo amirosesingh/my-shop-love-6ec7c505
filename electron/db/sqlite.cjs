@@ -356,12 +356,77 @@ function mirrorBatch(entries) {
              ON CONFLICT("${key}") ${conflict}`,
           ).run(...encoded);
         }
+        written += 1;
+      }
+    }
+    // The same transaction owns the durable upload intent. A process exit can
+    // therefore never leave business rows present without a replay record.
+    const ops = entries
+      .filter(
+        (entry) =>
+          entry &&
+          entry.entity !== "pos_store_settings" &&
+          typeof entry.entity === "string" &&
+          Array.isArray(entry.rows),
+      )
+      .map((entry) => ({ kind: "upsert", table: entry.entity, rows: entry.rows, onConflict: "id" }));
+    if (!ops.length) return written;
+    const batchId = `batch:${require("node:crypto").createHash("sha256").update(JSON.stringify(ops)).digest("hex")}`;
+    db.prepare(
+      `INSERT INTO offline_sync_queue
+         (id, table_name, record_id, action_type, payload_json, status, attempts,
+          client_transaction_id, created_at)
+       VALUES (?, '__business_batch__', ?, 'UPDATE', ?, 'pending', 0, ?, ?)
+       ON CONFLICT(id) DO NOTHING`,
+    ).run(
+      batchId,
+      batchId,
+      JSON.stringify({ ops }),
+      String(entries.flatMap((entry) => entry.rows ?? []).find((row) => row?.client_transaction_id)?.client_transaction_id ?? "") || null,
+      at,
+    );
         stmt.run(entity, id, JSON.stringify(row), at);
         written += 1;
       }
     }
     return written;
   });
+}
+
+function pendingBusinessBatches(limit = 25) {
+  if (!ready()) return [];
+  return db
+    .prepare(
+      `SELECT id, payload_json, attempts, created_at
+         FROM offline_sync_queue
+        WHERE table_name = '__business_batch__' AND status IN ('pending', 'failed')
+        ORDER BY created_at, id LIMIT ?`,
+    )
+    .all(Math.min(Math.max(Number(limit) || 25, 1), 100))
+    .map((row) => ({ ...row, payload: JSON.parse(row.payload_json) }));
+}
+
+function acknowledgeBusinessBatch(id) {
+  if (!ready()) return false;
+  return tx(() => db.prepare("DELETE FROM offline_sync_queue WHERE id = ?").run(String(id)).changes > 0);
+}
+
+function failBusinessBatch(id, error, maxAttempts = 5) {
+  if (!ready()) return false;
+  const row = db.prepare("SELECT attempts FROM offline_sync_queue WHERE id = ?").get(String(id));
+  if (!row) return false;
+  const attempts = Number(row.attempts ?? 0) + 1;
+  const status = attempts >= maxAttempts ? "dead_letter" : "failed";
+  return tx(
+    () =>
+      db
+        .prepare(
+          `UPDATE offline_sync_queue
+              SET status = ?, attempts = ?, error_message = ?, last_attempt_at = ?
+            WHERE id = ?`,
+        )
+        .run(status, attempts, String(error ?? "sync failed").slice(0, 1000), nowIso(), String(id)).changes > 0,
+  );
 }
 
 function listMirror(entity, limit = 500) {
@@ -734,6 +799,9 @@ module.exports = {
   setScope,
   mirror,
   mirrorBatch,
+  pendingBusinessBatches,
+  acknowledgeBusinessBatch,
+  failBusinessBatch,
   listMirror,
   counts,
   logAudit,
