@@ -63,8 +63,8 @@ async function handle({ request }: { request: Request }) {
 
   const body = await res.text();
   if (!res.ok) {
-    console.error(`Security finding ingest failed [${res.status}]: ${body}`);
-    return Response.json({ error: body }, { status: res.status });
+    console.error(`Security finding ingest failed [${res.status}]`);
+    return Response.json({ error: "Security finding ingest failed" }, { status: res.status });
   }
   return new Response(body, {
     status: 200,

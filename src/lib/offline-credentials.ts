@@ -7,6 +7,8 @@
  * checked locally, so the till keeps working. Entries expire so an employee
  * removed in head office cannot sign in forever.
  */
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
+
 export type CachedCredential = {
   username: string;
   cashierId: string;
@@ -45,7 +47,7 @@ export async function derive(pin: string, saltHex: string): Promise<string> {
 function read(): CachedCredential[] {
   if (!isBrowser()) return [];
   try {
-    return JSON.parse(window.localStorage.getItem(KEY) ?? "[]") as CachedCredential[];
+    return JSON.parse(readBusinessValue(KEY) ?? "[]") as CachedCredential[];
   } catch {
     return [];
   }
@@ -54,7 +56,7 @@ function read(): CachedCredential[] {
 function write(rows: CachedCredential[]) {
   if (!isBrowser()) return;
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(rows));
+    writeBusinessValue(KEY, JSON.stringify(rows));
   } catch {
     /* storage full */
   }

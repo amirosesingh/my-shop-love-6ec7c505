@@ -16,9 +16,8 @@ import { isElectron, isNative } from "@/platform-config/platform";
  */
 const warned = new Set<string>();
 
-function warnBridgeUnavailable(operation: string, err: unknown) {
-  const detail = err instanceof Error ? err.message : String(err);
-  console.warn(`[native-http] ${operation}: native bridge unavailable — ${detail}`);
+function warnBridgeUnavailable(operation: string, _error: unknown) {
+  if (import.meta.env.DEV) console.warn(`[native-http] ${operation}: native bridge unavailable`);
   if (typeof window === "undefined" || warned.has(operation)) return;
   warned.add(operation);
   void import("sonner")

@@ -11,6 +11,7 @@ import { Link } from "@tanstack/react-router";
 import { LifeBuoy } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { isTerminalApp } from "@/platform-config/platform";
 
 export function EmergencyAccessLink({
   className,
@@ -19,6 +20,7 @@ export function EmergencyAccessLink({
   className?: string;
   label?: string;
 }) {
+  if (!isTerminalApp()) return null;
   return (
     <Link
       to="/recovery"

@@ -301,10 +301,14 @@ function Purchasing() {
    * screen, which is exactly what forced a manual reload before.
    */
   const reconcileAfterPost = async (inv: ReceivingInvoice, productIds: string[]) => {
-    const rows = await refreshHistory();
-    await refreshDrafts();
-    const stored = rows?.find((r) => r.id === inv.id);
-    if (stored && stored.status === "posted") await syncProducts(productIds);
+    try {
+      const rows = await refreshHistory();
+      await refreshDrafts();
+      const stored = rows?.find((r) => r.id === inv.id);
+      if (stored && stored.status === "posted") await syncProducts(productIds);
+    } catch {
+      toast.info("Receiving was saved; the lists will refresh when the connection settles.");
+    }
   };
 
 

@@ -9,6 +9,7 @@
  * Events carry identifiers and codes only. Never PINs, tokens, passwords,
  * prices, totals or customer details.
  */
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
 import { recordSync } from "./sync-audit";
 
 export type DiagnosticKind =
@@ -16,6 +17,8 @@ export type DiagnosticKind =
   | "stock_delta_failed"
   | "stock_reconcile_drift"
   | "local_mirror_failed"
+  /** SQLite accepted the mutation but the optional SQL Server projection did not. */
+  | "compatibility_projection_failed"
   | "sale_idempotency_unavailable"
   | "shift_lookup_unavailable"
   /** Part of a basket was stored and the rest was parked for retry. */
@@ -72,7 +75,7 @@ export function reasonCode(message: unknown): string {
 export function listDiagnostics(limit = LIMIT): DiagnosticEvent[] {
   if (typeof window === "undefined") return [];
   try {
-    return (JSON.parse(window.localStorage.getItem(KEY) ?? "[]") as DiagnosticEvent[]).slice(
+    return (JSON.parse(readBusinessValue(KEY) ?? "[]") as DiagnosticEvent[]).slice(
       0,
       limit,
     );
@@ -83,7 +86,7 @@ export function listDiagnostics(limit = LIMIT): DiagnosticEvent[] {
 
 export function clearDiagnostics() {
   if (typeof window === "undefined") return;
-  window.localStorage.removeItem(KEY);
+  writeBusinessValue(KEY, null);
   announce();
 }
 
@@ -109,7 +112,7 @@ export function recordDiagnostic(input: {
   try {
     if (typeof window !== "undefined") {
       const next = [event, ...listDiagnostics(LIMIT)].slice(0, LIMIT);
-      window.localStorage.setItem(KEY, JSON.stringify(next));
+      writeBusinessValue(KEY, JSON.stringify(next));
     }
     recordSync({
       direction: "system",
@@ -138,6 +141,8 @@ export const describeDiagnostic = (e: DiagnosticEvent): string => {
         : `A stock movement was recorded centrally for a different amount than the till's ledger (${e.recordId ?? "unknown"}).`;
     case "local_mirror_failed":
       return `The terminal copy of ${e.entity} could not be updated (${e.code}).`;
+    case "compatibility_projection_failed":
+      return `The terminal safely stored ${e.entity}, but its compatibility copy needs retrying (${e.code}).`;
     case "sale_idempotency_unavailable":
       return `The duplicate-checkout check could not be completed (${e.code}).`;
     case "shift_lookup_unavailable":

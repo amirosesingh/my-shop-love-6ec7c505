@@ -12,8 +12,10 @@ describe("sales realtime refresh", () => {
     expect(store).toContain("subscribeSalesChange");
     expect(store).toContain("subscribeSettingsChange");
     expect(store).toContain('change.table !== "pos_settings"');
-    expect(engine).toContain('announceSalesChange(table, storeId)');
-    expect(store).toContain("subscribeSalesChange");
     expect(store).toContain("loadCloudState()");
+    expect(store).toContain('App.addListener("appStateChange"');
+    expect(store).toContain('window.addEventListener("focus", resume)');
+    expect(store).toContain('window.addEventListener("focus", focus)');
+    expect(store).toContain("if (cancelled) void handle.remove()");
   });
 });

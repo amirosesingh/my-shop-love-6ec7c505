@@ -137,9 +137,7 @@ export async function publishTelemetry(staff?: { name?: string | null; role?: st
       const column = missingColumn(error as { code?: string; message?: string });
       if (!column || ESSENTIAL.has(column) || droppedColumns.has(column)) return;
       droppedColumns.add(column);
-      console.warn(
-        `[telemetry] this database has no "${column}" column on branch_telemetry — reporting without it`,
-      );
+      if (import.meta.env.DEV) console.warn(`[telemetry] compatibility column unavailable: ${column}`);
     } catch {
       /* telemetry never interrupts trading */
       return;

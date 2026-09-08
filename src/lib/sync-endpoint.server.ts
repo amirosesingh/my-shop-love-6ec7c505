@@ -170,11 +170,7 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
   if (refused) {
     // One readable line per refusal so a live server shows why, without ever
     // logging a token, a key or the row contents.
-    console.warn(
-      `[sync] refused ${refused.kind} on ${refused.table}: ${refused.code} ` +
-        `(caller=${scope.kind}/${scope.label}, role=${scope.roleSlug ?? scope.role ?? "none"}, ` +
-        `branch=${scope.storeId ?? "none"}, supervisor=${scope.isSupervisor})`,
-    );
+    console.warn(`[sync] refused ${refused.kind} on ${refused.table}: ${refused.code}`);
   }
   return Response.json(
     {

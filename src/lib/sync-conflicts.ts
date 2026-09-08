@@ -6,6 +6,8 @@
  * That is the right outcome, but the person at the till should still be told,
  * so each of those is recorded here and shown on the Sync & backup screen.
  */
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
+
 export type SyncConflict = {
   id: string;
   at: string;
@@ -29,7 +31,7 @@ const isBrowser = () => typeof window !== "undefined";
 export function listConflicts(): SyncConflict[] {
   if (!isBrowser()) return [];
   try {
-    return JSON.parse(window.localStorage.getItem(KEY) ?? "[]") as SyncConflict[];
+    return JSON.parse(readBusinessValue(KEY) ?? "[]") as SyncConflict[];
   } catch {
     return [];
   }
@@ -38,7 +40,7 @@ export function listConflicts(): SyncConflict[] {
 function persist(rows: SyncConflict[]) {
   if (isBrowser()) {
     try {
-      window.localStorage.setItem(KEY, JSON.stringify(rows.slice(0, MAX)));
+      writeBusinessValue(KEY, JSON.stringify(rows.slice(0, MAX)));
     } catch {
       /* diagnostic only */
     }

@@ -51,6 +51,7 @@ import { recordActivity } from "./activity-events";
 import type { CloudSlice, CommitTarget } from "@/core/api/pos-db";
 import { clearSnapshot, hydrateSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isOnlineOnly } from "./live-mode";
+import { platformName } from "@/platform-config/platform";
 import { useAuth } from "@/lib/pos-auth";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { reserveBillNumber } from "./bill-number";
@@ -761,11 +762,51 @@ export function PosProvider({ children }: { children: ReactNode }) {
     };
     document.addEventListener("visibilitychange", resume);
     window.addEventListener("online", resume);
+    window.addEventListener("focus", resume);
+    let removeNative: (() => Promise<void>) | undefined;
+    let cancelled = false;
+    if (platformName() === "android") {
+      void import("@capacitor/app")
+        .then(({ App }) =>
+          App.addListener("appStateChange", ({ isActive }) => {
+            if (isActive) resume();
+          }),
+        )
+        .then((handle) => {
+          if (cancelled) void handle.remove();
+          else removeNative = () => handle.remove();
+        })
+        .catch(() => {
+          /* WebView visibility and focus remain the lifecycle fallback. */
+        });
+    }
     return () => {
+      cancelled = true;
       document.removeEventListener("visibilitychange", resume);
       window.removeEventListener("online", resume);
+      window.removeEventListener("focus", resume);
+      if (removeNative) void removeNative();
     };
   }, [signedIn, refreshActiveShift]);
+
+  // Electron can miss socket events while its window is minimized. Regaining
+  // focus wakes the durable worker and re-reads the branch snapshot; the
+  // worker remains responsible for ordered push/pull convergence.
+  useEffect(() => {
+    if (isOnlineOnly() || !signedIn) return;
+    const focus = () => {
+      const bridge = localDb();
+      if (bridge?.push) void bridge.push();
+      const active = activeBranchId(stateRef.current.currentStoreId) ?? stateRef.current.currentStoreId;
+      void loadCloudState(active ?? undefined)
+        .then((cloud) => setState((current) => applyCloud(current, cloud)))
+        .catch(() => {
+          /* SQLite remains authoritative while the central service is absent. */
+        });
+    };
+    window.addEventListener("focus", focus);
+    return () => window.removeEventListener("focus", focus);
+  }, [signedIn]);
 
   // A committed sale is announced by the existing shared Realtime channel.
   // The event is only a notification: always fetch the complete canonical
@@ -779,7 +820,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         timer = undefined;
-        void loadCloudState()
+        void loadCloudState(active ?? undefined)
           .then((cloud) => {
             writeSnapshot(cloud);
             setState((current) => applyCloud(current, cloud));

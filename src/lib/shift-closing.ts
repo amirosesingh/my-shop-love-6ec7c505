@@ -8,7 +8,7 @@
  */
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import type { ShiftState } from "@/core/types/pos-types";
-import { enqueue } from "./sync-outbox";
+import { commitOps } from "@/core/api/pos-db";
 
 export type ShiftCloseStep =
   | { ok: true; state: ShiftState }
@@ -80,12 +80,12 @@ export async function submitCashCount(
   // The line is down. The count is parked exactly as the server would have
   // received it and replayed on reconnect; the database still works out the
   // variance, and the client key means a replay cannot count the drawer twice.
-  enqueue("Cash count (waiting for the line)", {
+  await commitOps("Cash count (waiting for the line)", [{
     kind: "rpc",
     table: "shift_cash_counts",
     fn: "shift_cash_count_submit",
     args,
-  });
+  }]);
   return {
     ok: false,
     queued: true,

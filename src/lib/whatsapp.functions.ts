@@ -62,8 +62,8 @@ export const sendWhatsAppBill = createServerFn({ method: "POST" })
     );
     const text = await res.text();
     if (!res.ok) {
-      console.error(`[whatsapp] send failed [${res.status}]: ${text}`);
-      return { ok: false as const, error: `WhatsApp API ${res.status}: ${text.slice(0, 300)}` };
+      if (import.meta.env.DEV) console.error(`[whatsapp] send failed [${res.status}]`);
+      return { ok: false as const, error: `WhatsApp delivery failed (${res.status})` };
     }
     return { ok: true as const, response: text.slice(0, 300) };
   });

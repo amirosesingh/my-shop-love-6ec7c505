@@ -1,5 +1,5 @@
 /**
- *  * Registration must be decidable offline, must expire, must reject tampering,
+ * Registration must be decidable offline, must reject tampering,
  * and must stay entirely out of the local trading path.
  */
 import { readFileSync } from "node:fs";
@@ -18,10 +18,8 @@ const store = new Map<string, string>();
 
 import {
   clearActivationRecord,
-  graceValid,
   isRegistered,
   readActivationRecord,
-  setGraceDays,
   writeActivationRecord,
   type ActivationRecord,
 } from "@/core/activation/activation-record";
@@ -29,11 +27,8 @@ import { emergencyMode } from "@/core/activation/registration-status";
 
 vi.mock("@/core/activation/terminal-tokens", () => ({ readTerminalConfig: () => null }));
 
-const DAY = 24 * 60 * 60 * 1000;
-
 beforeEach(() => {
   window.localStorage.clear();
-  setGraceDays(7);
 });
 
 describe("activation record", () => {
@@ -46,26 +41,21 @@ describe("activation record", () => {
     expect(await isRegistered()).toBe("registered");
   });
 
-  it("expires the grace window after the configured number of days", async () => {
-    const verifiedAt = new Date(Date.now() - 8 * DAY);
-    await writeActivationRecord({ tokenId: "tok-1", verifiedAt });
-    expect(await isRegistered()).toBe("grace-expired");
-
-    setGraceDays(30);
-    await writeActivationRecord({ tokenId: "tok-1", verifiedAt });
+  it("does not expire a registered offline-capable terminal by elapsed days", async () => {
+    await writeActivationRecord({ tokenId: "tok-1", verifiedAt: new Date(0) });
     expect(await isRegistered()).toBe("registered");
   });
 
   it("rejects a hand-edited record instead of granting access", async () => {
-    await writeActivationRecord({ tokenId: "tok-1", verifiedAt: new Date(Date.now() - 8 * DAY) });
+    await writeActivationRecord({ tokenId: "tok-1" });
     const sealed = await readActivationRecord();
     expect(sealed).not.toBeNull();
 
-    // Re-seal the same blob with a stretched grace date but the original tag.
+    // Alter an authenticated field without updating its tag.
     const { setDeviceSecret } = await import("../device-secrets");
     await setDeviceSecret("activation.record.v1", {
       ...(sealed as ActivationRecord),
-      graceUntil: new Date(Date.now() + 999 * DAY).toISOString(),
+      tokenId: "tok-tampered",
     });
 
     expect(await readActivationRecord()).toBeNull();
@@ -78,24 +68,18 @@ describe("activation record", () => {
     expect(await isRegistered()).toBe("not-registered");
   });
 
-  it("treats a missing grace date as invalid", () => {
-    expect(graceValid(null)).toBe(false);
-  });
 });
 
 describe("emergency access branches", () => {
-  it("covers all four registered × cloud combinations", () => {
+  it("covers registered and unregistered connection combinations", () => {
     expect(emergencyMode({ registration: "registered", cloudConnected: true })).toBe(
       "online-verified",
     );
     expect(emergencyMode({ registration: "registered", cloudConnected: false })).toBe(
-      "offline-grace",
+      "offline-registered",
     );
     expect(emergencyMode({ registration: "not-registered", cloudConnected: true })).toBe(
       "online-unregistered",
-    );
-    expect(emergencyMode({ registration: "grace-expired", cloudConnected: false })).toBe(
-      "offline-unregistered",
     );
   });
 });
