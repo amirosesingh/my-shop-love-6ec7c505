@@ -294,40 +294,6 @@ async function cloudUpsert(table, rows) {
   if (error) throw error;
 }
 
-async function cloudMutation(op) {
-  if (op.kind === "insert" || op.kind === "upsert") return cloudUpsert(op.table, op.rows);
-  const bearer = credentials.sessionToken || credentials.accessToken;
-  if (relayUrl && (bearer || credentials.cashierToken || credentials.terminalToken)) {
-    const response = await fetch(relayUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
-      },
-      body: JSON.stringify({
-        sessionToken: credentials.sessionToken,
-        cashierToken: credentials.cashierToken,
-        terminalToken: credentials.terminalToken,
-        ops: [op],
-      }),
-    });
-    const body = await response.json().catch(() => null);
-    if (!response.ok || !body?.ok || body.results?.some((result) => !result.ok)) {
-      throw new Error(body?.error || body?.results?.find((result) => !result.ok)?.error || `Sync relay failed (${response.status})`);
-    }
-    return;
-  }
-  if (op.kind === "rpc") {
-    const { error } = await supabase.rpc(op.fn, op.args ?? {});
-    if (error) throw error;
-    return;
-  }
-  let query = op.kind === "delete" ? supabase.from(op.table).delete() : supabase.from(op.table).update(op.values ?? {});
-  for (const [column, value] of Object.entries(op.match ?? {})) query = query.eq(column, value);
-  const { error } = await query;
-  if (error) throw error;
-}
-
 /**
  * Pending branch rules are never table-upserted. The local row version is one
  * ahead of the confirmed version it was edited from, so replay uses that base
@@ -365,20 +331,19 @@ async function pushSqliteBusinessBatches() {
     const ops = Array.isArray(batch.payload?.ops) ? batch.payload.ops : [];
     try {
       for (const op of ops) {
-        if (!op?.kind || !op.table) {
+        if (op?.kind !== "upsert" || !op.table || !Array.isArray(op.rows)) {
           throw new Error("Unsupported operation in SQLite business outbox");
         }
-        const rows = Array.isArray(op.rows) ? op.rows : [];
-        const payload = stripAbsoluteStock(op.table, rows.map((row) => repo.toCloudRow(op.table, row)));
-        if (op.table === "pos_store_settings") await cloudSaveRules(rows);
-        else await cloudMutation({ ...op, ...(rows.length ? { rows: payload } : {}) });
+        const payload = stripAbsoluteStock(op.table, op.rows.map((row) => repo.toCloudRow(op.table, row)));
+        if (op.table === "pos_store_settings") await cloudSaveRules(op.rows);
+        else await cloudUpsert(op.table, payload);
         if (op.table === "item_activity_logs") {
           const delta = await applyStockDeltas(payload);
           if (delta?.error) throw new Error(delta.error);
         }
       }
       for (const op of ops) {
-        const ids = (op.rows ?? []).map((row) => row?.id).filter(Boolean);
+        const ids = op.rows.map((row) => row?.id).filter(Boolean);
         if (ids.length) await repo.markSynced(op.table, ids).catch(() => {});
       }
       sqlite.acknowledgeBusinessBatch(batch.id);

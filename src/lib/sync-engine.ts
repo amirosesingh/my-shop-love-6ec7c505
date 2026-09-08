@@ -829,6 +829,10 @@ function announceSettingsChange(
   for (const fn of settingsListeners) {
     try {
       fn({ reason, table, storeId });
+function announceSettingsChange(reason: string, storeId: string | null = null): void {
+  for (const fn of settingsListeners) {
+    try {
+      fn({ reason, table: "pos_store_settings", storeId });
     } catch {
       /* one bad listener must not stop the others */
     }
@@ -977,6 +981,12 @@ export function startSyncEngine() {
               announceSalesChange(changedTable, changedStore);
             }
           }
+        void syncNow(`live:${table}`);
+        if (table === "pos_settings" || table === "pos_store_settings") {
+          announceSettingsChange(`live:${table}`, storeId);
+        }
+        if (table === "sales" || table === "sale_items" || table === "payment_transactions") {
+          announceSalesChange(table, storeId);
         }
       }, 400);
     });

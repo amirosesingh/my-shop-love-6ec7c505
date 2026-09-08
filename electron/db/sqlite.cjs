@@ -321,12 +321,12 @@ function mirror(entity, rows) {
 }
 
 /** Persist a related business transaction in one SQLite transaction. */
-function mirrorBatch(entries, operations) {
-  if (!ready() || !Array.isArray(entries)) return 0;
-  if (!entries.length && (!Array.isArray(operations) || !operations.length)) return 0;
+function mirrorBatch(entries) {
+  if (!ready() || !Array.isArray(entries) || !entries.length) return 0;
   const at = nowIso();
   return tx(() => {
     const mirrorStmt = db.prepare(
+    const stmt = db.prepare(
       `INSERT INTO mirror (entity, id, payload, updated_at) VALUES (?, ?, ?, ?)
        ON CONFLICT(entity, id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`,
     );
@@ -348,7 +348,9 @@ function mirrorBatch(entries, operations) {
           const values = Object.entries(row).filter(([name, value]) => tableColumns.has(name) && value !== undefined);
           if (!values.some(([name]) => name === key)) values.push([key, id]);
           const names = values.map(([name]) => name);
-          const encoded = values.map(([, value]) => sqliteValue(value));
+          const encoded = values.map(([, value]) =>
+            value != null && typeof value === "object" ? JSON.stringify(value) : value,
+          );
           const updates = names.filter((name) => name !== key);
           const conflict = updates.length
             ? `DO UPDATE SET ${updates.map((name) => `"${name}" = excluded."${name}"`).join(", ")}`
@@ -364,33 +366,15 @@ function mirrorBatch(entries, operations) {
     }
     // The same transaction owns the durable upload intent. A process exit can
     // therefore never leave business rows present without a replay record.
-    const supplied = Array.isArray(operations) ? operations : null;
-    const ops = (supplied ?? entries.map((entry) => ({
-      kind: "upsert",
-      table: entry.entity,
-      rows: entry.rows,
-      onConflict: "id",
-    }))).filter((op) => op?.table !== "pos_store_settings");
-    // Updates and deletes have no row list above, but their local effect and
-    // replay intent must share the same transaction as every inserted row.
-    for (const op of ops) {
-      if ((op.kind !== "update" && op.kind !== "delete") || !op.table || !op.match) continue;
-      const id = String(op.match.id ?? "").trim();
-      if (!id) continue;
-      if (op.kind === "delete") {
-        db.prepare("DELETE FROM mirror WHERE entity = ? AND id = ?").run(op.table, id);
-        if (columnsOf(op.table).has("id")) db.prepare(`DELETE FROM "${op.table}" WHERE id = ?`).run(id);
-        continue;
-      }
-      const current = db.prepare("SELECT payload FROM mirror WHERE entity = ? AND id = ?").get(op.table, id);
-      const merged = { ...(current?.payload ? JSON.parse(current.payload) : { id }), ...(op.values ?? {}) };
-      mirrorStmt.run(op.table, id, JSON.stringify(merged), at);
-      const known = Object.entries(op.values ?? {}).filter(([name, value]) => columnsOf(op.table).has(name) && value !== undefined);
-      if (known.length && columnsOf(op.table).has("id")) {
-        db.prepare(`UPDATE "${op.table}" SET ${known.map(([name]) => `"${name}" = ?`).join(", ")} WHERE id = ?`)
-          .run(...known.map(([, value]) => sqliteValue(value)), id);
-      }
-    }
+    const ops = entries
+      .filter(
+        (entry) =>
+          entry &&
+          entry.entity !== "pos_store_settings" &&
+          typeof entry.entity === "string" &&
+          Array.isArray(entry.rows),
+      )
+      .map((entry) => ({ kind: "upsert", table: entry.entity, rows: entry.rows, onConflict: "id" }));
     if (!ops.length) return written;
     const batchId = `batch:${require("node:crypto").createHash("sha256").update(JSON.stringify(ops)).digest("hex")}`;
     db.prepare(
@@ -406,6 +390,10 @@ function mirrorBatch(entries, operations) {
       String(entries.flatMap((entry) => entry.rows ?? []).find((row) => row?.client_transaction_id)?.client_transaction_id ?? "") || null,
       at,
     );
+        stmt.run(entity, id, JSON.stringify(row), at);
+        written += 1;
+      }
+    }
     return written;
   });
 }

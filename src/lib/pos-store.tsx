@@ -36,6 +36,7 @@ import type {
   TransferStatus,
 } from "@/core/types/pos-types";
 import { subscribeSalesChange, subscribeSettingsChange } from "./sync-engine";
+import { subscribeSalesChange } from "./sync-engine";
 import { bookingBalance, lineDiscountTotal, lineUnitDiscount, r2, type DiscountType } from "@/core/types/pos-types";
 import { logger } from "./audit-log";
 import { toast } from "sonner";
