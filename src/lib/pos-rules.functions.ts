@@ -151,8 +151,11 @@ export const savePosRules = createServerFn({ method: "POST" })
     try {
       const caller = await assertCaller(data);
       if (!caller.isSupervisor) return { ok: false as const, error: "Supervisors only" };
+      const { resolveRulesAccess } = await import("./pos-rules-access.server");
+      const access = await resolveRulesAccess(data);
+      if (!access.ok) return { ok: false as const, error: access.error, code: access.code };
       const rules = await saveRules(
-        data.storeId ?? "",
+        access.branchId,
         data.patch as never,
         data.accessToken,
         data.expectedVersion,

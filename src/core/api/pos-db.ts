@@ -888,7 +888,7 @@ export async function importSampleData() {
 }
 
 /** Load every cloud-backed slice of the POS state. */
-export async function loadCloudState(): Promise<CloudSlice> {
+export async function loadCloudState(storeId?: string | null): Promise<CloudSlice> {
   const { hydrateTerminalConfig } = await import("@/core/activation/terminal-tokens");
   await hydrateTerminalConfig();
   const tiers = await supabase.from("membership_tiers").select("id, name").is("deleted_at", null);
@@ -924,12 +924,15 @@ export async function loadCloudState(): Promise<CloudSlice> {
     ),
 
     (async () => {
-      const read = () =>
-        supabase
+      const read = () => {
+        let query = supabase
           .from("sales")
-          .select(saleColumns())
+          .select(saleColumns());
+        if (storeId) query = query.eq("store_id", storeId);
+        return query
           .order("created_at", { ascending: false })
           .limit(500);
+      };
       const first = await read();
       if (first.error && isMissingTxnColumn(first.error.message)) {
         forgetTxnColumn(first.error.message);
@@ -2134,6 +2137,30 @@ export const db = {
         values: { exchanged_to_bill_number: sale.receiptNo },
         match: { bill_number: sale.exchangeOfReceiptNo },
       });
+    if (isOnlineOnly()) {
+      // One central transaction owns the immutable financial graph, member
+      // effect and stock deltas. Product rows remain a separate projection,
+      // with absolute stock stripped before they are sent.
+      await runOpLive("Saving sale", {
+        kind: "rpc",
+        table: "sales",
+        fn: "pos_sale_commit",
+        args: {
+          _sale: saleToRow(sale),
+          _items: saleItemRows(sale),
+          _payments: tenders,
+          _movements: movements,
+          _member: member ? memberToRow(member, tierId) : null,
+          _exchange_bill: sale.exchangeOfReceiptNo ?? null,
+        },
+      });
+      const projections = ops.filter((op) => op.table === "products");
+      if (projections.length) {
+        const { ops: safeProjections } = withRelativeStock(projections);
+        await runBatchLive("Updating sale projections", safeProjections);
+      }
+      return noteCommitTarget("cloud");
+    }
     return commitOps("Saving sale", ops);
   },
 
