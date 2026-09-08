@@ -1666,7 +1666,7 @@ function registerIpc() {
       written: localDb.mirror(guard.key(entity, { name: "table" }), guard.list(rows ?? [], { name: "rows", max: 5000 })),
     })),
   );
-  ipcMain.handle("local:mirror-batch", (_e, entries, ops) =>
+  ipcMain.handle("local:mirror-batch", (_e, entries) =>
     guard.guarded(() => ({
       ok: true,
       written: localDb.mirrorBatch(
@@ -1677,7 +1677,6 @@ function registerIpc() {
             rows: guard.list(value.rows ?? [], { name: "rows", max: 5000 }),
           };
         }),
-        ops === undefined ? undefined : guard.writeOps(ops),
       ),
     })),
   );

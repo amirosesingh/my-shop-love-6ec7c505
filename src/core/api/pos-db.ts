@@ -1658,11 +1658,11 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
       // Write it before the compatibility SQL Server projection: there must
       // never again be a committed till transaction that has no on-device
       // SQLite recovery copy.
-      if (ops.length) {
+      if (mirrorEntries.length) {
         if (!bridge.localMirrorBatch) {
           throw new Error("This desktop build cannot commit an atomic SQLite batch. Update the app.");
         }
-        const shadow = await bridge.localMirrorBatch(mirrorEntries, ops);
+        const shadow = await bridge.localMirrorBatch(mirrorEntries);
         const expected = mirrorEntries.reduce((total, entry) => total + entry.rows.length, 0);
         if (!shadow.ok || Number(shadow.written ?? 0) !== expected) {
           throw new Error(shadow.error ?? "The embedded SQLite transaction copy was incomplete");
@@ -1673,6 +1673,39 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
       }
       const result = await bridge.writeBatch(context, ops);
       if (!result.ok) throw new Error(result.error ?? `${context} could not be stored locally`);
+      const mirrorEntries = ops.flatMap((op) =>
+        op.kind === "insert" || op.kind === "upsert"
+          ? [{ entity: op.table, rows: op.rows as Record<string, unknown>[] }]
+          : [],
+      );
+      if (mirrorEntries.length && bridge.localMirrorBatch) {
+        // SQL Server has already committed at this point. SQLite is currently
+        // only a secondary projection, so its failure must not turn a durable
+        // sale into an apparent failed checkout and invite the cashier to take
+        // payment again. Record the degraded mirror for diagnostics; Phase 1B
+        // will make SQLite the primary transaction/outbox boundary.
+        try {
+          const shadow = await bridge.localMirrorBatch(mirrorEntries);
+          const expected = mirrorEntries.reduce((total, entry) => total + entry.rows.length, 0);
+          if (!shadow.ok || Number(shadow.written ?? 0) !== expected) {
+            recordDiagnostic({
+              kind: "local_mirror_failed",
+              entity: "sqlite_business_batch",
+              code: reasonCode(shadow.error ?? "incomplete SQLite mirror batch"),
+            });
+          }
+        } catch (shadowError) {
+          recordDiagnostic({
+            kind: "local_mirror_failed",
+            entity: "sqlite_business_batch",
+            code: reasonCode(shadowError),
+          });
+        const shadow = await bridge.localMirrorBatch(mirrorEntries);
+        const expected = mirrorEntries.reduce((total, entry) => total + entry.rows.length, 0);
+        if (!shadow.ok || Number(shadow.written ?? 0) !== expected) {
+          throw new Error(shadow.error ?? "The embedded SQLite transaction copy was incomplete");
+        }
+      }
       setCloudDirect(false);
       // `pos:write[-batch]` already wakes the Electron worker. This second
       // signal also covers alternate/test bridges and is deliberately detached:

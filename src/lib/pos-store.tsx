@@ -779,7 +779,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         timer = undefined;
-        void loadCloudState(active ?? undefined)
+        void loadCloudState()
           .then((cloud) => {
             writeSnapshot(cloud);
             setState((current) => applyCloud(current, cloud));

@@ -829,6 +829,10 @@ function announceSettingsChange(
   for (const fn of settingsListeners) {
     try {
       fn({ reason, table, storeId });
+function announceSettingsChange(reason: string, storeId: string | null = null): void {
+  for (const fn of settingsListeners) {
+    try {
+      fn({ reason, table: "pos_store_settings", storeId });
     } catch {
       /* one bad listener must not stop the others */
     }
@@ -858,27 +862,6 @@ async function refreshStaffMirror(): Promise<void> {
 const RETRY_DELAYS_MS = [2000, 10000, 30000];
 let liveTimer: number | undefined;
 const pendingLiveChanges = new Map<string, Set<string | null>>();
-
-function flushLiveChanges(): void {
-  liveTimer = undefined;
-  const changes = [...pendingLiveChanges.entries()];
-  pendingLiveChanges.clear();
-  void syncNow(`live:${changes.map(([changedTable]) => changedTable).join(",")}`);
-  for (const [changedTable, changedStores] of changes) {
-    for (const changedStore of changedStores) {
-      if (changedTable === "pos_settings" || changedTable === "pos_store_settings") {
-        announceSettingsChange(`live:${changedTable}`, changedStore, changedTable);
-      }
-      if (
-        changedTable === "sales" ||
-        changedTable === "sale_items" ||
-        changedTable === "payment_transactions"
-      ) {
-        announceSalesChange(changedTable, changedStore);
-      }
-    }
-  }
-}
 
 /**
  * Push a just-made change straight through instead of waiting for the timer.
@@ -980,7 +963,32 @@ export function startSyncEngine() {
       pendingLiveChanges.set(table, stores);
       if (liveTimer) window.clearTimeout(liveTimer);
       // One catch-up for a burst of related edits.
-      liveTimer = window.setTimeout(flushLiveChanges, 400);
+      liveTimer = window.setTimeout(() => {
+        liveTimer = undefined;
+        const changes = [...pendingLiveChanges.entries()];
+        pendingLiveChanges.clear();
+        void syncNow(`live:${changes.map(([changedTable]) => changedTable).join(",")}`);
+        for (const [changedTable, changedStores] of changes) {
+          for (const changedStore of changedStores) {
+            if (changedTable === "pos_settings" || changedTable === "pos_store_settings") {
+              announceSettingsChange(`live:${changedTable}`, changedStore, changedTable);
+            }
+            if (
+              changedTable === "sales" ||
+              changedTable === "sale_items" ||
+              changedTable === "payment_transactions"
+            ) {
+              announceSalesChange(changedTable, changedStore);
+            }
+          }
+        void syncNow(`live:${table}`);
+        if (table === "pos_settings" || table === "pos_store_settings") {
+          announceSettingsChange(`live:${table}`, storeId);
+        }
+        if (table === "sales" || table === "sale_items" || table === "payment_transactions") {
+          announceSalesChange(table, storeId);
+        }
+      }, 400);
     });
   }
   live.subscribe((status) => {
