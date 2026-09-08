@@ -399,6 +399,11 @@ export type PosBridge = {
   localMirrorBatch?: (
     entries: Array<{ entity: string; rows: Record<string, unknown>[] }>,
   ) => Promise<{ ok: boolean; written?: number; error?: string }>;
+  /** Read stable-ID rows from the embedded SQLite recovery mirror. */
+  localList?: (
+    entity: string,
+    limit?: number,
+  ) => Promise<{ ok: boolean; rows?: Record<string, unknown>[]; error?: string }>;
   connect: (
     config: LocalDbConfig,
     cloud?: CloudBridgeConfig,
