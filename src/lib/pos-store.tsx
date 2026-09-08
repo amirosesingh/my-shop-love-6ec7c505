@@ -35,6 +35,7 @@ import type {
   TransferKind,
   TransferStatus,
 } from "@/core/types/pos-types";
+import { subscribeSalesChange, subscribeSettingsChange } from "./sync-engine";
 import { subscribeSalesChange } from "./sync-engine";
 import { bookingBalance, lineDiscountTotal, lineUnitDiscount, r2, type DiscountType } from "@/core/types/pos-types";
 import { logger } from "./audit-log";
@@ -786,6 +787,33 @@ export function PosProvider({ children }: { children: ReactNode }) {
           })
           .catch(() => {
             /* reconnect/pull remains the eventual-convergence fallback */
+          });
+      }, 250);
+    });
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [signedIn]);
+
+  // General business settings share the existing Realtime channel with POS
+  // rules. A pos_settings notification refreshes the canonical state; rule
+  // rows remain owned by PosRulesProvider and its store-scoped query cache.
+  useEffect(() => {
+    if (!signedIn) return;
+    let timer: number | undefined;
+    const unsubscribe = subscribeSettingsChange((change) => {
+      if (change.table !== "pos_settings") return;
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = undefined;
+        void loadCloudState()
+          .then((cloud) => {
+            writeSnapshot(cloud);
+            setState((current) => applyCloud(current, cloud));
+          })
+          .catch(() => {
+            /* reconnect/pull remains the convergence fallback */
           });
       }, 250);
     });

@@ -12,6 +12,7 @@ describe("Electron durable business persistence", () => {
     expect(sqlite).toContain("function mirrorBatch(entries)");
     expect(sqlite).toContain("return tx(() =>");
     expect(sqlite).toContain("INSERT INTO mirror (entity, id, payload, updated_at)");
+    expect(sqlite).toContain('INSERT INTO "${entity}"');
     expect(gateway).toContain("bridge.localMirrorBatch(mirrorEntries)");
     expect(gateway).toContain("This desktop build cannot commit an atomic SQLite batch");
     expect(gateway.indexOf("await bridge.localMirrorBatch(mirrorEntries)")).toBeLessThan(

@@ -6,6 +6,12 @@ describe("sales realtime refresh", () => {
     const engine = readFileSync("src/lib/sync-engine.ts", "utf8");
     const store = readFileSync("src/lib/pos-store.tsx", "utf8");
     expect(engine).toMatch(/LIVE_TABLES[\s\S]*"sales"/);
+    expect(engine).toContain("announceSalesChange(changedTable, changedStore)");
+    expect(engine).toContain("pendingLiveChanges");
+    expect(engine).toContain("for (const [changedTable, changedStores] of changes)");
+    expect(store).toContain("subscribeSalesChange");
+    expect(store).toContain("subscribeSettingsChange");
+    expect(store).toContain('change.table !== "pos_settings"');
     expect(engine).toContain('announceSalesChange(table, storeId)');
     expect(store).toContain("subscribeSalesChange");
     expect(store).toContain("loadCloudState()");

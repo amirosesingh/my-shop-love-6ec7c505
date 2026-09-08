@@ -821,6 +821,14 @@ export function subscribeSalesChange(fn: (change: LiveChange) => void): () => vo
   return () => salesListeners.delete(fn);
 }
 
+function announceSettingsChange(
+  reason: string,
+  storeId: string | null = null,
+  table = "pos_store_settings",
+): void {
+  for (const fn of settingsListeners) {
+    try {
+      fn({ reason, table, storeId });
 function announceSettingsChange(reason: string, storeId: string | null = null): void {
   for (const fn of settingsListeners) {
     try {
@@ -853,6 +861,7 @@ async function refreshStaffMirror(): Promise<void> {
 
 const RETRY_DELAYS_MS = [2000, 10000, 30000];
 let liveTimer: number | undefined;
+const pendingLiveChanges = new Map<string, Set<string | null>>();
 
 /**
  * Push a just-made change straight through instead of waiting for the timer.
@@ -949,10 +958,29 @@ export function startSyncEngine() {
       const changed = ((payload as { new?: Record<string, unknown>; old?: Record<string, unknown> }).new ??
         (payload as { old?: Record<string, unknown> }).old ?? {}) as Record<string, unknown>;
       const storeId = String(changed.store_id ?? changed.branch_id ?? "").trim() || null;
+      const stores = pendingLiveChanges.get(table) ?? new Set<string | null>();
+      stores.add(storeId);
+      pendingLiveChanges.set(table, stores);
       if (liveTimer) window.clearTimeout(liveTimer);
       // One catch-up for a burst of related edits.
       liveTimer = window.setTimeout(() => {
         liveTimer = undefined;
+        const changes = [...pendingLiveChanges.entries()];
+        pendingLiveChanges.clear();
+        void syncNow(`live:${changes.map(([changedTable]) => changedTable).join(",")}`);
+        for (const [changedTable, changedStores] of changes) {
+          for (const changedStore of changedStores) {
+            if (changedTable === "pos_settings" || changedTable === "pos_store_settings") {
+              announceSettingsChange(`live:${changedTable}`, changedStore, changedTable);
+            }
+            if (
+              changedTable === "sales" ||
+              changedTable === "sale_items" ||
+              changedTable === "payment_transactions"
+            ) {
+              announceSalesChange(changedTable, changedStore);
+            }
+          }
         void syncNow(`live:${table}`);
         if (table === "pos_settings" || table === "pos_store_settings") {
           announceSettingsChange(`live:${table}`, storeId);
@@ -977,6 +1005,7 @@ export function startSyncEngine() {
     offConnectivity();
     if (debounce) window.clearTimeout(debounce);
     if (liveTimer) window.clearTimeout(liveTimer);
+    pendingLiveChanges.clear();
     void supabaseExternal.removeChannel(live);
     offMode();
     started = false;
