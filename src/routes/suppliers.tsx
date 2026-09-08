@@ -75,15 +75,20 @@ function Suppliers() {
     [list, query],
   );
 
-  function commit() {
+  async function commit() {
     if (!draft) return;
     if (!draft.name.trim()) return toast.error("Supplier name is required");
-    saveSupplier({ ...draft, name: draft.name.trim() });
-    setList((l) =>
-      [...l.filter((x) => x.id !== draft.id), draft].sort((a, b) => a.name.localeCompare(b.name)),
-    );
-    setDraft(null);
-    toast.success("Supplier saved");
+    try {
+      await saveSupplier({ ...draft, name: draft.name.trim() });
+      setList((l) =>
+        [...l.filter((x) => x.id !== draft.id), draft].sort((a, b) => a.name.localeCompare(b.name)),
+      );
+      setDraft(null);
+      toast.success("Supplier saved");
+    } catch {
+      setList(await loadSuppliers());
+      toast.error("Supplier could not be saved");
+    }
   }
 
   if (!allowed)
@@ -148,11 +153,16 @@ function Suppliers() {
                     <Switch
                       aria-label={`${s.name} active`}
                       checked={s.active}
-                      onCheckedChange={(v) => {
+                      onCheckedChange={async (v) => {
                         const next = { ...s, active: v };
-                        saveSupplier(next);
-                        setList((l) => l.map((x) => (x.id === s.id ? next : x)));
-                        toast.success(`${s.name} ${v ? "switched on" : "switched off"}`);
+                        try {
+                          await saveSupplier(next);
+                          setList((l) => l.map((x) => (x.id === s.id ? next : x)));
+                          toast.success(`${s.name} ${v ? "switched on" : "switched off"}`);
+                        } catch {
+                          setList(await loadSuppliers());
+                          toast.error("Supplier could not be updated");
+                        }
                       }}
                     />
                   </TableCell>
@@ -169,10 +179,15 @@ function Suppliers() {
                       variant="ghost"
                       size="icon"
                       aria-label={`Delete ${s.name}`}
-                      onClick={() => {
-                        deleteSupplier(s.id);
-                        setList((l) => l.filter((x) => x.id !== s.id));
-                        toast.success("Supplier removed");
+                      onClick={async () => {
+                        try {
+                          await deleteSupplier(s.id);
+                          setList((l) => l.filter((x) => x.id !== s.id));
+                          toast.success("Supplier removed");
+                        } catch {
+                          setList(await loadSuppliers());
+                          toast.error("Supplier could not be removed");
+                        }
                       }}
                     >
                       <Trash2 className="size-4 text-destructive" />

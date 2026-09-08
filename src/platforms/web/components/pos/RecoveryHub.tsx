@@ -28,7 +28,6 @@ import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { cloudKeyStatus, subscribeCloudKeys } from "@/lib/secure-cloud-config";
 import { boundBranchName } from "@/lib/active-branch";
 import { emergencyMode, useStartupGate } from "@/core/activation/registration-status";
-import { graceDays, setGraceDays } from "@/core/activation/activation-record";
 
 type Health = "ok" | "todo" | "info";
 
@@ -113,17 +112,14 @@ function ModeBanner() {
   const gate = useStartupGate();
   if (gate.loading) return null;
   const mode = emergencyMode(gate);
-  const until = gate.record ? new Date(gate.record.graceUntil).toLocaleDateString() : "";
   const copy: Record<string, { tone: string; text: string }> = {
     "online-verified": {
       tone: "border-success/40 bg-success/10 text-success",
       text: "Registered and connected — activation is verified online.",
     },
-    "offline-grace": {
+    "offline-registered": {
       tone: "border-warning/40 bg-warning/10 text-warning",
-      text: until
-        ? `Verified offline — valid until ${until}. Emergency access is granted in offline mode.`
-        : "Verified offline — emergency access is granted in offline mode.",
+      text: "Registered offline terminal — durable local operation remains available.",
     },
     "online-unregistered": {
       tone: "border-warning/40 bg-warning/10 text-warning",
@@ -138,11 +134,6 @@ function ModeBanner() {
   return (
     <div className={`rounded-lg border px-3 py-2 text-xs ${tone}`}>
       {text}
-      {mode !== "online-verified" && (
-        <span className="ml-1 opacity-80">
-          Offline grace period: {graceDays()} days.
-        </span>
-      )}
     </div>
   );
 }
@@ -157,7 +148,7 @@ export function RecoveryHub() {
   // A terminal that cannot sign anybody in cannot be asked for a supervisor
   // sign-in before it is repaired. Passing the recovery code therefore opens
   // the whole of this screen — connection, activation, local database, branch,
-  // grace period and hardware. The audit trail, backups and app control are
+  // branch and hardware. The audit trail, backups and app control are
   // not here: they are not repairs and still need a real administrator.
 
   useEffect(() => {
@@ -223,25 +214,6 @@ export function RecoveryHub() {
             ? `This device is bound to ${branch}. The binding comes from the activation code — re-activate above with a code issued for another location to move it.`
             : "No branch is bound yet. Activate this terminal with a code issued for the right location; the binding is applied automatically."}
         </p>
-      </Card>
-
-      <Card
-        icon={ShieldCheck}
-        title="Offline grace period"
-        blurb="How long this terminal keeps working after its last successful verification."
-        health="info"
-        status={`${graceDays()} days`}
-      >
-        <label className="flex items-center gap-2 text-sm text-muted-foreground">
-          Days
-          <input
-            type="number"
-            min={1}
-            defaultValue={graceDays()}
-            onChange={(e) => setGraceDays(Number(e.target.value))}
-            className="w-24 rounded-md border border-border bg-background px-2 py-1 text-foreground"
-          />
-        </label>
       </Card>
 
       <Card

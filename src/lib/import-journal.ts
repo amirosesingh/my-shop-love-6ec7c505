@@ -8,6 +8,7 @@
  * starting again and creating duplicates.
  */
 import type { ImportOutcome, RejectedRow } from "@/lib/product-import";
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
 
 const KEY = "pos.import.journal";
 const MAX_RUNS = 10;
@@ -29,17 +30,9 @@ export type ImportRun = {
   pending: RejectedRow[];
 };
 
-function storage(): Storage | null {
-  try {
-    return typeof window === "undefined" ? null : window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
 export function readRuns(): ImportRun[] {
   try {
-    const raw = storage()?.getItem(KEY);
+    const raw = readBusinessValue(KEY);
     const rows = raw ? (JSON.parse(raw) as ImportRun[]) : [];
     return Array.isArray(rows) ? rows : [];
   } catch {
@@ -49,7 +42,7 @@ export function readRuns(): ImportRun[] {
 
 function writeRuns(rows: ImportRun[]) {
   try {
-    storage()?.setItem(KEY, JSON.stringify(rows.slice(0, MAX_RUNS)));
+    writeBusinessValue(KEY, JSON.stringify(rows.slice(0, MAX_RUNS)));
   } catch {
     /* a full disk must never stop an import */
   }

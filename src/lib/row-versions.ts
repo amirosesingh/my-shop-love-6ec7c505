@@ -7,6 +7,8 @@
  * working from. The database then keeps whichever copy is newer, so a till
  * that was offline for an hour can no longer undo work done elsewhere.
  */
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
+
 const KEY = "pos.row.versions.v1";
 /** Plenty for a shift's worth of edits; oldest entries fall off the end. */
 const MAX = 4000;
@@ -23,7 +25,7 @@ function read(): Versions {
   if (memory) return memory;
   if (!isBrowser()) return (memory = {});
   try {
-    memory = JSON.parse(window.localStorage.getItem(KEY) ?? "{}") as Versions;
+    memory = JSON.parse(readBusinessValue(KEY) ?? "{}") as Versions;
   } catch {
     memory = {};
   }
@@ -34,7 +36,7 @@ function persist(next: Versions) {
   memory = next;
   if (!isBrowser()) return;
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(next));
+    writeBusinessValue(KEY, JSON.stringify(next));
   } catch {
     /* storage full — versions are an optimisation, never a source of truth */
   }

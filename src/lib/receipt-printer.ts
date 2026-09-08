@@ -176,11 +176,11 @@ export async function silentPrint(
       ...(paper ? { paper } : {}),
       ...(dialog ? { dialog: true } : {}),
     });
-    if (!res?.ok) console.error("Silent print failed:", res?.error);
+    if (!res?.ok && import.meta.env.DEV) console.error("Silent print failed");
     return { handled: true, ok: !!res?.ok, ...(res?.error ? { error: res.error } : {}) };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    console.error("Silent print failed:", error);
+    if (import.meta.env.DEV) console.error("Silent print failed");
     return { handled: true, ok: false, error };
   }
 }
@@ -198,11 +198,11 @@ export async function rawPulse(bytes: number[]): Promise<PulseResult> {
       ...(deviceName ? { deviceName } : {}),
       ...(share ? { share } : {}),
     });
-    if (!res?.ok) console.error("Drawer kick failed:", res?.error);
+    if (!res?.ok && import.meta.env.DEV) console.error("Drawer kick failed");
     return { handled: true, ok: !!res?.ok, ...(res?.error ? { error: res.error } : {}) };
   } catch (err) {
     const error = err instanceof Error ? err.message : String(err);
-    console.error("Drawer kick failed:", error);
+    if (import.meta.env.DEV) console.error("Drawer kick failed");
     return { handled: true, ok: false, error };
   }
 }

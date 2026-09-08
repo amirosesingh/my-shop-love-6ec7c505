@@ -9,7 +9,7 @@
  *
  * No privileged credential is entered or kept here by design.
  */
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Navigate, useNavigate } from "@tanstack/react-router";
 import { LifeBuoy, ArrowLeft, RefreshCw } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -17,6 +17,7 @@ import { RecoveryHub } from "@/platforms/web/components/pos/RecoveryHub";
 import { EmergencyPinGate } from "@/platforms/web/components/pos/EmergencyPinGate";
 import { heartbeat } from "@/core/activation/connection-health";
 import { APP_VERSION } from "@/version";
+import { isTerminalApp } from "@/platform-config/platform";
 
 
 
@@ -42,6 +43,7 @@ export const Route = createFileRoute("/recovery")({
 });
 
 function RecoveryPage() {
+  if (!isTerminalApp()) return <Navigate to="/" />;
   return (
     <EmergencyPinGate>
       <RecoverySettings />

@@ -9,13 +9,14 @@
  */
 import { db } from "@/core/api/pos-db";
 import type { ShiftSession } from "@/core/types/pos-types";
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
 
 const KEY = "pos-shift-sessions-v1";
 
 function read(): ShiftSession[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = readBusinessValue(KEY);
     const list = raw ? (JSON.parse(raw) as ShiftSession[]) : [];
     return Array.isArray(list) ? list : [];
   } catch {
@@ -27,7 +28,7 @@ function write(list: ShiftSession[]) {
   if (typeof window === "undefined") return;
   try {
     // Keep the most recent 200 sessions on the terminal.
-    window.localStorage.setItem(KEY, JSON.stringify(list.slice(-200)));
+    writeBusinessValue(KEY, JSON.stringify(list.slice(-200)));
   } catch {
     /* storage full — the database row still carries the truth */
   }

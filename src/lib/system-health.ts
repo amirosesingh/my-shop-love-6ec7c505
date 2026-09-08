@@ -3,6 +3,7 @@
  * realtime listener, the public member / redeem subdomains and the outbound
  * sync queue. Everything here is diagnostic — nothing blocks checkout.
  */
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { pendingCount, retryQuarantined } from "@/lib/sync-outbox";
 
@@ -35,14 +36,14 @@ const MAX_ERRORS = 100;
 export function listHealthErrors(): HealthError[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(window.localStorage.getItem(ERR_KEY) ?? "[]") as HealthError[];
+    return JSON.parse(readBusinessValue(ERR_KEY) ?? "[]") as HealthError[];
   } catch {
     return [];
   }
 }
 
 export function clearHealthErrors() {
-  if (typeof window !== "undefined") window.localStorage.removeItem(ERR_KEY);
+  if (typeof window !== "undefined") writeBusinessValue(ERR_KEY, null);
 }
 
 function recordError(service: ServiceId, code: string, detail: string) {
@@ -55,7 +56,7 @@ function recordError(service: ServiceId, code: string, detail: string) {
     detail,
   };
   try {
-    window.localStorage.setItem(
+    writeBusinessValue(
       ERR_KEY,
       JSON.stringify([entry, ...listHealthErrors()].slice(0, MAX_ERRORS)),
     );

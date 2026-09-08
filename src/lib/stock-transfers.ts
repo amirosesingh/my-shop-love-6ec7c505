@@ -123,10 +123,10 @@ export async function loadTransfers(): Promise<StoredTransfer[]> {
       byTransfer.set(l.transfer_id, list);
     }
     return rows.map((r) => rowToTransfer(r, byTransfer.get(r.id) ?? []));
-  } catch (e) {
+  } catch {
     // A branch with no connection still opens the transfers screen; it just
     // shows nothing rather than a crash.
-    console.error("[transfers] loadTransfers failed", e);
+    if (import.meta.env.DEV) console.error("[transfers] load failed");
     return [];
   }
 }
@@ -141,8 +141,8 @@ export async function loadTransfer(id: string): Promise<StoredTransfer | null> {
     const lines = await sb.from("stock_transfer_items").select("*").eq("transfer_id", id);
     if (lines.error) throw new Error(lines.error.message);
     return rowToTransfer(row, ((lines.data as Row[] | null) ?? []) as Row[]);
-  } catch (e) {
-    console.error("[transfers] loadTransfer failed", e);
+  } catch {
+    if (import.meta.env.DEV) console.error("[transfers] detail load failed");
     return null;
   }
 }

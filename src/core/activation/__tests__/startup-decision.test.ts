@@ -6,7 +6,6 @@ const base = {
   registration: "registered" as const,
   verdict: "verified" as const,
   activated: true,
-  graceOpen: true,
   offlineCapable: false,
 };
 
@@ -33,21 +32,10 @@ describe("start-up decision", () => {
     expect(startupDecision({ ...base, verdict: "unreachable" })).toBe("offline-blocked");
   });
 
-  it("Windows: a registered till inside its grace window may sign in offline", () => {
+  it("Windows: a registered offline-capable till may sign in offline", () => {
     expect(
       startupDecision({ ...base, verdict: "unreachable", offlineCapable: true }),
     ).toBe("ready");
-  });
-
-  it("Windows: an expired grace window blocks the till", () => {
-    expect(
-      startupDecision({
-        ...base,
-        verdict: "unreachable",
-        offlineCapable: true,
-        graceOpen: false,
-      }),
-    ).toBe("offline-blocked");
   });
 
   it("an unactivated, unreachable device is asked for the database first", () => {

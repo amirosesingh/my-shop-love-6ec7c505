@@ -60,7 +60,7 @@ function NotFoundComponent() {
 }
 
 function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  console.error(error);
+  if (import.meta.env.DEV) console.error(error);
   const router = useRouter();
   useEffect(() => {
     // Something on screen beats a blank window: the desktop shell must know the
@@ -107,8 +107,10 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             ? "This server has not been told where the database lives. Set SUPABASE_URL and SUPABASE_ANON_KEY in the hosting variables (Cloudflare: Workers → Settings → Variables & Secrets), then reload."
             : "Something went wrong on our end. You can try refreshing or head back home."}
         </p>
-        <p className="mt-2 break-words text-xs text-muted-foreground/80">{error.message}</p>
-        {error.stack && (
+        {import.meta.env.DEV && (
+          <p className="mt-2 break-words text-xs text-muted-foreground/80">{error.message}</p>
+        )}
+        {import.meta.env.DEV && error.stack && (
           <details className="mt-3 text-left">
             <summary className="cursor-pointer text-xs text-muted-foreground">
               Technical details

@@ -12,6 +12,7 @@
  * leaves the device, and it is removed as soon as the ticket is settled.
  */
 import type { CartLine, DiscountType } from "@/core/types/pos-types";
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
 
 export type CartDraft = {
   lines: CartLine[];
@@ -26,20 +27,9 @@ export type CartDraft = {
 
 const key = (storeId: string) => `pos.cart.draft.${storeId}`;
 
-function store(): Storage | null {
-  if (typeof window === "undefined") return null;
-  try {
-    return window.localStorage;
-  } catch {
-    return null;
-  }
-}
-
 export function loadCartDraft(storeId: string): CartDraft | null {
-  const s = store();
-  if (!s) return null;
   try {
-    const raw = s.getItem(key(storeId));
+    const raw = readBusinessValue(key(storeId));
     if (!raw) return null;
     const parsed = JSON.parse(raw) as Partial<CartDraft>;
     if (!Array.isArray(parsed.lines)) return null;
@@ -58,24 +48,20 @@ export function loadCartDraft(storeId: string): CartDraft | null {
 }
 
 export function saveCartDraft(storeId: string, draft: CartDraft) {
-  const s = store();
-  if (!s) return;
   try {
     if (!draft.lines.length && !draft.memberId && !draft.exchangeRef) {
-      s.removeItem(key(storeId));
+      writeBusinessValue(key(storeId), null);
       return;
     }
-    s.setItem(key(storeId), JSON.stringify(draft));
+    writeBusinessValue(key(storeId), JSON.stringify(draft));
   } catch {
     /* storage full or blocked — the ticket still works in memory */
   }
 }
 
 export function clearCartDraft(storeId: string) {
-  const s = store();
-  if (!s) return;
   try {
-    s.removeItem(key(storeId));
+    writeBusinessValue(key(storeId), null);
   } catch {
     /* ignore */
   }

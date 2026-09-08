@@ -50,7 +50,7 @@ export type CloudSlice = Pick<
 type Row = Record<string, any>;
 
 export function dbError(context: string, error: unknown) {
-  console.error(`[db] ${context}:`, error);
+  if (import.meta.env.DEV) console.error(`[db] ${context}:`, error);
   // Offline is a normal state for a till: the change is already stored here
   // and will sync later. Only claim that when the failure really is a
   // connection failure — validation and permission refusals never sync.
@@ -590,9 +590,8 @@ const announcedDrift = new Set<string>();
 const announceDrift = (column: string) => {
   if (announcedDrift.has(column)) return;
   announcedDrift.add(column);
-  console.warn(
-    `[schema] this database has no "${column}" column on sales — reads continue without it. Apply the latest schema file to restore the field.`,
-  );
+  if (import.meta.env.DEV)
+    console.warn(`[schema] sales compatibility column unavailable: ${column}`);
 };
 
 const forgetTxnColumn = (message?: string | null) => {
@@ -1412,33 +1411,15 @@ export async function loadProductsByIds(ids: string[]): Promise<Product[]> {
 /**
  * Writes never hit the network directly.
  *
- * On the Windows desktop shell they are committed to the local Microsoft SQL
- * Server instance (the source of truth) and the background worker pushes them
- * to the cloud later. In the browser they go to the localStorage outbox and the
- * in-page sync engine drains them. Either way the till keeps working offline.
+ * On Windows every helper enters the same SQLite durability boundary and the
+ * background worker pushes it centrally. Web and Android write centrally and
+ * surface failure instead of pretending browser storage is a business DB.
  */
 const queue = (context: string, op: SyncOp) => {
-  // Web and Android are live-only: the write goes to the backend now, and any
-  // failure is surfaced instead of being queued for later.
-  if (isOnlineOnly()) {
-    void runOpLive(context, op).catch((e) => dbError(context, e));
-    return;
-  }
-  const bridge = localDb();
-  if (bridge) {
-    void bridge.write(context, op).then((res) => {
-      if (!res.ok) dbError(context, new Error(res.error ?? "Local database write failed"));
-    });
-    return;
-  }
-  // Operational business data is never parked in browser storage: it goes to
-  // the central database (directly or through the relay) or it fails loudly.
-  if (isOperationalTable(op.table)) {
-    void runOpLive(context, op).catch((e) => dbError(context, e));
-    return;
-  }
-  enqueue(context, op);
-  void drainOutbox();
+  // All fire-and-forget model helpers still use the same authoritative commit
+  // gateway as awaited checkout. On Electron this guarantees SQLite + outbox
+  // durability instead of creating a second SQL Server-only mutation path.
+  void commitOps(context, [op]).catch((e) => dbError(context, e));
 };
 
 /**
@@ -1450,21 +1431,7 @@ const queue = (context: string, op: SyncOp) => {
 const queueSoft = (context: string, op: SyncOp) => {
   const note = (e: unknown) =>
     recordDiagnostic({ kind: "soft_write_failed", entity: op.table, code: reasonCode(e) });
-  if (isOnlineOnly()) {
-    void runOpLive(context, op).catch(note);
-    return;
-  }
-  const bridge = localDb();
-  if (bridge) {
-    void bridge
-      .write(context, op)
-      .then((res) => {
-        if (!res.ok) note(new Error(res.error ?? "local write failed"));
-      })
-      .catch(note);
-    return;
-  }
-  void runOpLive(context, op).catch(note);
+  void commitOps(context, [op]).catch(note);
 };
 
 /** Does this failure mean "a bill with that number is already stored"? */
@@ -1658,52 +1625,42 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
       // Write it before the compatibility SQL Server projection: there must
       // never again be a committed till transaction that has no on-device
       // SQLite recovery copy.
-      if (mirrorEntries.length) {
+      if (ops.length) {
         if (!bridge.localMirrorBatch) {
           throw new Error("This desktop build cannot commit an atomic SQLite batch. Update the app.");
         }
-        const shadow = await bridge.localMirrorBatch(mirrorEntries);
+        const shadow = await bridge.localMirrorBatch(mirrorEntries, ops);
         const expected = mirrorEntries.reduce((total, entry) => total + entry.rows.length, 0);
         if (!shadow.ok || Number(shadow.written ?? 0) !== expected) {
           throw new Error(shadow.error ?? "The embedded SQLite transaction copy was incomplete");
         }
       }
+      // SQLite is the acceptance boundary. SQL Server is retained as a
+      // compatibility projection, but failure there must not tell the cashier
+      // that an already durable transaction was lost (and invite a duplicate
+      // retry). The SQLite outbox owns retrying the central mutation.
       if (!bridge.writeBatch) {
-        throw new Error("This desktop build cannot commit an atomic local SQL batch. Update the app.");
-      }
-      const result = await bridge.writeBatch(context, ops);
-      if (!result.ok) throw new Error(result.error ?? `${context} could not be stored locally`);
-      const mirrorEntries = ops.flatMap((op) =>
-        op.kind === "insert" || op.kind === "upsert"
-          ? [{ entity: op.table, rows: op.rows as Record<string, unknown>[] }]
-          : [],
-      );
-      if (mirrorEntries.length && bridge.localMirrorBatch) {
-        // SQL Server has already committed at this point. SQLite is currently
-        // only a secondary projection, so its failure must not turn a durable
-        // sale into an apparent failed checkout and invite the cashier to take
-        // payment again. Record the degraded mirror for diagnostics; Phase 1B
-        // will make SQLite the primary transaction/outbox boundary.
+        recordDiagnostic({
+          kind: "compatibility_projection_failed",
+          entity: ops[0]?.table ?? "business_batch",
+          code: "unavailable",
+        });
+      } else {
         try {
-          const shadow = await bridge.localMirrorBatch(mirrorEntries);
-          const expected = mirrorEntries.reduce((total, entry) => total + entry.rows.length, 0);
-          if (!shadow.ok || Number(shadow.written ?? 0) !== expected) {
+          const result = await bridge.writeBatch(context, ops);
+          if (!result.ok) {
             recordDiagnostic({
-              kind: "local_mirror_failed",
-              entity: "sqlite_business_batch",
-              code: reasonCode(shadow.error ?? "incomplete SQLite mirror batch"),
+              kind: "compatibility_projection_failed",
+              entity: ops[0]?.table ?? "business_batch",
+              code: reasonCode(result.error),
             });
           }
-        } catch (shadowError) {
+        } catch (projectionError) {
           recordDiagnostic({
-            kind: "local_mirror_failed",
-            entity: "sqlite_business_batch",
-            code: reasonCode(shadowError),
+            kind: "compatibility_projection_failed",
+            entity: ops[0]?.table ?? "business_batch",
+            code: reasonCode(projectionError),
           });
-        const shadow = await bridge.localMirrorBatch(mirrorEntries);
-        const expected = mirrorEntries.reduce((total, entry) => total + entry.rows.length, 0);
-        if (!shadow.ok || Number(shadow.written ?? 0) !== expected) {
-          throw new Error(shadow.error ?? "The embedded SQLite transaction copy was incomplete");
         }
       }
       setCloudDirect(false);
@@ -1713,9 +1670,9 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
       if (bridge.push) void bridge.push();
       return noteCommitTarget("local");
     } catch (localError) {
-      // A desktop transaction is successful only after local SQL commits. Do
-      // not bypass a broken till database with a cloud-only write: doing so
-      // would make the terminal's offline ledger incomplete and unrecoverable.
+      // A desktop transaction is successful only after SQLite commits. Do not
+      // bypass a broken SQLite database with a cloud-only write: doing so would
+      // make the terminal's offline ledger incomplete and unrecoverable.
       throw new AllTargetsFailed(context, localError);
     }
   }
@@ -1778,8 +1735,7 @@ export const db = {
     const op: SyncOp = { kind: "delete", table: "products", match: { id } };
     const bridge = localDb();
     if (bridge) {
-      const res = await bridge.write("Deleting product", op);
-      if (!res.ok) throw new Error(res.error ?? "Deleting product failed");
+      await commitOps("Deleting product", [op]);
       return;
     }
     try {
@@ -1795,8 +1751,7 @@ export const db = {
       if (isLinkedRecordError(message)) throw e instanceof Error ? e : new Error(message);
       const offline = typeof navigator !== "undefined" && !navigator.onLine;
       if (!isOnlineOnly() && (offline || /failed to fetch|network|timeout/i.test(message))) {
-        enqueue("Deleting product", op);
-        void drainOutbox();
+        await commitOps("Deleting product", [op]);
         return;
       }
       throw e instanceof Error ? e : new Error(message);
@@ -1878,9 +1833,7 @@ export const db = {
     missingSettingsColumns.add(col);
     const retry = await supabase.from("pos_settings").upsert(settingsToRow(s) as never);
     if (retry.error) throw new Error(retry.error.message);
-    console.warn(
-      `[settings] this database has no "${col}" column on pos_settings — saved everything else. Run supabase/schema27.sql to add it.`,
-    );
+    if (import.meta.env.DEV) console.warn(`[settings] compatibility column unavailable: ${col}`);
   },
 
   /*

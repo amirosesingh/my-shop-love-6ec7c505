@@ -1,9 +1,11 @@
 /**
  * Persistent sync & backup activity log.
  *
- * Entries survive reloads (localStorage) so a manager can see what failed
+ * Entries survive reloads (SQLite in Electron) so a manager can see what failed
  * overnight, even after the terminal was restarted.
  */
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
+
 export type SyncDirection = "push" | "pull" | "backup";
 
 /** Why a sync attempt failed, in plain terms the log can group by. */
@@ -41,7 +43,7 @@ const isBrowser = () => typeof window !== "undefined";
 export function listSyncLog(): SyncLogEntry[] {
   if (!isBrowser()) return [];
   try {
-    return JSON.parse(window.localStorage.getItem(KEY) ?? "[]") as SyncLogEntry[];
+    return JSON.parse(readBusinessValue(KEY) ?? "[]") as SyncLogEntry[];
   } catch {
     return [];
   }
@@ -50,7 +52,7 @@ export function listSyncLog(): SyncLogEntry[] {
 function persist(entries: SyncLogEntry[]) {
   if (!isBrowser()) return;
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(entries.slice(0, MAX)));
+    writeBusinessValue(KEY, JSON.stringify(entries.slice(0, MAX)));
   } catch {
     /* storage full — keep going, the log is diagnostic only */
   }

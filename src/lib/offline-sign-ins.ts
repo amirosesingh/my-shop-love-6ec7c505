@@ -6,7 +6,7 @@
  * terminal, the person and the minute, so the same sign-in replayed by a retry
  * is an upsert onto the same row rather than a duplicate.
  */
-import { enqueue } from "./sync-outbox";
+import { commitOps } from "@/core/api/pos-db";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 
 /** Stable UUID-shaped id from a stable string. No dependency, no randomness. */
@@ -36,7 +36,7 @@ export async function queueOfflineSignIn(input: {
     /* no till registered */
   }
   const id = await deterministicId(`offline-signin|${terminalId}|${input.username}|${minute}`);
-  enqueue("cashier-login", {
+  await commitOps("cashier-login", [{
     kind: "upsert",
     table: "audit_logs",
     onConflict: "id",
@@ -57,5 +57,5 @@ export async function queueOfflineSignIn(input: {
         created_at: at.toISOString(),
       },
     ],
-  });
+  }]);
 }

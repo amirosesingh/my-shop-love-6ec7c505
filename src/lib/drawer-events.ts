@@ -1,6 +1,7 @@
 import { useSyncExternalStore } from "react";
 import { db } from "@/core/api/pos-db";
 import { recordActivity } from "./activity-events";
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
 
 /** Minimum / maximum length of the typed no-sale reason. */
 export const NO_SALE_REASON_MIN = 3;
@@ -33,7 +34,7 @@ function load() {
   if (loaded || typeof window === "undefined") return;
   loaded = true;
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = readBusinessValue(KEY);
     if (raw) events = JSON.parse(raw) as DrawerEvent[];
   } catch {
     /* corrupt storage */
@@ -43,7 +44,7 @@ function load() {
 function emit() {
   if (typeof window !== "undefined") {
     try {
-      window.localStorage.setItem(KEY, JSON.stringify(events.slice(0, MAX)));
+      writeBusinessValue(KEY, JSON.stringify(events.slice(0, MAX)));
     } catch {
       /* storage full */
     }

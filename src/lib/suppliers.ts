@@ -6,10 +6,10 @@
  * outbox like every other POS write, so receiving keeps working with no
  * connection.
  */
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { enqueue } from "./sync-outbox";
-import { drainOutbox } from "./sync-engine";
+import { commitOps } from "@/core/api/pos-db";
 
 const sb = supabaseExternal as unknown as SupabaseClient;
 
@@ -57,7 +57,7 @@ const CACHE_KEY = "pos.suppliers.v1";
 
 function cache(list: Supplier[]) {
   try {
-    window.localStorage.setItem(CACHE_KEY, JSON.stringify(list));
+    writeBusinessValue(CACHE_KEY, JSON.stringify(list));
   } catch {
     /* storage full — the database still holds the list */
   }
@@ -66,7 +66,7 @@ function cache(list: Supplier[]) {
 export function cachedSuppliers(): Supplier[] {
   if (typeof window === "undefined") return [];
   try {
-    const list = JSON.parse(window.localStorage.getItem(CACHE_KEY) ?? "[]") as Supplier[];
+    const list = JSON.parse(readBusinessValue(CACHE_KEY) ?? "[]") as Supplier[];
     return Array.isArray(list) ? list : [];
   } catch {
     return [];
@@ -82,17 +82,15 @@ export async function loadSuppliers(): Promise<Supplier[]> {
   return list;
 }
 
-export function saveSupplier(s: Supplier) {
+export async function saveSupplier(s: Supplier) {
   const list = cachedSuppliers();
   cache([...list.filter((x) => x.id !== s.id), s].sort((a, b) => a.name.localeCompare(b.name)));
-  enqueue("Saving supplier", { kind: "upsert", table: "suppliers", rows: [toRow(s)] });
-  void drainOutbox();
+  await commitOps("Saving supplier", [{ kind: "upsert", table: "suppliers", rows: [toRow(s)] }]);
 }
 
-export function deleteSupplier(id: string) {
+export async function deleteSupplier(id: string) {
   cache(cachedSuppliers().filter((x) => x.id !== id));
-  enqueue("Deleting supplier", { kind: "delete", table: "suppliers", match: { id } });
-  void drainOutbox();
+  await commitOps("Deleting supplier", [{ kind: "delete", table: "suppliers", match: { id } }]);
 }
 
 export const newSupplier = (name = ""): Supplier => ({

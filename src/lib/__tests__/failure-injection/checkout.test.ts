@@ -8,6 +8,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 const live = vi.fn();
 const localWriteBatch = vi.fn();
+const localMirrorBatch = vi.fn();
 
 vi.mock("@/lib/sync-engine", () => ({
   runOpLive: (...a: unknown[]) => live(...a),
@@ -17,6 +18,7 @@ vi.mock("@/core/local-db/local-db", () => ({
   localDb: () => ({
     write: vi.fn(),
     writeBatch: (...a: unknown[]) => localWriteBatch(...a),
+    localMirrorBatch: (...a: unknown[]) => localMirrorBatch(...a),
   }),
   electronDb: () => ({}),
   readBranch: () => ({ branchId: null, branchName: null }),
@@ -52,6 +54,8 @@ describe("failure injection — checkout", () => {
     (globalThis as unknown as { window: Record<string, unknown> }).window["pos"] = {};
     live.mockReset();
     localWriteBatch.mockReset();
+    localMirrorBatch.mockReset();
+    localMirrorBatch.mockResolvedValue({ ok: true, written: 3 });
     localWriteBatch.mockResolvedValue({ ok: true });
     setPreferredDatabaseMode("online");
   });
@@ -60,19 +64,26 @@ describe("failure injection — checkout", () => {
     delete (globalThis as unknown as { window: Record<string, unknown> }).window["pos"];
   });
 
-  it("stores nothing when the atomic local SQL batch is refused", async () => {
+  it("accepts the durable SQLite batch when the compatibility projection is refused", async () => {
     const before = listQueue().length;
     localWriteBatch.mockResolvedValue({ ok: false, error: "null value in column" });
-    await expect(commitOps("Saving sale", basket())).rejects.toThrow();
+    await expect(commitOps("Saving sale", basket())).resolves.toBe("local");
     expect(queuedTables(before)).toEqual([]);
     expect(live).not.toHaveBeenCalled();
   });
 
-  it("never exposes a half-stored basket when the local batch fails", async () => {
+  it("does not invite a duplicate retry when the compatibility projection fails", async () => {
     const before = listQueue().length;
     localWriteBatch.mockResolvedValue({ ok: false, error: "payment row refused" });
-    await expect(commitOps("Saving sale", basket())).rejects.toThrow();
+    await expect(commitOps("Saving sale", basket())).resolves.toBe("local");
     expect(queuedTables(before)).toEqual([]);
+    expect(localMirrorBatch).toHaveBeenCalledTimes(1);
+  });
+
+  it("rejects the commit when the authoritative SQLite transaction fails", async () => {
+    localMirrorBatch.mockResolvedValue({ ok: false, written: 0, error: "disk full" });
+    await expect(commitOps("Saving sale", basket())).rejects.toThrow("Saving sale");
+    expect(localWriteBatch).not.toHaveBeenCalled();
   });
 
   it("does not park anything in browser storage because the till writes locally", async () => {

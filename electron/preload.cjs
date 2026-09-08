@@ -117,8 +117,13 @@ contextBridge.exposeInMainWorld("pos", {
      upload intent are committed together before the SQL Server projection. */
   localInfo: () => invoke("local:info"),
   localMirror: (entity, rows) => invoke("local:mirror", entity, rows),
-  localMirrorBatch: (entries) => invoke("local:mirror-batch", entries),
+  localMirrorBatch: (entries, ops) => invoke("local:mirror-batch", entries, ops),
   localList: (entity, limit) => invoke("local:list", entity, limit),
+  localBusinessGet: (key) => {
+    const result = ipcRenderer.sendSync("local:business-get", key);
+    return result?.ok ? result.value ?? null : null;
+  },
+  localBusinessSet: (key, value) => ipcRenderer.sendSync("local:business-set", key, value)?.ok === true,
   localAuditLog: (entry) => invoke("local:audit-log", entry),
   localAuditList: (limit) => invoke("local:audit-list", limit),
   localAuditClear: () => invoke("local:audit-clear"),
