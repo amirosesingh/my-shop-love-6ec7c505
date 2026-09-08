@@ -1,11 +1,13 @@
 /**
  * Lightweight per-day sign-in log for a terminal.
  *
- * Purely local (localStorage): it records who signed in on this PC today so a
+ * Purely device-local: it records who signed in on this PC today so a
  * shift opened by one cashier can be continued by another and still show every
  * person who used the till during the day. This is NOT an HR attendance system
  * — it only tracks sign-in visibility.
  */
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
+
 
 const KEY = "pos-signin-log-v1";
 
@@ -29,7 +31,7 @@ export function dayKey(d: Date = new Date()): string {
 function read(): Store {
   if (typeof window === "undefined") return {};
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = readBusinessValue(KEY);
     return raw ? (JSON.parse(raw) as Store) : {};
   } catch {
     return {};
@@ -43,7 +45,7 @@ function write(store: Store) {
     const keys = Object.keys(store).sort().slice(-14);
     const trimmed: Store = {};
     for (const k of keys) trimmed[k] = store[k]!;
-    window.localStorage.setItem(KEY, JSON.stringify(trimmed));
+    writeBusinessValue(KEY, JSON.stringify(trimmed));
   } catch {
     /* storage full / disabled — sign-in visibility is best effort */
   }
@@ -85,7 +87,7 @@ export function signInsForDay(key: string = dayKey()): SignInEntry[] {
 export function clearSignInLog() {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.removeItem(KEY);
+    writeBusinessValue(KEY, null);
   } catch {
     /* ignore */
   }

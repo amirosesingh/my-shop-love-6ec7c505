@@ -3,13 +3,14 @@
  *
  * The register used to keep parked tickets in component state, so a bill
  * cancelled from the receipt vault had nowhere to land. Keeping them in one
- * small localStorage-backed store lets the receipts screen push a cancelled
+ * small platform store lets the receipts screen push a cancelled
  * bill straight back onto the register's hold list.
  */
 import { useEffect, useState } from "react";
 
 import type { CartLine } from "@/core/types/pos-types";
 import { db } from "@/core/api/pos-db";
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
 
 export type HeldOrder = {
   id: string;
@@ -50,7 +51,7 @@ const EVENT = "pos:held-orders-changed";
 export function readHeldOrders(): HeldOrder[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = readBusinessValue(KEY);
     const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? (parsed as HeldOrder[]) : [];
   } catch {
@@ -61,7 +62,7 @@ export function readHeldOrders(): HeldOrder[] {
 function write(orders: HeldOrder[]) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(orders));
+    writeBusinessValue(KEY, JSON.stringify(orders));
   } catch {
     /* storage full or blocked — the in-memory event still updates the UI */
   }

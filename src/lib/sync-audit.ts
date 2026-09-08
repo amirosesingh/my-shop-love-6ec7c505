@@ -6,6 +6,8 @@
  * survive a cleared browser cache; in the browser they fall back to
  * localStorage. Both are capped so the ledger can never grow without bound.
  */
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
+
 
 export type SyncDirection = "push" | "pull" | "mirror" | "system";
 export type SyncAuditStatus = "success" | "failed" | "skipped";
@@ -57,7 +59,7 @@ const announce = () => {
 function readLocal(): SyncAuditRow[] {
   if (typeof window === "undefined") return [];
   try {
-    return JSON.parse(window.localStorage.getItem(KEY) ?? "[]") as SyncAuditRow[];
+    return JSON.parse(readBusinessValue(KEY) ?? "[]") as SyncAuditRow[];
   } catch {
     return [];
   }
@@ -65,7 +67,7 @@ function readLocal(): SyncAuditRow[] {
 
 function writeLocal(rows: SyncAuditRow[]) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(KEY, JSON.stringify(rows.slice(0, LIMIT)));
+  writeBusinessValue(KEY, JSON.stringify(rows.slice(0, LIMIT)));
 }
 
 /** Record one sync operation. Never throws — auditing must not break a sale. */

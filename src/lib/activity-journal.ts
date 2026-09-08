@@ -7,6 +7,8 @@
  * deterministic: the cloud can rebuild exactly what happened, in the order it
  * happened, for each branch independently.
  */
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
+
 const TERMINAL_KEY = "pos.journal.terminalId";
 const SEQ_KEY = "pos.journal.seq";
 const BRANCH_KEY = "pos.journal.branchId";
@@ -16,10 +18,10 @@ const isBrowser = () => typeof window !== "undefined";
 /** Stable id for this physical till, generated once and kept forever. */
 export function terminalId(): string {
   if (!isBrowser()) return "server";
-  let id = window.localStorage.getItem(TERMINAL_KEY);
+  let id = readBusinessValue(TERMINAL_KEY);
   if (!id) {
     id = `T-${crypto.randomUUID().slice(0, 8).toUpperCase()}`;
-    window.localStorage.setItem(TERMINAL_KEY, id);
+    writeBusinessValue(TERMINAL_KEY, id);
   }
   return id;
 }
@@ -27,26 +29,25 @@ export function terminalId(): string {
 /** The branch this terminal is currently working at. */
 export function branchId(): string | null {
   if (!isBrowser()) return null;
-  return window.localStorage.getItem(BRANCH_KEY);
+  return readBusinessValue(BRANCH_KEY);
 }
 
 export function setBranchId(id: string | null) {
   if (!isBrowser()) return;
-  if (id) window.localStorage.setItem(BRANCH_KEY, id);
-  else window.localStorage.removeItem(BRANCH_KEY);
+  writeBusinessValue(BRANCH_KEY, id);
 }
 
 /** Monotonic counter — never reused, survives restarts and offline periods. */
 export function nextSeq(): number {
   if (!isBrowser()) return 0;
-  const next = Number(window.localStorage.getItem(SEQ_KEY) ?? "0") + 1;
-  window.localStorage.setItem(SEQ_KEY, String(next));
+  const next = Number(readBusinessValue(SEQ_KEY) ?? "0") + 1;
+  writeBusinessValue(SEQ_KEY, String(next));
   return next;
 }
 
 export function currentSeq(): number {
   if (!isBrowser()) return 0;
-  return Number(window.localStorage.getItem(SEQ_KEY) ?? "0");
+  return Number(readBusinessValue(SEQ_KEY) ?? "0");
 }
 
 export type JournalStamp = {

@@ -18,8 +18,8 @@ const sb = supabaseExternal as unknown as SupabaseClient;
 export type CouponResult = { success: boolean; error?: string };
 
 /** Log a swallowed read failure once, with the call that produced it. */
-function logRead(where: string, e: unknown) {
-  console.error(`[coupons] ${where} failed`, e);
+function logRead(where: string, _error: unknown) {
+  if (import.meta.env.DEV) console.error(`[coupons] ${where} failed`);
 }
 
 export type DiscountKind = "PERCENTAGE" | "FIXED_AMOUNT";

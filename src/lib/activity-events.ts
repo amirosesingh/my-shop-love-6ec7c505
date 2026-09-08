@@ -9,6 +9,7 @@
  * performing the action. When the till is offline the event is parked locally
  * and flushed on the next successful write.
  */
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { pushActivityEvent } from "./activity-events.functions";
 import { readCredentials } from "./pos-credentials";
@@ -121,7 +122,7 @@ type Queued = ActivityEventInput & { clientEventId: string; createdAt: string };
 function readQueue(): Queued[] {
   if (!isBrowser()) return [];
   try {
-    return JSON.parse(window.localStorage.getItem(QUEUE_KEY) ?? "[]") as Queued[];
+    return JSON.parse(readBusinessValue(QUEUE_KEY) ?? "[]") as Queued[];
   } catch {
     return [];
   }
@@ -130,7 +131,7 @@ function readQueue(): Queued[] {
 function writeQueue(rows: Queued[]) {
   if (!isBrowser()) return;
   try {
-    window.localStorage.setItem(QUEUE_KEY, JSON.stringify(rows.slice(-500)));
+    writeBusinessValue(QUEUE_KEY, JSON.stringify(rows.slice(-500)));
   } catch {
     /* storage full — the till keeps selling */
   }
@@ -291,12 +292,12 @@ const SEEN_KEY = "pos.activity.seen";
 
 export function lastSeenAt(): string {
   if (!isBrowser()) return "";
-  return window.localStorage.getItem(SEEN_KEY) ?? "";
+  return readBusinessValue(SEEN_KEY) ?? "";
 }
 
 export function markActivitySeen(stamp = new Date().toISOString()) {
   if (!isBrowser()) return;
-  window.localStorage.setItem(SEEN_KEY, stamp);
+  writeBusinessValue(SEEN_KEY, stamp);
 }
 
 /** Rows raised since the admin last opened the bell. */
@@ -353,7 +354,7 @@ type ClearedMap = Record<string, string[]>;
 function readClearedMap(): ClearedMap {
   if (!isBrowser()) return {};
   try {
-    const raw = window.localStorage.getItem(CLEARED_KEY);
+    const raw = readBusinessValue(CLEARED_KEY);
     const parsed = raw ? JSON.parse(raw) : {};
     return parsed && typeof parsed === "object" ? (parsed as ClearedMap) : {};
   } catch {
@@ -364,7 +365,7 @@ function readClearedMap(): ClearedMap {
 function writeClearedMap(map: ClearedMap) {
   if (!isBrowser()) return;
   try {
-    window.localStorage.setItem(CLEARED_KEY, JSON.stringify(map));
+    writeBusinessValue(CLEARED_KEY, JSON.stringify(map));
   } catch {
     /* storage blocked — clearing is only a view preference */
   }

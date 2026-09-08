@@ -8,6 +8,8 @@
  * `schema_migrations` table inside the database it targets, and is remembered
  * here so a later scan only ever surfaces genuinely new gaps.
  */
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
+
 export type SchemaEnvironment = "cloud" | "local";
 
 export type SchemaGap = {
@@ -52,7 +54,7 @@ export const gapKey = (gap: SchemaGap): string =>
 export function loadMigrations(): MigrationFile[] {
   if (typeof window === "undefined") return [];
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = readBusinessValue(KEY);
     const parsed = raw ? (JSON.parse(raw) as MigrationFile[]) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
@@ -63,7 +65,7 @@ export function loadMigrations(): MigrationFile[] {
 function saveMigrations(rows: MigrationFile[]) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(rows.slice(-100)));
+    writeBusinessValue(KEY, JSON.stringify(rows.slice(-100)));
   } catch {
     /* storage full — the file is already downloaded, tracking is best effort */
   }

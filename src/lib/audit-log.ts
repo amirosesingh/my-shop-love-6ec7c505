@@ -1,3 +1,4 @@
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
 import { useSyncExternalStore } from "react";
 import { db } from "@/core/api/pos-db";
 import { hasSignedInIdentity } from "./session-presence";
@@ -194,7 +195,7 @@ function load() {
   if (loaded || typeof window === "undefined") return;
   loaded = true;
   try {
-    const raw = window.localStorage.getItem(KEY);
+    const raw = readBusinessValue(KEY);
     if (raw) logs = JSON.parse(raw) as AuditLog[];
   } catch {
     /* corrupt storage */
@@ -204,7 +205,7 @@ function load() {
 function persist() {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(trim(logs)));
+    writeBusinessValue(KEY, JSON.stringify(trim(logs)));
   } catch {
     /* storage full */
   }
@@ -340,7 +341,7 @@ async function flushBatch() {
     // them as delivered so the queue is not blocked behind them forever.
     const code = (e as { code?: string } | null)?.code;
     if (code !== "23505") {
-      console.error("[audit] sync failed", e);
+      if (import.meta.env.DEV) console.error("[audit] sync failed");
       return;
     }
     batch = slice.map((l) => l.id);

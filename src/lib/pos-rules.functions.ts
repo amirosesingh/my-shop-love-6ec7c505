@@ -16,6 +16,7 @@ const saveInput = z.object({
   accessToken: z.string().min(10),
   storeId: z.string().max(64).optional(),
   patch: z.record(z.string(), ruleValue),
+  expectedVersion: z.number().int().nonnegative(),
 });
 
 const pinInput = z.object({
@@ -91,6 +92,9 @@ export const getPosRules = createServerFn({ method: "POST" })
         failure: base.failure,
         revision: base.revision,
         fetchedAt: base.fetchedAt,
+        rowVersion: base.rowVersion,
+        updatedAt: base.updatedAt,
+        updatedBy: base.updatedBy,
         scope: "",
         rules: base.rules,
       };
@@ -111,6 +115,9 @@ export const getPosRules = createServerFn({ method: "POST" })
         failure: access.code === "FORBIDDEN" ? ("permission" as const) : base.failure,
         revision: base.revision,
         fetchedAt: base.fetchedAt,
+        rowVersion: base.rowVersion,
+        updatedAt: base.updatedAt,
+        updatedBy: base.updatedBy,
         scope: "",
         rules: base.rules,
       };
@@ -126,6 +133,9 @@ export const getPosRules = createServerFn({ method: "POST" })
       failure: loaded.failure,
       revision: loaded.revision,
       fetchedAt: loaded.fetchedAt,
+      rowVersion: loaded.rowVersion,
+      updatedAt: loaded.updatedAt,
+      updatedBy: loaded.updatedBy,
       scope: access.branchId,
       rules: loaded.rules,
     };
@@ -141,12 +151,16 @@ export const savePosRules = createServerFn({ method: "POST" })
     try {
       const caller = await assertCaller(data);
       if (!caller.isSupervisor) return { ok: false as const, error: "Supervisors only" };
+      const { resolveRulesAccess } = await import("./pos-rules-access.server");
+      const access = await resolveRulesAccess(data);
+      if (!access.ok) return { ok: false as const, error: access.error, code: access.code };
       const rules = await saveRules(
-        data.storeId ?? "",
+        access.branchId,
         data.patch as never,
         data.accessToken,
+        data.expectedVersion,
       );
-      return { ok: true as const, rules };
+      return { ok: true as const, snapshot: rules, rules: rules.rules };
     } catch (e) {
       return { ok: false as const, error: (e as Error).message };
     }

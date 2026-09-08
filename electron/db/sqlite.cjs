@@ -60,6 +60,11 @@ const SYNCED_TABLES = [
 
 const nowIso = () => new Date().toISOString();
 const uuid = () => require("node:crypto").randomUUID();
+const sqliteValue = (value) => {
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (value != null && typeof value === "object") return JSON.stringify(value);
+  return value;
+};
 
 /* -------------------------------- init -------------------------------- */
 
@@ -140,7 +145,7 @@ const TOMBSTONE_TABLES = [
  * stock, shifts, the queued rows waiting to be sent and the terminal's own
  * settings are never rebuilt or cleared.
  */
-const SCHEMA_VERSION = 6;
+const SCHEMA_VERSION = 7;
 
 /** What the file on disk says it is. 0 for a database from before versioning. */
 function schemaVersion() {
@@ -175,6 +180,10 @@ function migrate() {
     add("last_error_at", "TEXT");
     add("synced_at", "TEXT");
     if (!have.has("updated_at")) db.exec(`ALTER TABLE ${table} ADD COLUMN updated_at TEXT`);
+  }
+  const rules = columnsOf("pos_store_settings");
+  if (rules.size && !rules.has("base_version")) {
+    db.exec(`ALTER TABLE pos_store_settings ADD COLUMN base_version INTEGER`);
   }
 
   // 2. Idempotency key on the transaction tables.
@@ -309,6 +318,132 @@ function mirror(entity, rows) {
     }
     return rows.length;
   });
+}
+
+/** Persist a related business transaction in one SQLite transaction. */
+function mirrorBatch(entries, operations) {
+  if (!ready() || !Array.isArray(entries)) return 0;
+  if (!entries.length && (!Array.isArray(operations) || !operations.length)) return 0;
+  const at = nowIso();
+  return tx(() => {
+    const mirrorStmt = db.prepare(
+      `INSERT INTO mirror (entity, id, payload, updated_at) VALUES (?, ?, ?, ?)
+       ON CONFLICT(entity, id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`,
+    );
+    let written = 0;
+    for (const entry of entries) {
+      const entity = String(entry?.entity ?? "").trim();
+      if (!entity || !Array.isArray(entry?.rows)) continue;
+      for (const row of entry.rows) {
+        const fallbackId = entity === "pos_store_settings" ? String(row?.store_id ?? "global") || "global" : "";
+        const id = String(row?.id ?? row?.key ?? fallbackId).trim();
+        if (!id) throw new Error(`SQLite mirror row for ${entity} has no stable id`);
+        mirrorStmt.run(entity, id, JSON.stringify(row), at);
+        // Keep the existing typed SQLite tables useful as an operational
+        // recovery view as well as retaining the lossless JSON payload above.
+        // Unknown cloud columns are ignored; every known value is parameterised.
+        const tableColumns = columnsOf(entity);
+        const key = entity === "pos_store_settings" ? "store_id" : "id";
+        if (tableColumns.has(key)) {
+          const values = Object.entries(row).filter(([name, value]) => tableColumns.has(name) && value !== undefined);
+          if (!values.some(([name]) => name === key)) values.push([key, id]);
+          const names = values.map(([name]) => name);
+          const encoded = values.map(([, value]) => sqliteValue(value));
+          const updates = names.filter((name) => name !== key);
+          const conflict = updates.length
+            ? `DO UPDATE SET ${updates.map((name) => `"${name}" = excluded."${name}"`).join(", ")}`
+            : "DO NOTHING";
+          db.prepare(
+            `INSERT INTO "${entity}" (${names.map((name) => `"${name}"`).join(", ")})
+             VALUES (${names.map(() => "?").join(", ")})
+             ON CONFLICT("${key}") ${conflict}`,
+          ).run(...encoded);
+        }
+        written += 1;
+      }
+    }
+    // The same transaction owns the durable upload intent. A process exit can
+    // therefore never leave business rows present without a replay record.
+    const supplied = Array.isArray(operations) ? operations : null;
+    const ops = (supplied ?? entries.map((entry) => ({
+      kind: "upsert",
+      table: entry.entity,
+      rows: entry.rows,
+      onConflict: "id",
+    })));
+    // Updates and deletes have no row list above, but their local effect and
+    // replay intent must share the same transaction as every inserted row.
+    for (const op of ops) {
+      if ((op.kind !== "update" && op.kind !== "delete") || !op.table || !op.match) continue;
+      const id = String(op.match.id ?? "").trim();
+      if (!id) continue;
+      if (op.kind === "delete") {
+        db.prepare("DELETE FROM mirror WHERE entity = ? AND id = ?").run(op.table, id);
+        if (columnsOf(op.table).has("id")) db.prepare(`DELETE FROM "${op.table}" WHERE id = ?`).run(id);
+        continue;
+      }
+      const current = db.prepare("SELECT payload FROM mirror WHERE entity = ? AND id = ?").get(op.table, id);
+      const merged = { ...(current?.payload ? JSON.parse(current.payload) : { id }), ...(op.values ?? {}) };
+      mirrorStmt.run(op.table, id, JSON.stringify(merged), at);
+      const known = Object.entries(op.values ?? {}).filter(([name, value]) => columnsOf(op.table).has(name) && value !== undefined);
+      if (known.length && columnsOf(op.table).has("id")) {
+        db.prepare(`UPDATE "${op.table}" SET ${known.map(([name]) => `"${name}" = ?`).join(", ")} WHERE id = ?`)
+          .run(...known.map(([, value]) => sqliteValue(value)), id);
+      }
+    }
+    if (!ops.length) return written;
+    const batchId = `batch:${require("node:crypto").createHash("sha256").update(JSON.stringify(ops)).digest("hex")}`;
+    db.prepare(
+      `INSERT INTO offline_sync_queue
+         (id, table_name, record_id, action_type, payload_json, status, attempts,
+          client_transaction_id, created_at)
+       VALUES (?, '__business_batch__', ?, 'UPDATE', ?, 'pending', 0, ?, ?)
+       ON CONFLICT(id) DO NOTHING`,
+    ).run(
+      batchId,
+      batchId,
+      JSON.stringify({ ops }),
+      String(entries.flatMap((entry) => entry.rows ?? []).find((row) => row?.client_transaction_id)?.client_transaction_id ?? "") || null,
+      at,
+    );
+    return written;
+  });
+}
+
+function pendingBusinessBatches(limit = 25) {
+  if (!ready()) return [];
+  return db
+    .prepare(
+      `SELECT id, payload_json, attempts, created_at
+         FROM offline_sync_queue
+        WHERE table_name = '__business_batch__' AND status IN ('pending', 'failed')
+        ORDER BY created_at, id LIMIT ?`,
+    )
+    .all(Math.min(Math.max(Number(limit) || 25, 1), 100))
+    .map((row) => ({ ...row, payload: JSON.parse(row.payload_json) }));
+}
+
+function acknowledgeBusinessBatch(id) {
+  if (!ready()) return false;
+  return tx(() => db.prepare("DELETE FROM offline_sync_queue WHERE id = ?").run(String(id)).changes > 0);
+}
+
+function failBusinessBatch(id, error, maxAttempts = 5) {
+  if (!ready()) return false;
+  const row = db.prepare("SELECT attempts FROM offline_sync_queue WHERE id = ?").get(String(id));
+  if (!row) return false;
+  const attempts = Number(row.attempts ?? 0) + 1;
+  const status = attempts >= maxAttempts ? "dead_letter" : "failed";
+  return tx(
+    () =>
+      db
+        .prepare(
+          `UPDATE offline_sync_queue
+              SET status = ?, attempts = ?, error_message = ?, last_attempt_at = ?
+            WHERE id = ?`,
+        )
+        .run(status, attempts, String(error ?? "sync failed").slice(0, 1000), nowIso(), String(id)).changes > 0,
+  );
 }
 
 function listMirror(entity, limit = 500) {
@@ -680,6 +815,10 @@ module.exports = {
   relationalHealth,
   setScope,
   mirror,
+  mirrorBatch,
+  pendingBusinessBatches,
+  acknowledgeBusinessBatch,
+  failBusinessBatch,
   listMirror,
   counts,
   logAudit,

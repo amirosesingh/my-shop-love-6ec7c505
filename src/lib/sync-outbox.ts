@@ -11,6 +11,7 @@ import { stamp } from "./activity-journal";
 import { isOnlineOnly } from "./live-mode";
 import { BACKOFF_FACTOR, BASE_BACKOFF_MS, syncConfig } from "./sync-config";
 import { touchedIds as versionedIds, versionsFor } from "./row-versions";
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
 
 export type Row = Record<string, unknown>;
 
@@ -104,7 +105,7 @@ function read(): QueuedOp[] {
   // The phone and the web build never queue: writes go straight to the backend.
   if (!canQueue()) return [];
   try {
-    return JSON.parse(window.localStorage.getItem(QUEUE_KEY) ?? "[]") as QueuedOp[];
+    return JSON.parse(readBusinessValue(QUEUE_KEY) ?? "[]") as QueuedOp[];
   } catch {
     return [];
   }
@@ -116,7 +117,7 @@ function write(queue: QueuedOp[]) {
     return;
   }
   try {
-    window.localStorage.setItem(QUEUE_KEY, JSON.stringify(queue));
+    writeBusinessValue(QUEUE_KEY, JSON.stringify(queue));
   } catch {
     /* storage full — the operation stays in memory for this session only */
   }

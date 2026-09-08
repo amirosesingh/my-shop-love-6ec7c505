@@ -331,7 +331,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       registration: startup.registration,
       verdict: startup.verdict,
       activated: Boolean(terminal.config),
-      graceOpen: startup.offlineGrace || startup.cloudConnected,
       offlineCapable: hasFeature("offlineFirst"),
     });
     // Step 1 — no usable database connection: ask for the URL and key.
@@ -357,7 +356,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     return (
       <>
         <CloudSetupGate />
-        {startup.offlineGrace && (
+        {startup.offlineAvailable && (
           <div className="bg-warning/15 px-3 py-1.5 text-center text-xs text-warning">
             Offline mode — this terminal is registered and keeps working locally.
           </div>

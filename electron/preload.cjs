@@ -113,11 +113,17 @@ contextBridge.exposeInMainWorld("pos", {
   getConfig: (key) => invoke("config:get", key),
   setConfig: (key, value) => invoke("config:set", key, value),
   resetConfig: () => invoke("config:reset"),
-  /* embedded local database (mirror + audit ledger). Offline sales live in
-     the branch SQL Server outbox — there is deliberately no second queue. */
+  /* Embedded SQLite recovery database. Business batches and their durable
+     upload intent are committed together before the SQL Server projection. */
   localInfo: () => invoke("local:info"),
   localMirror: (entity, rows) => invoke("local:mirror", entity, rows),
+  localMirrorBatch: (entries, ops) => invoke("local:mirror-batch", entries, ops),
   localList: (entity, limit) => invoke("local:list", entity, limit),
+  localBusinessGet: (key) => {
+    const result = ipcRenderer.sendSync("local:business-get", key);
+    return result?.ok ? result.value ?? null : null;
+  },
+  localBusinessSet: (key, value) => ipcRenderer.sendSync("local:business-set", key, value)?.ok === true,
   localAuditLog: (entry) => invoke("local:audit-log", entry),
   localAuditList: (limit) => invoke("local:audit-list", limit),
   localAuditClear: () => invoke("local:audit-clear"),

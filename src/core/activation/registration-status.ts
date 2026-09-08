@@ -19,10 +19,7 @@ import {
 } from "@/core/activation/connection-health";
 import { cloudKeyStatus, subscribeCloudKeys } from "@/lib/secure-cloud-config";
 import {
-  graceValid,
   isRegistered,
-  readActivationRecord,
-  type ActivationRecord,
   type RegistrationState,
 } from "@/core/activation/activation-record";
 
@@ -51,13 +48,12 @@ export type StartupGate = {
   verdict: CloudVerdict;
   /** central database URL + key are saved on this device */
   cloudConfigured: boolean | null;
-  record: ActivationRecord | null;
   /** true while the first read of the sealed record is in flight */
   loading: boolean;
   /** true until this launch's first connection check has produced a verdict */
   probing: boolean;
-  /** registered, offline, but still inside the grace window */
-  offlineGrace: boolean;
+  /** registered and using the durable offline desktop data path */
+  offlineAvailable: boolean;
   refresh: () => void;
 };
 
@@ -67,7 +63,6 @@ export type StartupGate = {
  */
 export function useStartupGate(): StartupGate {
   const [registration, setRegistration] = useState<RegistrationState | null>(null);
-  const [record, setRecord] = useState<ActivationRecord | null>(null);
   const [cloudConnected, setCloudConnected] = useState(() => isCloudConnected());
   const [verdict, setVerdict] = useState<CloudVerdict>(() => cloudVerdict());
   const [cloudConfigured, setCloudConfigured] = useState<boolean | null>(null);
@@ -100,10 +95,9 @@ export function useStartupGate(): StartupGate {
   useEffect(() => {
     let cancelled = false;
     void (async () => {
-      const [state, rec] = await Promise.all([isRegistered(), readActivationRecord()]);
+      const state = await isRegistered();
       if (cancelled) return;
       setRegistration(state);
-      setRecord(rec);
     })();
     return () => {
       cancelled = true;
@@ -133,10 +127,9 @@ export function useStartupGate(): StartupGate {
     cloudConnected,
     verdict,
     cloudConfigured,
-    record,
     loading: registration === null,
     probing,
-    offlineGrace: registration === "registered" && !cloudConnected && graceValid(record),
+    offlineAvailable: registration === "registered" && !cloudConnected,
     refresh: () => setTick((v) => v + 1),
   };
 }
@@ -144,7 +137,7 @@ export function useStartupGate(): StartupGate {
 /** The four Emergency Access branches, derived from the two checks. */
 export type EmergencyMode =
   | "online-verified"
-  | "offline-grace"
+  | "offline-registered"
   | "online-unregistered"
   | "offline-unregistered";
 
@@ -154,7 +147,7 @@ export function emergencyMode(gate: {
 }): EmergencyMode {
   const registered = gate.registration === "registered";
   if (registered && gate.cloudConnected) return "online-verified";
-  if (registered) return "offline-grace";
+  if (registered) return "offline-registered";
   return gate.cloudConnected ? "online-unregistered" : "offline-unregistered";
 }
 
@@ -177,25 +170,23 @@ export type StartupDecision =
  * The one rule the whole start-up flow follows.
  *
  * A saved activation record alone is never enough to reach the login screen:
- * either the connection is *proven* (`verified`), or this platform is allowed
- * to trade offline and the terminal is inside its grace window.
+ * either the connection is *proven* (`verified`), or this registered platform
+ * has the durable local database required for offline trading.
  */
 export function startupDecision(input: {
   registration: RegistrationState | null;
   verdict: CloudVerdict;
   /** the terminal has a usable activation/config on this device */
   activated: boolean;
-  /** the record's offline grace window is still open */
-  graceOpen: boolean;
   /** this platform may trade with no connection (Windows till) */
   offlineCapable: boolean;
 }): StartupDecision {
-  const { registration, verdict, activated, graceOpen, offlineCapable } = input;
+  const { registration, verdict, activated, offlineCapable } = input;
   // A missing or refused key is a configuration fault — always repairable.
   if (verdict === "unconfigured" || verdict === "rejected") return "connect-database";
   if (verdict === "verified") return activated ? "ready" : "activate";
   // Unreachable from here on.
-  if (offlineCapable && activated && registration === "registered" && graceOpen) return "ready";
+  if (offlineCapable && activated && registration === "registered") return "ready";
   if (activated) return "offline-blocked";
   return "connect-database";
 }

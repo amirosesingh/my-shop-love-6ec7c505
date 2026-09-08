@@ -2,9 +2,10 @@
  * Catalogue metadata — categories, sub-categories and units of measure.
  *
  * Both lists live on the POS database (`product_categories`, `uom_units`)
- * alongside the rest of the catalogue, and are mirrored to localStorage so a
+ * alongside the rest of the catalogue, and are mirrored to device storage so a
  * till that boots offline still shows the pickers it had yesterday.
  */
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
 import { useEffect, useState } from "react";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import type { CatalogKind, ProductCategory, UomUnit } from "@/core/types/pos-types";
@@ -34,7 +35,7 @@ const notify = () => listeners.forEach((l) => l());
 function readLocal<T>(key: string, fallback: T): T {
   if (!isBrowser()) return fallback;
   try {
-    const raw = window.localStorage.getItem(key);
+    const raw = readBusinessValue(key);
     return raw ? (JSON.parse(raw) as T) : fallback;
   } catch {
     return fallback;
@@ -44,7 +45,7 @@ function readLocal<T>(key: string, fallback: T): T {
 function writeLocal(key: string, value: unknown) {
   if (!isBrowser()) return;
   try {
-    window.localStorage.setItem(key, JSON.stringify(value));
+    writeBusinessValue(key, JSON.stringify(value));
   } catch {
     /* storage full or blocked — the cloud copy is still authoritative */
   }

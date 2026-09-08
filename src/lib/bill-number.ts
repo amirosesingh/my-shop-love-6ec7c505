@@ -13,6 +13,7 @@
 import { isWindowsShell, isMobileShell } from "@/platform-config/features";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { readLocalSetting, writeLocalSetting } from "@/core/local-db/local-db";
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
 
 export type Platform = "PC" | "MB" | "WB";
 
@@ -46,7 +47,7 @@ const clean = (v: string | null | undefined, fallback: string) =>
 /** Stable 01–99 index for this device, derived from its activation token. */
 export function terminalNumber(): string {
   if (typeof window !== "undefined") {
-    const saved = window.localStorage.getItem(TERMINAL_NO_KEY);
+    const saved = readBusinessValue(TERMINAL_NO_KEY);
     if (saved && /^\d{2}$/.test(saved)) return saved;
   }
   const seed = readTerminalConfig()?.tokenId ?? "";
@@ -54,7 +55,7 @@ export function terminalNumber(): string {
   for (const ch of seed) hash = (hash * 31 + ch.charCodeAt(0)) % 99;
   const value = String((hash % 99) + 1).padStart(2, "0");
   if (typeof window !== "undefined" && seed)
-    window.localStorage.setItem(TERMINAL_NO_KEY, value);
+    writeBusinessValue(TERMINAL_NO_KEY, value);
   return value;
 }
 
@@ -92,20 +93,10 @@ export function billPrefix(
 
 type SeqStore = { prefix: string; next: number };
 
-/** Device storage when there is any — server rendering has none. */
-const localStore = (): Storage | null => {
-  try {
-    return (globalThis as { localStorage?: Storage }).localStorage ?? null;
-  } catch {
-    return null;
-  }
-};
-
+/** Read the device counter (SQLite-backed in Electron). */
 const readSeq = (): SeqStore | null => {
-  const store = localStore();
-  if (!store) return null;
   try {
-    const raw = store.getItem(SEQ_KEY);
+    const raw = readBusinessValue(SEQ_KEY);
     const parsed = raw ? (JSON.parse(raw) as SeqStore) : null;
     return parsed && typeof parsed.next === "number" ? parsed : null;
   } catch {
@@ -127,10 +118,8 @@ export class BillNumberReservationError extends Error {
  * when there is no device storage at all (server rendering).
  */
 const writeSeq = (value: SeqStore): boolean => {
-  const store = localStore();
-  if (!store) return false;
   try {
-    store.setItem(SEQ_KEY, JSON.stringify(value));
+    writeBusinessValue(SEQ_KEY, JSON.stringify(value));
     return true;
   } catch (err) {
     throw new BillNumberReservationError(
@@ -173,7 +162,7 @@ export async function hydrateBillSequence(): Promise<void> {
     const local = readSeq();
     // Whichever source is further ahead wins; the counter never goes backwards.
     if (!local || local.prefix !== stored.prefix || local.next < stored.next) {
-      window.localStorage.setItem(SEQ_KEY, JSON.stringify(stored));
+      writeBusinessValue(SEQ_KEY, JSON.stringify(stored));
     }
   } catch {
     /* unreadable value — keep whatever the device already has */

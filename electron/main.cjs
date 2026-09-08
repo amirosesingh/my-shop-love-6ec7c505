@@ -1666,6 +1666,21 @@ function registerIpc() {
       written: localDb.mirror(guard.key(entity, { name: "table" }), guard.list(rows ?? [], { name: "rows", max: 5000 })),
     })),
   );
+  ipcMain.handle("local:mirror-batch", (_e, entries, ops) =>
+    guard.guarded(() => ({
+      ok: true,
+      written: localDb.mirrorBatch(
+        guard.list(entries ?? [], { name: "business transaction", max: 100 }).map((entry) => {
+          const value = guard.plainObject(entry, { name: "business transaction entry" });
+          return {
+            entity: guard.key(value.entity, { name: "table" }),
+            rows: guard.list(value.rows ?? [], { name: "rows", max: 5000 }),
+          };
+        }),
+        ops === undefined ? undefined : guard.writeOps(ops),
+      ),
+    })),
+  );
   ipcMain.handle("local:list", (_e, entity, limit) =>
     guard.guarded(() => ({
       ok: true,
@@ -1675,6 +1690,25 @@ function registerIpc() {
       ),
     })),
   );
+  ipcMain.on("local:business-get", (event, key) => {
+    try {
+      const name = String(key ?? "");
+      if (!name.startsWith("business:") || name.length > 200) throw new Error("Invalid business key");
+      event.returnValue = { ok: true, value: localDb.getState(name) };
+    } catch (error) {
+      event.returnValue = { ok: false, error: error?.message ?? String(error) };
+    }
+  });
+  ipcMain.on("local:business-set", (event, key, value) => {
+    try {
+      const name = String(key ?? "");
+      if (!name.startsWith("business:") || name.length > 200) throw new Error("Invalid business key");
+      localDb.setState(name, value == null ? null : String(value));
+      event.returnValue = { ok: true };
+    } catch (error) {
+      event.returnValue = { ok: false, error: error?.message ?? String(error) };
+    }
+  });
   ipcMain.handle("local:audit-log", (_e, entry) =>
     guard.guarded(() => ({
       ok: true,

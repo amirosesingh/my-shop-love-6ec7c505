@@ -796,24 +796,49 @@ const LIVE_TABLES = [
   "stores",
   "pos_settings",
   "pos_store_settings",
+  "sales",
+  "sale_items",
+  "payment_transactions",
 ] as const;
+
+export type LiveChange = { reason: string; table: string; storeId: string | null };
 
 /**
  * Listeners told when centrally controlled settings changed, so the running
  * POS re-reads its rules instead of waiting for a screen to be reopened.
  * This reuses the one live channel below — no second subscription.
  */
-const settingsListeners = new Set<(reason: string) => void>();
+const settingsListeners = new Set<(change: LiveChange) => void>();
+const salesListeners = new Set<(change: LiveChange) => void>();
 
-export function subscribeSettingsChange(fn: (reason: string) => void): () => void {
+export function subscribeSettingsChange(fn: (change: LiveChange) => void): () => void {
   settingsListeners.add(fn);
   return () => settingsListeners.delete(fn);
 }
 
-function announceSettingsChange(reason: string): void {
+export function subscribeSalesChange(fn: (change: LiveChange) => void): () => void {
+  salesListeners.add(fn);
+  return () => salesListeners.delete(fn);
+}
+
+function announceSettingsChange(
+  reason: string,
+  storeId: string | null = null,
+  table = "pos_store_settings",
+): void {
   for (const fn of settingsListeners) {
     try {
-      fn(reason);
+      fn({ reason, table, storeId });
+    } catch {
+      /* one bad listener must not stop the others */
+    }
+  }
+}
+
+function announceSalesChange(table: string, storeId: string | null): void {
+  for (const fn of salesListeners) {
+    try {
+      fn({ reason: `live:${table}`, table, storeId });
     } catch {
       /* one bad listener must not stop the others */
     }
@@ -832,6 +857,28 @@ async function refreshStaffMirror(): Promise<void> {
 
 const RETRY_DELAYS_MS = [2000, 10000, 30000];
 let liveTimer: number | undefined;
+const pendingLiveChanges = new Map<string, Set<string | null>>();
+
+function flushLiveChanges(): void {
+  liveTimer = undefined;
+  const changes = [...pendingLiveChanges.entries()];
+  pendingLiveChanges.clear();
+  void syncNow(`live:${changes.map(([changedTable]) => changedTable).join(",")}`);
+  for (const [changedTable, changedStores] of changes) {
+    for (const changedStore of changedStores) {
+      if (changedTable === "pos_settings" || changedTable === "pos_store_settings") {
+        announceSettingsChange(`live:${changedTable}`, changedStore, changedTable);
+      }
+      if (
+        changedTable === "sales" ||
+        changedTable === "sale_items" ||
+        changedTable === "payment_transactions"
+      ) {
+        announceSalesChange(changedTable, changedStore);
+      }
+    }
+  }
+}
 
 /**
  * Push a just-made change straight through instead of waiting for the timer.
@@ -924,16 +971,16 @@ export function startSyncEngine() {
   // shop's own database within a second instead of waiting for the timer.
   const live = supabaseExternal.channel("pos-live-settings");
   for (const table of LIVE_TABLES) {
-    live.on("postgres_changes", { event: "*", schema: "public", table }, () => {
+    live.on("postgres_changes", { event: "*", schema: "public", table }, (payload) => {
+      const changed = ((payload as { new?: Record<string, unknown>; old?: Record<string, unknown> }).new ??
+        (payload as { old?: Record<string, unknown> }).old ?? {}) as Record<string, unknown>;
+      const storeId = String(changed.store_id ?? changed.branch_id ?? "").trim() || null;
+      const stores = pendingLiveChanges.get(table) ?? new Set<string | null>();
+      stores.add(storeId);
+      pendingLiveChanges.set(table, stores);
       if (liveTimer) window.clearTimeout(liveTimer);
       // One catch-up for a burst of related edits.
-      liveTimer = window.setTimeout(() => {
-        liveTimer = undefined;
-        void syncNow(`live:${table}`);
-        if (table === "pos_settings" || table === "pos_store_settings") {
-          announceSettingsChange(`live:${table}`);
-        }
-      }, 400);
+      liveTimer = window.setTimeout(flushLiveChanges, 400);
     });
   }
   live.subscribe((status) => {
@@ -950,6 +997,7 @@ export function startSyncEngine() {
     offConnectivity();
     if (debounce) window.clearTimeout(debounce);
     if (liveTimer) window.clearTimeout(liveTimer);
+    pendingLiveChanges.clear();
     void supabaseExternal.removeChannel(live);
     offMode();
     started = false;

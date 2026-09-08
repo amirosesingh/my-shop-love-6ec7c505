@@ -10,6 +10,7 @@
  */
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { recordDiagnostic, reasonCode } from "./diagnostics";
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
 
 /** One relative stock change, keyed on the movement row that caused it. */
 export type StockMovement = {
@@ -83,7 +84,7 @@ export function listUnappliedStock(): UnappliedMovement[] {
   if (typeof window === "undefined") return [];
   try {
     const rows = JSON.parse(
-      window.localStorage.getItem(KEY) ?? "[]",
+      readBusinessValue(KEY) ?? "[]",
     ) as Partial<UnappliedMovement>[];
     return rows.filter((r) => r && r.movementId).map(normalise);
   } catch {
@@ -93,7 +94,7 @@ export function listUnappliedStock(): UnappliedMovement[] {
 
 function write(rows: UnappliedMovement[]) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(KEY, JSON.stringify(rows.slice(0, LIMIT)));
+  writeBusinessValue(KEY, JSON.stringify(rows.slice(0, LIMIT)));
   announce();
 }
 

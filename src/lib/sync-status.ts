@@ -4,6 +4,8 @@
  * The engine has no access to React state, so it publishes here and the
  * status pill subscribes.
  */
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
+
 export type SyncPhase = "offline" | "syncing" | "idle";
 
 export type SyncState = {
@@ -70,12 +72,12 @@ const PULL_KEY = "pos.sync.lastPullAt";
 
 export function lastSuccessfulPull(): string | null {
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem(PULL_KEY);
+  return readBusinessValue(PULL_KEY);
 }
 
 export function setLastSuccessfulPull(iso: string) {
   if (typeof window === "undefined") return;
-  window.localStorage.setItem(PULL_KEY, iso);
+  writeBusinessValue(PULL_KEY, iso);
 }
 
 /* --------------------- per-table pull high-water marks -------------------- */
@@ -85,7 +87,7 @@ const TABLE_PULL_KEY = "pos.sync.tablePullAt";
 const readTableMarks = (): Record<string, string> => {
   if (typeof window === "undefined") return {};
   try {
-    const raw = window.localStorage.getItem(TABLE_PULL_KEY);
+    const raw = readBusinessValue(TABLE_PULL_KEY);
     const parsed = raw ? (JSON.parse(raw) as Record<string, string>) : {};
     return parsed && typeof parsed === "object" ? parsed : {};
   } catch {
@@ -101,7 +103,7 @@ export function lastTablePull(table: string): string | null {
 export function setLastTablePull(table: string, iso: string) {
   if (typeof window === "undefined") return;
   try {
-    window.localStorage.setItem(
+    writeBusinessValue(
       TABLE_PULL_KEY,
       JSON.stringify({ ...readTableMarks(), [table]: iso }),
     );

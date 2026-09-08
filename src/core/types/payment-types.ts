@@ -120,8 +120,8 @@ export async function loadPaymentTypes(): Promise<PaymentType[]> {
     const list = ((res.data as Row[] | null) ?? []).map(toType).sort(bySort);
     if (list.length) writeCache(list);
     return list.length ? list : cachedPaymentTypes();
-  } catch (e) {
-    console.error("[payment-types] load failed", e);
+  } catch {
+    if (import.meta.env.DEV) console.error("[payment-types] load failed");
     return cachedPaymentTypes();
   }
 }

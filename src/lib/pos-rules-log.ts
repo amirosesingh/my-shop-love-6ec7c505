@@ -27,5 +27,5 @@ export function logRules(event: RulesLogEvent, fields: Record<string, string | n
     .map(([k, v]) => `${k}=${v}`)
     .join(" ");
   const text = line ? `${event} ${line}` : event;
-  console.warn(text);
+  if (import.meta.env.DEV) console.warn(text);
 }

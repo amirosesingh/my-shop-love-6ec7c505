@@ -4,6 +4,8 @@
  * Sending a bill needs the cloud, so when the branch is offline the message is
  * parked here and flushed automatically once the connection returns.
  */
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
+
 export type QueuedMessage = {
   id: string;
   phoneNumberId: string;
@@ -20,7 +22,7 @@ const listeners = new Set<() => void>();
 function read(): QueuedMessage[] {
   if (!isBrowser()) return [];
   try {
-    return JSON.parse(window.localStorage.getItem(KEY) ?? "[]") as QueuedMessage[];
+    return JSON.parse(readBusinessValue(KEY) ?? "[]") as QueuedMessage[];
   } catch {
     return [];
   }
@@ -29,7 +31,7 @@ function read(): QueuedMessage[] {
 function write(rows: QueuedMessage[]) {
   if (!isBrowser()) return;
   try {
-    window.localStorage.setItem(KEY, JSON.stringify(rows));
+    writeBusinessValue(KEY, JSON.stringify(rows));
   } catch {
     /* storage full */
   }

@@ -193,7 +193,7 @@ export function useRevocationCheck(): RevocationState {
       }
       setBlocked(false);
       void stampHeartbeat(config.tokenId);
-      // A verified status is the only thing that extends the offline grace.
+      // Refresh the sealed registration proof after a verified status.
       void writeActivationRecord({
         tokenId: config.tokenId,
         stamp: verdict.stamp ?? null,

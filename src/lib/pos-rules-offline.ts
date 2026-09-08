@@ -38,12 +38,15 @@ export async function queueRulesSave(input: {
   rules: PosRules;
   patch: Record<string, boolean | number>;
   actor?: string | null;
+  expectedVersion: number;
 }): Promise<QueuedRules> {
   const savedAt = Date.now();
   const row: Record<string, unknown> = {
     store_id: input.branchId || "",
     ...input.patch,
     updated_at: new Date(savedAt).toISOString(),
+    row_version: input.expectedVersion,
+    base_version: input.expectedVersion,
   };
   if (input.actor) row["updated_by"] = input.actor;
 
@@ -63,6 +66,9 @@ export async function queueRulesSave(input: {
     syncedAt: savedAt,
     rules: input.rules,
     pending: true,
+    rowVersion: input.expectedVersion,
+    updatedAt: new Date(savedAt).toISOString(),
+    updatedBy: input.actor ?? null,
   });
 
   logRules("POS_RULES_SAVE_QUEUED", {
