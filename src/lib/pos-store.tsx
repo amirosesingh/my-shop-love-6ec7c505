@@ -35,6 +35,7 @@ import type {
   TransferKind,
   TransferStatus,
 } from "@/core/types/pos-types";
+import { subscribeSalesChange, subscribeSettingsChange } from "./sync-engine";
 import { bookingBalance, lineDiscountTotal, lineUnitDiscount, r2, type DiscountType } from "@/core/types/pos-types";
 import { logger } from "./audit-log";
 import { toast } from "sonner";
@@ -48,7 +49,7 @@ import {
 } from "@/core/api/pos-db";
 import { recordActivity } from "./activity-events";
 import type { CloudSlice, CommitTarget } from "@/core/api/pos-db";
-import { clearSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
+import { clearSnapshot, hydrateSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isOnlineOnly } from "./live-mode";
 import { useAuth } from "@/lib/pos-auth";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
@@ -111,7 +112,7 @@ import {
   setPath,
   type SettingsSectionId,
 } from "./settings-sections";
-import { schedulePersist } from "./pos-persist";
+import { localDb } from "@/core/local-db/local-db";
 import {
   batches,
   DEFAULT_BATCH_SIZE,
@@ -475,37 +476,35 @@ export function PosProvider({ children }: { children: ReactNode }) {
     const watchdog = window.setTimeout(() => {
       if (!cancelled) setLoadPhase((p) => (p === "loading" ? "stalled" : p));
     }, 15000);
-    // Local-only slices (stores, shifts, transfers, counters) stay on the
-    // terminal; catalogue, members, bills, promos and settings come from cloud.
-    try {
-      // Web and Android keep nothing locally — every slice is loaded live.
-      const raw = isOnlineOnly() ? null : window.localStorage.getItem(KEY);
-      if (raw) {
-        const saved = JSON.parse(raw) as PosState;
-        // Migrate single-product transfers saved before multi-item support.
-        const transfers = (saved.transfers ?? []).map((t) => {
-          const legacy = t as Transfer & { productId?: string; qty?: number };
-          return t.items
-            ? t
-            : { ...t, items: [{ productId: legacy.productId ?? "", qty: legacy.qty ?? 0 }] };
-        });
-        setState((s) => ({
-          ...s,
-          stores: saved.stores?.length ? saved.stores : s.stores,
-          currentStoreId: saved.currentStoreId ?? s.currentStoreId,
-          shifts: saved.shifts ?? [],
-          transfers,
-          bookings: saved.bookings ?? [],
-          counter: saved.counter ?? 0,
-          transferCounter: saved.transferCounter ?? 0,
-          bookingCounter: saved.bookingCounter ?? 0,
-        }));
-      }
-    } catch {
-      /* ignore corrupt storage */
-    }
-
     void (async () => {
+      if (!isOnlineOnly()) {
+        await hydrateSnapshot();
+        try {
+          const stored = await localDb()?.getSetting?.(KEY);
+          if (stored?.value) {
+            const saved = JSON.parse(stored.value) as PosState;
+            const transfers = (saved.transfers ?? []).map((t) => {
+              const legacy = t as Transfer & { productId?: string; qty?: number };
+              return t.items
+                ? t
+                : { ...t, items: [{ productId: legacy.productId ?? "", qty: legacy.qty ?? 0 }] };
+            });
+            setState((s) => ({
+              ...s,
+              stores: saved.stores?.length ? saved.stores : s.stores,
+              currentStoreId: saved.currentStoreId ?? s.currentStoreId,
+              shifts: saved.shifts ?? [],
+              transfers,
+              bookings: saved.bookings ?? [],
+              counter: saved.counter ?? 0,
+              transferCounter: saved.transferCounter ?? 0,
+              bookingCounter: saved.bookingCounter ?? 0,
+            }));
+          }
+        } catch {
+          /* corrupt local UI projection does not affect the durable ledger */
+        }
+      }
       // Anonymous visitors get nothing: no products, members or sales.
       if (!signedIn) {
         if (authReady && !cancelled) {
@@ -582,7 +581,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!ready) return;
     if (isOnlineOnly()) return;
-    schedulePersist(KEY, () => JSON.stringify(state));
+    const pending = localDb()?.setSetting?.(KEY, JSON.stringify(state));
+    if (pending) void pending.catch(() => undefined);
   }, [state, ready]);
 
   // Overrides follow the cluster, branch and person in context.
@@ -766,6 +766,61 @@ export function PosProvider({ children }: { children: ReactNode }) {
       window.removeEventListener("online", resume);
     };
   }, [signedIn, refreshActiveShift]);
+
+  // A committed sale is announced by the existing shared Realtime channel.
+  // The event is only a notification: always fetch the complete canonical
+  // transaction graph rather than assembling a sale from a partial payload.
+  useEffect(() => {
+    if (!signedIn) return;
+    let timer: number | undefined;
+    const unsubscribe = subscribeSalesChange((change) => {
+      const active = activeBranchId(stateRef.current.currentStoreId) ?? stateRef.current.currentStoreId;
+      if (change.storeId && active && change.storeId !== active) return;
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = undefined;
+        void loadCloudState()
+          .then((cloud) => {
+            writeSnapshot(cloud);
+            setState((current) => applyCloud(current, cloud));
+          })
+          .catch(() => {
+            /* reconnect/pull remains the eventual-convergence fallback */
+          });
+      }, 250);
+    });
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [signedIn]);
+
+  // General business settings share the existing Realtime channel with POS
+  // rules. A pos_settings notification refreshes the canonical state; rule
+  // rows remain owned by PosRulesProvider and its store-scoped query cache.
+  useEffect(() => {
+    if (!signedIn) return;
+    let timer: number | undefined;
+    const unsubscribe = subscribeSettingsChange((change) => {
+      if (change.table !== "pos_settings") return;
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        timer = undefined;
+        void loadCloudState()
+          .then((cloud) => {
+            writeSnapshot(cloud);
+            setState((current) => applyCloud(current, cloud));
+          })
+          .catch(() => {
+            /* reconnect/pull remains the convergence fallback */
+          });
+      }, 250);
+    });
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [signedIn]);
 
   // Pull sync: tills and desktops refresh the master data (catalogue, prices,
   // members, branches, settings) from the cloud on a timer and whenever the

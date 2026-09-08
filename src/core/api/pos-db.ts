@@ -1023,6 +1023,33 @@ async function loadLocalState(cause: unknown): Promise<CloudSlice> {
   }
   const result = await bridge.snapshot();
   if (!result.ok) throw cause;
+  // The operational SQL snapshot intentionally excludes sales. Recover the
+  // durable transaction graph from SQLite so a desktop reopened without a
+  // network still shows the bills it accepted before shutdown.
+  let localSales: Row[] = [];
+  if (bridge.localList) {
+    try {
+      const [headers, items] = await Promise.all([
+        bridge.localList("sales", 5000),
+        bridge.localList("sale_items", 20000),
+      ]);
+      if (headers.ok) {
+        const linesBySale = new Map<string, Row[]>();
+        for (const item of items.ok ? (items.rows ?? []) : []) {
+          const saleId = String(item.sale_id ?? "");
+          if (!saleId) continue;
+          linesBySale.set(saleId, [...(linesBySale.get(saleId) ?? []), item]);
+        }
+        localSales = (headers.rows ?? []).map((sale) => ({
+          ...sale,
+          sale_items: linesBySale.get(String(sale.id ?? "")) ?? [],
+        }));
+      }
+    } catch {
+      // The SQL snapshot still supplies catalogue/settings. A corrupt recovery
+      // mirror must not stop the register opening for an operator to repair it.
+    }
+  }
   tierIdByName = {};
   tierNameById = {};
   for (const tier of result.tiers ?? []) {
@@ -1033,7 +1060,7 @@ async function loadLocalState(cause: unknown): Promise<CloudSlice> {
   return {
     products: (result.products ?? []).map(rowToProduct),
     members: (result.members ?? []).map((row) => rowToMember(row, tierName)),
-    sales: [],
+    sales: localSales.map(rowToSale),
     promotions: (result.promotions ?? []).map(rowToPromotion),
     settings: rowToSettings((result.settings as Row | null) ?? null),
     stores: (result.stores ?? []).map(rowToStore),
@@ -1619,6 +1646,25 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   const bridge = localDb();
   if (bridge) {
     try {
+      const mirrorEntries = ops.flatMap((op) =>
+        op.kind === "insert" || op.kind === "upsert"
+          ? [{ entity: op.table, rows: op.rows as Record<string, unknown>[] }]
+          : [],
+      );
+      // SQLite is the mandatory durable boundary for desktop business rows.
+      // Write it before the compatibility SQL Server projection: there must
+      // never again be a committed till transaction that has no on-device
+      // SQLite recovery copy.
+      if (ops.length) {
+        if (!bridge.localMirrorBatch) {
+          throw new Error("This desktop build cannot commit an atomic SQLite batch. Update the app.");
+        }
+        const shadow = await bridge.localMirrorBatch(mirrorEntries, ops);
+        const expected = mirrorEntries.reduce((total, entry) => total + entry.rows.length, 0);
+        if (!shadow.ok || Number(shadow.written ?? 0) !== expected) {
+          throw new Error(shadow.error ?? "The embedded SQLite transaction copy was incomplete");
+        }
+      }
       if (!bridge.writeBatch) {
         throw new Error("This desktop build cannot commit an atomic local SQL batch. Update the app.");
       }

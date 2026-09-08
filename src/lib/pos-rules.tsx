@@ -30,6 +30,8 @@ import { platformName } from "@/platform-config/platform";
 export { platformName };
 import { DEFAULT_POS_RULES, normalizeRules, type PosRules } from "./pos-rules";
 
+export const posRulesQueryKey = (storeId: string) => ["pos-rules", storeId.trim()] as const;
+
 /** Why the live values are not in use, in words a supervisor can act on. */
 export type RulesFailureKind =
   | "none"
@@ -100,7 +102,10 @@ type Ctx = {
   terminalId: string;
   platform: string;
   lastSyncedAt: number | null;
-  refresh: () => void;
+  refresh: () => Promise<void>;
+  rowVersion: number;
+  updatedAt: string | null;
+  updatedBy: string | null;
 };
 
 const RulesContext = createContext<Ctx | null>(null);
@@ -117,6 +122,9 @@ type Snapshot = {
   revision: string;
   branchId: string;
   lastSyncedAt: number | null;
+  rowVersion: number;
+  updatedAt: string | null;
+  updatedBy: string | null;
 };
 
 type Answer = {
@@ -130,6 +138,9 @@ type Answer = {
   fetchedAt?: number;
   rules?: unknown;
   error?: string;
+  rowVersion?: number;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
 };
 
 /**
@@ -138,7 +149,15 @@ type Answer = {
  */
 const lastGood = new Map<
   string,
-  { rules: PosRules; revision: string; at: number; pending?: boolean }
+  {
+    rules: PosRules;
+    revision: string;
+    at: number;
+    pending?: boolean;
+    rowVersion: number;
+    updatedAt: string | null;
+    updatedBy: string | null;
+  }
 >();
 
 /** Ask the server, over whichever transport this platform can actually reach. */
@@ -171,7 +190,7 @@ export function PosRulesProvider({
 }) {
   const queryClient = useQueryClient();
   const scope = (storeId ?? "").trim();
-  const key = ["pos-rules", scope] as const;
+  const key = useMemo(() => posRulesQueryKey(scope), [scope]);
   const device = useRef<string>("");
   if (!device.current) device.current = typeof window === "undefined" ? "server" : terminalId();
 
@@ -199,6 +218,9 @@ export function PosRulesProvider({
             revision: stored.revision,
             at: stored.syncedAt,
             pending: stored.pending === true,
+            rowVersion: stored.rowVersion ?? 0,
+            updatedAt: stored.updatedAt ?? null,
+            updatedBy: stored.updatedBy ?? null,
           };
           lastGood.set(scope, cached);
         }
@@ -227,6 +249,9 @@ export function PosRulesProvider({
           revision: "",
           branchId: scope,
           lastSyncedAt: null,
+          rowVersion: 0,
+          updatedAt: null,
+          updatedBy: null,
         };
       };
 
@@ -251,6 +276,9 @@ export function PosRulesProvider({
           revision: now.revision,
           branchId: scope,
           lastSyncedAt: now.at,
+          rowVersion: now.rowVersion,
+          updatedAt: now.updatedAt,
+          updatedBy: now.updatedBy,
         };
       };
 
@@ -276,6 +304,9 @@ export function PosRulesProvider({
           revision: now.revision,
           branchId: scope,
           lastSyncedAt: now.at,
+          rowVersion: now.rowVersion,
+          updatedAt: now.updatedAt,
+          updatedBy: now.updatedBy,
         };
       };
 
@@ -300,7 +331,15 @@ export function PosRulesProvider({
                 branch_id: scope,
                 revision,
               });
-              cached = { rules, revision, at, pending: false };
+              cached = {
+                rules,
+                revision,
+                at,
+                pending: false,
+                rowVersion: Math.max(0, Number(res.rowVersion) || 0),
+                updatedAt: res.updatedAt ?? null,
+                updatedBy: res.updatedBy ?? null,
+              };
               lastGood.set(scope, cached);
               await writeCachedRules({
                 terminalId: me,
@@ -309,7 +348,23 @@ export function PosRulesProvider({
                 syncedAt: at,
                 rules,
                 pending: false,
+                rowVersion: cached.rowVersion,
+                updatedAt: cached.updatedAt,
+                updatedBy: cached.updatedBy,
               });
+            } else if (Math.max(0, Number(res.rowVersion) || 0) > cached.rowVersion) {
+              // The branch moved on while this terminal was offline. The
+              // queued RPC will be rejected as STALE_RULES; stop enforcing
+              // the stale local draft and let the confirmed central snapshot
+              // replace it below.
+              logRules("POS_RULES_PENDING_ABANDONED", {
+                platform,
+                terminal_id: me,
+                branch_id: scope,
+                category: "STALE_RULES",
+              });
+              cached = null;
+              lastGood.delete(scope);
             } else if (pendingExpired(cached.at)) {
               // Too old to keep holding the branch to it.
               logRules("POS_RULES_PENDING_ABANDONED", {
@@ -327,7 +382,14 @@ export function PosRulesProvider({
           // A late answer must never put an older rule set back in place.
           if (!cached || at >= cached.at) {
             const changed = !cached || cached.revision !== revision;
-            lastGood.set(scope, { rules, revision, at });
+            lastGood.set(scope, {
+              rules,
+              revision,
+              at,
+              rowVersion: Math.max(0, Number(res.rowVersion) || 0),
+              updatedAt: res.updatedAt ?? null,
+              updatedBy: res.updatedBy ?? null,
+            });
             if (changed) {
               logRules("POS_RULES_REVISION_CHANGED", {
                 platform,
@@ -342,6 +404,9 @@ export function PosRulesProvider({
                 revision,
                 syncedAt: at,
                 rules,
+                rowVersion: Math.max(0, Number(res.rowVersion) || 0),
+                updatedAt: res.updatedAt ?? null,
+                updatedBy: res.updatedBy ?? null,
               });
             }
           }
@@ -364,6 +429,9 @@ export function PosRulesProvider({
             revision: now.revision,
             branchId: scope,
             lastSyncedAt: now.at,
+            rowVersion: Math.max(0, Number(res.rowVersion) || 0),
+            updatedAt: res.updatedAt ?? null,
+            updatedBy: res.updatedBy ?? null,
           };
         }
 
@@ -398,10 +466,12 @@ export function PosRulesProvider({
   // spell offline re-reads it too. No terminal has to be visited by hand.
   useEffect(
     () =>
-      subscribeSettingsChange(() => {
-        void queryClient.invalidateQueries({ queryKey: ["pos-rules"] });
+      subscribeSettingsChange((change) => {
+        if (change.table !== "pos_store_settings") return;
+        if (change.storeId !== null && change.storeId !== "" && change.storeId !== scope) return;
+        void queryClient.invalidateQueries({ queryKey: key });
       }),
-    [queryClient],
+    [key, queryClient, scope],
   );
 
   const value = useMemo<Ctx>(() => {
@@ -424,9 +494,14 @@ export function PosRulesProvider({
       terminalId: device.current,
       platform: platformName(),
       lastSyncedAt: query.data?.lastSyncedAt ?? null,
-      refresh: () => void queryClient.invalidateQueries({ queryKey: ["pos-rules"] }),
+      rowVersion: query.data?.rowVersion ?? 0,
+      updatedAt: query.data?.updatedAt ?? null,
+      updatedBy: query.data?.updatedBy ?? null,
+      refresh: async () => {
+        await queryClient.refetchQueries({ queryKey: key });
+      },
     };
-  }, [query.data, query.isPending, queryClient]);
+  }, [key, query.data, query.isPending, queryClient]);
 
   return <RulesContext.Provider value={value}>{children}</RulesContext.Provider>;
 }
@@ -450,7 +525,10 @@ export function usePosRules(): Ctx {
       terminalId: "",
       platform: platformName(),
       lastSyncedAt: null,
-      refresh: () => {},
+      rowVersion: 0,
+      updatedAt: null,
+      updatedBy: null,
+      refresh: async () => {},
     }
   );
 }

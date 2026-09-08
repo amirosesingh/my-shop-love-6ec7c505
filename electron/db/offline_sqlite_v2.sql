@@ -1287,6 +1287,7 @@ CREATE TABLE IF NOT EXISTS pos_store_settings (
   require_pin_edit_tenders INTEGER,
   require_pin_terminal_reset INTEGER,
   row_version INTEGER,
+  base_version INTEGER,
   updated_by TEXT,
   updated_at TEXT,
   allow_offline_approvals INTEGER,
