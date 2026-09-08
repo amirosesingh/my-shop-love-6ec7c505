@@ -294,40 +294,6 @@ async function cloudUpsert(table, rows) {
   if (error) throw error;
 }
 
-async function cloudMutation(op) {
-  if (op.kind === "insert" || op.kind === "upsert") return cloudUpsert(op.table, op.rows);
-  const bearer = credentials.sessionToken || credentials.accessToken;
-  if (relayUrl && (bearer || credentials.cashierToken || credentials.terminalToken)) {
-    const response = await fetch(relayUrl, {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        ...(bearer ? { Authorization: `Bearer ${bearer}` } : {}),
-      },
-      body: JSON.stringify({
-        sessionToken: credentials.sessionToken,
-        cashierToken: credentials.cashierToken,
-        terminalToken: credentials.terminalToken,
-        ops: [op],
-      }),
-    });
-    const body = await response.json().catch(() => null);
-    if (!response.ok || !body?.ok || body.results?.some((result) => !result.ok)) {
-      throw new Error(body?.error || body?.results?.find((result) => !result.ok)?.error || `Sync relay failed (${response.status})`);
-    }
-    return;
-  }
-  if (op.kind === "rpc") {
-    const { error } = await supabase.rpc(op.fn, op.args ?? {});
-    if (error) throw error;
-    return;
-  }
-  let query = op.kind === "delete" ? supabase.from(op.table).delete() : supabase.from(op.table).update(op.values ?? {});
-  for (const [column, value] of Object.entries(op.match ?? {})) query = query.eq(column, value);
-  const { error } = await query;
-  if (error) throw error;
-}
-
 /**
  * Pending branch rules are never table-upserted. The local row version is one
  * ahead of the confirmed version it was edited from, so replay uses that base
@@ -364,42 +330,20 @@ async function pushSqliteBusinessBatches() {
   for (const batch of batches) {
     const ops = Array.isArray(batch.payload?.ops) ? batch.payload.ops : [];
     try {
-      const saleOp = ops.find((op) => op?.table === "sales" && Array.isArray(op.rows) && op.rows.length === 1);
-      const atomicTables = new Set(["sales", "sale_items", "payment_transactions", "item_activity_logs"]);
-      let replayOps = ops;
-      if (saleOp) {
-        const sale = saleOp.rows[0];
-        const rowsFor = (table) => ops.filter((op) => op?.table === table).flatMap((op) => op.rows ?? []);
-        await cloudMutation({
-          kind: "rpc",
-          table: "sales",
-          fn: "pos_sale_commit",
-          args: {
-            _sale: repo.toCloudRow("sales", sale),
-            _items: rowsFor("sale_items").map((row) => repo.toCloudRow("sale_items", row)),
-            _payments: rowsFor("payment_transactions").map((row) => repo.toCloudRow("payment_transactions", row)),
-            _movements: rowsFor("item_activity_logs").map((row) => repo.toCloudRow("item_activity_logs", row)),
-            _member: rowsFor("members")[0] ? repo.toCloudRow("members", rowsFor("members")[0]) : null,
-            _exchange_bill: sale.original_bill_number ?? null,
-          },
-        });
-        replayOps = ops.filter((op) => !atomicTables.has(op.table) && op.table !== "members");
-      }
-      for (const op of replayOps) {
-        if (!op?.kind || !op.table) {
+      for (const op of ops) {
+        if (op?.kind !== "upsert" || !op.table || !Array.isArray(op.rows)) {
           throw new Error("Unsupported operation in SQLite business outbox");
         }
-        const rows = Array.isArray(op.rows) ? op.rows : [];
-        const payload = stripAbsoluteStock(op.table, rows.map((row) => repo.toCloudRow(op.table, row)));
-        if (op.table === "pos_store_settings") await cloudSaveRules(rows);
-        else await cloudMutation({ ...op, ...(rows.length ? { rows: payload } : {}) });
+        const payload = stripAbsoluteStock(op.table, op.rows.map((row) => repo.toCloudRow(op.table, row)));
+        if (op.table === "pos_store_settings") await cloudSaveRules(op.rows);
+        else await cloudUpsert(op.table, payload);
         if (op.table === "item_activity_logs") {
           const delta = await applyStockDeltas(payload);
           if (delta?.error) throw new Error(delta.error);
         }
       }
       for (const op of ops) {
-        const ids = (op.rows ?? []).map((row) => row?.id).filter(Boolean);
+        const ids = op.rows.map((row) => row?.id).filter(Boolean);
         if (ids.length) await repo.markSynced(op.table, ids).catch(() => {});
       }
       sqlite.acknowledgeBusinessBatch(batch.id);

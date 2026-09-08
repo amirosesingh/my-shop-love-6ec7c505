@@ -117,7 +117,7 @@ contextBridge.exposeInMainWorld("pos", {
      upload intent are committed together before the SQL Server projection. */
   localInfo: () => invoke("local:info"),
   localMirror: (entity, rows) => invoke("local:mirror", entity, rows),
-  localMirrorBatch: (entries, ops) => invoke("local:mirror-batch", entries, ops),
+  localMirrorBatch: (entries) => invoke("local:mirror-batch", entries),
   localList: (entity, limit) => invoke("local:list", entity, limit),
   localAuditLog: (entry) => invoke("local:audit-log", entry),
   localAuditList: (limit) => invoke("local:audit-list", limit),
