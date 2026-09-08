@@ -8,6 +8,7 @@
  */
 const { createClient } = require("@supabase/supabase-js");
 const repo = require("../db/repo.cjs");
+const sqlite = require("../db/sqlite.cjs");
 
 const BATCH = 50;
 const INTERVAL_MS = 30_000;
@@ -293,6 +294,71 @@ async function cloudUpsert(table, rows) {
   if (error) throw error;
 }
 
+/**
+ * Pending branch rules are never table-upserted. The local row version is one
+ * ahead of the confirmed version it was edited from, so replay uses that base
+ * version and lets the canonical RPC reject a stale terminal explicitly.
+ */
+async function cloudSaveRules(rows) {
+  for (const row of rows) {
+    const patch = repo.toCloudRow("pos_store_settings", row);
+    const storeId = String(patch.store_id ?? credentials.branchId ?? "");
+    delete patch.store_id;
+    delete patch.row_version;
+    delete patch.updated_at;
+    delete patch.updated_by;
+    const expectedVersion = Math.max(0, Number(row.base_version ?? row.row_version ?? 0));
+    const { error } = await supabase.rpc("pos_rules_save", {
+      _store_id: storeId,
+      _patch: patch,
+      _expected_version: expectedVersion,
+    });
+    if (error) throw error;
+  }
+}
+
+/**
+ * Drain transaction batches whose rows and upload intent were committed in
+ * one SQLite transaction. SQL Server remains a compatibility projection; on
+ * acknowledgement its matching rows are marked synced so the legacy pass
+ * below cannot upload the same batch a second time.
+ */
+async function pushSqliteBusinessBatches() {
+  const batches = sqlite.pendingBusinessBatches?.(BATCH) ?? [];
+  let pushed = 0;
+  let failed = 0;
+  for (const batch of batches) {
+    const ops = Array.isArray(batch.payload?.ops) ? batch.payload.ops : [];
+    try {
+      for (const op of ops) {
+        if (op?.kind !== "upsert" || !op.table || !Array.isArray(op.rows)) {
+          throw new Error("Unsupported operation in SQLite business outbox");
+        }
+        const payload = stripAbsoluteStock(op.table, op.rows.map((row) => repo.toCloudRow(op.table, row)));
+        if (op.table === "pos_store_settings") await cloudSaveRules(op.rows);
+        else await cloudUpsert(op.table, payload);
+        if (op.table === "item_activity_logs") {
+          const delta = await applyStockDeltas(payload);
+          if (delta?.error) throw new Error(delta.error);
+        }
+      }
+      for (const op of ops) {
+        const ids = op.rows.map((row) => row?.id).filter(Boolean);
+        if (ids.length) await repo.markSynced(op.table, ids).catch(() => {});
+      }
+      sqlite.acknowledgeBusinessBatch(batch.id);
+      pushed += 1;
+    } catch (error) {
+      sqlite.failBusinessBatch(batch.id, error?.message ?? String(error), MAX_ATTEMPTS);
+      failed += 1;
+      // Preserve batch order: a later transaction must not overtake a failed
+      // earlier transaction from the same terminal.
+      break;
+    }
+  }
+  return { pushed, failed };
+}
+
 function setEnabled(on) {
   enabled = !!on;
   notify();
@@ -324,6 +390,14 @@ async function push() {
   setPhase("pushing");
   let pushed = 0;
   let failed = 0;
+  const sqliteResult = await pushSqliteBusinessBatches();
+  pushed += sqliteResult.pushed;
+  failed += sqliteResult.failed;
+  if (sqliteResult.failed) {
+    setPhase("idle");
+    notify();
+    return { ok: false, pushed, failed, error: "SQLite business batch upload failed" };
+  }
   for (const table of repo.PUSH_TABLES ?? repo.TABLES) {
     const retryAt = cloudMissing.get(table);
     if (retryAt && Date.now() < retryAt) continue; // parked: central schema missing
@@ -343,7 +417,8 @@ async function push() {
     );
     let error = null;
     try {
-      await cloudUpsert(table, payload);
+      if (table === "pos_store_settings") await cloudSaveRules(rows);
+      else await cloudUpsert(table, payload);
       cloudMissing.delete(table); // the central schema caught up
     } catch (err) {
       error = err;

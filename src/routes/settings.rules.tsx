@@ -21,6 +21,7 @@ import { savePosRules } from "@/lib/pos-rules.functions";
 import { queueRulesSave } from "@/lib/pos-rules-offline";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { getIdleTimeout, saveIdleTimeout } from "@/lib/idle-timeout.functions";
+import { isWindowsShell } from "@/platform-config/features";
 
 export const Route = createFileRoute("/settings/rules")({
   head: () => ({
@@ -59,6 +60,7 @@ function RulesSettings() {
     revision,
     branchId,
     terminalId: terminal,
+    rowVersion,
   } = usePosRules();
 
 
@@ -108,13 +110,15 @@ function RulesSettings() {
    * Used when the central system cannot be reached right now.
    */
   async function keepLocally(reason: string) {
+    if (!isWindowsShell()) throw new Error("Rules can only be saved while connected on this device.");
     await queueRulesSave({
       terminalId: terminal,
       branchId: branchId || currentStore.id,
       rules: draft,
       patch: draft as unknown as Record<string, boolean | number>,
+      expectedVersion: rowVersion,
     });
-    refresh();
+    await refresh();
     toast.success("Saved on this terminal", {
       description: `${reason} These rules are in force here and will reach head office on the next connection.`,
     });
@@ -135,16 +139,26 @@ function RulesSettings() {
           accessToken: auth.accessToken,
           storeId: currentStore.id,
           patch: draft as unknown as Record<string, boolean | number>,
+          expectedVersion: rowVersion,
         },
       });
       if (!res.ok) {
+        if (/STALE_RULES/i.test(res.error ?? "")) {
+          await refresh();
+          toast.error("These settings were changed on another terminal. The latest version has been loaded.");
+          return;
+        }
         // A refusal is a refusal; only an unreachable system is queued.
         toast.error(res.error ?? "Could not save rules");
         return;
       }
-      refresh();
+      await refresh();
       toast.success("Rules saved");
     } catch (e) {
+      if (!isWindowsShell()) {
+        notifyError(e, "Could not save rules");
+        return;
+      }
       try {
         await keepLocally("Head office could not be reached.");
       } catch {
