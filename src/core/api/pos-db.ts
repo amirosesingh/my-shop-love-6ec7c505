@@ -1712,11 +1712,11 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
       // central latency must never hold up a locally durable till transaction.
       if (bridge.push) void bridge.push();
       return noteCommitTarget("local");
-    } catch (local) {
+    } catch (localError) {
       // A desktop transaction is successful only after local SQL commits. Do
       // not bypass a broken till database with a cloud-only write: doing so
       // would make the terminal's offline ledger incomplete and unrecoverable.
-      throw new AllTargetsFailed(context, local);
+      throw new AllTargetsFailed(context, localError);
     }
   }
 
