@@ -5,28 +5,24 @@ const read = (file: string) => readFileSync(file, "utf8");
 
 describe("Electron durable business persistence", () => {
   it("makes the atomic SQLite copy the first mandatory desktop commit boundary", () => {
+  it("does not report a committed SQL transaction as failed when its SQLite projection fails", () => {
+  it("atomically shadows related transaction rows in embedded SQLite", () => {
     const sqlite = read("electron/db/sqlite.cjs");
     const gateway = read("src/core/api/pos-db.ts");
     expect(sqlite).toContain("function mirrorBatch(entries)");
     expect(sqlite).toContain("return tx(() =>");
     expect(sqlite).toContain("INSERT INTO mirror (entity, id, payload, updated_at)");
     expect(sqlite).toContain('INSERT INTO "${entity}"');
-    expect(sqlite).toContain("function pendingBusinessBatches(limit = 25)");
-    expect(sqlite).toContain("function acknowledgeBusinessBatch(id)");
     expect(gateway).toContain("bridge.localMirrorBatch(mirrorEntries)");
     expect(gateway).toContain("This desktop build cannot commit an atomic SQLite batch");
     expect(gateway.indexOf("await bridge.localMirrorBatch(mirrorEntries)")).toBeLessThan(
       gateway.indexOf("await bridge.writeBatch(context, ops)"),
     );
-  });
-
-  it("drains and acknowledges the SQLite outbox before the legacy SQL queue", () => {
-    const worker = read("electron/sync/worker.cjs");
-    expect(worker).toContain("async function pushSqliteBusinessBatches()");
-    expect(worker).toContain("sqlite.acknowledgeBusinessBatch(batch.id)");
-    expect(worker.indexOf("await pushSqliteBusinessBatches()")).toBeLessThan(
-      worker.indexOf("for (const table of repo.PUSH_TABLES"),
+    expect(gateway).toContain('entity: "sqlite_business_batch"');
+    expect(gateway).not.toContain(
+      'throw new Error(shadow.error ?? "The embedded SQLite transaction copy was incomplete")',
     );
+    expect(gateway).toContain("embedded SQLite transaction copy was incomplete");
   });
 
   it("keeps the desktop state projection and cloud snapshot out of localStorage", () => {

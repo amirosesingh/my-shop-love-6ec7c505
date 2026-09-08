@@ -321,6 +321,7 @@ function mirrorBatch(entries) {
   const at = nowIso();
   return tx(() => {
     const mirrorStmt = db.prepare(
+    const stmt = db.prepare(
       `INSERT INTO mirror (entity, id, payload, updated_at) VALUES (?, ?, ?, ?)
        ON CONFLICT(entity, id) DO UPDATE SET payload = excluded.payload, updated_at = excluded.updated_at`,
     );
@@ -384,6 +385,10 @@ function mirrorBatch(entries) {
       String(entries.flatMap((entry) => entry.rows ?? []).find((row) => row?.client_transaction_id)?.client_transaction_id ?? "") || null,
       at,
     );
+        stmt.run(entity, id, JSON.stringify(row), at);
+        written += 1;
+      }
+    }
     return written;
   });
 }
