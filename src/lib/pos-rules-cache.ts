@@ -12,6 +12,7 @@
  */
 import { getDeviceSecret, setDeviceSecret, clearDeviceSecret } from "./device-secrets";
 import { normalizeRules, type PosRules } from "./pos-rules";
+import { isWindowsShell } from "@/platform-config/features";
 
 const SLOT = "pos-rules-last-good";
 
@@ -26,6 +27,9 @@ export type CachedRules = {
    * yet. It stays in force locally until the confirmation comes back.
    */
   pending?: boolean;
+  rowVersion?: number;
+  updatedAt?: string | null;
+  updatedBy?: string | null;
 };
 
 type Stored = Omit<CachedRules, "rules"> & { rules: unknown };
@@ -35,7 +39,20 @@ export async function readCachedRules(
   terminalId: string,
   branchId: string,
 ): Promise<CachedRules | null> {
-  const stored = await getDeviceSecret<Stored>(SLOT).catch(() => null);
+  let stored: Stored | null = null;
+  if (typeof window !== "undefined" && isWindowsShell()) {
+    const bridge = (window as unknown as {
+      pos?: { getSetting?: (key: string) => Promise<{ value?: string | null }> };
+    }).pos;
+    const value = await bridge?.getSetting?.(SLOT).catch(() => null);
+    try {
+      stored = value?.value ? (JSON.parse(value.value) as Stored) : null;
+    } catch {
+      stored = null;
+    }
+  } else {
+    stored = await getDeviceSecret<Stored>(SLOT).catch(() => null);
+  }
   if (!stored || typeof stored !== "object") return null;
   if ((stored.branchId ?? "") !== branchId) return null;
   if (stored.terminalId && terminalId && stored.terminalId !== terminalId) return null;
@@ -46,14 +63,31 @@ export async function readCachedRules(
     syncedAt: Number(stored.syncedAt) || 0,
     rules: normalizeRules(stored.rules),
     pending: stored.pending === true,
+    rowVersion: Math.max(0, Number(stored.rowVersion) || 0),
+    updatedAt: typeof stored.updatedAt === "string" ? stored.updatedAt : null,
+    updatedBy: typeof stored.updatedBy === "string" ? stored.updatedBy : null,
   };
 }
 
 /** Replace the stored set in one step; a matching revision is left alone. */
 export async function writeCachedRules(entry: CachedRules): Promise<void> {
+  if (typeof window !== "undefined" && isWindowsShell()) {
+    const bridge = (window as unknown as {
+      pos?: { setSetting?: (key: string, value: string | null) => Promise<unknown> };
+    }).pos;
+    await bridge?.setSetting?.(SLOT, JSON.stringify(entry));
+    return;
+  }
   await setDeviceSecret(SLOT, entry).catch(() => undefined);
 }
 
 export function clearCachedRules(): void {
+  if (typeof window !== "undefined" && isWindowsShell()) {
+    const bridge = (window as unknown as {
+      pos?: { setSetting?: (key: string, value: string | null) => Promise<unknown> };
+    }).pos;
+    void bridge?.setSetting?.(SLOT, null);
+    return;
+  }
   clearDeviceSecret(SLOT);
 }
