@@ -339,6 +339,11 @@ async function healOpsColumns(ops) {
     if (!opRows?.length) continue;
     const known = await tableColumns(op.table).catch(() => null);
     if (!known || !known.size) continue; // a missing table heals from the error path
+    if (op.table === "pos_store_settings" && !known.has("base_version")) {
+      const heal = await poolDb.ensureColumn(op.table, "base_version", "INT");
+      if (heal.ok) known.add("base_version");
+      else if (heal.permission) throw schemaPermissionError(op.table, heal.error);
+    }
     for (const row of opRows.slice(0, 5)) {
       for (const key of Object.keys(row)) {
         if (SYNC_COLUMNS.has(key) || known.has(key.toLowerCase())) continue;

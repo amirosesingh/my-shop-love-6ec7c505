@@ -293,6 +293,29 @@ async function cloudUpsert(table, rows) {
   if (error) throw error;
 }
 
+/**
+ * Pending branch rules are never table-upserted. The local row version is one
+ * ahead of the confirmed version it was edited from, so replay uses that base
+ * version and lets the canonical RPC reject a stale terminal explicitly.
+ */
+async function cloudSaveRules(rows) {
+  for (const row of rows) {
+    const patch = repo.toCloudRow("pos_store_settings", row);
+    const storeId = String(patch.store_id ?? credentials.branchId ?? "");
+    delete patch.store_id;
+    delete patch.row_version;
+    delete patch.updated_at;
+    delete patch.updated_by;
+    const expectedVersion = Math.max(0, Number(row.base_version ?? row.row_version ?? 0));
+    const { error } = await supabase.rpc("pos_rules_save", {
+      _store_id: storeId,
+      _patch: patch,
+      _expected_version: expectedVersion,
+    });
+    if (error) throw error;
+  }
+}
+
 function setEnabled(on) {
   enabled = !!on;
   notify();
@@ -343,7 +366,8 @@ async function push() {
     );
     let error = null;
     try {
-      await cloudUpsert(table, payload);
+      if (table === "pos_store_settings") await cloudSaveRules(rows);
+      else await cloudUpsert(table, payload);
       cloudMissing.delete(table); // the central schema caught up
     } catch (err) {
       error = err;
