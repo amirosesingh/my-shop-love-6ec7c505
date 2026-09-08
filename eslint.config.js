@@ -1,22 +1,12 @@
 import js from "@eslint/js";
-import eslintConfigPrettier from "eslint-config-prettier";
+import eslintPluginPrettier from "eslint-plugin-prettier/recommended";
 import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  {
-    ignores: [
-      "dist/**",
-      "dist-desktop/**",
-      ".output/**",
-      ".vinxi/**",
-      "capacitor-shell/**",
-      "src/routeTree.gen.ts",
-    ],
-    linterOptions: { reportUnusedDisableDirectives: "warn" },
-  },
+  { ignores: ["dist", ".output", ".vinxi"] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -44,11 +34,6 @@ export default tseslint.config(
       ],
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
-      // Existing integration boundaries intentionally use `any`; keep the
-      // debt visible without making formatting-era code fail CI wholesale.
-      "@typescript-eslint/no-explicit-any": "warn",
-      "prefer-const": "warn",
-      "no-useless-escape": "warn",
     },
   },
   {
@@ -75,13 +60,5 @@ export default tseslint.config(
       ],
     },
   },
-  {
-    // CJS integration tests intentionally load and spy on Electron modules.
-    files: ["src/**/*.test.ts"],
-    rules: { "@typescript-eslint/no-require-imports": "off" },
-  },
-  // Formatting has its own `npm run format` workflow. This prevents rule
-  // conflicts without treating the entire historical format baseline as
-  // code-quality errors during `npm run lint`.
-  eslintConfigPrettier,
+  eslintPluginPrettier,
 );
