@@ -796,24 +796,45 @@ const LIVE_TABLES = [
   "stores",
   "pos_settings",
   "pos_store_settings",
+  "sales",
+  "sale_items",
+  "payment_transactions",
 ] as const;
+
+export type LiveChange = { reason: string; table: string; storeId: string | null };
 
 /**
  * Listeners told when centrally controlled settings changed, so the running
  * POS re-reads its rules instead of waiting for a screen to be reopened.
  * This reuses the one live channel below — no second subscription.
  */
-const settingsListeners = new Set<(reason: string) => void>();
+const settingsListeners = new Set<(change: LiveChange) => void>();
+const salesListeners = new Set<(change: LiveChange) => void>();
 
-export function subscribeSettingsChange(fn: (reason: string) => void): () => void {
+export function subscribeSettingsChange(fn: (change: LiveChange) => void): () => void {
   settingsListeners.add(fn);
   return () => settingsListeners.delete(fn);
 }
 
-function announceSettingsChange(reason: string): void {
+export function subscribeSalesChange(fn: (change: LiveChange) => void): () => void {
+  salesListeners.add(fn);
+  return () => salesListeners.delete(fn);
+}
+
+function announceSettingsChange(reason: string, storeId: string | null = null): void {
   for (const fn of settingsListeners) {
     try {
-      fn(reason);
+      fn({ reason, table: "pos_store_settings", storeId });
+    } catch {
+      /* one bad listener must not stop the others */
+    }
+  }
+}
+
+function announceSalesChange(table: string, storeId: string | null): void {
+  for (const fn of salesListeners) {
+    try {
+      fn({ reason: `live:${table}`, table, storeId });
     } catch {
       /* one bad listener must not stop the others */
     }
@@ -924,14 +945,20 @@ export function startSyncEngine() {
   // shop's own database within a second instead of waiting for the timer.
   const live = supabaseExternal.channel("pos-live-settings");
   for (const table of LIVE_TABLES) {
-    live.on("postgres_changes", { event: "*", schema: "public", table }, () => {
+    live.on("postgres_changes", { event: "*", schema: "public", table }, (payload) => {
+      const changed = ((payload as { new?: Record<string, unknown>; old?: Record<string, unknown> }).new ??
+        (payload as { old?: Record<string, unknown> }).old ?? {}) as Record<string, unknown>;
+      const storeId = String(changed.store_id ?? changed.branch_id ?? "").trim() || null;
       if (liveTimer) window.clearTimeout(liveTimer);
       // One catch-up for a burst of related edits.
       liveTimer = window.setTimeout(() => {
         liveTimer = undefined;
         void syncNow(`live:${table}`);
         if (table === "pos_settings" || table === "pos_store_settings") {
-          announceSettingsChange(`live:${table}`);
+          announceSettingsChange(`live:${table}`, storeId);
+        }
+        if (table === "sales" || table === "sale_items" || table === "payment_transactions") {
+          announceSalesChange(table, storeId);
         }
       }, 400);
     });

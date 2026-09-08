@@ -71,6 +71,7 @@ CREATE TABLE dbo.pos_store_settings (
   [require_pin_edit_tenders] BIT,
   [require_pin_terminal_reset] BIT,
   [row_version] INT,
+  [base_version] INT,
   [updated_by] NVARCHAR(MAX),
   [updated_at] DATETIME2(3),
   [allow_offline_approvals] BIT,
@@ -131,6 +132,7 @@ BEGIN
   IF COL_LENGTH('dbo.pos_store_settings', 'require_pin_edit_tenders') IS NULL ALTER TABLE dbo.pos_store_settings ADD [require_pin_edit_tenders] BIT;
   IF COL_LENGTH('dbo.pos_store_settings', 'require_pin_terminal_reset') IS NULL ALTER TABLE dbo.pos_store_settings ADD [require_pin_terminal_reset] BIT;
   IF COL_LENGTH('dbo.pos_store_settings', 'row_version') IS NULL ALTER TABLE dbo.pos_store_settings ADD [row_version] INT;
+  IF COL_LENGTH('dbo.pos_store_settings', 'base_version') IS NULL ALTER TABLE dbo.pos_store_settings ADD [base_version] INT;
   IF COL_LENGTH('dbo.pos_store_settings', 'updated_by') IS NULL ALTER TABLE dbo.pos_store_settings ADD [updated_by] NVARCHAR(MAX);
   IF COL_LENGTH('dbo.pos_store_settings', 'updated_at') IS NULL ALTER TABLE dbo.pos_store_settings ADD [updated_at] DATETIME2(3);
   IF COL_LENGTH('dbo.pos_store_settings', 'allow_offline_approvals') IS NULL ALTER TABLE dbo.pos_store_settings ADD [allow_offline_approvals] BIT;
