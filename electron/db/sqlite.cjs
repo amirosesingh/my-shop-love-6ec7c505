@@ -60,6 +60,11 @@ const SYNCED_TABLES = [
 
 const nowIso = () => new Date().toISOString();
 const uuid = () => require("node:crypto").randomUUID();
+const sqliteValue = (value) => {
+  if (typeof value === "boolean") return value ? 1 : 0;
+  if (value != null && typeof value === "object") return JSON.stringify(value);
+  return value;
+};
 
 /* -------------------------------- init -------------------------------- */
 
