@@ -8,6 +8,7 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpc = vi.fn();
+const localMirrorBatch = vi.fn();
 
 vi.mock("@/integrations/supabase/external-client", () => ({
   supabaseExternal: { rpc: (...a: unknown[]) => rpc(...a) },
@@ -26,7 +27,9 @@ const store = new Map<string, string>();
   removeEventListener: () => {},
 };
 // A desktop till: the only platform allowed to hold work on the device.
-(globalThis as unknown as { window: Record<string, unknown> }).window["pos"] = {};
+(globalThis as unknown as { window: Record<string, unknown> }).window["pos"] = {
+  localMirrorBatch: (...args: unknown[]) => localMirrorBatch(...args),
+};
 
 import { submitCashCount } from "@/lib/shift-closing";
 import { listQueue } from "@/lib/sync-outbox";
@@ -36,6 +39,8 @@ const counted = { cash: 250.5, card: null, digital: null };
 describe("failure injection — shift close", () => {
   beforeEach(() => {
     rpc.mockReset();
+    localMirrorBatch.mockReset();
+    localMirrorBatch.mockResolvedValue({ ok: true, written: 0 });
   });
 
   it("parks the blind count when the line dies mid-close", async () => {
@@ -44,9 +49,10 @@ describe("failure injection — shift close", () => {
     const res = await submitCashCount("shift-1", counted, { clientKey: "shift-1:original" });
     expect(res.ok).toBe(false);
     expect(res.ok === false && res.queued).toBe(true);
-    const parked = listQueue().slice(before);
-    expect(parked).toHaveLength(1);
-    const op = parked[0]!.op as { fn: string; args: Record<string, unknown> };
+    expect(listQueue().slice(before)).toHaveLength(0);
+    expect(localMirrorBatch).toHaveBeenCalledTimes(1);
+    const [, operations] = localMirrorBatch.mock.calls[0]!;
+    const op = operations[0] as { fn: string; args: Record<string, unknown> };
     expect(op.fn).toBe("shift_cash_count_submit");
     // The same key travels with it, so a replay cannot count the drawer twice,
     // and no variance is computed on the till.
@@ -57,7 +63,9 @@ describe("failure injection — shift close", () => {
 
   it("does not park a count the server refused on principle", async () => {
     const before = listQueue().length;
-    rpc.mockResolvedValue({ error: { message: "You do not have permission to submit a cash count." } });
+    rpc.mockResolvedValue({
+      error: { message: "You do not have permission to submit a cash count." },
+    });
     const res = await submitCashCount("shift-2", counted);
     expect(res.ok).toBe(false);
     expect(res.ok === false && res.queued).toBeFalsy();

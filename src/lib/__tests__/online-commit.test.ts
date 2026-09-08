@@ -3,6 +3,7 @@ import { describe, expect, it, vi, beforeEach, afterEach } from "vitest";
 
 const live = vi.fn();
 const localWriteBatch = vi.fn();
+const localMirrorBatch = vi.fn();
 const localPush = vi.fn();
 const legacyCreateSale = vi.fn();
 
@@ -14,6 +15,7 @@ vi.mock("@/core/local-db/local-db", () => ({
   localDb: () => ({
     write: vi.fn(),
     writeBatch: (...a: unknown[]) => localWriteBatch(...a),
+    localMirrorBatch: (...a: unknown[]) => localMirrorBatch(...a),
     push: (...a: unknown[]) => localPush(...a),
   }),
   electronDb: () => ({ createSale: (...a: unknown[]) => legacyCreateSale(...a) }),
@@ -44,9 +46,14 @@ describe("commitOps on a Windows till", () => {
     (globalThis as unknown as { window: Record<string, unknown> }).window["pos"] = {};
     live.mockReset();
     localWriteBatch.mockReset();
+    localMirrorBatch.mockReset();
     localPush.mockReset();
     legacyCreateSale.mockReset();
     localWriteBatch.mockResolvedValue({ ok: true });
+    localMirrorBatch.mockImplementation(async (entries: Array<{ rows?: unknown[] }>) => ({
+      ok: true,
+      written: entries.reduce((total, entry) => total + (entry.rows?.length ?? 0), 0),
+    }));
     setPreferredDatabaseMode("online");
   });
   afterEach(() => {
@@ -99,9 +106,10 @@ describe("commitOps on a Windows till", () => {
     expect(legacyCreateSale).not.toHaveBeenCalled();
   });
 
-  it("stops instead of creating a cloud-only gap when local SQL refuses the batch", async () => {
-    localWriteBatch.mockResolvedValue({ ok: false, error: "no local engine" });
+  it("stops instead of creating a cloud-only gap when SQLite refuses the batch", async () => {
+    localMirrorBatch.mockResolvedValue({ ok: false, written: 0, error: "no local engine" });
     await expect(commitOps("Saving sale", ops)).rejects.toThrow(/Local Database Required/);
+    expect(localWriteBatch).not.toHaveBeenCalled();
     expect(live).not.toHaveBeenCalled();
   });
 
@@ -117,5 +125,4 @@ describe("commitOps on a Windows till", () => {
     expect(localWriteBatch).toHaveBeenCalledWith("Saving sale", basket);
     expect(listQueue().slice(before)).toEqual([]);
   });
-
 });

@@ -2,18 +2,26 @@ import { describe, expect, it, beforeEach } from "vitest";
 import { billPrefix, dayStamp, reserveBillNumber } from "@/lib/bill-number";
 
 const store = new Map<string, string>();
-(globalThis as { localStorage?: unknown }).localStorage = {
+const localStorage = {
   getItem: (k: string) => store.get(k) ?? null,
   setItem: (k: string, v: string) => void store.set(k, v),
   removeItem: (k: string) => void store.delete(k),
   clear: () => store.clear(),
+};
+(globalThis as { localStorage?: unknown }).localStorage = localStorage;
+(globalThis as unknown as { window: { localStorage: typeof localStorage } }).window = {
+  localStorage,
 };
 
 beforeEach(() => store.clear());
 
 describe("bill numbers", () => {
   it("uses the configured branch, till and padding", async () => {
-    const n = await reserveBillNumber("B1", [], { branchCode: "B101", terminalNo: "3", padding: 5 });
+    const n = await reserveBillNumber("B1", [], {
+      branchCode: "B101",
+      terminalNo: "3",
+      padding: 5,
+    });
     expect(n).toMatch(/^B101-[A-Z]{2}03-\d{8}-00001$/);
   });
 
@@ -40,8 +48,8 @@ describe("bill numbers", () => {
 
 describe("bill number reservation failures", () => {
   it("refuses to hand out a number the device could not record", async () => {
-    const original = globalThis.localStorage;
-    (globalThis as { localStorage?: unknown }).localStorage = {
+    const original = window.localStorage;
+    const unavailable = {
       getItem: () => null,
       setItem: () => {
         throw new Error("QuotaExceededError");
@@ -49,13 +57,14 @@ describe("bill number reservation failures", () => {
       removeItem: () => {},
       clear: () => {},
     };
-    const { reserveBillNumber, BillNumberReservationError } = await import(
-      "@/lib/bill-number"
-    );
+    (globalThis as { localStorage?: unknown }).localStorage = unavailable;
+    (window as unknown as { localStorage: typeof unavailable }).localStorage = unavailable;
+    const { reserveBillNumber, BillNumberReservationError } = await import("@/lib/bill-number");
     await expect(reserveBillNumber("B1", [], { branchCode: "B101" })).rejects.toBeInstanceOf(
       BillNumberReservationError,
     );
     (globalThis as { localStorage?: unknown }).localStorage = original;
+    (window as unknown as { localStorage: typeof original }).localStorage = original;
   });
 
   it("awaits the durable reservation before returning a number", async () => {
@@ -64,7 +73,6 @@ describe("bill number reservation failures", () => {
     const b = await reserveBillNumber("B1", [], { branchCode: "B101", padding: 4 });
     expect(a).not.toEqual(b);
   });
-
 
   it("never hands the same number to two concurrent callers", async () => {
     const { reserveBillNumber } = await import("@/lib/bill-number");

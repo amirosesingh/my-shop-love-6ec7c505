@@ -35,7 +35,10 @@ const basket = () =>
     { kind: "insert", table: "payment_transactions", rows: [{ id: "t-1" }] },
   ] as never;
 
-const queuedTables = (from: number) => listQueue().slice(from).map((q) => q.op.table);
+const queuedTables = (from: number) =>
+  listQueue()
+    .slice(from)
+    .map((q) => q.op.table);
 
 describe("failure injection — checkout", () => {
   beforeEach(() => {
@@ -55,7 +58,10 @@ describe("failure injection — checkout", () => {
     live.mockReset();
     localWriteBatch.mockReset();
     localMirrorBatch.mockReset();
-    localMirrorBatch.mockResolvedValue({ ok: true, written: 3 });
+    localMirrorBatch.mockImplementation(async (entries: Array<{ rows?: unknown[] }>) => ({
+      ok: true,
+      written: entries.reduce((total, entry) => total + (entry.rows?.length ?? 0), 0),
+    }));
     localWriteBatch.mockResolvedValue({ ok: true });
     setPreferredDatabaseMode("online");
   });

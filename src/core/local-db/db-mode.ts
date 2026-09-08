@@ -89,7 +89,7 @@ export function unreachableMessage(): string {
 export class AllTargetsFailed extends Error {
   readonly context: string;
   constructor(context: string, cause?: unknown) {
-    super(unreachableMessage());
+    super(`${context}: ${unreachableMessage()}`);
     this.name = "AllTargetsFailed";
     this.context = context;
     if (cause !== undefined) (this as { cause?: unknown }).cause = cause;
