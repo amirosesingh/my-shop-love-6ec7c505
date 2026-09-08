@@ -888,7 +888,7 @@ export async function importSampleData() {
 }
 
 /** Load every cloud-backed slice of the POS state. */
-export async function loadCloudState(): Promise<CloudSlice> {
+export async function loadCloudState(storeId?: string | null): Promise<CloudSlice> {
   const { hydrateTerminalConfig } = await import("@/core/activation/terminal-tokens");
   await hydrateTerminalConfig();
   const tiers = await supabase.from("membership_tiers").select("id, name").is("deleted_at", null);
@@ -924,12 +924,15 @@ export async function loadCloudState(): Promise<CloudSlice> {
     ),
 
     (async () => {
-      const read = () =>
-        supabase
+      const read = () => {
+        let query = supabase
           .from("sales")
-          .select(saleColumns())
+          .select(saleColumns());
+        if (storeId) query = query.eq("store_id", storeId);
+        return query
           .order("created_at", { ascending: false })
           .limit(500);
+      };
       const first = await read();
       if (first.error && isMissingTxnColumn(first.error.message)) {
         forgetTxnColumn(first.error.message);
@@ -1023,6 +1026,33 @@ async function loadLocalState(cause: unknown): Promise<CloudSlice> {
   }
   const result = await bridge.snapshot();
   if (!result.ok) throw cause;
+  // The operational SQL snapshot intentionally excludes sales. Recover the
+  // durable transaction graph from SQLite so a desktop reopened without a
+  // network still shows the bills it accepted before shutdown.
+  let localSales: Row[] = [];
+  if (bridge.localList) {
+    try {
+      const [headers, items] = await Promise.all([
+        bridge.localList("sales", 5000),
+        bridge.localList("sale_items", 20000),
+      ]);
+      if (headers.ok) {
+        const linesBySale = new Map<string, Row[]>();
+        for (const item of items.ok ? (items.rows ?? []) : []) {
+          const saleId = String(item.sale_id ?? "");
+          if (!saleId) continue;
+          linesBySale.set(saleId, [...(linesBySale.get(saleId) ?? []), item]);
+        }
+        localSales = (headers.rows ?? []).map((sale) => ({
+          ...sale,
+          sale_items: linesBySale.get(String(sale.id ?? "")) ?? [],
+        }));
+      }
+    } catch {
+      // The SQL snapshot still supplies catalogue/settings. A corrupt recovery
+      // mirror must not stop the register opening for an operator to repair it.
+    }
+  }
   tierIdByName = {};
   tierNameById = {};
   for (const tier of result.tiers ?? []) {
@@ -1033,7 +1063,7 @@ async function loadLocalState(cause: unknown): Promise<CloudSlice> {
   return {
     products: (result.products ?? []).map(rowToProduct),
     members: (result.members ?? []).map((row) => rowToMember(row, tierName)),
-    sales: [],
+    sales: localSales.map(rowToSale),
     promotions: (result.promotions ?? []).map(rowToPromotion),
     settings: rowToSettings((result.settings as Row | null) ?? null),
     stores: (result.stores ?? []).map(rowToStore),
@@ -1619,6 +1649,25 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   const bridge = localDb();
   if (bridge) {
     try {
+      const mirrorEntries = ops.flatMap((op) =>
+        op.kind === "insert" || op.kind === "upsert"
+          ? [{ entity: op.table, rows: op.rows as Record<string, unknown>[] }]
+          : [],
+      );
+      // SQLite is the mandatory durable boundary for desktop business rows.
+      // Write it before the compatibility SQL Server projection: there must
+      // never again be a committed till transaction that has no on-device
+      // SQLite recovery copy.
+      if (ops.length) {
+        if (!bridge.localMirrorBatch) {
+          throw new Error("This desktop build cannot commit an atomic SQLite batch. Update the app.");
+        }
+        const shadow = await bridge.localMirrorBatch(mirrorEntries, ops);
+        const expected = mirrorEntries.reduce((total, entry) => total + entry.rows.length, 0);
+        if (!shadow.ok || Number(shadow.written ?? 0) !== expected) {
+          throw new Error(shadow.error ?? "The embedded SQLite transaction copy was incomplete");
+        }
+      }
       if (!bridge.writeBatch) {
         throw new Error("This desktop build cannot commit an atomic local SQL batch. Update the app.");
       }
@@ -1630,11 +1679,11 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
       // central latency must never hold up a locally durable till transaction.
       if (bridge.push) void bridge.push();
       return noteCommitTarget("local");
-    } catch (local) {
+    } catch (localError) {
       // A desktop transaction is successful only after local SQL commits. Do
       // not bypass a broken till database with a cloud-only write: doing so
       // would make the terminal's offline ledger incomplete and unrecoverable.
-      throw new AllTargetsFailed(context, local);
+      throw new AllTargetsFailed(context, localError);
     }
   }
 
@@ -2055,6 +2104,30 @@ export const db = {
         values: { exchanged_to_bill_number: sale.receiptNo },
         match: { bill_number: sale.exchangeOfReceiptNo },
       });
+    if (isOnlineOnly()) {
+      // One central transaction owns the immutable financial graph, member
+      // effect and stock deltas. Product rows remain a separate projection,
+      // with absolute stock stripped before they are sent.
+      await runOpLive("Saving sale", {
+        kind: "rpc",
+        table: "sales",
+        fn: "pos_sale_commit",
+        args: {
+          _sale: saleToRow(sale),
+          _items: saleItemRows(sale),
+          _payments: tenders,
+          _movements: movements,
+          _member: member ? memberToRow(member, tierId) : null,
+          _exchange_bill: sale.exchangeOfReceiptNo ?? null,
+        },
+      });
+      const projections = ops.filter((op) => op.table === "products");
+      if (projections.length) {
+        const { ops: safeProjections } = withRelativeStock(projections);
+        await runBatchLive("Updating sale projections", safeProjections);
+      }
+      return noteCommitTarget("cloud");
+    }
     return commitOps("Saving sale", ops);
   },
 

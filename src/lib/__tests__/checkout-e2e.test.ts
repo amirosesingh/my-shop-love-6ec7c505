@@ -56,7 +56,13 @@ const sale = (over: Partial<Sale> = {}): Sale =>
     ...over,
   }) as Sale;
 
-const opsSent = () => live.mock.calls.map((c) => c[1] as { kind: string; table: string; rows?: unknown[] });
+const opsSent = () => live.mock.calls.map((c) => c[1] as {
+  kind: string;
+  table: string;
+  rows?: unknown[];
+  args?: Record<string, unknown>;
+});
+const saleArgs = () => opsSent().find((o) => o.kind === "rpc" && o.table === "sales")?.args;
 
 describe("checkout commit", () => {
   beforeEach(() => {
@@ -71,13 +77,11 @@ describe("checkout commit", () => {
 
   it("writes bill, lines, tender ledger and stock movement together", async () => {
     await db.commitSale(sale(), [], null);
-    const tables = opsSent().map((o) => `${o.kind}:${o.table}`);
-    // Every part of the bill goes out as a conflict-safe upsert, so a retry
-    // after a half-written batch repairs it instead of duplicating it.
-    expect(tables).toContain("upsert:sales");
-    expect(tables).toContain("upsert:sale_items");
-    expect(tables).toContain("upsert:payment_transactions");
-    expect(tables).toContain("upsert:item_activity_logs");
+    expect(opsSent().map((o) => `${o.kind}:${o.table}`)).toContain("rpc:sales");
+    expect(saleArgs()?.["_sale"]).toBeTruthy();
+    expect(saleArgs()?.["_items"]).toHaveLength(1);
+    expect(saleArgs()?.["_payments"]).toHaveLength(1);
+    expect(saleArgs()?.["_movements"]).toHaveLength(1);
   });
 
   it("records one ledger row per tender on a split payment", async () => {
@@ -91,9 +95,9 @@ describe("checkout commit", () => {
       [],
       null,
     );
-    const tenders = opsSent().find((o) => o.table === "payment_transactions");
-    expect(tenders?.rows).toHaveLength(2);
-    expect((tenders?.rows as { amount: number }[]).reduce((a, r) => a + r.amount, 0)).toBe(100);
+    const tenders = saleArgs()?.["_payments"] as { amount: number }[];
+    expect(tenders).toHaveLength(2);
+    expect(tenders.reduce((a, r) => a + r.amount, 0)).toBe(100);
   });
 
   it("skips a zero-value tender line", async () => {
@@ -102,30 +106,26 @@ describe("checkout commit", () => {
       [],
       null,
     );
-    const tenders = opsSent().find((o) => o.table === "payment_transactions");
-    expect(tenders?.rows).toHaveLength(1);
+    expect(saleArgs()?.["_payments"]).toHaveLength(1);
   });
 
   it("does not bill twice when the same attempt is retried", async () => {
     attemptRows.mockReturnValue({ data: [{ id: "sale-1" }], error: null });
     const target = await db.commitSale(sale(), [], null);
     expect(target).toBe("cloud");
-    // The bill already exists, so the retry must not create a second one: it
-    // replays the same rows under the same keys as upserts.
-    const kinds = new Set(opsSent().map((o) => o.kind));
-    expect([...kinds]).toEqual(["upsert"]);
+    expect(opsSent()).toHaveLength(1);
+    expect(opsSent()[0]?.kind).toBe("rpc");
   });
 
   it("still saves when the duplicate check itself cannot run", async () => {
     attemptRows.mockReturnValue({ data: null, error: { message: "offline" } });
     await db.commitSale(sale(), [], null);
-    expect(opsSent().some((o) => o.table === "sales")).toBe(true);
+    expect(saleArgs()?.["_sale"]).toBeTruthy();
   });
 
   it("links an exchange back to the original bill", async () => {
     await db.commitSale(sale({ exchangeOfReceiptNo: "B101-PC01-20260810-0007" } as never), [], null);
-    const link = opsSent().find((o) => o.kind === "update" && o.table === "sales");
-    expect(link).toBeTruthy();
+    expect(saleArgs()?.["_exchange_bill"]).toBe("B101-PC01-20260810-0007");
   });
 
   it("marks returned lines as returns in the stock ledger", async () => {
@@ -139,8 +139,7 @@ describe("checkout commit", () => {
       [],
       null,
     );
-    const moves = opsSent().find((o) => o.table === "item_activity_logs")
-      ?.rows as { activity_type: string; quantity_delta: number }[];
+    const moves = saleArgs()?.["_movements"] as { activity_type: string; quantity_delta: number }[];
     expect(moves.map((m) => m.activity_type)).toEqual(["sale", "return"]);
     expect(moves[1].quantity_delta).toBe(1);
   });

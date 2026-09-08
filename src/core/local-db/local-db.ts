@@ -395,6 +395,16 @@ export type PosBridge = {
   write: (context: string, op: SyncOp) => Promise<{ ok: boolean; error?: string }>;
   /** Persist a related operation set in one SQL transaction. */
   writeBatch?: (context: string, ops: SyncOp[]) => Promise<{ ok: boolean; error?: string }>;
+  /** Atomic SQLite business rows plus their durable upload intent. */
+  localMirrorBatch?: (
+    entries: Array<{ entity: string; rows: Record<string, unknown>[] }>,
+    ops?: SyncOp[],
+  ) => Promise<{ ok: boolean; written?: number; error?: string }>;
+  /** Read stable-ID rows from the embedded SQLite recovery mirror. */
+  localList?: (
+    entity: string,
+    limit?: number,
+  ) => Promise<{ ok: boolean; rows?: Record<string, unknown>[]; error?: string }>;
   connect: (
     config: LocalDbConfig,
     cloud?: CloudBridgeConfig,

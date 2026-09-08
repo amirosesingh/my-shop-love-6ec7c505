@@ -341,6 +341,24 @@ export async function runRelayRpc(
   op: RelayRpc,
   scope: RelayScope,
 ): Promise<{ ok: boolean; error?: string; code?: string }> {
+  if (op.fn === "pos_sale_commit") {
+    if (!scope.isSupervisor && scope.permissions.can_process_sale !== true) {
+      return { ok: false, code: "PERMISSION_DENIED", error: "You are not allowed to process a sale." };
+    }
+    const sale = op.args._sale;
+    const storeId = sale && typeof sale === "object" ? (sale as Record<string, unknown>).store_id : null;
+    if (typeof storeId !== "string" || !storeId) {
+      return { ok: false, code: "SCOPE_MISSING", error: "The sale branch is missing." };
+    }
+    if (!scope.isSupervisor && storeId !== scope.storeId) {
+      return { ok: false, code: "STORE_FORBIDDEN", error: "You can only sell for your own branch." };
+    }
+    const res = await serviceRest("rpc/pos_sale_commit", {
+      method: "POST",
+      body: JSON.stringify(op.args),
+    });
+    return res.ok ? { ok: true } : { ok: false, error: (await res.text()).slice(0, 400) };
+  }
   const spec = RELAY_RPCS[op.fn];
   if (!spec) return { ok: false, code: "TABLE_FORBIDDEN", error: `"${op.fn}" cannot be run` };
   if (!scope.isSupervisor && scope.permissions[spec.permission] !== true)
