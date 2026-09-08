@@ -12,6 +12,8 @@ describe("sales realtime refresh", () => {
     expect(store).toContain("subscribeSalesChange");
     expect(store).toContain("subscribeSettingsChange");
     expect(store).toContain('change.table !== "pos_settings"');
+    expect(engine).toContain('announceSalesChange(table, storeId)');
+    expect(store).toContain("subscribeSalesChange");
     expect(store).toContain("loadCloudState()");
   });
 });
