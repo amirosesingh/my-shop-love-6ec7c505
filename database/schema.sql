@@ -3228,6 +3228,11 @@ CREATE TABLE dbo.authorization_actions (
   mode NVARCHAR(20) NOT NULL DEFAULT N'none',
   allowed_roles NVARCHAR(MAX) NOT NULL DEFAULT N'[]',
   allowed_user_ids NVARCHAR(MAX) NOT NULL DEFAULT N'[]',
+  requester_roles NVARCHAR(MAX) NOT NULL DEFAULT N'["cashier","staff","manager","admin"]',
+  requester_user_ids NVARCHAR(MAX) NOT NULL DEFAULT N'[]',
+  authority_limits NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
+  extra_authority NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
+  absolute_ceilings NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
   require_reason BIT NOT NULL DEFAULT 0,
   threshold DECIMAL(18,4) NULL,
   is_enabled BIT NOT NULL DEFAULT 1,
@@ -3246,6 +3251,11 @@ BEGIN
   IF COL_LENGTH('dbo.authorization_actions', 'mode') IS NULL ALTER TABLE dbo.authorization_actions ADD [mode] NVARCHAR(20) DEFAULT N'none';
   IF COL_LENGTH('dbo.authorization_actions', 'allowed_roles') IS NULL ALTER TABLE dbo.authorization_actions ADD [allowed_roles] NVARCHAR(MAX) DEFAULT N'[]';
   IF COL_LENGTH('dbo.authorization_actions', 'allowed_user_ids') IS NULL ALTER TABLE dbo.authorization_actions ADD [allowed_user_ids] NVARCHAR(MAX) DEFAULT N'[]';
+  IF COL_LENGTH('dbo.authorization_actions', 'requester_roles') IS NULL ALTER TABLE dbo.authorization_actions ADD [requester_roles] NVARCHAR(MAX) DEFAULT N'["cashier","staff","manager","admin"]';
+  IF COL_LENGTH('dbo.authorization_actions', 'requester_user_ids') IS NULL ALTER TABLE dbo.authorization_actions ADD [requester_user_ids] NVARCHAR(MAX) DEFAULT N'[]';
+  IF COL_LENGTH('dbo.authorization_actions', 'authority_limits') IS NULL ALTER TABLE dbo.authorization_actions ADD [authority_limits] NVARCHAR(MAX) DEFAULT N'{}';
+  IF COL_LENGTH('dbo.authorization_actions', 'extra_authority') IS NULL ALTER TABLE dbo.authorization_actions ADD [extra_authority] NVARCHAR(MAX) DEFAULT N'{}';
+  IF COL_LENGTH('dbo.authorization_actions', 'absolute_ceilings') IS NULL ALTER TABLE dbo.authorization_actions ADD [absolute_ceilings] NVARCHAR(MAX) DEFAULT N'{}';
   IF COL_LENGTH('dbo.authorization_actions', 'require_reason') IS NULL ALTER TABLE dbo.authorization_actions ADD [require_reason] BIT DEFAULT 0;
   IF COL_LENGTH('dbo.authorization_actions', 'threshold') IS NULL ALTER TABLE dbo.authorization_actions ADD [threshold] DECIMAL(18,4) NULL;
   IF COL_LENGTH('dbo.authorization_actions', 'is_enabled') IS NULL ALTER TABLE dbo.authorization_actions ADD [is_enabled] BIT DEFAULT 1;
@@ -3276,6 +3286,15 @@ CREATE TABLE dbo.authorization_requests (
   decision_note NVARCHAR(400) NULL,
   expires_at DATETIME2(3) NULL,
   consumed_at DATETIME2(3) NULL,
+  requested_amount DECIMAL(18,4) NULL,
+  approved_amount DECIMAL(18,4) NULL,
+  approved_payload NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
+  bill_snapshot NVARCHAR(MAX) NOT NULL DEFAULT N'{}',
+  snapshot_hash NVARCHAR(80) NOT NULL DEFAULT N'',
+  held_order_id NVARCHAR(120) NULL,
+  notified_at DATETIME2(3) NULL,
+  requester_direct_limit DECIMAL(18,4) NULL,
+  value_unit NVARCHAR(20) NOT NULL DEFAULT N'number',
   is_synced BIT NOT NULL DEFAULT 0, sync_status NVARCHAR(40) NOT NULL DEFAULT N'pending',
   row_version INT NOT NULL DEFAULT 0, sync_attempts INT NOT NULL DEFAULT 0,
   last_error_at DATETIME2(3) NULL, client_transaction_id NVARCHAR(120) NULL,
@@ -3299,6 +3318,15 @@ BEGIN
   IF COL_LENGTH('dbo.authorization_requests', 'decision_note') IS NULL ALTER TABLE dbo.authorization_requests ADD [decision_note] NVARCHAR(400) NULL;
   IF COL_LENGTH('dbo.authorization_requests', 'expires_at') IS NULL ALTER TABLE dbo.authorization_requests ADD [expires_at] DATETIME2(3) NULL;
   IF COL_LENGTH('dbo.authorization_requests', 'consumed_at') IS NULL ALTER TABLE dbo.authorization_requests ADD [consumed_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'requested_amount') IS NULL ALTER TABLE dbo.authorization_requests ADD [requested_amount] DECIMAL(18,4) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'approved_amount') IS NULL ALTER TABLE dbo.authorization_requests ADD [approved_amount] DECIMAL(18,4) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'approved_payload') IS NULL ALTER TABLE dbo.authorization_requests ADD [approved_payload] NVARCHAR(MAX) DEFAULT N'{}';
+  IF COL_LENGTH('dbo.authorization_requests', 'bill_snapshot') IS NULL ALTER TABLE dbo.authorization_requests ADD [bill_snapshot] NVARCHAR(MAX) DEFAULT N'{}';
+  IF COL_LENGTH('dbo.authorization_requests', 'snapshot_hash') IS NULL ALTER TABLE dbo.authorization_requests ADD [snapshot_hash] NVARCHAR(80) DEFAULT N'';
+  IF COL_LENGTH('dbo.authorization_requests', 'held_order_id') IS NULL ALTER TABLE dbo.authorization_requests ADD [held_order_id] NVARCHAR(120) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'notified_at') IS NULL ALTER TABLE dbo.authorization_requests ADD [notified_at] DATETIME2(3) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'requester_direct_limit') IS NULL ALTER TABLE dbo.authorization_requests ADD [requester_direct_limit] DECIMAL(18,4) NULL;
+  IF COL_LENGTH('dbo.authorization_requests', 'value_unit') IS NULL ALTER TABLE dbo.authorization_requests ADD [value_unit] NVARCHAR(20) DEFAULT N'number';
   IF COL_LENGTH('dbo.authorization_requests', 'is_synced') IS NULL ALTER TABLE dbo.authorization_requests ADD [is_synced] BIT DEFAULT 0;
   IF COL_LENGTH('dbo.authorization_requests', 'sync_status') IS NULL ALTER TABLE dbo.authorization_requests ADD [sync_status] NVARCHAR(40) DEFAULT N'pending';
   IF COL_LENGTH('dbo.authorization_requests', 'row_version') IS NULL ALTER TABLE dbo.authorization_requests ADD [row_version] INT DEFAULT 0;

@@ -208,6 +208,11 @@ export type Database = {
           action_key: string
           allowed_roles: string[]
           allowed_user_ids: string[]
+          requester_roles: string[]
+          requester_user_ids: string[]
+          authority_limits: Json
+          extra_authority: Json
+          absolute_ceilings: Json
           created_at: string
           id: string
           is_enabled: boolean
@@ -222,6 +227,11 @@ export type Database = {
           action_key: string
           allowed_roles?: string[]
           allowed_user_ids?: string[]
+          requester_roles?: string[]
+          requester_user_ids?: string[]
+          authority_limits?: Json
+          extra_authority?: Json
+          absolute_ceilings?: Json
           created_at?: string
           id?: string
           is_enabled?: boolean
@@ -236,6 +246,11 @@ export type Database = {
           action_key?: string
           allowed_roles?: string[]
           allowed_user_ids?: string[]
+          requester_roles?: string[]
+          requester_user_ids?: string[]
+          authority_limits?: Json
+          extra_authority?: Json
+          absolute_ceilings?: Json
           created_at?: string
           id?: string
           is_enabled?: boolean
@@ -312,6 +327,8 @@ export type Database = {
           payload: Json
           reason: string
           requested_amount: number | null
+          requester_direct_limit: number | null
+          value_unit: string
           requested_by: string
           requested_by_name: string
           snapshot_hash: string
@@ -338,6 +355,8 @@ export type Database = {
           payload?: Json
           reason?: string
           requested_amount?: number | null
+          requester_direct_limit?: number | null
+          value_unit?: string
           requested_by: string
           requested_by_name?: string
           snapshot_hash?: string
@@ -364,6 +383,8 @@ export type Database = {
           payload?: Json
           reason?: string
           requested_amount?: number | null
+          requester_direct_limit?: number | null
+          value_unit?: string
           requested_by?: string
           requested_by_name?: string
           snapshot_hash?: string

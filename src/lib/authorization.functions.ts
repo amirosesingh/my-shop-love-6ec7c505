@@ -23,6 +23,11 @@ const saveRuleInput = caller.extend({
   mode: z.enum(["none", "pin", "request", "either"]),
   allowedRoles: z.array(z.string().max(40)).max(20).default([]),
   allowedUserIds: z.array(z.string().max(64)).max(50).default([]),
+  requesterRoles: z.array(z.string().max(40)).max(20).default([]),
+  requesterUserIds: z.array(z.string().max(64)).max(50).default([]),
+  authorityLimits: z.record(z.string(), z.number().finite().nonnegative()).default({}),
+  extraAuthority: z.record(z.string(), z.number().finite().nonnegative()).default({}),
+  absoluteCeilings: z.record(z.string(), z.number().finite().nonnegative()).default({}),
   requireReason: z.boolean().default(false),
   threshold: z.number().nullable().default(null),
 });
@@ -34,6 +39,9 @@ const pinInput = caller.extend({
   storeId: z.string().max(64).optional(),
   terminalId: z.string().max(64).optional(),
   reason: z.string().max(400).optional(),
+  requestedAmount: z.number().finite().nonnegative().nullish(),
+  requesterDirectLimit: z.number().finite().nonnegative().nullish(),
+  valueUnit: z.enum(["percent", "currency", "quantity", "number"]).default("number"),
 });
 
 const snapshotLine = z.object({
@@ -81,6 +89,8 @@ const submitInput = caller.extend({
     .record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()]))
     .default({}),
   requestedAmount: z.number().finite().nullish(),
+  requesterDirectLimit: z.number().finite().nonnegative().nullish(),
+  valueUnit: z.enum(["percent", "currency", "quantity", "number"]).default("number"),
   heldOrderId: z.string().max(80).nullish(),
   snapshot: snapshotInput.nullish(),
 });
@@ -156,6 +166,11 @@ export const saveAuthorizationRule = createServerFn({ method: "POST" })
         mode: data.mode,
         allowedRoles: data.allowedRoles,
         allowedUserIds: data.allowedUserIds,
+        requesterRoles: data.requesterRoles,
+        requesterUserIds: data.requesterUserIds,
+        authorityLimits: data.authorityLimits,
+        extraAuthority: data.extraAuthority,
+        absoluteCeilings: data.absoluteCeilings,
         requireReason: data.requireReason,
         threshold: data.threshold,
         isEnabled: true,
@@ -173,14 +188,13 @@ export const saveAuthorizationRule = createServerFn({ method: "POST" })
 export const authorizeWithPin = createServerFn({ method: "POST" })
   .inputValidator((data: unknown) => pinInput.parse(data))
   .handler(async ({ data }) => {
-    const { loadRuleRows, verifyAuthorizationPin, writeLog } = await import(
-      "./authorization.server"
-    );
+    const { loadRuleRows, verifyAuthorizationPin, writeLog } =
+      await import("./authorization.server");
     const { signOverrideGrant } = await import("./pos-rules.server");
-    const { resolveRules } = await import("./authorization");
-    const { throttleStatus, throttleFail, throttleReset, minutesLeft } = await import(
-      "./pin-throttle.server"
-    );
+    const { resolveRules, canAuthorizeAmount, effectiveApprovalAuthority } =
+      await import("./authorization");
+    const { throttleStatus, throttleFail, throttleReset, minutesLeft } =
+      await import("./pin-throttle.server");
     let who: Caller;
     try {
       who = await assertCaller(data);
@@ -224,6 +238,39 @@ export const authorizeWithPin = createServerFn({ method: "POST" })
           : "That ID or PIN is not allowed to authorise this",
       };
     }
+    if (
+      !canAuthorizeAmount(
+        rule,
+        { userId: person.userId, role: person.role },
+        data.requestedAmount,
+        data.requesterDirectLimit,
+      )
+    ) {
+      const authority = effectiveApprovalAuthority(
+        rule,
+        { userId: person.userId, role: person.role },
+        data.requesterDirectLimit,
+      );
+      await writeLog({
+        actionKey: data.actionKey,
+        modeUsed: "pin",
+        requestedBy: who.id,
+        authorizedBy: person.userId,
+        authorizerRole: person.role,
+        storeId: data.storeId ?? "",
+        terminalId: data.terminalId ?? "",
+        outcome: "denied",
+        detail: {
+          reason: "approval authority exceeded",
+          requested_amount: data.requestedAmount,
+          ...authority,
+        },
+      });
+      return {
+        ok: false as const,
+        error: `Requested value is ${data.requestedAmount}. This approver's effective maximum is ${authority.effectiveMaximum}. Higher authority is required.`,
+      };
+    }
     await throttleReset(key);
     const logged = await writeLog({
       actionKey: data.actionKey,
@@ -234,7 +281,7 @@ export const authorizeWithPin = createServerFn({ method: "POST" })
       storeId: data.storeId ?? "",
       terminalId: data.terminalId ?? "",
       outcome: "approved",
-      detail: { reason: data.reason ?? "" },
+      detail: { reason: data.reason ?? "", requested_amount: data.requestedAmount ?? null },
     });
     return {
       ok: true as const,
@@ -260,7 +307,18 @@ export const submitAuthorizationRequest = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     try {
       const who = await assertCaller(data);
-      const { createRequest, markRequestNotified } = await import("./authorization.server");
+      const { createRequest, markRequestNotified, loadRuleRows } =
+        await import("./authorization.server");
+      const { resolveRules, canRequestApproval } = await import("./authorization");
+      const rule = resolveRules(await loadRuleRows(data.storeId ?? ""), data.storeId ?? "")[
+        data.actionKey
+      ];
+      if (!canRequestApproval(rule, { userId: who.id, role: who.role })) {
+        return {
+          ok: false as const,
+          error: "You are not allowed to request approval for this action",
+        };
+      }
       const { normalizeSnapshot, snapshotFingerprint } = await import("./ticket-snapshot");
       const snapshot = data.snapshot ? normalizeSnapshot(data.snapshot) : null;
       const request = await createRequest({
@@ -273,6 +331,8 @@ export const submitAuthorizationRequest = createServerFn({ method: "POST" })
         payload: data.payload,
         ttlHours: 24,
         requestedAmount: data.requestedAmount ?? snapshot?.requestedValue ?? null,
+        requesterDirectLimit: data.requesterDirectLimit ?? null,
+        valueUnit: data.valueUnit,
         snapshot,
         snapshotHash: snapshotFingerprint(snapshot),
         heldOrderId: data.heldOrderId ?? null,
@@ -318,7 +378,13 @@ async function notifyApprovers(
 
 /** Tell the cashier who asked what happened to their request. */
 async function notifyRequester(
-  request: { id: string; actionKey: string; requestedBy: string; storeId: string; terminalId: string },
+  request: {
+    id: string;
+    actionKey: string;
+    requestedBy: string;
+    storeId: string;
+    terminalId: string;
+  },
   approve: boolean,
   approver: Caller,
   amount: number | null,
@@ -355,7 +421,7 @@ export const listAuthorizationRequests = createServerFn({ method: "POST" })
     try {
       const who = await assertCaller(data);
       const { listRequests, loadRuleRows } = await import("./authorization.server");
-      const { resolveRules, canAuthorize } = await import("./authorization");
+      const { resolveRules, canAuthorizeAmount } = await import("./authorization");
       const rules = resolveRules(
         await loadRuleRows(data.storeId ?? "").catch(() => []),
         data.storeId ?? "",
@@ -369,7 +435,12 @@ export const listAuthorizationRequests = createServerFn({ method: "POST" })
       const visible = all.filter(
         (r) =>
           r.requestedBy.toLowerCase() === who.id.toLowerCase() ||
-          canAuthorize(rules[r.actionKey], { userId: who.id, role: who.role }),
+          canAuthorizeAmount(
+            rules[r.actionKey],
+            { userId: who.id, role: who.role },
+            r.requestedAmount,
+            r.requesterDirectLimit,
+          ),
       );
       return {
         ok: true as const,
@@ -393,10 +464,10 @@ export const decideAuthorizationRequest = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     try {
       const who = await assertCaller(data);
-      const { getRequest, decideRequest, loadRuleRows, writeLog } = await import(
-        "./authorization.server"
-      );
-      const { resolveRules, canAuthorize } = await import("./authorization");
+      const { getRequest, decideRequest, loadRuleRows, writeLog } =
+        await import("./authorization.server");
+      const { resolveRules, canAuthorizeAmount, effectiveApprovalAuthority } =
+        await import("./authorization");
       const existing = await getRequest(data.id);
       if (!existing) return { ok: false as const, error: "That request no longer exists" };
       if (existing.status !== "pending") {
@@ -406,7 +477,25 @@ export const decideAuthorizationRequest = createServerFn({ method: "POST" })
         await loadRuleRows(existing.storeId).catch(() => []),
         existing.storeId,
       );
-      if (!canAuthorize(rules[existing.actionKey], { userId: who.id, role: who.role })) {
+      const requestedDecisionAmount = data.approve
+        ? (data.approvedAmount ?? existing.requestedAmount ?? null)
+        : existing.requestedAmount;
+      if (
+        !canAuthorizeAmount(
+          rules[existing.actionKey],
+          { userId: who.id, role: who.role },
+          requestedDecisionAmount,
+          existing.requesterDirectLimit,
+        )
+      ) {
+        const authority = effectiveApprovalAuthority(
+          rules[existing.actionKey],
+          {
+            userId: who.id,
+            role: who.role,
+          },
+          existing.requesterDirectLimit,
+        );
         await writeLog({
           actionKey: existing.actionKey,
           modeUsed: "request",
@@ -417,9 +506,19 @@ export const decideAuthorizationRequest = createServerFn({ method: "POST" })
           storeId: existing.storeId,
           terminalId: existing.terminalId,
           outcome: "denied",
-          detail: { reason: "not allowed to decide this action" },
+          detail: {
+            reason: "approval authority exceeded",
+            requested_amount: requestedDecisionAmount,
+            ...authority,
+          },
         });
-        return { ok: false as const, error: "You are not allowed to decide this action" };
+        return {
+          ok: false as const,
+          error:
+            authority.effectiveMaximum === null
+              ? "You are not allowed to decide this action"
+              : `Requested value is ${requestedDecisionAmount}. Your effective maximum is ${authority.effectiveMaximum}. Higher authority is required.`,
+        };
       }
       if (existing.requestedBy.toLowerCase() === who.id.toLowerCase()) {
         return { ok: false as const, error: "You cannot approve your own request" };
@@ -454,6 +553,13 @@ export const decideAuthorizationRequest = createServerFn({ method: "POST" })
           note: data.note,
           requested_amount: existing.requestedAmount,
           approved_amount: approvedAmount,
+          requester_direct_limit: existing.requesterDirectLimit,
+          value_unit: existing.valueUnit,
+          ...effectiveApprovalAuthority(
+            rules[existing.actionKey],
+            { userId: who.id, role: who.role },
+            existing.requesterDirectLimit,
+          ),
           snapshot_hash: existing.snapshotHash,
           held_order_id: existing.heldOrderId,
         },

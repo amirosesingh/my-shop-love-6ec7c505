@@ -55,10 +55,11 @@ export type GateRequest = {
   snapshot?: TicketSnapshot | null;
   /** The value being asked for, kept beside whatever is finally granted. */
   requestedAmount?: number | null;
+  requesterDirectLimit?: number | null;
+  valueUnit?: "percent" | "currency" | "quantity" | "number";
   /** The parked ticket this request belongs to. */
   heldOrderId?: string | null;
 };
-
 
 export type GateResult = {
   ok: boolean;
@@ -118,9 +119,9 @@ export function ManagerGateProvider({
       //     approved here, and how.
       const offline = !isOnline();
       let promptMode = mode;
-      const gateAction = (request.action in GATE_RULE_KEY ? request.action : null) as
-        | GateAction
-        | null;
+      const gateAction = (
+        request.action in GATE_RULE_KEY ? request.action : null
+      ) as GateAction | null;
       if (offline && gateAction) {
         const allowance = offlineApprovalMode(legacyRules, gateAction);
         if (allowance === "refused") {
@@ -180,6 +181,10 @@ export function ManagerGateProvider({
           ...(request.requestedAmount === undefined || request.requestedAmount === null
             ? {}
             : { requestedAmount: request.requestedAmount }),
+          ...(request.requesterDirectLimit == null
+            ? {}
+            : { requesterDirectLimit: request.requesterDirectLimit }),
+          ...(request.valueUnit ? { valueUnit: request.valueUnit } : {}),
           ...(request.heldOrderId ? { heldOrderId: request.heldOrderId } : {}),
         });
       });

@@ -6,10 +6,14 @@ const root = process.cwd();
 const schemaPath = resolve(root, "supabase/schema.sql");
 
 describe("canonical Supabase schema", () => {
-  it("is the only hand-run central SQL installer", () => {
+  it("keeps one scoped production upgrade beside the canonical installer", () => {
     const sqlDir = resolve(root, "supabase/sql");
     // 99_reset_data.sql is a deliberate one-off data wipe, not a schema installer.
-    expect(readdirSync(sqlDir).sort()).toEqual(["99_reset_data.sql", "README.md"]);
+    expect(readdirSync(sqlDir).sort()).toEqual([
+      "99_reset_data.sql",
+      "README.md",
+      "production_upgrade_current.sql",
+    ]);
     expect(existsSync(schemaPath)).toBe(true);
   });
 
@@ -34,7 +38,9 @@ describe("canonical Supabase schema", () => {
   it("includes the deep inventory helper and final verification", () => {
     const sql = readFileSync(schemaPath, "utf8");
     expect(sql).toContain("CREATE OR REPLACE FUNCTION public.schema_inventory_deep()");
-    expect(sql).toContain("REVOKE ALL ON FUNCTION public.schema_inventory_deep() FROM PUBLIC, anon, authenticated");
+    expect(sql).toContain(
+      "REVOKE ALL ON FUNCTION public.schema_inventory_deep() FROM PUBLIC, anon, authenticated",
+    );
     expect(sql).toContain("Schema check: everything present.");
   });
 });

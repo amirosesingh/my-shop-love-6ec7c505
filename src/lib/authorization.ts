@@ -14,10 +14,26 @@ export type { TicketSnapshot } from "./ticket-snapshot";
 export type AuthMode = "none" | "pin" | "request" | "either";
 
 export const AUTH_MODES: { value: AuthMode; label: string; blurb: string }[] = [
-  { value: "none", label: "No authorisation", blurb: "Runs straight away if the person's own permissions allow it." },
-  { value: "pin", label: "PIN only", blurb: "Someone with the right to authorise must type their PIN at the till." },
-  { value: "request", label: "Approval request", blurb: "The action waits in the approvals queue until it is decided." },
-  { value: "either", label: "Either", blurb: "The person chooses a PIN on the spot or sends it for approval." },
+  {
+    value: "none",
+    label: "No authorisation",
+    blurb: "Runs straight away if the person's own permissions allow it.",
+  },
+  {
+    value: "pin",
+    label: "PIN only",
+    blurb: "Someone with the right to authorise must type their PIN at the till.",
+  },
+  {
+    value: "request",
+    label: "Approval request",
+    blurb: "The action waits in the approvals queue until it is decided.",
+  },
+  {
+    value: "either",
+    label: "Either",
+    blurb: "The person chooses a PIN on the spot or sends it for approval.",
+  },
 ];
 
 /** Every action that can be gated. */
@@ -47,31 +63,157 @@ export const AUTH_GROUPS: { id: string; label: string; blurb: string }[] = [
   { id: "sales", label: "Sales & pricing", blurb: "What may be changed on a ticket at the till." },
   { id: "cash", label: "Cash & shift", blurb: "The drawer, the count and the hand-back." },
   { id: "inventory", label: "Inventory", blurb: "Stock movements and the catalogue." },
-  { id: "records", label: "Records & edits", blurb: "Changing something that has already been posted." },
+  {
+    id: "records",
+    label: "Records & edits",
+    blurb: "Changing something that has already been posted.",
+  },
   { id: "admin", label: "Administration", blurb: "Terminal and member administration." },
 ];
 
 export const AUTH_ACTIONS: AuthActionDef[] = [
-  { key: "refund", group: "sales", label: "Refund", blurb: "Returning money to a customer.", deferrable: false },
-  { key: "void_cart", group: "sales", label: "Void the whole cart", blurb: "Abandoning a ticket in progress.", deferrable: false },
-  { key: "void_line", group: "sales", label: "Void / delete a line", blurb: "Removing an item already scanned.", deferrable: false },
-  { key: "reduce_qty", group: "sales", label: "Reduce a quantity", blurb: "Lowering the count on a scanned line.", deferrable: false },
-  { key: "manual_discount", group: "sales", label: "Manual discount", blurb: "Any hand-typed line or bill discount.", deferrable: false },
-  { key: "discount_over_limit", group: "sales", label: "Discount above the limit", blurb: "A discount larger than the cashier may give.", thresholdLabel: "Discount (%) allowed without authorisation", deferrable: false },
-  { key: "price_override", group: "sales", label: "Price override", blurb: "Typing a different price at the till.", deferrable: false },
-  { key: "below_cost_sale", group: "sales", label: "Sell below cost", blurb: "Selling an item under its unit cost.", deferrable: false },
-  { key: "tax_exemption", group: "sales", label: "Tax exemption", blurb: "Removing tax from a ticket.", deferrable: false },
-  { key: "edit_tenders", group: "sales", label: "Edit split payments", blurb: "Changing the tenders on a bill.", deferrable: false },
-  { key: "no_sale_drawer", group: "cash", label: "No-sale drawer open", blurb: "Opening the drawer without a sale.", deferrable: false },
-  { key: "shift_close", group: "cash", label: "Close a shift", blurb: "Running the Z-report and handing back the till.", deferrable: false },
-  { key: "shift_close_variance", group: "cash", label: "Close a shift over the variance limit", blurb: "The counted cash is short or over by more than allowed.", thresholdLabel: "Variance allowed without authorisation", deferrable: false },
-  { key: "stock_adjustment", group: "inventory", label: "Stock adjustment", blurb: "Recounting or writing off stock.", deferrable: true },
-  { key: "delete_product", group: "inventory", label: "Delete a product", blurb: "Removing an item from the catalogue.", deferrable: true },
-  { key: "edit_posted_stock", group: "records", label: "Edit a posted stock record", blurb: "Changing a count that has already been posted.", deferrable: true },
-  { key: "edit_posted_purchase", group: "records", label: "Edit a received purchase", blurb: "Changing a goods-received entry after it was received.", deferrable: true },
-  { key: "discard_draft", group: "records", label: "Discard a draft with items", blurb: "Throwing away a draft that already has lines on it.", deferrable: true },
-  { key: "terminal_unpair", group: "admin", label: "Unpair / reset a terminal", blurb: "Sending a machine back to the activation screen.", deferrable: true },
-  { key: "member_points_adjust", group: "admin", label: "Adjust member points", blurb: "Adding or removing loyalty points by hand.", deferrable: true },
+  {
+    key: "refund",
+    group: "sales",
+    label: "Refund",
+    blurb: "Returning money to a customer.",
+    deferrable: false,
+  },
+  {
+    key: "void_cart",
+    group: "sales",
+    label: "Void the whole cart",
+    blurb: "Abandoning a ticket in progress.",
+    deferrable: false,
+  },
+  {
+    key: "void_line",
+    group: "sales",
+    label: "Void / delete a line",
+    blurb: "Removing an item already scanned.",
+    deferrable: false,
+  },
+  {
+    key: "reduce_qty",
+    group: "sales",
+    label: "Reduce a quantity",
+    blurb: "Lowering the count on a scanned line.",
+    deferrable: false,
+  },
+  {
+    key: "manual_discount",
+    group: "sales",
+    label: "Manual discount",
+    blurb: "Any hand-typed line or bill discount.",
+    deferrable: false,
+  },
+  {
+    key: "discount_over_limit",
+    group: "sales",
+    label: "Discount above the limit",
+    blurb: "A discount larger than the cashier may give.",
+    thresholdLabel: "Discount (%) allowed without authorisation",
+    deferrable: false,
+  },
+  {
+    key: "price_override",
+    group: "sales",
+    label: "Price override",
+    blurb: "Typing a different price at the till.",
+    deferrable: false,
+  },
+  {
+    key: "below_cost_sale",
+    group: "sales",
+    label: "Sell below cost",
+    blurb: "Selling an item under its unit cost.",
+    deferrable: false,
+  },
+  {
+    key: "tax_exemption",
+    group: "sales",
+    label: "Tax exemption",
+    blurb: "Removing tax from a ticket.",
+    deferrable: false,
+  },
+  {
+    key: "edit_tenders",
+    group: "sales",
+    label: "Edit split payments",
+    blurb: "Changing the tenders on a bill.",
+    deferrable: false,
+  },
+  {
+    key: "no_sale_drawer",
+    group: "cash",
+    label: "No-sale drawer open",
+    blurb: "Opening the drawer without a sale.",
+    deferrable: false,
+  },
+  {
+    key: "shift_close",
+    group: "cash",
+    label: "Close a shift",
+    blurb: "Running the Z-report and handing back the till.",
+    deferrable: false,
+  },
+  {
+    key: "shift_close_variance",
+    group: "cash",
+    label: "Close a shift over the variance limit",
+    blurb: "The counted cash is short or over by more than allowed.",
+    thresholdLabel: "Variance allowed without authorisation",
+    deferrable: false,
+  },
+  {
+    key: "stock_adjustment",
+    group: "inventory",
+    label: "Stock adjustment",
+    blurb: "Recounting or writing off stock.",
+    deferrable: true,
+  },
+  {
+    key: "delete_product",
+    group: "inventory",
+    label: "Delete a product",
+    blurb: "Removing an item from the catalogue.",
+    deferrable: true,
+  },
+  {
+    key: "edit_posted_stock",
+    group: "records",
+    label: "Edit a posted stock record",
+    blurb: "Changing a count that has already been posted.",
+    deferrable: true,
+  },
+  {
+    key: "edit_posted_purchase",
+    group: "records",
+    label: "Edit a received purchase",
+    blurb: "Changing a goods-received entry after it was received.",
+    deferrable: true,
+  },
+  {
+    key: "discard_draft",
+    group: "records",
+    label: "Discard a draft with items",
+    blurb: "Throwing away a draft that already has lines on it.",
+    deferrable: true,
+  },
+  {
+    key: "terminal_unpair",
+    group: "admin",
+    label: "Unpair / reset a terminal",
+    blurb: "Sending a machine back to the activation screen.",
+    deferrable: true,
+  },
+  {
+    key: "member_points_adjust",
+    group: "admin",
+    label: "Adjust member points",
+    blurb: "Adding or removing loyalty points by hand.",
+    deferrable: true,
+  },
 ];
 
 export const AUTH_ACTION_LABEL: Record<string, string> = Object.fromEntries(
@@ -87,6 +229,15 @@ export type AuthorizationRule = {
   mode: AuthMode;
   allowedRoles: string[];
   allowedUserIds: string[];
+  /** Roles/users allowed to raise (not decide) a queued request. */
+  requesterRoles: string[];
+  requesterUserIds: string[];
+  /** Maximum approvable value by `role:<role>` or `user:<id>`; absent means unlimited. */
+  authorityLimits: Record<string, number>;
+  /** Relative authority added to the requester's direct limit. */
+  extraAuthority: Record<string, number>;
+  /** Optional hard cap after applying relative authority. */
+  absoluteCeilings: Record<string, number>;
   requireReason: boolean;
   threshold: number | null;
   isEnabled: boolean;
@@ -99,6 +250,11 @@ export const defaultRule = (actionKey: AuthActionKey): AuthorizationRule => ({
   mode: "none",
   allowedRoles: ["admin", "manager"],
   allowedUserIds: [],
+  requesterRoles: ["cashier", "staff", "manager", "admin"],
+  requesterUserIds: [],
+  authorityLimits: {},
+  extraAuthority: {},
+  absoluteCeilings: {},
   requireReason: false,
   threshold: null,
   isEnabled: true,
@@ -109,6 +265,15 @@ const asStrings = (raw: unknown): string[] =>
 
 const asMode = (raw: unknown): AuthMode =>
   raw === "pin" || raw === "request" || raw === "either" ? raw : "none";
+
+const asLimits = (raw: unknown): Record<string, number> => {
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) return {};
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>)
+      .map(([key, value]) => [key.toLowerCase(), Number(value)] as const)
+      .filter(([, value]) => Number.isFinite(value) && value >= 0),
+  );
+};
 
 /** Coerce an untrusted database row into a complete rule. */
 export function normalizeRule(input: unknown): AuthorizationRule {
@@ -126,6 +291,13 @@ export function normalizeRule(input: unknown): AuthorizationRule {
       ? asStrings(row["allowed_roles"])
       : base.allowedRoles,
     allowedUserIds: asStrings(row["allowed_user_ids"]),
+    requesterRoles: asStrings(row["requester_roles"]).length
+      ? asStrings(row["requester_roles"])
+      : base.requesterRoles,
+    requesterUserIds: asStrings(row["requester_user_ids"]),
+    authorityLimits: asLimits(row["authority_limits"]),
+    extraAuthority: asLimits(row["extra_authority"]),
+    absoluteCeilings: asLimits(row["absolute_ceilings"]),
     requireReason: row["require_reason"] === true,
     threshold: threshold === null || threshold === undefined ? null : Number(threshold),
     isEnabled: row["is_enabled"] !== false,
@@ -185,6 +357,105 @@ export function canAuthorize(
   return !!id && rule.allowedUserIds.map((u) => u.toLowerCase()).includes(id);
 }
 
+/** Authentication never implies authority: request and decision rights are separate. */
+export function canRequestApproval(
+  rule: AuthorizationRule | undefined,
+  who: { userId?: string | null; role?: string | null },
+): boolean {
+  if (!rule || !rule.isEnabled || (rule.mode !== "request" && rule.mode !== "either")) return false;
+  const role = (who.role ?? "").toLowerCase();
+  const id = (who.userId ?? "").toLowerCase();
+  return (
+    rule.requesterRoles.some((r) => r.toLowerCase() === role) ||
+    (!!id && rule.requesterUserIds.some((u) => u.toLowerCase() === id))
+  );
+}
+
+/** A configured personal limit wins over the role limit; no configured limit is unlimited. */
+function authorityValue(
+  map: Record<string, number>,
+  who: { userId?: string | null; role?: string | null },
+) {
+  const userKey = `user:${(who.userId ?? "").toLowerCase()}`;
+  const roleKey = `role:${(who.role ?? "").toLowerCase()}`;
+  return map[userKey] ?? map[roleKey] ?? null;
+}
+
+/** Legacy absolute authority. Kept unchanged for already-deployed rules. */
+export function approvalAuthority(
+  rule: AuthorizationRule | undefined,
+  who: { userId?: string | null; role?: string | null },
+): number | null {
+  if (!rule) return null;
+  return authorityValue(rule.authorityLimits, who);
+}
+
+export type EffectiveAuthority = {
+  mode: "unlimited" | "legacy_absolute" | "relative";
+  directLimit: number | null;
+  extraAllowance: number | null;
+  absoluteCeiling: number | null;
+  effectiveMaximum: number | null;
+};
+
+/** New relative values take precedence; legacy absolute values retain their old meaning. */
+export function effectiveApprovalAuthority(
+  rule: AuthorizationRule | undefined,
+  who: { userId?: string | null; role?: string | null },
+  directLimit?: number | null,
+): EffectiveAuthority {
+  if (!rule)
+    return {
+      mode: "unlimited",
+      directLimit: null,
+      extraAllowance: null,
+      absoluteCeiling: null,
+      effectiveMaximum: null,
+    };
+  const extra = authorityValue(rule.extraAuthority, who);
+  const ceiling = authorityValue(rule.absoluteCeilings, who);
+  if (extra !== null) {
+    const direct = Number.isFinite(directLimit) ? Number(directLimit) : 0;
+    const combined = direct + extra;
+    return {
+      mode: "relative",
+      directLimit: direct,
+      extraAllowance: extra,
+      absoluteCeiling: ceiling,
+      effectiveMaximum: ceiling === null ? combined : Math.min(combined, ceiling),
+    };
+  }
+  const legacy = approvalAuthority(rule, who);
+  if (legacy !== null)
+    return {
+      mode: "legacy_absolute",
+      directLimit: directLimit ?? null,
+      extraAllowance: null,
+      absoluteCeiling: legacy,
+      effectiveMaximum: legacy,
+    };
+  return {
+    mode: "unlimited",
+    directLimit: directLimit ?? null,
+    extraAllowance: null,
+    absoluteCeiling: ceiling,
+    effectiveMaximum: ceiling,
+  };
+}
+
+export function canAuthorizeAmount(
+  rule: AuthorizationRule | undefined,
+  who: { userId?: string | null; role?: string | null },
+  amount: number | null | undefined,
+  directLimit?: number | null,
+): boolean {
+  if (!canAuthorize(rule, who)) return false;
+  const limit = effectiveApprovalAuthority(rule, who, directLimit).effectiveMaximum;
+  return (
+    limit === null || amount == null || (Number.isFinite(amount) && amount >= 0 && amount <= limit)
+  );
+}
+
 /** Approval payloads stay flat so they survive the wire unchanged. */
 export type PayloadValue = string | number | boolean | null;
 export type AuthPayload = Record<string, PayloadValue>;
@@ -207,6 +478,8 @@ export type AuthorizationRequest = {
   createdAt: string;
   /** the value the cashier asked for, and the one that was actually granted */
   requestedAmount: number | null;
+  requesterDirectLimit: number | null;
+  valueUnit: "percent" | "currency" | "quantity" | "number";
   approvedAmount: number | null;
   approvedPayload: AuthPayload;
   /** the ticket the approver reviewed, and its fingerprint */
@@ -244,6 +517,15 @@ export function normalizeRequest(input: unknown): AuthorizationRequest {
     expiresAt: String(row["expires_at"] ?? ""),
     createdAt: String(row["created_at"] ?? ""),
     requestedAmount: numberOrNull(row["requested_amount"]),
+    requesterDirectLimit: numberOrNull(
+      row["requester_direct_limit"] ??
+        (row["payload"] as AuthPayload | undefined)?.["allowed_limit"],
+    ),
+    valueUnit: (["percent", "currency", "quantity", "number"].includes(String(row["value_unit"]))
+      ? String(row["value_unit"])
+      : String((row["payload"] as AuthPayload | undefined)?.["discount_type"]) === "percent"
+        ? "percent"
+        : "number") as AuthorizationRequest["valueUnit"],
     approvedAmount: numberOrNull(row["approved_amount"]),
     approvedPayload: (row["approved_payload"] as AuthPayload) ?? {},
     snapshot: normalizeSnapshotRow(row["bill_snapshot"]),
@@ -263,4 +545,3 @@ function normalizeSnapshotRow(raw: unknown): TicketSnapshot | null {
 /** The value that applies once a request is decided: the granted one wins. */
 export const effectiveAmount = (r: AuthorizationRequest): number | null =>
   r.approvedAmount ?? r.requestedAmount;
-

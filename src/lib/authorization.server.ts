@@ -45,6 +45,11 @@ export async function saveRuleRow(rule: {
   mode: string;
   allowedRoles: string[];
   allowedUserIds: string[];
+  requesterRoles: string[];
+  requesterUserIds: string[];
+  authorityLimits: Record<string, number>;
+  extraAuthority: Record<string, number>;
+  absoluteCeilings: Record<string, number>;
   requireReason: boolean;
   threshold: number | null;
   isEnabled: boolean;
@@ -59,6 +64,11 @@ export async function saveRuleRow(rule: {
         mode: rule.mode,
         allowed_roles: rule.allowedRoles,
         allowed_user_ids: rule.allowedUserIds,
+        requester_roles: rule.requesterRoles,
+        requester_user_ids: rule.requesterUserIds,
+        authority_limits: rule.authorityLimits,
+        extra_authority: rule.extraAuthority,
+        absolute_ceilings: rule.absoluteCeilings,
         require_reason: rule.requireReason,
         threshold: rule.threshold,
         is_enabled: rule.isEnabled,
@@ -124,6 +134,8 @@ export async function createRequest(input: {
   payload: AuthPayload;
   ttlHours: number;
   requestedAmount?: number | null;
+  requesterDirectLimit?: number | null;
+  valueUnit?: string;
   snapshot?: TicketSnapshot | null;
   snapshotHash?: string;
   heldOrderId?: string | null;
@@ -141,6 +153,8 @@ export async function createRequest(input: {
         payload: input.payload,
         status: "pending",
         requested_amount: input.requestedAmount ?? null,
+        requester_direct_limit: input.requesterDirectLimit ?? null,
+        value_unit: input.valueUnit ?? "number",
         bill_snapshot: input.snapshot ?? {},
         snapshot_hash: input.snapshotHash ?? "",
         held_order_id: input.heldOrderId ?? null,
@@ -234,9 +248,7 @@ export async function markRequestNotified(id: string): Promise<void> {
  */
 export async function consumeRequest(id: string, expectedHash?: string): Promise<boolean> {
   const guard =
-    expectedHash === undefined
-      ? ""
-      : `&snapshot_hash=eq.${encodeURIComponent(expectedHash)}`;
+    expectedHash === undefined ? "" : `&snapshot_hash=eq.${encodeURIComponent(expectedHash)}`;
   const res = await rest(
     `authorization_requests?id=eq.${encodeURIComponent(id)}&status=eq.approved&consumed_at=is.null${guard}`,
     {
@@ -283,8 +295,7 @@ export async function verifyAuthorizationPin(
       p_allowed_users: allowedUsers,
     });
     const row = (Array.isArray(rows) ? rows[0] : rows) as
-      | { user_id?: string; full_name?: string; role?: string }
-      | undefined;
+      { user_id?: string; full_name?: string; role?: string } | undefined;
     if (!row?.user_id) return null;
     return { userId: row.user_id, name: row.full_name || row.user_id, role: row.role ?? "manager" };
   } catch {
