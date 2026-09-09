@@ -2,7 +2,7 @@
  * Builds the Windows installer + update manifest into ./release.
  *
  * The update feed URL comes from POS_UPDATE_URL (the plain web folder that
- * will host "LovablePOS Setup <version>.exe" + latest.yml). A placeholder is
+ * will host "Retail Setup <version>.exe" + latest.yml). A placeholder is
  * used when it is unset so local builds still succeed.
  *
  * The installer is handed to other shops, so it must carry no web deployment

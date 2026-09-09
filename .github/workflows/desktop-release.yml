@@ -84,7 +84,7 @@ jobs:
           v="${{ steps.meta.outputs.version }}"
           base="https://updatecms.luckycharmsdnbhd.com/pos-app"
           epoch=$(node -e "const m=/BUNDLE_EPOCH\s*=\s*(\d+)/.exec(require('fs').readFileSync('src/lib/bundle-epoch.ts','utf8'));if(!m){process.exit(1)}console.log(m[1])")
-          node -e "const fs=require('fs');fs.writeFileSync('upload/manifest.json',JSON.stringify({version:'$v',buildNumber:Number('${{ steps.meta.outputs.build_number }}'),releaseNotes:'Release $v',apkUrl:'$base/latest/android/NorthwindPOS-$v.apk',bundleUrl:'$base/latest/android/web/web-$v.zip',bundleEpoch:Number('$epoch'),windowsUrl:'$base/latest/LovablePOS%20Setup%20$v.exe'}))"
+          node -e "const fs=require('fs');fs.writeFileSync('upload/manifest.json',JSON.stringify({version:'$v',buildNumber:Number('${{ steps.meta.outputs.build_number }}'),releaseNotes:'Release $v',apkUrl:'$base/latest/android/Retail-$v.apk',bundleUrl:'$base/latest/android/web/web-$v.zip',bundleEpoch:Number('$epoch'),windowsUrl:'$base/latest/Retail%20Setup%20$v.exe'}))"
           ls -la upload
 
       - name: Deploy to Cloudflare R2

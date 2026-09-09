@@ -69,13 +69,13 @@ import { nextSku, peekSku, readSkuSettings } from "@/lib/sku";
 export const Route = createFileRoute("/inventory")({
   head: () => ({
     meta: [
-      { title: "Inventory — Northwind POS" },
+      { title: "Inventory — Retail" },
       {
         name: "description",
         content:
           "Track stock levels, costs, margins and reorder alerts for every product in the store.",
       },
-      { property: "og:title", content: "Inventory — Northwind POS" },
+      { property: "og:title", content: "Inventory — Retail" },
       { property: "og:description", content: "Stock levels, costs and reorder alerts." },
     ],
   }),

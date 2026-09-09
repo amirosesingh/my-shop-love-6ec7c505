@@ -23,13 +23,13 @@ import {
 export const Route = createFileRoute("/reports/sales")({
   head: () => ({
     meta: [
-      { title: "Sales Summary Report — Northwind POS" },
+      { title: "Sales Summary Report — Retail" },
       {
         name: "description",
         content:
           "Bill-by-bill sales report with subtotal, discount, tax, tender type and cashier for any date range.",
       },
-      { property: "og:title", content: "Sales Summary Report — Northwind POS" },
+      { property: "og:title", content: "Sales Summary Report — Retail" },
       { property: "og:description", content: "Revenue and discount breakdown per bill." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

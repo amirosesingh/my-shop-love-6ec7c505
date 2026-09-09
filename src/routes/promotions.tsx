@@ -25,13 +25,13 @@ import type { DiscountType, MemberTier, PromoType, Promotion } from "@/core/type
 export const Route = createFileRoute("/promotions")({
   head: () => ({
     meta: [
-      { title: "Promotions & Discounts — Northwind POS" },
+      { title: "Promotions & Discounts — Retail" },
       {
         name: "description",
         content:
           "Configure loyalty point policies, free-of-charge gifts, birthday discounts and spend-threshold offers applied live at the register.",
       },
-      { property: "og:title", content: "Promotions & Discounts — Northwind POS" },
+      { property: "og:title", content: "Promotions & Discounts — Retail" },
       {
         property: "og:description",
         content: "Point policies, FOC gifts, birthday and threshold discount rules.",

@@ -25,7 +25,7 @@ New page **Promotions → Coupon campaigns** in the POS backoffice (admin only, 
 
 - `/join` — Full name, mobile, optional email. Looks up `members` by phone; creates the member if new. If a welcome campaign is live, issues a voucher and redirects to the voucher page.
 - `/claim/$campaignSlug` — validates the campaign (active, inside window, under limit) before showing anything; phone entry; unknown phone reveals a one-field name box; then issues the voucher and redirects.
-- `/c/$tokenSlug` — voucher view: discount, Lucky Charms member badge, QR encoding the token, live countdown to expiry. Expired hides the QR with "THIS COUPON HAS EXPIRED"; redeemed hides the QR with a red "COUPON ALREADY REDEEMED on <timestamp>".
+- `/c/$tokenSlug` — voucher view: discount, Retail member badge, QR encoding the token, live countdown to expiry. Expired hides the QR with "THIS COUPON HAS EXPIRED"; redeemed hides the QR with a red "COUPON ALREADY REDEEMED on <timestamp>".
 - These pages render standalone (no POS sidebar/shell) and are excluded from the shift lock and terminal guards.
 
 ## 4. Subdomains

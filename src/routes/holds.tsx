@@ -30,13 +30,13 @@ import { TICKET_ACTIONS, logTicketEvent, useTicketTrail } from "@/lib/ticket-aud
 export const Route = createFileRoute("/holds")({
   head: () => ({
     meta: [
-      { title: "Hold Tickets — Northwind POS" },
+      { title: "Hold Tickets — Retail" },
       {
         name: "description",
         content:
           "View, reopen and switch between parked tickets, and see who cleared, voided, held or reprinted each one.",
       },
-      { property: "og:title", content: "Hold Tickets — Northwind POS" },
+      { property: "og:title", content: "Hold Tickets — Retail" },
       {
         property: "og:description",
         content: "Parked drafts and the full ticket trail for your till.",

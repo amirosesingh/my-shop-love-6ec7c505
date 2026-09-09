@@ -39,13 +39,13 @@ import { exactCodeMatch } from "@/lib/product-search";
 export const Route = createFileRoute("/receiving/$id")({
   head: () => ({
     meta: [
-      { title: "Receive stock — Northwind POS" },
+      { title: "Receive stock — Retail" },
       {
         name: "description",
         content:
           "Count an arrived transfer in line by line, record any discrepancy and post the stock to this branch.",
       },
-      { property: "og:title", content: "Receive stock — Northwind POS" },
+      { property: "og:title", content: "Receive stock — Retail" },
       {
         property: "og:description",
         content: "Physically verify an arrived stock transfer before it hits the shelf.",

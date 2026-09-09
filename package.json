@@ -126,7 +126,7 @@
   "version": "1.3.172",
   "build": {
     "appId": "app.lovable.pos",
-    "productName": "LovablePOS",
+    "productName": "Retail",
     "files": [
       "electron/**",
       "database/**",

@@ -4,13 +4,13 @@ import { SectionHub } from "@/platforms/web/components/pos/SectionHub";
 export const Route = createFileRoute("/customers")({
   head: () => ({
     meta: [
-      { title: "Customers & Marketing — Northwind POS" },
+      { title: "Customers & Marketing — Retail" },
       {
         name: "description",
         content:
           "Loyalty member directory, membership tiers and the promotions engine for discounts and free-of-charge offers.",
       },
-      { property: "og:title", content: "Customers & Marketing — Northwind POS" },
+      { property: "og:title", content: "Customers & Marketing — Retail" },
       {
         property: "og:description",
         content: "Members, loyalty points and running promotions.",

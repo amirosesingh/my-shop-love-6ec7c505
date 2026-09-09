@@ -1291,7 +1291,7 @@ installer: `npm run desktop:installer`.
 ### 45.2 Windows till with local SQL Server
 
 1. Install SQL Server Express, enable TCP/IP for the instance.
-2. Create an empty database (default `LovablePOS`) — tables are created on first
+2. Create an empty database (default `Retail`) — tables are created on first
    connect from `electron/db/*.sql`.
 3. `npm install`; for Windows Integrated Authentication also
    `npm install msnodesqlv8` (needs VS Build Tools).

@@ -4,13 +4,13 @@ import { SectionHub } from "@/platforms/web/components/pos/SectionHub";
 export const Route = createFileRoute("/inventory-hub")({
   head: () => ({
     meta: [
-      { title: "Inventory & Supply — Northwind POS" },
+      { title: "Inventory & Supply — Retail" },
       {
         name: "description",
         content:
           "Product catalog, purchase orders and receiving, branch stock transfers and warehouse locations.",
       },
-      { property: "og:title", content: "Inventory & Supply — Northwind POS" },
+      { property: "og:title", content: "Inventory & Supply — Retail" },
       {
         property: "og:description",
         content: "Stock, suppliers and branch logistics for the point of sale.",

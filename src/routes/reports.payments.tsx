@@ -28,13 +28,13 @@ import {
 export const Route = createFileRoute("/reports/payments")({
   head: () => ({
     meta: [
-      { title: "Cashier Payments Report — Northwind POS" },
+      { title: "Cashier Payments Report — Retail" },
       {
         name: "description",
         content:
           "Every payment transaction taken by each cashier with the full tender breakdown: cash, card machine, wallet, transfer and points.",
       },
-      { property: "og:title", content: "Cashier Payments Report — Northwind POS" },
+      { property: "og:title", content: "Cashier Payments Report — Retail" },
       {
         property: "og:description",
         content: "Payments per cashier with tender and card-machine breakdown.",

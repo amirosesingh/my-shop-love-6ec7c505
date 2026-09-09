@@ -25,13 +25,13 @@ import { TRANSFER_STATUS_LABELS } from "@/core/types/pos-types";
 export const Route = createFileRoute("/requests/")({
   head: () => ({
     meta: [
-      { title: "Stock Requests — Northwind POS" },
+      { title: "Stock Requests — Retail" },
       {
         name: "description",
         content:
           "Every stock request raised by or sent to this branch, with its approval, dispatch and receiving status.",
       },
-      { property: "og:title", content: "Stock Requests — Northwind POS" },
+      { property: "og:title", content: "Stock Requests — Retail" },
       {
         property: "og:description",
         content: "Track branch-to-branch stock requests from one register.",

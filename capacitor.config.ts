@@ -12,7 +12,7 @@ const remote = process.env["POS_MOBILE_URL"];
 
 const config: CapacitorConfig = {
   appId: "com.luckycharms.pos",
-  appName: "Northwind POS",
+  appName: "Retail",
   webDir: "capacitor-shell",
   ...(remote
     ? { server: { url: remote, cleartext: false, androidScheme: "https" } }

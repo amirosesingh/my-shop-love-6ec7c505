@@ -5,13 +5,13 @@ import { HardwarePanel } from "@/platforms/web/components/pos/settings/panels/Ha
 export const Route = createFileRoute("/settings/hardware")({
   head: () => ({
     meta: [
-      { title: "Terminal Hardware — Northwind POS" },
+      { title: "Terminal Hardware — Retail" },
       {
         name: "description",
         content:
           "Printer, cash drawer and device settings that belong to this till alone and are never copied to another terminal.",
       },
-      { property: "og:title", content: "Terminal Hardware — Northwind POS" },
+      { property: "og:title", content: "Terminal Hardware — Retail" },
       {
         property: "og:description",
         content: "Local-only printer and drawer configuration for this machine.",

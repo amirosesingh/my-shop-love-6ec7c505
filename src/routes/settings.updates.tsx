@@ -7,13 +7,13 @@ import { TerminalStatusCard } from "@/platforms/web/components/pos/TerminalStatu
 export const Route = createFileRoute("/settings/updates")({
   head: () => ({
     meta: [
-      { title: "Software Updates — Northwind POS" },
+      { title: "Software Updates — Retail" },
       {
         name: "description",
         content:
           "Check the installed till version, download new releases in the background, restart to install, and roll back to the last version that started cleanly.",
       },
-      { property: "og:title", content: "Software Updates — Northwind POS" },
+      { property: "og:title", content: "Software Updates — Retail" },
       {
         property: "og:description",
         content: "Background updates, version status and safe-mode rollback for the register.",

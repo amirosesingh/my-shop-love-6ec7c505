@@ -17,7 +17,7 @@
 `.github/workflows/android-apk.yml` is extended so it does not only leave an artifact behind:
 
 - Runs on manual click, on `v*` tags, and on pushes to `main` that touch mobile-related files.
-- After the build, renames the APK to `NorthwindPOS-<version>.apk`, and uploads both that and a stable `NorthwindPOS-latest.apk` to Cloudflare R2 under `pos-app/android/`, using the same R2 secrets the desktop workflow uses.
+- After the build, renames the APK to `Retail-<version>.apk`, and uploads both that and a stable `Retail-latest.apk` to Cloudflare R2 under `pos-app/android/`, using the same R2 secrets the desktop workflow uses.
 - Writes a tiny `android/latest.json` (version, filename, date) next to them so the app can point staff to the current download.
 - Keeps the GitHub artifact and attaches the APK to the GitHub release on tag builds.
 - Concurrency guard so two runs never overwrite each other mid-upload.

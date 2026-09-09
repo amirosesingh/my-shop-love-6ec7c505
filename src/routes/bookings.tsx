@@ -57,13 +57,13 @@ import {
 export const Route = createFileRoute("/bookings")({
   head: () => ({
     meta: [
-      { title: "Bookings & Pay Later — Northwind POS" },
+      { title: "Bookings & Pay Later — Retail" },
       {
         name: "description",
         content:
           "Track reserved goods, take part payments, settle balances and hand over collected bookings.",
       },
-      { property: "og:title", content: "Bookings & Pay Later — Northwind POS" },
+      { property: "og:title", content: "Bookings & Pay Later — Retail" },
       {
         property: "og:description",
         content: "Layaway tickets with deposits, due dates and balance collection.",

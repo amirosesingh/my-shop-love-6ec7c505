@@ -48,7 +48,7 @@ const FIELDS: { key: Key; label: string; hint: string; placeholder: string }[] =
     key: "bank_account_name",
     label: "Bank account holder name",
     hint: "Stored encrypted; shown masked here.",
-    placeholder: "Northwind Sports Sdn Bhd",
+    placeholder: "Retail",
   },
   {
     key: "bank_name",

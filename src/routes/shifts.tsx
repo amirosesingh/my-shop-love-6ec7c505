@@ -45,13 +45,13 @@ import { logSystemAction } from "@/lib/system-audit";
 export const Route = createFileRoute("/shifts")({
   head: () => ({
     meta: [
-      { title: "Shifts & Sales — Northwind POS" },
+      { title: "Shifts & Sales — Retail" },
       {
         name: "description",
         content:
           "Open and close cashier shifts, count the drawer, print X and Z reports and reprint or refund any receipt.",
       },
-      { property: "og:title", content: "Shifts & Sales — Northwind POS" },
+      { property: "og:title", content: "Shifts & Sales — Retail" },
       { property: "og:description", content: "Shift control, drawer counts and X/Z reports." },
     ],
   }),

@@ -11,13 +11,13 @@ import { listMemberVerifications } from "@/lib/verification.functions";
 export const Route = createFileRoute("/verifications")({
   head: () => ({
     meta: [
-      { title: "Member Verification Log — Northwind POS" },
+      { title: "Member Verification Log — Retail" },
       {
         name: "description",
         content:
           "Every one-time verification code sent to a member: channel, outcome, attempts and the staff member who sent it.",
       },
-      { property: "og:title", content: "Member Verification Log — Northwind POS" },
+      { property: "og:title", content: "Member Verification Log — Retail" },
       {
         property: "og:description",
         content: "Outcome of every member verification code sent from the till.",

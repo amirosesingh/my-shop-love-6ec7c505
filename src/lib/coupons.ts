@@ -276,7 +276,7 @@ export async function loadVoucherByToken(token: string): Promise<VoucherView | n
     return {
       voucher: toVoucher(row.voucher as Row),
       campaign: toCampaign(row.campaign as Row),
-      memberName: (row.member_name as string) || "Lucky Charms member",
+      memberName: (row.member_name as string) || "Retail member",
       memberCode: (row.member_code as string) || "",
     };
   } catch (e) {

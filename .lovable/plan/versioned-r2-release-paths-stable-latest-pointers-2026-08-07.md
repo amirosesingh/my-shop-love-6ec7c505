@@ -10,16 +10,16 @@ installer. This adds immutable, versioned upload paths plus a single stable
 ```text
 updatelccms/pos-app/
   releases/<tag>-<shortsha>/            immutable, never overwritten
-    NorthwindPOS-Setup-<ver>.exe
+    Retail-Setup-<ver>.exe
     *.blockmap
     latest.yml
-    android/NorthwindPOS-<ver>.apk
+    android/Retail-<ver>.apk
     android/web-<ver>.zip
   latest/                               stable pointers the clients poll
-    NorthwindPOS-Setup.exe
+    Retail-Setup.exe
     latest.yml
     release.json                        {version, tag, commit, released, paths}
-    android/NorthwindPOS-latest.apk
+    android/Retail-latest.apk
     android/latest.json
     android/web/web-latest.zip
     android/web/latest.json
@@ -47,7 +47,7 @@ folder mirrors them.
 - Same release id.
 - Upload APK + web bundle to `releases/<release-id>/android/` (immutable).
 - Publish pointers to `latest/android/` and `latest/android/web/`:
-  `NorthwindPOS-latest.apk`, `web-latest.zip`, and `latest.json` extended with
+  `Retail-latest.apk`, `web-latest.zip`, and `latest.json` extended with
   `tag`, `commit`, and the versioned URL, with `no-cache` headers.
 - Keep the current `pos-app/android/` upload for backwards compatibility.
 

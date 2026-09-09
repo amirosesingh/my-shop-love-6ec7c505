@@ -36,13 +36,13 @@ import {
 export const Route = createFileRoute("/suppliers")({
   head: () => ({
     meta: [
-      { title: "Suppliers — Northwind POS" },
+      { title: "Suppliers — Retail" },
       {
         name: "description",
         content:
           "Keep every supplier's contact, tax number and terms in one central directory used by purchasing and goods receiving.",
       },
-      { property: "og:title", content: "Suppliers — Northwind POS" },
+      { property: "og:title", content: "Suppliers — Retail" },
       {
         property: "og:description",
         content: "Central supplier directory for purchasing and receiving.",

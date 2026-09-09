@@ -145,7 +145,7 @@ const TOMBSTONE_TABLES = [
  * stock, shifts, the queued rows waiting to be sent and the terminal's own
  * settings are never rebuilt or cleared.
  */
-const SCHEMA_VERSION = 7;
+const SCHEMA_VERSION = 8;
 
 /** What the file on disk says it is. 0 for a database from before versioning. */
 function schemaVersion() {
@@ -184,6 +184,21 @@ function migrate() {
   const rules = columnsOf("pos_store_settings");
   if (rules.size && !rules.has("base_version")) {
     db.exec(`ALTER TABLE pos_store_settings ADD COLUMN base_version INTEGER`);
+  }
+
+  // Version 8 preserves an in-progress close across process restarts.
+  const shifts = columnsOf("shifts");
+  if (shifts.size) {
+    const addShift = (name, ddl) => {
+      if (!columnsOf("shifts").has(name)) db.exec(`ALTER TABLE shifts ADD COLUMN ${name} ${ddl}`);
+    };
+    addShift("state", "TEXT NOT NULL DEFAULT 'ACTIVE'");
+    addShift("close_reason", "TEXT");
+    addShift("closing_started_at", "TEXT");
+    addShift("closing_started_by", "TEXT");
+    addShift("counted_card", "REAL");
+    addShift("counted_digital", "REAL");
+    addShift("variance_status", "TEXT");
   }
 
   // 2. Idempotency key on the transaction tables.

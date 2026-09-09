@@ -22,13 +22,13 @@ import {
 export const Route = createFileRoute("/settings/groups")({
   head: () => ({
     meta: [
-      { title: "Groups & Clusters — Northwind POS" },
+      { title: "Groups & Clusters — Retail" },
       {
         name: "description",
         content:
           "Create the groups your branches and warehouses belong to, keep them active or archived, and see which locations sit in each one.",
       },
-      { property: "og:title", content: "Groups & Clusters — Northwind POS" },
+      { property: "og:title", content: "Groups & Clusters — Retail" },
       {
         property: "og:description",
         content: "One list of company groups, used everywhere a branch is assigned.",

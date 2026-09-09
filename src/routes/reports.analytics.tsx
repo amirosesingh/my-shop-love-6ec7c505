@@ -32,13 +32,13 @@ import { ReportHeader, StatCard, defaultRange, inRange } from "@/platforms/web/c
 export const Route = createFileRoute("/reports/analytics")({
   head: () => ({
     meta: [
-      { title: "Business Analytics Board — Northwind POS" },
+      { title: "Business Analytics Board — Retail" },
       {
         name: "description",
         content:
           "Top selling items, revenue share per shop, daily and monthly revenue with averages, discounts given away and gross profit per branch.",
       },
-      { property: "og:title", content: "Business Analytics Board — Northwind POS" },
+      { property: "og:title", content: "Business Analytics Board — Retail" },
       {
         property: "og:description",
         content: "Top items, revenue per shop, daily and monthly trends, savings and profit.",

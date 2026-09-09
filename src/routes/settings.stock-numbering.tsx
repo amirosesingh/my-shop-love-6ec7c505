@@ -22,13 +22,13 @@ import { activeBranchId } from "@/lib/active-branch";
 export const Route = createFileRoute("/settings/stock-numbering")({
   head: () => ({
     meta: [
-      { title: "Document Numbering — Northwind POS" },
+      { title: "Document Numbering — Retail" },
       {
         name: "description",
         content:
           "Choose the prefix, starting number, padding and reset rule for stock count and goods received reference numbers.",
       },
-      { property: "og:title", content: "Document Numbering — Northwind POS" },
+      { property: "og:title", content: "Document Numbering — Retail" },
       {
         property: "og:description",
         content: "Prefix, branch, period and running number rules for stock counts and receiving.",

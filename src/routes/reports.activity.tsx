@@ -27,13 +27,13 @@ import {
 export const Route = createFileRoute("/reports/activity")({
   head: () => ({
     meta: [
-      { title: "Register Activity Report — Northwind POS" },
+      { title: "Register Activity Report — Retail" },
       {
         name: "description",
         content:
           "Timeline of till operations: orders held and resumed, carts voided, bills split, refunds and drawer opens with timestamps.",
       },
-      { property: "og:title", content: "Register Activity Report — Northwind POS" },
+      { property: "og:title", content: "Register Activity Report — Retail" },
       { property: "og:description", content: "Terminal operation timeline with full timestamps." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

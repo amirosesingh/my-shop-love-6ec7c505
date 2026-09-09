@@ -20,13 +20,13 @@ import type { BookingServiceType } from "@/core/types/pos-types";
 export const Route = createFileRoute("/settings/services")({
   head: () => ({
     meta: [
-      { title: "Booking Services — Northwind POS" },
+      { title: "Booking Services — Retail" },
       {
         name: "description",
         content:
           "Set up the jobs customers book in for — re-stringing, repairs, custom orders — with a default service fee.",
       },
-      { property: "og:title", content: "Booking Services — Northwind POS" },
+      { property: "og:title", content: "Booking Services — Retail" },
       { property: "og:description", content: "Service types and default fees for bookings." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

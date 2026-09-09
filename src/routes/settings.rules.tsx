@@ -20,6 +20,7 @@ import { RULE_GROUPS, type PosRules, type PosRuleKey } from "@/lib/pos-rules";
 import { savePosRules } from "@/lib/pos-rules.functions";
 import { queueRulesSave } from "@/lib/pos-rules-offline";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
+import { posFetch, serverOrigin } from "@/lib/server-origin";
 import { getIdleTimeout, saveIdleTimeout } from "@/lib/idle-timeout.functions";
 import { isWindowsShell } from "@/platform-config/features";
 
@@ -134,14 +135,25 @@ function RulesSettings() {
         await keepLocally("Head office could not be reached.");
         return;
       }
-      const res = await savePosRules({
-        data: {
-          accessToken: auth.accessToken,
-          storeId: currentStore.id,
-          patch: draft as unknown as Record<string, boolean | number>,
-          expectedVersion: rowVersion,
-        },
-      });
+      const payload = {
+        ...auth,
+        accessToken: auth.accessToken,
+        storeId: currentStore.id,
+        patch: draft as unknown as Record<string, boolean | number>,
+        expectedVersion: rowVersion,
+      };
+      // Native bundles have no local app server; the hosted endpoint derives
+      // branch and supervisor authority from these credentials.
+      const res = serverOrigin()
+        ? await posFetch("/api/public/pos-rules/save", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+          }).then(async (response) => ({
+            ...((await response.json().catch(() => ({}))) as { ok?: boolean; error?: string }),
+            ok: response.ok,
+          }))
+        : await savePosRules({ data: payload });
       if (!res.ok) {
         if (/STALE_RULES/i.test(res.error ?? "")) {
           await refresh();

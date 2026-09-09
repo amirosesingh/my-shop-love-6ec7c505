@@ -29,13 +29,13 @@ import {
 export const Route = createFileRoute("/reports/coupons")({
   head: () => ({
     meta: [
-      { title: "Coupon Usage Report — Northwind POS" },
+      { title: "Coupon Usage Report — Retail" },
       {
         name: "description",
         content:
           "Track every coupon applied at the till: the code, whether it hit the whole bill or one item, the value taken off and the exact timestamp.",
       },
-      { property: "og:title", content: "Coupon Usage Report — Northwind POS" },
+      { property: "og:title", content: "Coupon Usage Report — Retail" },
       { property: "og:description", content: "Bill-level and item-level coupon audit trail." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

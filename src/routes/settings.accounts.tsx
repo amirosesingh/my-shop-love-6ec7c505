@@ -24,13 +24,13 @@ import {
 export const Route = createFileRoute("/settings/accounts")({
   head: () => ({
     meta: [
-      { title: "Payment Accounts — Northwind POS" },
+      { title: "Payment Accounts — Retail" },
       {
         name: "description",
         content:
           "Name every card machine, bank account and e-wallet so cashiers can record exactly where each payment landed.",
       },
-      { property: "og:title", content: "Payment Accounts — Northwind POS" },
+      { property: "og:title", content: "Payment Accounts — Retail" },
       { property: "og:description", content: "Card machines, bank accounts and e-wallets for the till." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

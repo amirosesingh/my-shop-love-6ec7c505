@@ -8,13 +8,13 @@ import { ConnectionSummary } from "@/platforms/web/components/pos/settings/Conne
 export const Route = createFileRoute("/settings/database")({
   head: () => ({
     meta: [
-      { title: "Database Connection — Northwind POS" },
+      { title: "Database Connection — Retail" },
       {
         name: "description",
         content:
           "Central database credentials, the local SQL Server connection, connection tests and the setup health check for this till.",
       },
-      { property: "og:title", content: "Database Connection — Northwind POS" },
+      { property: "og:title", content: "Database Connection — Retail" },
       {
         property: "og:description",
         content: "Cloud and local database connections, tests and schema health in one place.",

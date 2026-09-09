@@ -23,7 +23,7 @@ export const defaultPaymentDetails: PaymentDetails = {
 
 export const defaultReceiptSettings: ReceiptSettings = {
   paper: "80mm",
-  companyName: "NORTHWIND & CO.",
+  companyName: "RETAIL",
   taxNumber: "88-2201194",
   regNumber: "",
   phone: "555-0100",

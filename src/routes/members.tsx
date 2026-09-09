@@ -26,13 +26,13 @@ import { useVerificationGateway } from "@/lib/verification-gateway";
 export const Route = createFileRoute("/members")({
   head: () => ({
     meta: [
-      { title: "Members — Northwind POS" },
+      { title: "Members — Retail" },
       {
         name: "description",
         content:
           "Central membership register with tiers, loyalty point balances, lifetime spend and printable statements.",
       },
-      { property: "og:title", content: "Members — Northwind POS" },
+      { property: "og:title", content: "Members — Retail" },
       { property: "og:description", content: "Loyalty tiers, points and member statements." },
     ],
   }),

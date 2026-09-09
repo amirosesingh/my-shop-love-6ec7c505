@@ -10,9 +10,9 @@ import type { ReceiptCustomLine } from "@/core/types/pos-types";
 export const Route = createFileRoute("/settings/qr")({
   head: () => ({
     meta: [
-      { title: "Receipt QR Code — Northwind POS" },
+      { title: "Receipt QR Code — Retail" },
       { name: "description", content: "Print a QR code on receipts for feedback forms, loyalty sign-up or a payment link, with size and placement control." },
-      { property: "og:title", content: "Receipt QR Code — Northwind POS" },
+      { property: "og:title", content: "Receipt QR Code — Retail" },
       { property: "og:description", content: "QR code printed on receipts." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

@@ -199,13 +199,13 @@ function NotificationSettingsPage() {
 export const Route = createFileRoute("/settings/notifications")({
   head: () => ({
     meta: [
-      { title: "Notifications & Alerts — Northwind POS" },
+      { title: "Notifications & Alerts — Retail" },
       {
         name: "description",
         content:
           "Pick which till events raise an admin notification and which are also delivered by WhatsApp, with quiet hours and per-event control.",
       },
-      { property: "og:title", content: "Notifications & Alerts — Northwind POS" },
+      { property: "og:title", content: "Notifications & Alerts — Retail" },
       {
         property: "og:description",
         content: "Per-event admin alerts and WhatsApp delivery rules for the register.",

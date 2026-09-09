@@ -31,13 +31,13 @@ import { groupName, selectableGroups, useStoreGroups } from "@/lib/store-groups"
 export const Route = createFileRoute("/stores")({
   head: () => ({
     meta: [
-      { title: "Manage Locations — Northwind POS" },
+      { title: "Manage Locations — Retail" },
       {
         name: "description",
         content:
           "Create stores and warehouses, nest sub-warehouse levels underneath them and choose the level stock is picked from first.",
       },
-      { property: "og:title", content: "Manage Locations — Northwind POS" },
+      { property: "og:title", content: "Manage Locations — Retail" },
       {
         property: "og:description",
         content: "Multi-level location and sub-warehouse builder for multi-branch retail.",

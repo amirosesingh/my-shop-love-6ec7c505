@@ -5,9 +5,9 @@ import { WhatsAppFields } from "@/platforms/web/components/pos/settings/panels/I
 export const Route = createFileRoute("/settings/whatsapp")({
   head: () => ({
     meta: [
-      { title: "WhatsApp Bills — Northwind POS" },
+      { title: "WhatsApp Bills — Retail" },
       { name: "description", content: "Send receipts and booking slips over the WhatsApp Cloud API, with message format, greeting and auto-send controls." },
-      { property: "og:title", content: "WhatsApp Bills — Northwind POS" },
+      { property: "og:title", content: "WhatsApp Bills — Retail" },
       { property: "og:description", content: "WhatsApp receipt delivery settings." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

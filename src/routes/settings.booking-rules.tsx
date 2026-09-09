@@ -20,13 +20,13 @@ import { bookingRulesOf, DEFAULT_SERVICE_TERMS, type BookingRules } from "@/core
 export const Route = createFileRoute("/settings/booking-rules")({
   head: () => ({
     meta: [
-      { title: "Booking Rules — Northwind POS" },
+      { title: "Booking Rules — Retail" },
       {
         name: "description",
         content:
           "Deposit minimums, turnaround times, racket job requirements and who may cancel or re-spec a booking.",
       },
-      { property: "og:title", content: "Booking Rules — Northwind POS" },
+      { property: "og:title", content: "Booking Rules — Retail" },
       {
         property: "og:description",
         content: "Deposits, scheduling, racket job cards and booking controls.",

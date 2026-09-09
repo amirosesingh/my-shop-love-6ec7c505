@@ -148,13 +148,13 @@ export const Route = createFileRoute("/")({
   }),
   head: () => ({
     meta: [
-      { title: "Register — Northwind POS" },
+      { title: "Register — Retail" },
       {
         name: "description",
         content:
           "Ring up sales, attach members, take cash or card payments, open the drawer and print thermal receipts.",
       },
-      { property: "og:title", content: "Register — Northwind POS" },
+      { property: "og:title", content: "Register — Retail" },
       { property: "og:description", content: "Fast touch checkout with receipts and members." },
     ],
   }),

@@ -28,13 +28,13 @@ import type { CatalogKind, ProductCategory } from "@/core/types/pos-types";
 export const Route = createFileRoute("/settings/catalog")({
   head: () => ({
     meta: [
-      { title: "Categories & Units — Northwind POS" },
+      { title: "Categories & Units — Retail" },
       {
         name: "description",
         content:
           "Manage product categories, sub-categories, groups and the units of measure used across the catalogue.",
       },
-      { property: "og:title", content: "Categories & Units — Northwind POS" },
+      { property: "og:title", content: "Categories & Units — Retail" },
       {
         property: "og:description",
         content: "Catalogue classification and unit of measure setup.",

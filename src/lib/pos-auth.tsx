@@ -746,7 +746,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // key and opens the device session in one call.
       // The sign-in call above already opened the device session; reuse it.
       let cashierToken = verified?.cashierToken ?? "";
-      let sessionToken = verified?.sessionToken ?? "";
+      const sessionToken = verified?.sessionToken ?? "";
 
       if (!cashierToken) {
         const issued = await issueCashierSession({ data: { username: next.userCode, pin } });

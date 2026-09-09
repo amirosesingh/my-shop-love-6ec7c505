@@ -15,13 +15,13 @@ import { PublicPageClosed } from "@/platforms/web/components/pos/PublicPageClose
 export const Route = createFileRoute("/c/$tokenSlug")({
   head: () => ({
     meta: [
-      { title: "Your voucher — Lucky Charms" },
+      { title: "Your voucher — Retail" },
       {
         name: "description",
         content:
           "Show this voucher at the counter to redeem your discount. Includes a scannable code and a live expiry countdown.",
       },
-      { property: "og:title", content: "Your voucher — Lucky Charms" },
+      { property: "og:title", content: "Your voucher — Retail" },
       { property: "og:description", content: "Scan at the till to redeem your discount." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

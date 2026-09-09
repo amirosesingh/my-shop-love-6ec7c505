@@ -53,13 +53,13 @@ import type { Cursor } from "@/lib/keyset";
 export const Route = createFileRoute("/coupons")({
   head: () => ({
     meta: [
-      { title: "Coupon Campaigns — Northwind POS" },
+      { title: "Coupon Campaigns — Retail" },
       {
         name: "description",
         content:
           "Create digital coupon campaigns, share claim links on any channel and track every voucher issued and redeemed at the till.",
       },
-      { property: "og:title", content: "Coupon Campaigns — Northwind POS" },
+      { property: "og:title", content: "Coupon Campaigns — Retail" },
       {
         property: "og:description",
         content: "Digital coupon campaigns, claim links and voucher redemption tracking.",

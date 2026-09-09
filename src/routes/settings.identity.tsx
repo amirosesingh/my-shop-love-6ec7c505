@@ -8,7 +8,7 @@ import { readBranding, useBranding, writeBranding } from "@/lib/branding";
 import type { ReceiptOverride, ReceiptSettings } from "@/core/types/pos-types";
 
 const IDENTITY_FIELDS: { key: keyof ReceiptOverride; label: string; placeholder: string }[] = [
-  { key: "companyName", label: "Company name", placeholder: "NORTHWIND & CO." },
+  { key: "companyName", label: "Company name", placeholder: "RETAIL" },
   { key: "taxNumber", label: "Tax / VAT number", placeholder: "88-2201194" },
   { key: "regNumber", label: "Registration number", placeholder: "REG-000123" },
   { key: "phone", label: "Phone", placeholder: "555-0100" },
@@ -18,9 +18,9 @@ const IDENTITY_FIELDS: { key: keyof ReceiptOverride; label: string; placeholder:
 export const Route = createFileRoute("/settings/identity")({
   head: () => ({
     meta: [
-      { title: "Business Identity — Northwind POS" },
+      { title: "Business Identity — Retail" },
       { name: "description", content: "Company name, tax and registration numbers, contact details, receipt header and thank-you footer, per branch or globally." },
-      { property: "og:title", content: "Business Identity — Northwind POS" },
+      { property: "og:title", content: "Business Identity — Retail" },
       { property: "og:description", content: "Company details printed on every receipt." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

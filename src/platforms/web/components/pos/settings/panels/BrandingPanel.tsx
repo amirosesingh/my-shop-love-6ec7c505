@@ -82,7 +82,7 @@ export function BrandingPanel() {
           <Input
             value={receipt.companyName}
             onChange={(e) => updateSettings({ receipt: { ...receipt, companyName: e.target.value } })}
-            placeholder="Northwind & Co."
+            placeholder="Retail"
           />
           <p className="text-[11px] text-muted-foreground">
             Shown on receipts, the till header and the customer display.

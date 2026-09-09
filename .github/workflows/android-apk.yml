@@ -131,11 +131,11 @@ jobs:
           epoch=$(node -e "const m=/BUNDLE_EPOCH\s*=\s*(\d+)/.exec(require('fs').readFileSync('src/lib/bundle-epoch.ts','utf8'));if(!m){process.exit(1)}console.log(m[1])")
           mkdir -p versioned/android/web latest/android latest/android/web release-assets
           src=$(ls android/app/build/outputs/apk/release/*.apk | head -n1)
-          cp "$src" "versioned/android/NorthwindPOS-$v.apk"
-          cp "$src" "latest/android/NorthwindPOS-$v.apk"
-          cp "$src" "latest/android/NorthwindPOS-latest.apk"
-          cp "$src" "release-assets/NorthwindPOS-$v.apk"
-          manifest=$(printf '{"version":"%s","file":"NorthwindPOS-%s.apk","tag":"%s","commit":"%s","released":"%s","path":"pos-app/releases/%s/android/"}\n' \
+          cp "$src" "versioned/android/Retail-$v.apk"
+          cp "$src" "latest/android/Retail-$v.apk"
+          cp "$src" "latest/android/Retail-latest.apk"
+          cp "$src" "release-assets/Retail-$v.apk"
+          manifest=$(printf '{"version":"%s","file":"Retail-%s.apk","tag":"%s","commit":"%s","released":"%s","path":"pos-app/releases/%s/android/"}\n' \
             "$v" "$v" "${{ steps.meta.outputs.tag }}" "${{ steps.meta.outputs.commit }}" "$released" "$rid")
           echo "$manifest" > latest/android/latest.json
           echo "$manifest" > versioned/android/latest.json
@@ -143,7 +143,7 @@ jobs:
           # Unified cross-platform manifest read by Android, Windows and web.
           base="https://updatecms.luckycharmsdnbhd.com/pos-app"
           build="${{ steps.meta.outputs.build_number }}"
-          printf '{"version":"%s","buildNumber":%s,"releaseNotes":"%s","apkUrl":"%s/latest/android/NorthwindPOS-%s.apk","bundleUrl":"%s/latest/android/web/web-%s.zip","bundleEpoch":%s,"windowsUrl":"%s/latest/LovablePOS%%20Setup%%20%s.exe"}\n' \
+          printf '{"version":"%s","buildNumber":%s,"releaseNotes":"%s","apkUrl":"%s/latest/android/Retail-%s.apk","bundleUrl":"%s/latest/android/web/web-%s.zip","bundleEpoch":%s,"windowsUrl":"%s/latest/Retail%%20Setup%%20%s.exe"}\n' \
             "$v" "$build" "Release $v" "$base" "$v" "$base" "$v" "$epoch" "$base" "$v" > release-assets/manifest.json
           cp release-assets/manifest.json latest/manifest.json 2>/dev/null || { mkdir -p latest && cp release-assets/manifest.json latest/manifest.json; }
           if [ -z "${{ inputs.app_url }}" ]; then
@@ -162,7 +162,7 @@ jobs:
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: NorthwindPOS-android
+          name: Retail-android
           if-no-files-found: error
           path: release-assets/*.apk
 

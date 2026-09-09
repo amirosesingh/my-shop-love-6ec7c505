@@ -5,7 +5,7 @@ Goal: one tag push produces a downloadable `.exe` installer, and every till alre
 ## How releases will work
 
 - A GitHub Actions workflow runs on a Windows runner. Push a version tag (`v1.0.1`) or trigger it by hand, and it builds the desktop bundle, produces the NSIS installer, and uploads the release files as downloadable artifacts.
-- Files produced: `LovablePOS Setup <version>.exe`, `latest.yml` (the manifest the tills read), and a `.blockmap` used for smaller delta downloads.
+- Files produced: `Retail Setup <version>.exe`, `latest.yml` (the manifest the tills read), and a `.blockmap` used for smaller delta downloads.
 - You download those three files from the workflow run and drop them into your own web folder (for example `https://updates.yourdomain.com/pos/`). That folder is the update feed.
 - No code signing for now, so a first-time install shows the Windows SmartScreen "More info → Run anyway" prompt. Signing can be added later by adding a certificate to repo secrets.
 

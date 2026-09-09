@@ -7,13 +7,13 @@ import { SyncSettings } from "@/platforms/web/components/pos/SyncSettings";
 export const Route = createFileRoute("/settings/sync")({
   head: () => ({
     meta: [
-      { title: "Sync — Northwind POS" },
+      { title: "Sync — Retail" },
       {
         name: "description",
         content:
           "The one place sync runs from: live table-by-table status, every change still waiting, why it is stuck, the audit ledger and backups.",
       },
-      { property: "og:title", content: "Sync — Northwind POS" },
+      { property: "og:title", content: "Sync — Retail" },
       { property: "og:description", content: "Trigger sync, watch progress and clear the queue." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

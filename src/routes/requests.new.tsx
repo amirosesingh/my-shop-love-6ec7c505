@@ -13,13 +13,13 @@ import { usePos } from "@/lib/pos-store";
 export const Route = createFileRoute("/requests/new")({
   head: () => ({
     meta: [
-      { title: "New stock request — Northwind POS" },
+      { title: "New stock request — Retail" },
       {
         name: "description",
         content:
           "Ask another branch for stock: search the catalogue, set quantities and send the request for approval.",
       },
-      { property: "og:title", content: "New stock request — Northwind POS" },
+      { property: "og:title", content: "New stock request — Retail" },
       {
         property: "og:description",
         content: "Raise a branch-to-branch stock request from a full transaction screen.",

@@ -1,12 +1,23 @@
 import js from "@eslint/js";
-import eslintPluginPrettier from "eslint-plugin-prettier/recommended";
+import prettier from "eslint-config-prettier";
 import globals from "globals";
 import reactHooks from "eslint-plugin-react-hooks";
 import reactRefresh from "eslint-plugin-react-refresh";
 import tseslint from "typescript-eslint";
 
 export default tseslint.config(
-  { ignores: ["dist", ".output", ".vinxi"] },
+  {
+    ignores: [
+      "dist",
+      "dist-desktop",
+      ".output",
+      ".vinxi",
+      ".wrangler",
+      "release",
+      "capacitor-shell",
+      "src/routeTree.gen.ts",
+    ],
+  },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ["**/*.{ts,tsx}"],
@@ -34,6 +45,18 @@ export default tseslint.config(
       ],
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       "@typescript-eslint/no-unused-vars": "off",
+      // Existing boundary adapters still need typed follow-up work. Keep this
+      // visible as debt without making it indistinguishable from correctness
+      // and security failures.
+      "@typescript-eslint/no-explicit-any": "warn",
+    },
+  },
+  {
+    // A few Electron integration tests intentionally load CommonJS modules
+    // from the desktop runtime. Application TypeScript remains ESM-only.
+    files: ["src/lib/__tests__/**/*.test.ts"],
+    rules: {
+      "@typescript-eslint/no-require-imports": "off",
     },
   },
   {
@@ -60,5 +83,8 @@ export default tseslint.config(
       ],
     },
   },
-  eslintPluginPrettier,
+  // Formatting is checked by Prettier, not surfaced as thousands of ESLint
+  // correctness failures. This only disables conflicting style rules; it does
+  // not weaken hooks, TypeScript, refresh, or restricted-import validation.
+  prettier,
 );

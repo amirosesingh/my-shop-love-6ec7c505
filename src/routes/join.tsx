@@ -12,13 +12,13 @@ import { PublicPageClosed } from "@/platforms/web/components/pos/PublicPageClose
 export const Route = createFileRoute("/join")({
   head: () => ({
     meta: [
-      { title: "Join the rewards club — Lucky Charms" },
+      { title: "Join the rewards club — Retail" },
       {
         name: "description",
         content:
           "Sign up in seconds with your mobile number to collect loyalty points and unlock your welcome coupon.",
       },
-      { property: "og:title", content: "Join the rewards club — Lucky Charms" },
+      { property: "og:title", content: "Join the rewards club — Retail" },
       {
         property: "og:description",
         content: "Register your mobile number and claim your welcome coupon instantly.",
