@@ -311,7 +311,8 @@ const isPaused = () => paused;
 
 /* ------------------------------ rollback ------------------------------ */
 
-const artifact = (version) => `${app.getName()} Setup ${version}.exe`;
+const PRODUCT_NAME = "Retail";
+const artifact = (version) => `${PRODUCT_NAME} Setup ${version}.exe`;
 
 /** Where the installer for a given version lives on the configured feed. */
 function rollbackUrl(version) {

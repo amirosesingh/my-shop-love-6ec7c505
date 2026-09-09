@@ -12,7 +12,6 @@ import {
   type DbHealthReport,
   type RecentRows,
 } from "@/lib/db-health";
-import { importSampleData } from "@/core/api/pos-db";
 import { FeatureSchemaReport } from "@/platforms/web/components/pos/settings/panels/FeatureSchemaReport";
 import { RelationFlowGraph } from "@/platforms/web/components/pos/settings/RelationFlowGraph";
 import {
@@ -34,7 +33,6 @@ export function DatabaseHealthPanel() {
   const [coverage, setCoverage] = useState<BranchCoverage[] | null>(null);
   const [peek, setPeek] = useState<RecentRows | null>(null);
   const [peeking, setPeeking] = useState<string | null>(null);
-  const [seeding, setSeeding] = useState(false);
   const [relations, setRelations] = useState<RelationalReport | null>(null);
   const [relBusy, setRelBusy] = useState(false);
   const [summary, setSummary] = useState<string[] | null>(null);
@@ -93,20 +91,6 @@ export function DatabaseHealthPanel() {
     toast.success("Consolidated report copied");
   };
 
-  /** Demo catalogue, on request only — nothing is ever inserted automatically. */
-  const loadSample = async () => {
-    if (!window.confirm("Add the demo products, members and promotions to the central database?")) return;
-    setSeeding(true);
-    try {
-      await importSampleData();
-      toast.success("Sample data added");
-    } catch (e) {
-      notifyError(e);
-    } finally {
-      setSeeding(false);
-    }
-  };
-
   const run = async () => {
     setBusy(true);
     try {
@@ -152,9 +136,6 @@ export function DatabaseHealthPanel() {
         </Button>
         <Button size="sm" variant="outline" onClick={() => void copyAll()}>
           Copy everything
-        </Button>
-        <Button size="sm" variant="outline" disabled={seeding} onClick={() => void loadSample()}>
-          {seeding ? "Adding…" : "Load sample data"}
         </Button>
         {report && (
           <span className="text-xs text-muted-foreground">
