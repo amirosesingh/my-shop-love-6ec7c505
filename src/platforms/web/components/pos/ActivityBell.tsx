@@ -36,6 +36,9 @@ import {
   type CentreView,
 } from "@/lib/approval-centre";
 import { AUTH_ACTION_LABEL, type AuthorizationRequest } from "@/lib/authorization";
+import { usePosOptional } from "@/lib/pos-store";
+import { useSyncSummary } from "@/lib/sync-summary";
+import { attentionCounts } from "@/lib/needs-attention";
 
 const POLL_MS = 45_000;
 
@@ -46,6 +49,8 @@ const when = (iso: string) => {
 
 export function ActivityBell({ compact }: { compact?: boolean }) {
   const { isSupervisor, user } = useAuth();
+  const pos = usePosOptional();
+  const sync = useSyncSummary();
   // Everyone gets the centre; only supervisors get the branch activity feed.
   const showActivity = isSupervisor;
   const allowed = true;
@@ -112,12 +117,18 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
 
   const hidden = useMemo(() => new Set(clearedIds(meKey)), [meKey, clearedTick]);
   const visibleRows = rows.filter((r) => !hidden.has(r.id));
-  const toDecide = (centre?.toDecide ?? []).filter((r) => !hidden.has(r.id));
-  const waiting = (centre?.waiting ?? []).filter((r) => !hidden.has(r.id));
-  const ready = (centre?.ready ?? []).filter((r) => !hidden.has(r.id));
-  const history = centre?.history ?? [];
-  const clearedCount = hidden.size;
-  const badge = unread + toDecide.length + ready.length;
+  // Unresolved business records never consult notification clear/read preferences.
+  const toDecide = centre?.toDecide ?? [];
+  const waiting = centre?.waiting ?? [];
+  const ready = centre?.ready ?? [];
+  const clearedEvents = rows.filter((r) => hidden.has(r.id));
+  const clearedCount = clearedEvents.length;
+  const attention = attentionCounts({
+    approvals: [...toDecide, ...waiting],
+    transfers: isSupervisor ? pos?.state.transfers : [],
+    syncFailures: isSupervisor ? sync.failed : 0,
+  });
+  const badge = unread + attention.total + ready.length;
 
   if (!allowed) return null;
 
@@ -160,10 +171,34 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
           </p>
         </div>
 
-        <Tabs defaultValue={toDecide.length ? "decide" : ready.length ? "ready" : "waiting"}>
+        <div className="grid grid-cols-4 gap-1 border-b border-border px-3 py-2 text-center text-[10px]">
+          <span>
+            <strong>{attention.total}</strong>
+            <br />
+            Needs attention
+          </span>
+          <span>
+            <strong>{attention.approvals}</strong>
+            <br />
+            Approvals
+          </span>
+          <span>
+            <strong>{attention.transfers}</strong>
+            <br />
+            Transfers
+          </span>
+          <span>
+            <strong>{attention.sync}</strong>
+            <br />
+            Sync issues
+          </span>
+        </div>
+        <Tabs
+          defaultValue={attention.approvals ? "attention" : ready.length ? "ready" : "activity"}
+        >
           <TabsList className="grid w-full grid-cols-5 rounded-none">
-            <TabsTrigger value="decide" className="text-[10px]">
-              Decide{toDecide.length ? ` ${toDecide.length}` : ""}
+            <TabsTrigger value="attention" className="text-[10px]">
+              Attention{attention.approvals ? ` ${attention.approvals}` : ""}
             </TabsTrigger>
             <TabsTrigger value="waiting" className="text-[10px]">
               Waiting{waiting.length ? ` ${waiting.length}` : ""}
@@ -179,30 +214,21 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="decide" className="m-0 max-h-80 overflow-y-auto">
+          <TabsContent value="attention" className="m-0 max-h-80 overflow-y-auto">
             <RequestList
-              rows={toDecide}
-              empty="Nothing is waiting for your decision."
-              onClear={(id) => clearActivityEntry(meKey, id)}
+              rows={[...toDecide, ...waiting]}
+              empty="No approvals need attention."
               actionLabel="Review"
               onAction={() => setOpen(false)}
             />
           </TabsContent>
 
           <TabsContent value="waiting" className="m-0 max-h-80 overflow-y-auto">
-            <RequestList
-              rows={waiting}
-              empty="You have nothing waiting for approval."
-              onClear={(id) => clearActivityEntry(meKey, id)}
-            />
+            <RequestList rows={waiting} empty="You have nothing waiting for approval." />
           </TabsContent>
 
           <TabsContent value="ready" className="m-0 max-h-80 overflow-y-auto">
-            <RequestList
-              rows={ready}
-              empty="No decisions to pick up."
-              onClear={(id) => clearActivityEntry(meKey, id)}
-            />
+            <RequestList rows={ready} empty="No decisions to pick up." />
           </TabsContent>
 
           <TabsContent value="activity" className="m-0 max-h-80 overflow-y-auto">
@@ -213,11 +239,7 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
             ) : missing ? (
               <p className="px-3 py-6 text-center text-xs text-muted-foreground">
                 The activity log is not set up on this database yet. Run
-                <span className="font-medium">
-                  {" "}
-                  supabase/schema.sql
-                </span>{" "}
-                to switch it on.
+                <span className="font-medium"> supabase/schema.sql</span> to switch it on.
               </p>
             ) : visibleRows.length === 0 ? (
               <p className="px-3 py-6 text-center text-xs text-muted-foreground">
@@ -270,25 +292,14 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
                 <p className="px-3 pt-2 text-[10px] text-muted-foreground">
                   Clearing only hides an entry here. Nothing is deleted.
                 </p>
-                {[...clearedIds(meKey)].reverse().map((id) => {
-                  const row =
-                    rows.find((r) => r.id === id) ??
-                    [...(centre?.toDecide ?? []), ...(centre?.waiting ?? []), ...(centre?.ready ?? []), ...history].find(
-                      (r) => r.id === id,
-                    );
+                {clearedEvents.map((row) => {
+                  const id = row.id;
                   return (
                     <div
                       key={id}
                       className="flex items-center gap-2 border-b border-border/60 px-3 py-2 last:border-0"
                     >
-                      <p className="min-w-0 flex-1 truncate text-xs">
-                        {row && "title" in row
-                          ? row.title
-                          : row
-                            ? (AUTH_ACTION_LABEL[(row as AuthorizationRequest).actionKey] ??
-                              (row as AuthorizationRequest).actionKey)
-                            : id}
-                      </p>
+                      <p className="min-w-0 flex-1 truncate text-xs">{row.title}</p>
                       <button
                         type="button"
                         className="text-[10px] text-primary underline"
@@ -330,13 +341,11 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
 function RequestList({
   rows,
   empty,
-  onClear,
   actionLabel,
   onAction,
 }: {
   rows: AuthorizationRequest[];
   empty: string;
-  onClear: (id: string) => void;
   actionLabel?: string;
   onAction?: () => void;
 }) {
@@ -360,17 +369,8 @@ function RequestList({
                 {actionLabel}
               </Link>
             ) : null}
-            <button
-              type="button"
-              className="text-[10px] text-muted-foreground underline"
-              onClick={() => onClear(r.id)}
-            >
-              Clear
-            </button>
           </div>
-          <p className="mt-1 text-[11px] text-muted-foreground">
-            {r.reason || "No reason given"}
-          </p>
+          <p className="mt-1 text-[11px] text-muted-foreground">{r.reason || "No reason given"}</p>
           <p className="mt-1 text-[10px] text-muted-foreground">
             {when(r.createdAt)} · {r.requestedByName || r.requestedBy}
             {r.requestedAmount !== null ? ` · asked ${r.requestedAmount.toFixed(2)}` : ""}

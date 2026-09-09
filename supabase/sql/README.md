@@ -1,48 +1,25 @@
-# Central (PostgreSQL / Supabase) SQL
+# Central PostgreSQL / Supabase SQL
 
-## Run this one file: `../schema.sql`
+## Existing production database — current release
 
-`supabase/schema.sql` is the single, complete script for the central database.
+Run exactly one manual upgrade file:
 
-- Fresh, empty project: it creates every table, column, index, view, routine,
-  grant and access rule.
-- Live database with data: it adds missing objects and safely repairs known
-  compatible legacy column types. No table or column is dropped and no data is
-  silently discarded; incompatible values stop with a precise error.
-- Safe to run again as often as you like.
+`production_upgrade_current.sql`
 
-How to run it: open the SQL editor of the central project, paste the whole file,
-run it. The last thing it prints is a check — either
-`Schema check: everything present.` or a warning naming what is still missing.
+It is the scoped, transactional, re-runnable upgrade for the current approval-authority and Needs Attention release. Do not also run its represented timestamped migrations or either full canonical schema when using this manual path.
 
-## Folder contents
+## Automated deployments
 
-| Path | What it is |
-| --- | --- |
-| `../schema.sql` | The full, re-runnable central schema. Use this. |
-| `../migrations/` | Historical change files, applied in order by the platform. Do not run by hand. |
+`../migrations/` remains the authoritative migration history for Supabase CLI and automated deployment. Do not run individual migration files by hand when using the consolidated manual upgrade.
 
-## Notes
+## Fresh installation
 
-- The local Windows/SQL Server mirror is a different set of files:
-  `database/schema.sql` and `db/offline/`.
-- Historical files in `../migrations/` are retained for the migration system;
-  never delete or run them manually.
-- If a screen says a table or column is missing, run `../schema.sql` again and
-  read the final check message.
+Use the repository's existing full canonical schema process with `../schema.sql`. `../retail_cloud_full.sql` is also a full canonical representation, not this release's incremental production upgrade.
 
-## Starting fresh — `99_reset_data.sql`
+## Windows and Electron
 
-`99_reset_data.sql` empties every trading record (sales, shifts, bookings,
-stock, catalogue, members, coupons and all history) so the shop can begin from
-zero. Login accounts, staff profiles and PINs, settings, branches and
-registered terminals are left exactly as they are.
+Windows SQL Server uses POS Schema Manager; technician fallback is `../../db/offline/pos-offline-sqlserver.sql`. Electron SQLite upgrades automatically. These files must never be run in Supabase.
 
-It is destructive and there is no undo — take a backup first. Paste the file
-into the central project's SQL editor and run it; the last statement prints the
-remaining row counts, which should all be `0`.
+## Destructive maintenance
 
-Clear the central database first, then run the matching file on each till
-(`db/offline/99_reset_local_data.sql` for a branch SQL Server database,
-`electron/db/99_reset_local_sqlite.sql` for the desktop's own file). Doing it in
-the other order simply pulls the old rows back down.
+`99_reset_data.sql` deliberately empties trading data and is unrelated to upgrades. Never run it for deployment.

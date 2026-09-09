@@ -24,10 +24,7 @@ import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { notifyError } from "@/lib/notify";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
-import {
-  authorizeWithPin,
-  submitAuthorizationRequest,
-} from "@/lib/authorization.functions";
+import { authorizeWithPin, submitAuthorizationRequest } from "@/lib/authorization.functions";
 import { looksOffline, parkGovernanceRow } from "@/lib/governance-offline";
 import { useAuthOptional } from "@/lib/pos-auth";
 import type { AuthMode, AuthPayload } from "@/lib/authorization";
@@ -50,6 +47,8 @@ export type AuthorizationPrompt = {
   /** The ticket the approver will review, when the action came from a sale. */
   snapshot?: TicketSnapshot | null;
   requestedAmount?: number | null;
+  requesterDirectLimit?: number | null;
+  valueUnit?: "percent" | "currency" | "quantity" | "number";
   heldOrderId?: string | null;
 };
 
@@ -148,6 +147,10 @@ export function AuthorizationDialog({
           ...(prompt.storeId ? { storeId: prompt.storeId } : {}),
           ...(prompt.terminalId ? { terminalId: prompt.terminalId } : {}),
           ...(note.trim() ? { reason: note.trim() } : {}),
+          ...(prompt.requestedAmount == null ? {} : { requestedAmount: prompt.requestedAmount }),
+          ...(prompt.requesterDirectLimit == null
+            ? {}
+            : { requesterDirectLimit: prompt.requesterDirectLimit }),
         },
       });
       if (!res.ok) {
@@ -183,6 +186,10 @@ export function AuthorizationDialog({
           ...(prompt.requestedAmount === undefined || prompt.requestedAmount === null
             ? {}
             : { requestedAmount: prompt.requestedAmount }),
+          ...(prompt.requesterDirectLimit == null
+            ? {}
+            : { requesterDirectLimit: prompt.requesterDirectLimit }),
+          valueUnit: prompt.valueUnit ?? "number",
           ...(prompt.heldOrderId ? { heldOrderId: prompt.heldOrderId } : {}),
         },
       });
@@ -239,8 +246,8 @@ export function AuthorizationDialog({
   const requestPane = (
     <div className="space-y-2">
       <p className="text-sm text-muted-foreground">
-        This will wait in the approvals queue until someone allowed to decide it
-        approves or rejects it. Nothing happens to the sale until then.
+        This will wait in the approvals queue until someone allowed to decide it approves or rejects
+        it. Nothing happens to the sale until then.
       </p>
       {prompt?.snapshot ? (
         <div className="rounded-md border border-border/60 bg-muted/30 p-2 text-[11px]">
@@ -248,8 +255,8 @@ export function AuthorizationDialog({
             {prompt.snapshot.lines.length} item(s) · total {prompt.snapshot.total.toFixed(2)}
           </p>
           <p className="text-muted-foreground">
-            The whole ticket is sent with the request, and it is parked while you serve the
-            next customer. If it changes afterwards the approval no longer applies.
+            The whole ticket is sent with the request, and it is parked while you serve the next
+            customer. If it changes afterwards the approval no longer applies.
           </p>
         </div>
       ) : null}

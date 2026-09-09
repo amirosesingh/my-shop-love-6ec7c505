@@ -1041,6 +1041,11 @@ CREATE TABLE IF NOT EXISTS public.whatsapp_queue (
 -- Additive column top-up: brings an older database up to date.
 -- Existing rows are never touched.
 -- ============================================================
+ALTER TABLE public.authorization_actions ADD COLUMN IF NOT EXISTS extra_authority jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE public.authorization_actions ADD COLUMN IF NOT EXISTS absolute_ceilings jsonb NOT NULL DEFAULT '{}'::jsonb;
+ALTER TABLE public.authorization_requests ADD COLUMN IF NOT EXISTS requester_direct_limit numeric;
+ALTER TABLE public.authorization_requests ADD COLUMN IF NOT EXISTS value_unit text NOT NULL DEFAULT 'number';
+
 ALTER TABLE public.coupon_campaigns ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid() NOT NULL;
 
 ALTER TABLE public.coupon_campaigns ADD COLUMN IF NOT EXISTS name text;
@@ -8193,6 +8198,11 @@ CREATE TABLE IF NOT EXISTS public.authorization_actions (
   mode text NOT NULL DEFAULT 'none',
   allowed_roles text[] NOT NULL DEFAULT ARRAY['admin','manager']::text[],
   allowed_user_ids text[] NOT NULL DEFAULT ARRAY[]::text[],
+  requester_roles text[] NOT NULL DEFAULT ARRAY['cashier','staff','manager','admin']::text[],
+  requester_user_ids text[] NOT NULL DEFAULT ARRAY[]::text[],
+  authority_limits jsonb NOT NULL DEFAULT '{}'::jsonb,
+  extra_authority jsonb NOT NULL DEFAULT '{}'::jsonb,
+  absolute_ceilings jsonb NOT NULL DEFAULT '{}'::jsonb,
   require_reason boolean NOT NULL DEFAULT false,
   threshold numeric,
   is_enabled boolean NOT NULL DEFAULT true,
@@ -8229,6 +8239,8 @@ CREATE TABLE IF NOT EXISTS public.authorization_requests (
   decision_note text,
   expires_at timestamptz NOT NULL DEFAULT (now() + interval '24 hours'),
   consumed_at timestamptz,
+  requester_direct_limit numeric,
+  value_unit text NOT NULL DEFAULT 'number',
   created_at timestamptz NOT NULL DEFAULT now(),
   updated_at timestamptz NOT NULL DEFAULT now()
 );

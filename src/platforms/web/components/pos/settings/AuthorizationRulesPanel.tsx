@@ -16,10 +16,7 @@ import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import { SettingsSections } from "@/platforms/web/components/pos/settings/SettingsSection";
 import { notifyError } from "@/lib/notify";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
-import {
-  getAuthorizationRules,
-  saveAuthorizationRule,
-} from "@/lib/authorization.functions";
+import { getAuthorizationRules, saveAuthorizationRule } from "@/lib/authorization.functions";
 import {
   AUTH_ACTIONS,
   AUTH_GROUPS,
@@ -62,9 +59,7 @@ export function AuthorizationRulesPanel({
         if (cancelled) return;
         if (!res.ok) setError(res.error ?? "");
         else setError("");
-        const rows = (res.rules ?? []).map((r) =>
-          normalizeRule({ ...r, action_key: r.actionKey }),
-        );
+        const rows = (res.rules ?? []).map((r) => normalizeRule({ ...r, action_key: r.actionKey }));
         const resolved = resolveRules(rows, branchScope ? storeId : "");
         setRules(resolved);
         setDraft(resolved);
@@ -84,9 +79,7 @@ export function AuthorizationRulesPanel({
   const dirty = useMemo(
     () =>
       new Set(
-        Object.keys(draft).filter(
-          (k) => JSON.stringify(draft[k]) !== JSON.stringify(rules[k]),
-        ),
+        Object.keys(draft).filter((k) => JSON.stringify(draft[k]) !== JSON.stringify(rules[k])),
       ),
     [draft, rules],
   );
@@ -110,6 +103,11 @@ export function AuthorizationRulesPanel({
           mode: rule.mode,
           allowedRoles: rule.allowedRoles,
           allowedUserIds: rule.allowedUserIds,
+          requesterRoles: rule.requesterRoles,
+          requesterUserIds: rule.requesterUserIds,
+          authorityLimits: rule.authorityLimits,
+          extraAuthority: rule.extraAuthority,
+          absoluteCeilings: rule.absoluteCeilings,
           requireReason: rule.requireReason,
           threshold: rule.threshold,
         },
@@ -193,7 +191,9 @@ export function AuthorizationRulesPanel({
                     {rule.mode !== "none" && (
                       <div className="grid gap-3 rounded-md bg-muted/40 p-3 sm:grid-cols-2">
                         <div className="space-y-1">
-                          <Label className="text-xs text-muted-foreground">Roles that may authorise</Label>
+                          <Label className="text-xs text-muted-foreground">
+                            Roles that may authorise
+                          </Label>
                           <div className="flex flex-wrap gap-3">
                             {ROLE_CHOICES.map((role) => (
                               <label key={role} className="flex items-center gap-1 text-xs">
@@ -213,6 +213,99 @@ export function AuthorizationRulesPanel({
                               </label>
                             ))}
                           </div>
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <Label className="text-xs text-muted-foreground">
+                            Roles allowed to request escalation
+                          </Label>
+                          <div className="flex flex-wrap gap-3">
+                            {["cashier", ...ROLE_CHOICES].map((role) => (
+                              <label
+                                key={`request-${role}`}
+                                className="flex items-center gap-1 text-xs"
+                              >
+                                <input
+                                  type="checkbox"
+                                  disabled={!mayEdit}
+                                  checked={rule.requesterRoles.includes(role)}
+                                  onChange={(e) =>
+                                    patch(action.key, {
+                                      requesterRoles: e.target.checked
+                                        ? [...rule.requesterRoles, role]
+                                        : rule.requesterRoles.filter((r) => r !== role),
+                                    })
+                                  }
+                                />
+                                {role}
+                              </label>
+                            ))}
+                          </div>
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <Label className="text-xs text-muted-foreground">
+                            Extra approval authority (for example role:manager=20, user:lead1=5)
+                          </Label>
+                          <Input
+                            className="h-8"
+                            disabled={!mayEdit}
+                            value={Object.entries(rule.extraAuthority)
+                              .map(([k, v]) => `${k}=${v}`)
+                              .join(", ")}
+                            onChange={(e) =>
+                              patch(action.key, {
+                                extraAuthority: Object.fromEntries(
+                                  e.target.value
+                                    .split(",")
+                                    .map((part) => part.trim().split("="))
+                                    .filter(
+                                      ([key, value]) =>
+                                        key &&
+                                        value !== undefined &&
+                                        Number.isFinite(Number(value)) &&
+                                        Number(value) >= 0,
+                                    )
+                                    .map(([key, value]) => [key.toLowerCase(), Number(value)]),
+                                ),
+                              })
+                            }
+                            placeholder="Added to the requester's direct limit; percentage values are points"
+                          />
+                        </div>
+                        <div className="space-y-1 sm:col-span-2">
+                          <Label className="text-xs text-muted-foreground">
+                            Optional absolute maximum
+                          </Label>
+                          <Input
+                            className="h-8"
+                            disabled={!mayEdit}
+                            value={Object.entries(rule.absoluteCeilings)
+                              .map(([k, v]) => `${k}=${v}`)
+                              .join(", ")}
+                            onChange={(e) =>
+                              patch(action.key, {
+                                absoluteCeilings: Object.fromEntries(
+                                  e.target.value
+                                    .split(",")
+                                    .map((part) => part.trim().split("="))
+                                    .filter(
+                                      ([key, value]) =>
+                                        key &&
+                                        value !== undefined &&
+                                        Number.isFinite(Number(value)) &&
+                                        Number(value) >= 0,
+                                    )
+                                    .map(([key, value]) => [key.toLowerCase(), Number(value)]),
+                                ),
+                              })
+                            }
+                            placeholder="Optional hard cap, e.g. role:manager=40"
+                          />
+                          {Object.keys(rule.authorityLimits).length ? (
+                            <p className="text-[10px] text-muted-foreground">
+                              Existing absolute approval limits remain active until replaced by an
+                              extra-authority value.
+                            </p>
+                          ) : null}
                         </div>
                         <div className="space-y-1">
                           <Label className="text-xs text-muted-foreground">

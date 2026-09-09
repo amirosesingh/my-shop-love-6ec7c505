@@ -3684,10 +3684,26 @@ function Register() {
                 title: "Discount above cashier limit",
                 reason:
                   t === "percent"
-                    ? `Cashiers may give up to ${rules.max_cashier_discount_percent}%.`
-                    : `Cashiers may give up to ${money(rules.max_cart_discount_amount)}.`,
+                    ? `Your maximum allowed discount is ${rules.max_cashier_discount_percent}%. A ${v}% discount requires approval.`
+                    : `Your maximum allowed discount is ${money(rules.max_cart_discount_amount)}. A ${money(v)} discount requires approval.`,
                 storeId: currentStore.id,
                 requestedBy: activeCashier,
+                requestedAmount: v,
+                requesterDirectLimit:
+                  t === "percent"
+                    ? rules.max_cashier_discount_percent
+                    : rules.max_cart_discount_amount,
+                valueUnit: t === "percent" ? "percent" : "currency",
+                payload: {
+                  discount_type: t,
+                  discount_scope: target === "bill" ? "bill" : "item",
+                  allowed_limit:
+                    t === "percent"
+                      ? rules.max_cashier_discount_percent
+                      : rules.max_cart_discount_amount,
+                  requested_value: v,
+                  transaction: billNo ?? `draft-${currentStore.id}`,
+                },
                 detail: `${v}${t === "percent" ? "%" : ""} on ${target === "bill" ? "the bill" : "a line"}`,
               });
               if (!grant) return;
