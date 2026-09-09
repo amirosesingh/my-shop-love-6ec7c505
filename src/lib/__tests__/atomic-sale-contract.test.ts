@@ -22,4 +22,12 @@ describe("atomic central sale contract", () => {
     expect(worker).toContain('fn: "pos_sale_commit"');
     expect(gateway).toContain("_member: member ? memberToRow(member, tierId) : null");
   });
+
+  it("allows the Electron atomic sale RPC through the HTTP relay contract", () => {
+    const endpoint = read("src/lib/sync-endpoint.server.ts");
+    const relay = read("src/core/api/pos-relay.server.ts");
+    expect(endpoint).toContain('z.enum(["pos_sale_commit", "sale_refund"])');
+    expect(relay).toContain('if (op.fn === "pos_sale_commit")');
+    expect(relay).toContain("scope.permissions.can_process_sale");
+  });
 });
