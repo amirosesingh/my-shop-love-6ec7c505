@@ -6,13 +6,13 @@ import { useAuth } from "@/lib/pos-auth";
 export const Route = createFileRoute("/settings/database-explorer")({
   head: () => ({
     meta: [
-      { title: "Database Explorer — Northwind POS" },
+      { title: "Database Explorer — Retail" },
       {
         name: "description",
         content:
           "Connect this till to its local Microsoft SQL Server, browse databases, tables and columns, and run read-only checks.",
       },
-      { property: "og:title", content: "Database Explorer — Northwind POS" },
+      { property: "og:title", content: "Database Explorer — Retail" },
       {
         property: "og:description",
         content: "SSMS-style local SQL Server browsing for the desktop till.",

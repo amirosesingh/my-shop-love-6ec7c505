@@ -7,9 +7,9 @@ The phone reaches the server fine. The link the update feed hands it is dead.
 Verified live against your bucket just now:
 
 ```text
-pos-app/manifest.json                             200  (apkUrl = .../latest/android/NorthwindPOS-1.2.104.apk)
-pos-app/latest/android/NorthwindPOS-1.2.104.apk   404  <-- the phone downloads this
-pos-app/android/NorthwindPOS-1.2.104.apk          200  (the APK does exist here)
+pos-app/manifest.json                             200  (apkUrl = .../latest/android/Retail-1.2.104.apk)
+pos-app/latest/android/Retail-1.2.104.apk   404  <-- the phone downloads this
+pos-app/android/Retail-1.2.104.apk          200  (the APK does exist here)
 pos-app/releases/v1.2.104-760efae/android/…apk    200
 pos-app/latest/manifest.json                      404
 pos-app/latest/latest.yml                         200  (Windows files are intact)

@@ -35,13 +35,13 @@ import type { Cursor } from "@/lib/keyset";
 export const Route = createFileRoute("/receipts")({
   head: () => ({
     meta: [
-      { title: "Receipt History Log — Northwind POS" },
+      { title: "Receipt History Log — Retail" },
       {
         name: "description",
         content:
           "Browse every processed receipt and reprint it as a standard customer receipt, a gift receipt or an internal Z-report.",
       },
-      { property: "og:title", content: "Receipt History Log — Northwind POS" },
+      { property: "og:title", content: "Receipt History Log — Retail" },
       {
         property: "og:description",
         content: "Three receipt templates, one history log, native printing.",

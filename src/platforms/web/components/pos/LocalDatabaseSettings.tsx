@@ -45,6 +45,7 @@ export function LocalDatabaseSettings() {
   const [removing, setRemoving] = useState(false);
   const [confirmRemove, setConfirmRemove] = useState(false);
   const [audit, setAudit] = useState<LocalConnectionAudit | null>(null);
+  const [savingReport, setSavingReport] = useState(false);
 
   /**
    * Deletes the sealed credentials file, cancels anything still connecting and
@@ -181,7 +182,6 @@ export function LocalDatabaseSettings() {
   const savedLabel = configured
     ? [config.server?.trim(), config.database?.trim()].filter(Boolean).join(" · ")
     : "";
-  const [savingReport, setSavingReport] = useState(false);
   const blockingIssues = (audit?.issues ?? []).filter((i) => i.severity === "error");
   const driverInfo = audit?.driver;
 

@@ -9,9 +9,9 @@ import { Textarea } from "@/components/ui/textarea";
 export const Route = createFileRoute("/settings/payment")({
   head: () => ({
     meta: [
-      { title: "Bank Transfer Details — Northwind POS" },
+      { title: "Bank Transfer Details — Retail" },
       { name: "description", content: "Bank account, WhatsApp number and payment QR shown on the customer display and printed on booking slips." },
-      { property: "og:title", content: "Bank Transfer Details — Northwind POS" },
+      { property: "og:title", content: "Bank Transfer Details — Retail" },
       { property: "og:description", content: "Bank account and payment QR for customer transfers." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

@@ -10,12 +10,12 @@ import { useAuth } from "@/lib/pos-auth";
 export const Route = createFileRoute("/staff")({
   head: () => ({
     meta: [
-      { title: "Staff Accounts — Northwind POS" },
+      { title: "Staff Accounts — Retail" },
       {
         name: "description",
         content: "Create, update, deactivate and securely manage staff accounts, roles and permissions.",
       },
-      { property: "og:title", content: "Staff Accounts — Northwind POS" },
+      { property: "og:title", content: "Staff Accounts — Retail" },
       { property: "og:description", content: "Staff accounts, roles and permission management." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

@@ -5,13 +5,13 @@ import { PaymentMethodsPanel } from "@/platforms/web/components/pos/settings/pan
 export const Route = createFileRoute("/settings/payment-methods")({
   head: () => ({
     meta: [
-      { title: "Payment Methods — Northwind POS" },
+      { title: "Payment Methods — Retail" },
       {
         name: "description",
         content:
           "Add, rename, reorder, disable or delete the payment collection types offered at the till, including government voucher tenders that require a serial number.",
       },
-      { property: "og:title", content: "Payment Methods — Northwind POS" },
+      { property: "og:title", content: "Payment Methods — Retail" },
       {
         property: "og:description",
         content: "Manage the tenders cashiers can collect, including voucher and coupon redemptions.",

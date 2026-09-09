@@ -396,13 +396,13 @@ function StockOperationsPage() {
 export const Route = createFileRoute("/stock-operations")({
   head: () => ({
     meta: [
-      { title: "Stock Operations — Northwind POS" },
+      { title: "Stock Operations — Retail" },
       {
         name: "description",
         content:
           "Every stock count record with its reference number, plus barcode-driven counting, bulk imports and branch transfers.",
       },
-      { property: "og:title", content: "Stock Operations — Northwind POS" },
+      { property: "og:title", content: "Stock Operations — Retail" },
       {
         property: "og:description",
         content: "Reference-numbered stock count records, drafts and posted adjustments in one list.",

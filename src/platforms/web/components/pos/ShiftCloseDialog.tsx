@@ -10,7 +10,7 @@
  * separate, permission-gated table and are only fetched for staff allowed to
  * see them.
  */
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { AlertTriangle, CheckCircle2, Lock } from "lucide-react";
 import { toast } from "sonner";
 import {
@@ -62,6 +62,7 @@ export function ShiftCloseDialog({
   const [busy, setBusy] = useState(false);
   const [serverState, setServerState] = useState<ShiftState | null>(null);
   const [recon, setRecon] = useState<ShiftReconciliation | null>(null);
+  const drawerOpenedForShift = useRef<string | null>(null);
 
   const mayCount = can("can_shift_cash_count") || can("can_close_shift");
   const maySeeVariance = can("can_shift_variance_view");
@@ -86,6 +87,16 @@ export function ShiftCloseDialog({
     setDigital("");
     setRecountReason("");
   }, [open, activeShift?.id, activeShift?.state, activeShift?.closeReason]);
+
+  // Open once, as soon as the irreversible server transition reaches the
+  // count stage. Keeping the shift id in a ref prevents rerenders and dialog
+  // state updates from firing a second no-sale pulse.
+  useEffect(() => {
+    if (!open || !activeShift || step !== "count") return;
+    if (drawerOpenedForShift.current === activeShift.id) return;
+    drawerOpenedForShift.current = activeShift.id;
+    openCashDrawer("Shift closing cash count");
+  }, [open, step, activeShift?.id]);
 
   // Managers see the numbers; the database refuses everyone else.
   useEffect(() => {
@@ -112,7 +123,6 @@ export function ShiftCloseDialog({
       countedDigital: counted.digital,
     });
     printShiftReport(closed ?? shift, state.sales, "zreport");
-    openCashDrawer();
     toast.success("Shift closed · Z report printed");
     setStep("done");
     onOpenChange(false);

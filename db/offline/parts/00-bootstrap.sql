@@ -1,5 +1,5 @@
 /* =====================================================================
-   Lucky Charms POS — offline database for Microsoft SQL Server
+   Retail — offline database for Microsoft SQL Server
    ---------------------------------------------------------------------
    Run this once on the till PC (SQL Server 2019+ or SQL Server Express).
 

@@ -29,13 +29,13 @@ import { TRANSFER_STATUS_LABELS } from "@/core/types/pos-types";
 export const Route = createFileRoute("/transfers/$id")({
   head: () => ({
     meta: [
-      { title: "Stock transfer — Northwind POS" },
+      { title: "Stock transfer — Retail" },
       {
         name: "description",
         content:
           "The full record of one stock transfer: approved, dispatched and verified quantities, discrepancies and history.",
       },
-      { property: "og:title", content: "Stock transfer — Northwind POS" },
+      { property: "og:title", content: "Stock transfer — Retail" },
       {
         property: "og:description",
         content: "Approved, dispatched and verified quantities for one branch stock transfer.",

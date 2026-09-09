@@ -22,9 +22,9 @@ const FAMILIES: { key: FontFamilyKey; label: string }[] = [
 export const Route = createFileRoute("/settings/type")({
   head: () => ({
     meta: [
-      { title: "Receipt Typography — Northwind POS" },
+      { title: "Receipt Typography — Retail" },
       { name: "description", content: "Choose font family, size, letter spacing and weight for the header, body and footer of printed receipts." },
-      { property: "og:title", content: "Receipt Typography — Northwind POS" },
+      { property: "og:title", content: "Receipt Typography — Retail" },
       { property: "og:description", content: "Fonts and sizing for printed receipts." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

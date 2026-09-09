@@ -1,3 +1,4 @@
+-- Retail canonical fresh-install/reference schema. DO NOT run against an existing production database.
 -- ============================================================
 -- supabase/schema.sql - full cloud schema (Postgres / Supabase)
 -- Retail

@@ -1,7 +1,7 @@
 /**
  * Self-update for the Android build, mirroring the Windows till.
  *
- * The release workflow uploads `NorthwindPOS-<version>.apk` and a small
+ * The release workflow uploads `Retail-<version>.apk` and a small
  * `latest.json` to the same update bucket the desktop app uses. The phone
  * reads that file, compares versions, downloads the APK and hands it to
  * Android's installer. Nothing here runs on web or Electron.
@@ -76,7 +76,7 @@ async function fetchLatest(): Promise<Latest> {
   if (manifest) {
     const target = resolvePlatformTarget(manifest, "android");
     const file =
-      target?.url.split("/").pop() || `NorthwindPOS-${manifest.version}.apk`;
+      target?.url.split("/").pop() || `Retail-${manifest.version}.apk`;
     return {
       version: manifest.version,
       file,
@@ -96,7 +96,7 @@ async function fetchLatest(): Promise<Latest> {
       if (!data?.version) throw new Error("The update feed did not report a version.");
       return {
         version: data.version,
-        file: data.file || `NorthwindPOS-${data.version}.apk`,
+        file: data.file || `Retail-${data.version}.apk`,
         feed,
         url: null,
         notes: null,

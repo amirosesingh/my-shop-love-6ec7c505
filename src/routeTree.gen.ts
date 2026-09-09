@@ -116,6 +116,7 @@ import { Route as ApiPublicSyncHealthRouteImport } from './routes/api/public/syn
 import { Route as ApiPublicTerminalStaffRouteImport } from './routes/api/public/terminal-staff'
 import { Route as ApiSettingsSyncBatchRouteImport } from './routes/api/settings.sync-batch'
 import { Route as ApiSettingsUpsertRouteImport } from './routes/api/settings.upsert'
+import { Route as ApiPublicPosRulesSaveRouteImport } from './routes/api/public/pos-rules.save'
 import { Route as ApiV1PosSyncRouteImport } from './routes/api/v1/pos/sync'
 
 const IndexRoute = IndexRouteImport.update({
@@ -654,6 +655,11 @@ const ApiSettingsUpsertRoute = ApiSettingsUpsertRouteImport.update({
   path: '/upsert',
   getParentRoute: () => ApiSettingsRoute,
 } as any)
+const ApiPublicPosRulesSaveRoute = ApiPublicPosRulesSaveRouteImport.update({
+  id: '/save',
+  path: '/save',
+  getParentRoute: () => ApiPublicPosRulesRoute,
+} as any)
 const ApiV1PosSyncRoute = ApiV1PosSyncRouteImport.update({
   id: '/api/v1/pos/sync',
   path: '/api/v1/pos/sync',
@@ -761,13 +767,14 @@ export interface FileRoutesByFullPath {
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/desktop-session': typeof ApiPublicDesktopSessionRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
-  '/api/public/pos-rules': typeof ApiPublicPosRulesRoute
+  '/api/public/pos-rules': typeof ApiPublicPosRulesRouteWithChildren
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
   '/api/public/terminal-staff': typeof ApiPublicTerminalStaffRoute
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
+  '/api/public/pos-rules/save': typeof ApiPublicPosRulesSaveRoute
   '/api/v1/pos/sync': typeof ApiV1PosSyncRoute
 }
 export interface FileRoutesByTo {
@@ -871,13 +878,14 @@ export interface FileRoutesByTo {
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/desktop-session': typeof ApiPublicDesktopSessionRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
-  '/api/public/pos-rules': typeof ApiPublicPosRulesRoute
+  '/api/public/pos-rules': typeof ApiPublicPosRulesRouteWithChildren
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
   '/api/public/terminal-staff': typeof ApiPublicTerminalStaffRoute
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
+  '/api/public/pos-rules/save': typeof ApiPublicPosRulesSaveRoute
   '/api/v1/pos/sync': typeof ApiV1PosSyncRoute
 }
 export interface FileRoutesById {
@@ -982,13 +990,14 @@ export interface FileRoutesById {
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/desktop-session': typeof ApiPublicDesktopSessionRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
-  '/api/public/pos-rules': typeof ApiPublicPosRulesRoute
+  '/api/public/pos-rules': typeof ApiPublicPosRulesRouteWithChildren
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
   '/api/public/terminal-staff': typeof ApiPublicTerminalStaffRoute
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
+  '/api/public/pos-rules/save': typeof ApiPublicPosRulesSaveRoute
   '/api/v1/pos/sync': typeof ApiV1PosSyncRoute
 }
 export interface FileRouteTypes {
@@ -1101,6 +1110,7 @@ export interface FileRouteTypes {
     | '/api/public/terminal-staff'
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
+    | '/api/public/pos-rules/save'
     | '/api/v1/pos/sync'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -1211,6 +1221,7 @@ export interface FileRouteTypes {
     | '/api/public/terminal-staff'
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
+    | '/api/public/pos-rules/save'
     | '/api/v1/pos/sync'
   id:
     | '__root__'
@@ -1321,6 +1332,7 @@ export interface FileRouteTypes {
     | '/api/public/terminal-staff'
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
+    | '/api/public/pos-rules/save'
     | '/api/v1/pos/sync'
   fileRoutesById: FileRoutesById
 }
@@ -1425,7 +1437,7 @@ export interface RootRouteChildren {
   ApiPublicCashierLoginRoute: typeof ApiPublicCashierLoginRoute
   ApiPublicDesktopSessionRoute: typeof ApiPublicDesktopSessionRoute
   ApiPublicHealthMetadataRoute: typeof ApiPublicHealthMetadataRoute
-  ApiPublicPosRulesRoute: typeof ApiPublicPosRulesRoute
+  ApiPublicPosRulesRoute: typeof ApiPublicPosRulesRouteWithChildren
   ApiPublicSecurityAlertsRoute: typeof ApiPublicSecurityAlertsRoute
   ApiPublicSyncRoute: typeof ApiPublicSyncRoute
   ApiPublicSyncHealthRoute: typeof ApiPublicSyncHealthRoute
@@ -2184,6 +2196,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiSettingsUpsertRouteImport
       parentRoute: typeof ApiSettingsRoute
     }
+    '/api/public/pos-rules/save': {
+      id: '/api/public/pos-rules/save'
+      path: '/save'
+      fullPath: '/api/public/pos-rules/save'
+      preLoaderRoute: typeof ApiPublicPosRulesSaveRouteImport
+      parentRoute: typeof ApiPublicPosRulesRoute
+    }
     '/api/v1/pos/sync': {
       id: '/api/v1/pos/sync'
       path: '/api/v1/pos/sync'
@@ -2207,6 +2226,17 @@ const ApiSettingsRouteChildren: ApiSettingsRouteChildren = {
 const ApiSettingsRouteWithChildren = ApiSettingsRoute._addFileChildren(
   ApiSettingsRouteChildren,
 )
+
+interface ApiPublicPosRulesRouteChildren {
+  ApiPublicPosRulesSaveRoute: typeof ApiPublicPosRulesSaveRoute
+}
+
+const ApiPublicPosRulesRouteChildren: ApiPublicPosRulesRouteChildren = {
+  ApiPublicPosRulesSaveRoute: ApiPublicPosRulesSaveRoute,
+}
+
+const ApiPublicPosRulesRouteWithChildren =
+  ApiPublicPosRulesRoute._addFileChildren(ApiPublicPosRulesRouteChildren)
 
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
@@ -2309,7 +2339,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCashierLoginRoute: ApiPublicCashierLoginRoute,
   ApiPublicDesktopSessionRoute: ApiPublicDesktopSessionRoute,
   ApiPublicHealthMetadataRoute: ApiPublicHealthMetadataRoute,
-  ApiPublicPosRulesRoute: ApiPublicPosRulesRoute,
+  ApiPublicPosRulesRoute: ApiPublicPosRulesRouteWithChildren,
   ApiPublicSecurityAlertsRoute: ApiPublicSecurityAlertsRoute,
   ApiPublicSyncRoute: ApiPublicSyncRoute,
   ApiPublicSyncHealthRoute: ApiPublicSyncHealthRoute,

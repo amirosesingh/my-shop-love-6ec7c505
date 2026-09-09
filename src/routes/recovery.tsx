@@ -24,13 +24,13 @@ import { isTerminalApp } from "@/platform-config/platform";
 export const Route = createFileRoute("/recovery")({
   head: () => ({
     meta: [
-      { title: "Emergency Access & Recovery — Northwind POS" },
+      { title: "Emergency Access & Recovery — Retail" },
       {
         name: "description",
         content:
           "Repair this terminal's backend address and central database connection when the POS cannot reach its server.",
       },
-      { property: "og:title", content: "Emergency Access & Recovery — Northwind POS" },
+      { property: "og:title", content: "Emergency Access & Recovery — Retail" },
       {
         property: "og:description",
         content: "Offline-capable connection repair for a till or handheld that cannot sign in.",
@@ -88,7 +88,7 @@ function RecoverySettings() {
       </div>
 
       <p className="pt-1 text-center text-[11px] text-muted-foreground">
-        Northwind POS v{APP_VERSION}
+        Retail v{APP_VERSION}
       </p>
     </main>
   );

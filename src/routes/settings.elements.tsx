@@ -17,9 +17,9 @@ const TOGGLES: { key: keyof ReceiptSettings; label: string }[] = [
 export const Route = createFileRoute("/settings/elements")({
   head: () => ({
     meta: [
-      { title: "Receipt Elements — Northwind POS" },
+      { title: "Receipt Elements — Retail" },
       { name: "description", content: "Pick the paper size and choose which blocks print on each slip: logo, member points, barcode and tax breakdown." },
-      { property: "og:title", content: "Receipt Elements — Northwind POS" },
+      { property: "og:title", content: "Receipt Elements — Retail" },
       { property: "og:description", content: "Paper size and printed receipt blocks." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

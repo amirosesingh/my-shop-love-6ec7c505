@@ -11,13 +11,13 @@ import type { BookingSlipSettings } from "@/core/types/pos-types";
 export const Route = createFileRoute("/settings/booking-slip")({
   head: () => ({
     meta: [
-      { title: "Booking Slip Wording — Northwind POS" },
+      { title: "Booking Slip Wording — Retail" },
       {
         name: "description",
         content:
           "Write the terms and conditions printed on racket booking and pay-later slips, and turn on a customer signature line.",
       },
-      { property: "og:title", content: "Booking Slip Wording — Northwind POS" },
+      { property: "og:title", content: "Booking Slip Wording — Retail" },
       {
         property: "og:description",
         content: "Terms, conditions and the customer signature block on booking slips.",

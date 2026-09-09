@@ -170,13 +170,13 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
         content:
           "width=device-width, initial-scale=1.0, minimum-scale=0.5, maximum-scale=2.0, user-scalable=yes, viewport-fit=cover",
       },
-      { title: "Northwind POS — Register, Shifts & Inventory" },
+      { title: "Retail — Register, Shifts & Inventory" },
       {
         name: "description",
         content:
           "Touch point of sale with shift open/close, inventory, central membership, cash drawer control and thermal receipt printing.",
       },
-      { property: "og:title", content: "Northwind POS" },
+      { property: "og:title", content: "Retail" },
       {
         property: "og:description",
         content: "Point of sale with shifts, inventory, membership and receipt printing.",

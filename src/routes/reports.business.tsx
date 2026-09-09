@@ -19,13 +19,13 @@ import { ReportHeader, StatCard, defaultRange, downloadCsv, inRange } from "@/pl
 export const Route = createFileRoute("/reports/business")({
   head: () => ({
     meta: [
-      { title: "Retail Performance Report — Northwind POS" },
+      { title: "Retail Performance Report — Retail" },
       {
         name: "description",
         content:
           "Profitability by product, stock movement speed and cashier performance across every branch and date range.",
       },
-      { property: "og:title", content: "Retail Performance Report — Northwind POS" },
+      { property: "og:title", content: "Retail Performance Report — Retail" },
       {
         property: "og:description",
         content: "Margin, sell-through speed and takings per cashier in one report.",

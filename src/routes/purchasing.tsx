@@ -87,13 +87,13 @@ import type { Product } from "@/core/types/pos-types";
 export const Route = createFileRoute("/purchasing")({
   head: () => ({
     meta: [
-      { title: "Receiving Orders & Stock Entry — Northwind POS" },
+      { title: "Receiving Orders & Stock Entry — Retail" },
       {
         name: "description",
         content:
           "Scan supplier invoices line by line, edit cost and quantity received, create missing items inline and post stock into the branch.",
       },
-      { property: "og:title", content: "Receiving Orders & Stock Entry — Northwind POS" },
+      { property: "og:title", content: "Receiving Orders & Stock Entry — Retail" },
       {
         property: "og:description",
         content: "Barcode-driven receiving invoices with inline product creation and audit trail.",

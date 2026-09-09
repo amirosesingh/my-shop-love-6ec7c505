@@ -16,9 +16,9 @@ Hosted at `https://updatecms.luckycharmsdnbhd.com/pos-app/manifest.json` (base U
   "version": "1.2.101",
   "buildNumber": 1201,
   "releaseNotes": "Bug fixes and UI improvements",
-  "apkUrl": "https://.../app-updates/NorthwindPOS-1.2.101.apk",
+  "apkUrl": "https://.../app-updates/Retail-1.2.101.apk",
   "bundleUrl": "https://.../app-updates/web-bundle-1.2.101.zip",
-  "windowsUrl": "https://.../app-updates/NorthwindPOS-Setup-1.2.101.exe"
+  "windowsUrl": "https://.../app-updates/Retail-Setup-1.2.101.exe"
 }
 ```
 

@@ -10,9 +10,9 @@ import type { ReceiptCustomLine } from "@/core/types/pos-types";
 export const Route = createFileRoute("/settings/lines")({
   head: () => ({
     meta: [
-      { title: "Receipt Extra Lines — Northwind POS" },
+      { title: "Receipt Extra Lines — Retail" },
       { name: "description", content: "Add policy notes, promotions or opening hours above the footer or below the header of every printed receipt." },
-      { property: "og:title", content: "Receipt Extra Lines — Northwind POS" },
+      { property: "og:title", content: "Receipt Extra Lines — Retail" },
       { property: "og:description", content: "Custom note lines printed on receipts." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

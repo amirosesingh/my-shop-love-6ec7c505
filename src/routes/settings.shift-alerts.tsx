@@ -18,13 +18,13 @@ import {
 export const Route = createFileRoute("/settings/shift-alerts")({
   head: () => ({
     meta: [
-      { title: "Shift alerts — Northwind POS" },
+      { title: "Shift alerts — Retail" },
       {
         name: "description",
         content:
           "Choose how the day-end shift summary reaches this phone: in-app alert, WhatsApp to managers, or a phone notification.",
       },
-      { property: "og:title", content: "Shift alerts — Northwind POS" },
+      { property: "og:title", content: "Shift alerts — Retail" },
       {
         property: "og:description",
         content: "Day-end shift summary delivery settings for this device.",

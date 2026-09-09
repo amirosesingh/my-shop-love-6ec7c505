@@ -27,13 +27,13 @@ import { listSystemAudit } from "@/lib/system-audit.functions";
 export const Route = createFileRoute("/reports/history")({
   head: () => ({
     meta: [
-      { title: "Edit History & Audit Trail — Northwind POS" },
+      { title: "Edit History & Audit Trail — Retail" },
       {
         name: "description",
         content:
           "Permanent record of price overrides, voids, discounts, shift edits, account changes and sign-in attempts with actor, terminal and timestamp.",
       },
-      { property: "og:title", content: "Edit History & Audit Trail — Northwind POS" },
+      { property: "og:title", content: "Edit History & Audit Trail — Retail" },
       {
         property: "og:description",
         content: "Tamper-proof log of every critical action taken in the system.",

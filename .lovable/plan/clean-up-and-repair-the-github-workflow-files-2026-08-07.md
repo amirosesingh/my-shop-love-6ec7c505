@@ -55,7 +55,7 @@ android-apk.yml      tag v* or manual       APK -> R2 + GitHub release
   `upload-artifact@v4`, `action-gh-release@v2`, `wrangler-action@v3`).
 - Windows job keeps Node 22 + `bun install --frozen-lockfile`, then
   `bun run desktop:release`, which already bumps and mirrors `src/version.ts`.
-- Release names stay `NorthwindPOS-<version>.apk` / `LovablePOS Setup
+- Release names stay `Retail-<version>.apk` / `Retail Setup
   <version>.exe`, and `latest.json` / `latest.yml` keep their current paths in
   the `updatelccms` bucket so existing tills keep updating.
 - No application code changes.

@@ -42,7 +42,7 @@ import {
 } from "./receipt-template";
 
 export const STORE = {
-  name: "NORTHWIND & CO.",
+  name: "RETAIL",
   line1: "42 Harbour Street, Unit 3",
   line2: "Tel 555-0100 · VAT 88-2201194",
 };
@@ -356,7 +356,7 @@ const shell = (title: string, body: string, autoPrint = true) => {
 </style></head><body><div class="${RECEIPT_SCOPE.slice(1)}">${body}</div>
 ${
   autoPrint
-    ? `<script>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close()},400)}<\/script>`
+    ? `<script>window.onload=function(){window.focus();window.print();setTimeout(function(){window.close()},400)}</script>`
     : ""
 }
 </body></html>`;
@@ -1033,7 +1033,7 @@ export function printTransferNote(
  * which is how drawers are wired in practice. If a local ESC/POS bridge agent is
  * installed it is used instead.
  */
-export function openCashDrawer() {
+export function openCashDrawer(reason = "Cash drawer opened") {
   if (!canOpenDrawer()) {
     toast.error("Cash drawer not available on this device", {
       description: "The drawer opens through the receipt printer on the Windows till.",
@@ -1058,7 +1058,7 @@ export function openCashDrawer() {
     browserPrint(
       shell(
         "drawer",
-        `<pre style="font-size:1px;line-height:1px">${kick}</pre><div class="c muted">DRAWER OPEN</div>`,
+        `<pre style="font-size:1px;line-height:1px">${kick}</pre><div class="c muted">${esc(reason)}</div>`,
       ),
     );
   });

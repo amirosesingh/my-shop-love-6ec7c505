@@ -46,13 +46,13 @@ import {
 export const Route = createFileRoute("/settings/access")({
   head: () => ({
     meta: [
-      { title: "Roles & Access — Northwind POS" },
+      { title: "Roles & Access — Retail" },
       {
         name: "description",
         content:
           "One place to set what every role may do and what it can see: permissions and screen visibility side by side, searchable, with owner-only areas protected.",
       },
-      { property: "og:title", content: "Roles & Access — Northwind POS" },
+      { property: "og:title", content: "Roles & Access — Retail" },
       {
         property: "og:description",
         content: "Permissions and screen visibility for every role, on one page.",

@@ -18,13 +18,13 @@ import { PublicPageClosed } from "@/platforms/web/components/pos/PublicPageClose
 export const Route = createFileRoute("/claim/$campaignSlug")({
   head: () => ({
     meta: [
-      { title: "Claim your coupon — Lucky Charms" },
+      { title: "Claim your coupon — Retail" },
       {
         name: "description",
         content:
           "Enter your mobile number to claim this offer. Your personal voucher is issued instantly with a scannable code.",
       },
-      { property: "og:title", content: "Claim your coupon — Lucky Charms" },
+      { property: "og:title", content: "Claim your coupon — Retail" },
       {
         property: "og:description",
         content: "Grab your personal voucher — one tap, no app needed.",

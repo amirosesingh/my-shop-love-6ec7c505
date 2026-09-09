@@ -16,13 +16,13 @@ import type { ReceiptCustomLine } from "@/core/types/pos-types";
 export const Route = createFileRoute("/settings/receipt-designer")({
   head: () => ({
     meta: [
-      { title: "Receipt Designer — Northwind POS" },
+      { title: "Receipt Designer — Retail" },
       {
         name: "description",
         content:
           "Insert dynamic receipt fields, upload a branch logo and style the printed slip with scoped CSS, with a live sample preview.",
       },
-      { property: "og:title", content: "Receipt Designer — Northwind POS" },
+      { property: "og:title", content: "Receipt Designer — Retail" },
       {
         property: "og:description",
         content: "Dynamic fields, logo upload and scoped CSS for printed receipts.",

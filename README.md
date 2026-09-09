@@ -1,4 +1,4 @@
-# Lovable POS Suite
+# Retail Suite
 
 create a point of sale system which includes sale, open/close shift, inventory management, central membership system, print recipt, drawer opening and all type of recipt print
 

@@ -10,9 +10,9 @@
  *     "version": "1.2.101",
  *     "buildNumber": 1201,
  *     "releaseNotes": "Bug fixes and UI improvements",
- *     "apkUrl":     "https://…/NorthwindPOS-1.2.101.apk",
+ *     "apkUrl":     "https://…/Retail-1.2.101.apk",
  *     "bundleUrl":  "https://…/web-1.2.101.zip",
- *     "windowsUrl": "https://…/NorthwindPOS-Setup-1.2.101.exe"
+ *     "windowsUrl": "https://…/Retail-Setup-1.2.101.exe"
  *   }
  *
  * Every read is bounded by a 7 second timeout so an unreachable folder can

@@ -12,9 +12,9 @@ import type { TaxMode } from "@/core/types/pos-types";
 export const Route = createFileRoute("/settings/tax")({
   head: () => ({
     meta: [
-      { title: "Tax & Pricing — Northwind POS" },
+      { title: "Tax & Pricing — Retail" },
       { name: "description", content: "Set the global tax rate and choose whether prices include tax or have it added at checkout." },
-      { property: "og:title", content: "Tax & Pricing — Northwind POS" },
+      { property: "og:title", content: "Tax & Pricing — Retail" },
       { property: "og:description", content: "Global tax rate and inclusive / exclusive pricing mode." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

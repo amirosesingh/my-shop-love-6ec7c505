@@ -33,13 +33,13 @@ const COUNTRIES: { code: string; name: string; zone: string }[] = [
 export const Route = createFileRoute("/settings/region")({
   head: () => ({
     meta: [
-      { title: "Region & Time — Northwind POS" },
+      { title: "Region & Time — Retail" },
       {
         name: "description",
         content:
           "Choose the country, time zone, date order and clock used on every screen, receipt and report.",
       },
-      { property: "og:title", content: "Region & Time — Northwind POS" },
+      { property: "og:title", content: "Region & Time — Retail" },
       {
         property: "og:description",
         content: "Country, time zone and date/time formats for the whole till.",

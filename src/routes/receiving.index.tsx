@@ -25,13 +25,13 @@ import { TRANSFER_STATUS_LABELS } from "@/core/types/pos-types";
 export const Route = createFileRoute("/receiving/")({
   head: () => ({
     meta: [
-      { title: "Goods Receiving — Northwind POS" },
+      { title: "Goods Receiving — Retail" },
       {
         name: "description",
         content:
           "Deliveries on their way to this branch and stock already counted in, with the blind-count receiving workspace one click away.",
       },
-      { property: "og:title", content: "Goods Receiving — Northwind POS" },
+      { property: "og:title", content: "Goods Receiving — Retail" },
       {
         property: "og:description",
         content: "Count arriving stock in and post it to the shelf.",

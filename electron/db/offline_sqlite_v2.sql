@@ -84,10 +84,51 @@ CREATE TABLE IF NOT EXISTS shifts (
   opening_float  REAL NOT NULL DEFAULT 0,
   counted_cash   REAL,
   expected_cash  REAL,
+  state          TEXT NOT NULL DEFAULT 'ACTIVE',
+  close_reason   TEXT,
+  closing_started_at TEXT,
+  closing_started_by TEXT,
+  counted_card   REAL,
+  counted_digital REAL,
+  variance_status TEXT,
   status         TEXT NOT NULL DEFAULT 'open',
   updated_at     TEXT
 );
 CREATE INDEX IF NOT EXISTS shifts_store_idx ON shifts (store_id, opened_at DESC);
+
+CREATE TABLE IF NOT EXISTS shift_cash_counts (
+  id TEXT PRIMARY KEY, shift_id TEXT NOT NULL REFERENCES shifts(id), store_id TEXT NOT NULL,
+  terminal_id TEXT, kind TEXT NOT NULL DEFAULT 'ORIGINAL', counted_cash REAL NOT NULL CHECK(counted_cash >= 0),
+  counted_card REAL CHECK(counted_card IS NULL OR counted_card >= 0),
+  counted_digital REAL CHECK(counted_digital IS NULL OR counted_digital >= 0), reason TEXT,
+  counted_by_name TEXT, client_key TEXT, created_at TEXT NOT NULL,
+  UNIQUE(shift_id, kind, client_key)
+);
+CREATE INDEX IF NOT EXISTS shift_cash_counts_shift_idx ON shift_cash_counts (shift_id, created_at);
+
+CREATE TABLE IF NOT EXISTS shift_reconciliations (
+  id TEXT PRIMARY KEY, shift_id TEXT NOT NULL REFERENCES shifts(id), store_id TEXT NOT NULL,
+  count_id TEXT REFERENCES shift_cash_counts(id), expected_cash REAL NOT NULL, expected_card REAL NOT NULL DEFAULT 0,
+  expected_digital REAL NOT NULL DEFAULT 0, counted_cash REAL NOT NULL, counted_card REAL,
+  counted_digital REAL, variance_cash REAL NOT NULL, variance_card REAL, variance_digital REAL,
+  variance_total REAL NOT NULL, variance_status TEXT NOT NULL, created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS shift_reconciliations_shift_idx ON shift_reconciliations (shift_id, created_at);
+
+CREATE TABLE IF NOT EXISTS shift_close_events (
+  id TEXT PRIMARY KEY, shift_id TEXT NOT NULL REFERENCES shifts(id), store_id TEXT NOT NULL,
+  terminal_id TEXT, event TEXT NOT NULL, from_state TEXT, to_state TEXT, actor_name TEXT,
+  detail TEXT NOT NULL DEFAULT '{}', created_at TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS shift_close_events_shift_idx ON shift_close_events (shift_id, created_at);
+
+CREATE TABLE IF NOT EXISTS shift_variance_alerts (
+  id TEXT PRIMARY KEY, shift_id TEXT NOT NULL REFERENCES shifts(id), store_id TEXT NOT NULL,
+  reconciliation_id TEXT NOT NULL REFERENCES shift_reconciliations(id), variance_total REAL NOT NULL,
+  variance_status TEXT NOT NULL, severity TEXT NOT NULL, message TEXT NOT NULL,
+  acknowledged_at TEXT, created_at TEXT NOT NULL, UNIQUE(reconciliation_id)
+);
+CREATE INDEX IF NOT EXISTS shift_variance_alerts_store_idx ON shift_variance_alerts (store_id, created_at);
 
 CREATE TABLE IF NOT EXISTS sales (
   id              TEXT PRIMARY KEY,
@@ -881,7 +922,7 @@ CREATE TABLE IF NOT EXISTS pos_settings (
   show_barcode INTEGER DEFAULT 1 NOT NULL,
   show_tax_details INTEGER DEFAULT 1 NOT NULL,
   updated_at TEXT NOT NULL,
-  company_name TEXT DEFAULT 'NORTHWIND & CO.' NOT NULL,
+  company_name TEXT DEFAULT 'RETAIL' NOT NULL,
   tax_number TEXT,
   reg_number TEXT,
   phone TEXT,

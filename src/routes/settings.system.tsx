@@ -18,13 +18,13 @@ export const Route = createFileRoute("/settings/system")({
   },
   head: () => ({
     meta: [
-      { title: "System & General Settings — Northwind POS" },
+      { title: "System & General Settings — Retail" },
       {
         name: "description",
         content:
           "One window for connection health, database integrity, code logic health, security alerts, data sync and settings inheritance on this till.",
       },
-      { property: "og:title", content: "System & General Settings — Northwind POS" },
+      { property: "og:title", content: "System & General Settings — Retail" },
       {
         property: "og:description",
         content: "Diagnose, sync and configure every service this till depends on, in one view.",

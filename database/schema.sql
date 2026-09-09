@@ -241,6 +241,8 @@ BEGIN
   IF COL_LENGTH('dbo.shifts', 'closing_started_at') IS NULL ALTER TABLE dbo.shifts ADD [closing_started_at] DATETIME2(3);
   IF COL_LENGTH('dbo.shifts', 'closing_started_by') IS NULL ALTER TABLE dbo.shifts ADD [closing_started_by] NVARCHAR(200);
   IF COL_LENGTH('dbo.shifts', 'final_counted_cash') IS NULL ALTER TABLE dbo.shifts ADD [final_counted_cash] DECIMAL(18,4);
+  IF COL_LENGTH('dbo.shifts', 'counted_card') IS NULL ALTER TABLE dbo.shifts ADD [counted_card] DECIMAL(18,4);
+  IF COL_LENGTH('dbo.shifts', 'counted_digital') IS NULL ALTER TABLE dbo.shifts ADD [counted_digital] DECIMAL(18,4);
   IF COL_LENGTH('dbo.shifts', 'variance_status') IS NULL ALTER TABLE dbo.shifts ADD [variance_status] NVARCHAR(40);
 END
 GO
@@ -2301,7 +2303,7 @@ BEGIN
   IF COL_LENGTH('dbo.pos_settings', 'show_barcode') IS NULL ALTER TABLE dbo.pos_settings ADD [show_barcode] BIT DEFAULT 1;
   IF COL_LENGTH('dbo.pos_settings', 'show_tax_details') IS NULL ALTER TABLE dbo.pos_settings ADD [show_tax_details] BIT DEFAULT 1;
   IF COL_LENGTH('dbo.pos_settings', 'updated_at') IS NULL ALTER TABLE dbo.pos_settings ADD [updated_at] DATETIME2(3) DEFAULT SYSUTCDATETIME();
-  IF COL_LENGTH('dbo.pos_settings', 'company_name') IS NULL ALTER TABLE dbo.pos_settings ADD [company_name] NVARCHAR(400) DEFAULT N'NORTHWIND & CO.';
+  IF COL_LENGTH('dbo.pos_settings', 'company_name') IS NULL ALTER TABLE dbo.pos_settings ADD [company_name] NVARCHAR(400) DEFAULT N'RETAIL';
   IF COL_LENGTH('dbo.pos_settings', 'tax_number') IS NULL ALTER TABLE dbo.pos_settings ADD [tax_number] NVARCHAR(MAX);
   IF COL_LENGTH('dbo.pos_settings', 'reg_number') IS NULL ALTER TABLE dbo.pos_settings ADD [reg_number] NVARCHAR(MAX);
   IF COL_LENGTH('dbo.pos_settings', 'phone') IS NULL ALTER TABLE dbo.pos_settings ADD [phone] NVARCHAR(400);

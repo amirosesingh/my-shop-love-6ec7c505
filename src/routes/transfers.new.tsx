@@ -13,13 +13,13 @@ import { usePos } from "@/lib/pos-store";
 export const Route = createFileRoute("/transfers/new")({
   head: () => ({
     meta: [
-      { title: "New stock transfer — Northwind POS" },
+      { title: "New stock transfer — Retail" },
       {
         name: "description",
         content:
           "Send stock to another branch: pick products, set the quantities going in the box and raise the transfer note.",
       },
-      { property: "og:title", content: "New stock transfer — Northwind POS" },
+      { property: "og:title", content: "New stock transfer — Retail" },
       {
         property: "og:description",
         content: "Raise a direct branch-to-branch stock transfer.",

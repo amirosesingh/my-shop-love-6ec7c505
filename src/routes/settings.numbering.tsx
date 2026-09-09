@@ -11,13 +11,13 @@ import { activeBranchId } from "@/lib/active-branch";
 export const Route = createFileRoute("/settings/numbering")({
   head: () => ({
     meta: [
-      { title: "Bill Numbering — Northwind POS" },
+      { title: "Bill Numbering — Retail" },
       {
         name: "description",
         content:
           "Choose how receipt numbers are built: branch code, till number, running length and daily reset.",
       },
-      { property: "og:title", content: "Bill Numbering — Northwind POS" },
+      { property: "og:title", content: "Bill Numbering — Retail" },
       {
         property: "og:description",
         content: "Branch, till, date and sequence rules for every receipt number.",

@@ -15,13 +15,13 @@ import {
 export const Route = createFileRoute("/settings/sku")({
   head: () => ({
     meta: [
-      { title: "SKU Numbering — Northwind POS" },
+      { title: "SKU Numbering — Retail" },
       {
         name: "description",
         content:
           "Choose automatic running-number SKUs or manual codes for new products, and set the prefix and next number.",
       },
-      { property: "og:title", content: "SKU Numbering — Northwind POS" },
+      { property: "og:title", content: "SKU Numbering — Retail" },
       { property: "og:description", content: "Automatic or manual product code numbering." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

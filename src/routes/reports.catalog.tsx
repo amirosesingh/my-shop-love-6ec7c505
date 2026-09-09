@@ -27,13 +27,13 @@ import {
 export const Route = createFileRoute("/reports/catalog")({
   head: () => ({
     meta: [
-      { title: "Catalog Change History — Northwind POS" },
+      { title: "Catalog Change History — Retail" },
       {
         name: "description",
         content:
           "Audit of every product added, renamed, repriced or restocked, with the staff member responsible and the exact time.",
       },
-      { property: "og:title", content: "Catalog Change History — Northwind POS" },
+      { property: "og:title", content: "Catalog Change History — Retail" },
       { property: "og:description", content: "Product and stock edit history with timestamps." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary_large_image" },

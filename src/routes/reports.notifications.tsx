@@ -234,13 +234,13 @@ function NotificationsReport() {
 export const Route = createFileRoute("/reports/notifications")({
   head: () => ({
     meta: [
-      { title: "Activity & Notifications Log — Northwind POS" },
+      { title: "Activity & Notifications Log — Retail" },
       {
         name: "description",
         content:
           "Searchable history of sign-ins, shift changes, sales, refunds, drawer opens and staff edits, with WhatsApp delivery status and CSV export.",
       },
-      { property: "og:title", content: "Activity & Notifications Log — Northwind POS" },
+      { property: "og:title", content: "Activity & Notifications Log — Retail" },
       {
         property: "og:description",
         content: "Every till event with who did it, where, and whether an alert went out.",

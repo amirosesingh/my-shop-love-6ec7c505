@@ -6,13 +6,13 @@ import { ReceiptPrinterSettings } from "@/platforms/web/components/pos/ReceiptPr
 export const Route = createFileRoute("/settings/printer")({
   head: () => ({
     meta: [
-      { title: "Receipt Printer — Northwind POS" },
+      { title: "Receipt Printer — Retail" },
       {
         name: "description",
         content:
           "Choose the thermal printer for this till, set encoding, line endings, page margins and the cash drawer kick pin, then print a test slip.",
       },
-      { property: "og:title", content: "Receipt Printer — Northwind POS" },
+      { property: "og:title", content: "Receipt Printer — Retail" },
       { property: "og:description", content: "Printer, margins and cash drawer settings for this terminal." },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

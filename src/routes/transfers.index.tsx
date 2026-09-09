@@ -32,13 +32,13 @@ type TransferSearch = { items?: string; kind?: TransferKind };
 export const Route = createFileRoute("/transfers/")({
   head: () => ({
     meta: [
-      { title: "Stock Transfers — Northwind POS" },
+      { title: "Stock Transfers — Retail" },
       {
         name: "description",
         content:
           "Send stock between branches or request products from another store, then approve, receive and print transfer notes.",
       },
-      { property: "og:title", content: "Stock Transfers — Northwind POS" },
+      { property: "og:title", content: "Stock Transfers — Retail" },
       {
         property: "og:description",
         content: "Branch-to-branch stock transfers and product requests.",

@@ -21,13 +21,13 @@ import { privateStockStores, productVisibleAt } from "@/lib/branch-policy";
 export const Route = createFileRoute("/all-shops")({
   head: () => ({
     meta: [
-      { title: "All Shops — Northwind POS" },
+      { title: "All Shops — Retail" },
       {
         name: "description",
         content:
           "Live takings and shift status for every branch, plus one stock table showing each product's inventory across all shops.",
       },
-      { property: "og:title", content: "All Shops — Northwind POS" },
+      { property: "og:title", content: "All Shops — Retail" },
       {
         property: "og:description",
         content: "Group-wide sales and inventory in a single panel.",

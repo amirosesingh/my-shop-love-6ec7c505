@@ -29,13 +29,13 @@ import {
 export const Route = createFileRoute("/reports/voids")({
   head: () => ({
     meta: [
-      { title: "Void & Refund History — Northwind POS" },
+      { title: "Void & Refund History — Retail" },
       {
         name: "description",
         content:
           "Who voided carts, deleted lines, cancelled bills and issued refunds, with the value involved, the reason given and the approving supervisor.",
       },
-      { property: "og:title", content: "Void & Refund History — Northwind POS" },
+      { property: "og:title", content: "Void & Refund History — Retail" },
       {
         property: "og:description",
         content: "Full void, cancellation and refund trail per cashier.",

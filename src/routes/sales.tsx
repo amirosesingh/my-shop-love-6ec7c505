@@ -4,13 +4,13 @@ import { SectionHub } from "@/platforms/web/components/pos/SectionHub";
 export const Route = createFileRoute("/sales")({
   head: () => ({
     meta: [
-      { title: "Sales & Operations — Northwind POS" },
+      { title: "Sales & Operations — Retail" },
       {
         name: "description",
         content:
           "Register, live dashboard, shift management, bookings, customer display and bill history in one place.",
       },
-      { property: "og:title", content: "Sales & Operations — Northwind POS" },
+      { property: "og:title", content: "Sales & Operations — Retail" },
       {
         property: "og:description",
         content: "Everything the counter needs during a trading day.",

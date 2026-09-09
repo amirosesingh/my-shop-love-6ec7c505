@@ -5,13 +5,13 @@ import { TelemetryPanel } from "@/platforms/web/components/pos/settings/panels/T
 export const Route = createFileRoute("/settings/branch-telemetry")({
   head: () => ({
     meta: [
-      { title: "Branch Telemetry Centre — Northwind POS" },
+      { title: "Branch Telemetry Centre — Retail" },
       {
         name: "description",
         content:
           "Live health of every till: connection state, storage engine, unsynced changes and the last successful sync, with data-only remote commands.",
       },
-      { property: "og:title", content: "Branch Telemetry Centre — Northwind POS" },
+      { property: "og:title", content: "Branch Telemetry Centre — Retail" },
       {
         property: "og:description",
         content: "Monitor every terminal and send sync or catalogue refresh requests.",

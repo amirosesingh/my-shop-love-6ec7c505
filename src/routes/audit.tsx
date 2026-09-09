@@ -64,13 +64,13 @@ import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 export const Route = createFileRoute("/audit")({
   head: () => ({
     meta: [
-      { title: "Audit Logs & Activity Trail — Northwind POS" },
+      { title: "Audit Logs & Activity Trail — Retail" },
       {
         name: "description",
         content:
           "Filterable compliance trail of every click, sale, inventory edit and sync event captured across the point of sale.",
       },
-      { property: "og:title", content: "Audit Logs & Activity Trail — Northwind POS" },
+      { property: "og:title", content: "Audit Logs & Activity Trail — Retail" },
       {
         property: "og:description",
         content: "Staff activity telemetry with detail inspector and CSV export.",

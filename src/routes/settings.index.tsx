@@ -57,13 +57,13 @@ export const Route = createFileRoute("/settings/")({
   },
   head: () => ({
     meta: [
-      { title: "Settings — Northwind POS" },
+      { title: "Settings — Retail" },
       {
         name: "description",
         content:
           "Every POS configuration area in one window: terminal and display, receipts and printing, tax and pricing, payments, bookings, sync and health checks.",
       },
-      { property: "og:title", content: "Settings — Northwind POS" },
+      { property: "og:title", content: "Settings — Retail" },
       {
         property: "og:description",
         content: "All register configuration in one responsive settings window.",
