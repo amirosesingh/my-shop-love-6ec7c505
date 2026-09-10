@@ -722,15 +722,15 @@ export async function runExclusive(reason: string = "timer"): Promise<void> {
     cycleRunning = true;
     setSyncState({ phase: "syncing" });
     try {
-      const pushed = await desktopBridge.push();
-      const pulled = await desktopBridge.pull();
-      const status = await desktopBridge.status().catch(() => null);
+      const cycle = desktopBridge.syncNow
+        ? await desktopBridge.syncNow()
+        : (await desktopBridge.status());
       setSyncState({
-        phase: status?.phase === "pushing" || status?.phase === "pulling" ? "syncing" : "idle",
-        pending: status?.businessBatches?.pending ?? status?.queue?.length ?? 0,
-        lastSyncAt: status?.lastPushAt ?? status?.lastPullAt ?? undefined,
-        credentialsInvalid: status?.credentialsInvalid ?? false,
-        lastError: pushed.error ?? pulled.error ?? null,
+        phase: cycle?.phase === "pushing" || cycle?.phase === "pulling" ? "syncing" : "idle",
+        pending: cycle?.businessBatches?.pending ?? cycle?.queue?.length ?? 0,
+        lastSyncAt: cycle?.lastPushAt ?? cycle?.lastPullAt ?? undefined,
+        credentialsInvalid: cycle?.credentialsInvalid ?? false,
+        lastError: cycle?.error ?? null,
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
