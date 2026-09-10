@@ -120,7 +120,7 @@ async function addPin(pin: Pin, ownerId: string | null) {
       kind: "upsert",
       table: "nav_pins",
       rows: [row],
-      onConflict: "owner_id,item_kind,item_key",
+      onConflict: "id",
     });
   }
 }
