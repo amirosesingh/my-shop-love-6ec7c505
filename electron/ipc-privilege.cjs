@@ -50,7 +50,6 @@ const CHANNEL_LEVELS = {
   "pos:compare-rows": OPEN,
   "pos:restore-status": OPEN,
   "pos:restore-evidence": OPEN,
-  "db:create-sale": OPEN,
   "db:get-products": OPEN,
   "db:get-pending-sync-count": OPEN,
   "db:get-branch": OPEN,
