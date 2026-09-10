@@ -21,6 +21,7 @@ describe("Electron durable business persistence", () => {
     );
     expect(gateway).toContain('kind: "compatibility_projection_failed"');
     expect(gateway).toContain('return noteCommitTarget("local")');
+    expect(gateway).toContain("created_at: s.createdAt");
   });
 
   it("drains and acknowledges the SQLite outbox before the legacy SQL queue", () => {
