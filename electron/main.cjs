@@ -1938,6 +1938,7 @@ function registerIpc() {
   });
 
   ipcMain.handle("pos:set-sync-enabled", (_e, on) => worker.setEnabled(on));
+  ipcMain.handle("pos:set-sync-config", (_e, config) => worker.setConfig(guard.options(config, { name: "sync config" })));
 
   /* ---- shop side of the server/shop data comparison ---- */
   ipcMain.handle("pos:compare-summary", async (_e, options) => {
