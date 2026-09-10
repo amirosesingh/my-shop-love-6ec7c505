@@ -1853,8 +1853,7 @@ export const db = {
     };
     const bridge = localDb();
     if (bridge) {
-      const res = await bridge.write("Saving settings", op);
-      if (!res.ok) throw new Error(res.error ?? "Local database write failed");
+      await commitOps("Saving settings", [op]);
       return;
     }
     const op2: SyncOp = op;
