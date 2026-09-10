@@ -192,7 +192,6 @@ contextBridge.exposeInMainWorld("pos", {
  * these calls — never over HTTP.
  */
 contextBridge.exposeInMainWorld("electronAPI", {
-  createSale: (payload) => invoke("db:create-sale", payload),
   getProducts: () => invoke("db:get-products"),
   getPendingSyncCount: () => invoke("db:get-pending-sync-count"),
   getBranch: () => invoke("db:get-branch"),
