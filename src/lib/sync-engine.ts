@@ -1,19 +1,15 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { logSync } from "./sync-log";
-import { noteSyncAck } from "./sync-summary";
 import { hasRequiredPlatformConfig } from "./platform-config-ready";
 import { hasSignedInIdentity } from "./session-presence";
 
 import { replayOrder } from "./activity-journal";
-import { isTerminalRevoked } from "./use-revocation-check";
 import { tableSyncAllowed } from "./sync-policy";
 import { canRelay, hasStaffSession, relayOp } from "@/core/api/sync-relay";
 import { preferRelay } from "./pos-auth-route";
 import {
   effectiveDatabaseMode,
   isConnectionError,
-  noteConnectionLost,
-  noteConnectionRestored,
   subscribeDatabaseMode,
 } from "@/core/local-db/db-mode";
 import {
