@@ -906,6 +906,20 @@ export function startSyncEngine() {
   // Push queued work first, then bring central changes down, then converge the
   // terminal's own database in both directions — one cycle at a time.
   const desktopBridge = localDb();
+  const applyDesktopStatus = (status: Awaited<ReturnType<NonNullable<typeof desktopBridge>["status"]>>) => {
+    const batches = status.businessBatches;
+    const failedRow = batches?.rows?.find((row) => row.status !== "pending");
+    setSyncState({
+      phase: status.phase === "pushing" || status.phase === "pulling" ? "syncing" : "idle",
+      pending: batches ? batches.pending + batches.failed : (status.queue?.length ?? 0),
+      lastSyncAt: status.lastPushAt ?? status.lastPullAt ?? null,
+      lastError: status.error ?? failedRow?.error_message ?? null,
+      credentialsInvalid: status.credentialsInvalid ?? false,
+      cloudConfigured: status.cloudConfigured ?? null,
+    });
+  };
+  const offDesktopStatus = desktopBridge?.onStatus?.(applyDesktopStatus);
+  if (desktopBridge) void desktopBridge.status().then(applyDesktopStatus).catch(() => {});
   const tick = () => {
     if (!desktopBridge) void runExclusive("timer");
   };
@@ -1001,6 +1015,7 @@ export function startSyncEngine() {
     if (liveTimer) window.clearTimeout(liveTimer);
     pendingLiveChanges.clear();
     void supabaseExternal.removeChannel(live);
+    offDesktopStatus?.();
     offMode();
     started = false;
 
