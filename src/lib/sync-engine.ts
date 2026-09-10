@@ -498,71 +498,45 @@ let draining = false;
  * sale_items) therefore always land in sequence.
  */
 export async function drainOutbox(): Promise<{ pushed: number; failed: number }> {
-  // A revoked terminal keeps selling locally but is cut off from the cloud.
-  if (!isOnline()) setSyncState({ phase: "offline", pending: listQueue().length });
-  // Keys rejected: stay parked until fresh ones are saved — no retry storm.
-  if (syncState().credentialsInvalid) return { pushed: 0, failed: 0 };
-  if (draining || !isOnline() || !isOnlineSyncEnabled() || isTerminalRevoked())
-    return { pushed: 0, failed: 0 };
+  // The renderer outbox is now migration-only on Electron. Any entry left by
+  // an older build is copied into SQLite's durable business outbox and then
+  // removed here; only the main-process worker is allowed to send it centrally.
+  const bridge = localDb();
+  if (!bridge?.localMirrorBatch || draining) return { pushed: 0, failed: 0 };
+
   draining = true;
-  setSyncState({ phase: "syncing", pending: listQueue().length });
-  let pushed = 0;
+  let moved = 0;
   let failed = 0;
-  const blocked = new Set<string>();
-  // One pass sends at most a batch, so a long queue can never hold the
-  // checkout UI or the rest of the cycle behind it.
-  const batchSize = syncConfig().batchSize;
   try {
     for (const entry of replayOrder(listQueue())) {
-      if (pushed + failed >= batchSize) break;
-      if (entry.quarantined) continue;
-      // Branch-level switches: held writes stay queued, never dropped.
-      if (!tableSyncAllowed(entry.op.table)) continue;
-      const terminal = entry.terminalId ?? "legacy";
-      if (blocked.has(terminal)) continue;
-      // Capped exponential backoff with spread: 5s, 15s, 45s … up to 5 min.
-      if (entry.attempts > 0 && Date.now() < nextAttemptDue(entry)) continue;
-      const ok = await runOne(entry);
-      if (ok) pushed += 1;
-      else {
+      const op = versionedOp(entry);
+      const entries =
+        op.kind === "insert" || op.kind === "upsert"
+          ? [{ entity: op.table, rows: op.rows as Record<string, unknown>[] }]
+          : [];
+      try {
+        const result = await bridge.localMirrorBatch(entries, [op]);
+        if (!result.ok) throw new Error(result.error ?? "SQLite outbox migration failed");
+        resolveOp(entry.id);
+        moved += 1;
+      } catch (error) {
+        failOp(entry.id, error instanceof Error ? error.message : String(error));
         failed += 1;
-        blocked.add(terminal);
+        // Preserve the original queue order; a later operation must not pass a
+        // predecessor that could not be made durable in SQLite.
+        break;
       }
     }
 
-    if (pushed) markSynced();
-    // The central database accepted these changes: that is the acknowledgement
-    // the Sync page shows, separate from "a pass finished".
-    if (pushed) noteSyncAck();
-    // A successful push proves the connection is back, so online mode resumes.
-    if (pushed) noteConnectionRestored();
-    // Tell the register this terminal synced, so the Terminals screen can show
-    // a truthful "last sync" instead of guessing from the check-in time.
-    if (pushed && !failed) {
-      void (async () => {
-        try {
-          const { readTerminalConfig, stampHeartbeat } = await import(
-            "@/core/activation/terminal-tokens"
-          );
-          const tokenId = readTerminalConfig()?.tokenId;
-          if (tokenId) await stampHeartbeat(tokenId, { synced: true });
-        } catch {
-          /* reporting the sync time must never break the sync itself */
-        }
-      })();
+    if (moved) {
+      markSynced();
+      if (bridge.syncNow) void bridge.syncNow();
+      else if (bridge.push) void bridge.push();
     }
   } finally {
     draining = false;
-    setSyncState({
-      phase: isOnline() ? "idle" : "offline",
-      pending: listQueue().length,
-      // A clean push proves the saved keys work — clear any earlier rejection.
-      ...(pushed && !failed
-        ? { lastSyncAt: new Date().toISOString(), lastError: null, credentialsInvalid: false }
-        : {}),
-    });
   }
-  return { pushed, failed };
+  return { pushed: moved, failed };
 }
 
 /* ---------------------------- downward sync ---------------------------- */
