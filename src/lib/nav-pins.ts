@@ -108,6 +108,7 @@ async function addPin(pin: Pin, ownerId: string | null) {
   const next = [...listPins().filter((p) => !samePin(p, pin)), pin];
   publish(next);
   const row = {
+    id: crypto.randomUUID(),
     owner_id: pin.company ? null : ownerId,
     item_kind: pin.kind,
     item_key: pin.key,
