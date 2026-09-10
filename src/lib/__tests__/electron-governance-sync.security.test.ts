@@ -122,6 +122,40 @@ describe("Electron supervisor/governance sync relay", () => {
     expect(out.ok).toBe(true);
   });
 
+  it("permission-gates settings, promotions and suppliers relay writes", async () => {
+    for (const table of ["pos_settings", "promotions", "suppliers"] as const) {
+      const denied = await safeAuthorizeRelayOp(
+        {
+          kind: "upsert",
+          table,
+          rows: [{ id: "row-1", name: "Example" }],
+          onConflict: "id",
+        },
+        cashier,
+      );
+      expect(denied.ok, table).toBe(false);
+      expect(denied.ok ? null : denied.code, table).toBe("PERMISSION_DENIED");
+    }
+
+    const settings = await safeAuthorizeRelayOp(
+      { kind: "upsert", table: "pos_settings", rows: [{ id: "row-1" }], onConflict: "id" },
+      { ...cashier, permissions: { can_access_pos_settings: true } },
+    );
+    expect(settings.ok).toBe(true);
+
+    const promotion = await safeAuthorizeRelayOp(
+      { kind: "upsert", table: "promotions", rows: [{ id: "row-1" }], onConflict: "id" },
+      { ...cashier, permissions: { can_manage_promotions: true } },
+    );
+    expect(promotion.ok).toBe(true);
+
+    const supplier = await safeAuthorizeRelayOp(
+      { kind: "upsert", table: "suppliers", rows: [{ id: "row-1" }], onConflict: "id" },
+      { ...cashier, permissions: { can_receive_purchase_order: true } },
+    );
+    expect(supplier.ok).toBe(true);
+  });
+
   it("refuses offline shift cash-count replay without count/close permission", async () => {
     const out = await runRelayRpc(
       {
