@@ -104,7 +104,7 @@ describe("commitOps on a Windows till", () => {
 
   it("stops instead of creating a cloud-only gap when SQLite refuses the batch", async () => {
     localMirrorBatch.mockResolvedValue({ ok: false, written: 0, error: "no local engine" });
-    await expect(commitOps("Saving sale", ops)).rejects.toThrow(/Local Database Required/);
+    await expect(commitOps("Saving sale", ops)).rejects.toThrow(/Local transaction storage unavailable/);
     expect(localWriteBatch).not.toHaveBeenCalled();
     expect(live).not.toHaveBeenCalled();
   });
