@@ -393,6 +393,7 @@ export type LocalSyncStatus = {
   errorStage?: string | null;
   reconnecting?: boolean;
   configured?: boolean;
+  cloudConfigured?: boolean;
   phase?: "idle" | "pushing" | "pulling";
   enabled?: boolean;
   /** The central project rejected this device's keys — sync is parked. */
@@ -544,7 +545,7 @@ export type PosBridge = {
   push: () => Promise<{ ok: boolean; pushed: number; failed: number; error?: string }>;
   pull: () => Promise<{ ok: boolean; merged: number; error?: string }>;
   /** One mutex-protected main-process sync cycle on Electron. */
-  syncNow?: () => Promise<LocalSyncStatus & { ok: boolean }>;
+  syncNow?: () => Promise<LocalSyncStatus & { ok: boolean; busy?: boolean; pushed?: number; failed?: number; merged?: number }>;
   /** Operator-triggered restore of this branch's trading history. */
   restore?: (options?: { days?: number }) => Promise<RestoreRun & { ok: boolean; error?: string }>;
   restoreStatus?: () => Promise<RestoreRun | null>;
