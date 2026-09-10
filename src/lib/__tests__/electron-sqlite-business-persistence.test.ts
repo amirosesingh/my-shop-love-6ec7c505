@@ -65,6 +65,27 @@ describe("Electron durable business persistence", () => {
     expect(privilege).toContain('"pos:sync-now": OPEN');
   });
 
+  it("migrates the old renderer outbox into SQLite instead of uploading it directly on Electron", () => {
+    const engine = read("src/lib/sync-engine.ts");
+    expect(engine).toContain("The renderer outbox is now migration-only on Electron");
+    expect(engine).toContain("await bridge.localMirrorBatch(entries, [op])");
+    expect(engine).toContain("if (bridge.syncNow) void bridge.syncNow()");
+    expect(engine).not.toContain("async function runOne(entry");
+    expect(engine).not.toContain("function recordRelayFailure");
+  });
+
+  it("serializes push-only, pull-only and full Electron sync through one worker mutex", () => {
+    const worker = read("electron/sync/worker.cjs");
+    const main = read("electron/main.cjs");
+    expect(worker).toContain('async function request(direction = "both")');
+    expect(worker).toContain('if (running || !enabled || !supabase)');
+    expect(worker).toContain('if (direction === "push") return await push()');
+    expect(worker).toContain('if (direction === "pull") return await pull()');
+    expect(worker).toContain('return request("both")');
+    expect(main).toContain('worker.request("push")');
+    expect(main).toContain('worker.request("pull")');
+  });
+
   it("allows the durable sale RPC through the relay input contract", () => {
     const endpoint = read("src/lib/sync-endpoint.server.ts");
     const relay = read("src/core/api/pos-relay.server.ts");
