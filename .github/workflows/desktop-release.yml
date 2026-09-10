@@ -53,37 +53,43 @@ jobs:
             echo "release_id=$tag-$short"
           } >> "$GITHUB_OUTPUT"
 
-      # POS_UPDATE_URL is the update feed address, not tenant configuration.
-      # No web environment (Supabase URL/key, backend URL) is provided to this
-      # job: the till is told where to connect during activation or in
-      # Settings -> Database & Cloud Connection.
       - name: Build Electron installer
         env:
           POS_UPDATE_URL: ${{ vars.POS_UPDATE_URL }}
         run: npm run desktop:release
-
-
-
 
       - name: Write release manifest
         shell: bash
         run: |
           node -e "const fs=require('fs');fs.writeFileSync('release/release.json',JSON.stringify({version:'${{ steps.meta.outputs.version }}',tag:'${{ steps.meta.outputs.tag }}',commit:'${{ steps.meta.outputs.commit }}',released:new Date().toISOString(),path:'pos-app/releases/${{ steps.meta.outputs.release_id }}/'},null,2))"
 
-      - name: Stage publishable files only
+      - name: Stage and validate publishable files
         shell: bash
         run: |
-          # electron-builder also leaves win-unpacked/, builder-debug.yml and
-          # other build scratch in release/. Only the files a till downloads
-          # are copied into the upload folder, so the bucket stays clean.
+          set -euo pipefail
           rm -rf upload && mkdir -p upload
           shopt -s nullglob
           for f in release/*.exe release/*.exe.blockmap release/latest.yml release/release.json; do
             cp "$f" upload/
           done
           v="${{ steps.meta.outputs.version }}"
+          expected="Retail Setup $v.exe"
           base="https://updatecms.luckycharmsdnbhd.com/pos-app"
           epoch=$(node -e "const m=/BUNDLE_EPOCH\s*=\s*(\d+)/.exec(require('fs').readFileSync('src/lib/bundle-epoch.ts','utf8'));if(!m){process.exit(1)}console.log(m[1])")
+          if [ ! -f "upload/$expected" ]; then
+            echo "Expected Windows installer is missing: upload/$expected"
+            ls -la release upload
+            exit 1
+          fi
+          if [ ! -s upload/latest.yml ]; then
+            echo "release/latest.yml was not generated or is empty"
+            exit 1
+          fi
+          if ! grep -Fq "$expected" upload/latest.yml; then
+            echo "latest.yml does not reference the exact installer: $expected"
+            cat upload/latest.yml
+            exit 1
+          fi
           node -e "const fs=require('fs');fs.writeFileSync('upload/manifest.json',JSON.stringify({version:'$v',buildNumber:Number('${{ steps.meta.outputs.build_number }}'),releaseNotes:'Release $v',apkUrl:'$base/latest/android/Retail-$v.apk',bundleUrl:'$base/latest/android/web/web-$v.zip',bundleEpoch:Number('$epoch'),windowsUrl:'$base/latest/Retail%20Setup%20$v.exe'}))"
           ls -la upload
 
@@ -95,27 +101,40 @@ jobs:
           AWS_DEFAULT_REGION: auto
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: |
+          set -euo pipefail
           if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ]; then
-            echo "R2 credentials are not configured; skipping upload."; exit 0
+            echo "R2 credentials are required for a Windows release. Refusing to publish a release with no updater files."
+            exit 1
           fi
           rid="${{ steps.meta.outputs.release_id }}"
-          # Immutable, versioned copy.
-          aws s3 sync upload "s3://updatelccms/pos-app/releases/$rid" \
-            --endpoint-url "$R2_ENDPOINT" \
-            --cache-control "public,max-age=31536000,immutable"
-          # Stable pointers the tills poll.
-          # --delete clears anything left behind by earlier releases
-          # (win-unpacked/ and friends) on the next run.
-          # Android owns latest/android/**, so it is excluded from the prune.
-          # Both release jobs publish the same cross-platform manifest for the
-          # same commit, making their completion order irrelevant. Excluding
-          # the folder also prevents Windows from deleting Android artefacts.
-          aws s3 sync upload s3://updatelccms/pos-app/latest \
-            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" --delete \
-            --exclude "android/*"
-          aws s3 cp upload/manifest.json s3://updatelccms/pos-app/manifest.json \
-            --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" \
-            --content-type "application/json"
+          aws s3 sync upload "s3://updatelccms/pos-app/releases/$rid" --endpoint-url "$R2_ENDPOINT" --cache-control "public,max-age=31536000,immutable"
+          aws s3 sync upload s3://updatelccms/pos-app/latest --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" --delete --exclude "android/*"
+          aws s3 cp upload/manifest.json s3://updatelccms/pos-app/manifest.json --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" --content-type "application/json"
+
+      - name: Verify public Windows update feed
+        shell: bash
+        run: |
+          set -euo pipefail
+          v="${{ steps.meta.outputs.version }}"
+          base="https://updatecms.luckycharmsdnbhd.com/pos-app"
+          manifest_url="$base/latest/latest.yml"
+          installer_url="$base/latest/Retail%20Setup%20$v.exe"
+          app_manifest_url="$base/manifest.json"
+          for url in "$manifest_url" "$installer_url" "$app_manifest_url"; do
+            echo "Verifying $url"
+            curl --fail --silent --show-error --location --retry 4 --retry-delay 2 --connect-timeout 15 --max-time 90 -I "$url" >/dev/null
+          done
+          remote_manifest=$(curl --fail --silent --show-error --location --retry 4 --retry-delay 2 --connect-timeout 15 --max-time 90 "$manifest_url")
+          if ! printf '%s' "$remote_manifest" | grep -Fq "Retail Setup $v.exe"; then
+            echo "Published latest.yml does not reference Retail Setup $v.exe"
+            printf '%s\n' "$remote_manifest"
+            exit 1
+          fi
+          remote_version=$(curl --fail --silent --show-error --location --retry 4 --retry-delay 2 --connect-timeout 15 --max-time 90 "$app_manifest_url" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);process.stdout.write(String(j.version||''))})")
+          if [ "$remote_version" != "$v" ]; then
+            echo "Published manifest version $remote_version does not match package version $v"
+            exit 1
+          fi
 
       - name: Remove build scratch left in the bucket by earlier releases
         shell: bash
@@ -127,10 +146,8 @@ jobs:
         run: |
           if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$R2_ENDPOINT" ]; then exit 0; fi
           for stray in win-unpacked builder-debug.yml builder-effective-config.yaml .icon-ico .cache; do
-            aws s3 rm "s3://updatelccms/pos-app/$stray" --recursive \
-              --endpoint-url "$R2_ENDPOINT" || true
-            aws s3 rm "s3://updatelccms/pos-app/latest/$stray" --recursive \
-              --endpoint-url "$R2_ENDPOINT" || true
+            aws s3 rm "s3://updatelccms/pos-app/$stray" --recursive --endpoint-url "$R2_ENDPOINT" || true
+            aws s3 rm "s3://updatelccms/pos-app/latest/$stray" --recursive --endpoint-url "$R2_ENDPOINT" || true
           done
 
       - name: Keep only the five most recent releases
@@ -143,15 +160,13 @@ jobs:
         run: |
           if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$R2_ENDPOINT" ]; then exit 0; fi
           RETAIN=5
-          folders=$(aws s3 ls s3://updatelccms/pos-app/releases/ \
-            --endpoint-url "$R2_ENDPOINT" | awk '/PRE/ {print $2}' | sort)
+          folders=$(aws s3 ls s3://updatelccms/pos-app/releases/ --endpoint-url "$R2_ENDPOINT" | awk '/PRE/ {print $2}' | sort)
           total=$(echo "$folders" | grep -c . || true)
           if [ "$total" -le "$RETAIN" ]; then echo "Nothing to prune ($total kept)."; exit 0; fi
           echo "$folders" | head -n "$((total - RETAIN))" | while read -r old; do
             [ -z "$old" ] && continue
             echo "Removing old release $old"
-            aws s3 rm "s3://updatelccms/pos-app/releases/$old" --recursive \
-              --endpoint-url "$R2_ENDPOINT" || true
+            aws s3 rm "s3://updatelccms/pos-app/releases/$old" --recursive --endpoint-url "$R2_ENDPOINT" || true
           done
 
       - name: Attach installer to the GitHub release
