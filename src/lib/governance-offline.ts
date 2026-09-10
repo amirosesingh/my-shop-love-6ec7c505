@@ -12,6 +12,7 @@
  * Android) simply reports that nothing could be parked.
  */
 import { localDb } from "@/core/local-db/local-db";
+import { commitOps } from "@/core/api/pos-db";
 import type { SyncOp } from "./sync-outbox";
 
 export type ParkResult = { parked: boolean; reason?: string };
@@ -51,8 +52,8 @@ export async function parkGovernanceRow(
   };
   const op: SyncOp = { kind: "upsert", table, rows: [payload], onConflict: "id" };
   try {
-    const res = await bridge.write(`Recording ${table.replace(/_/g, " ")}`, op);
-    return res?.ok ? { parked: true } : { parked: false, reason: res?.error ?? "Local write failed" };
+    await commitOps(`Recording ${table.replace(/_/g, " ")}`, [op]);
+    return { parked: true };
   } catch (error) {
     return { parked: false, reason: String((error as Error)?.message ?? error) };
   }
