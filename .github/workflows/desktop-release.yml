@@ -120,17 +120,22 @@ jobs:
           manifest_url="$base/latest/latest.yml"
           installer_url="$base/latest/Retail%20Setup%20$v.exe"
           app_manifest_url="$base/manifest.json"
-          for url in "$manifest_url" "$installer_url" "$app_manifest_url"; do
-            echo "Verifying $url"
-            curl --fail --silent --show-error --location --retry 4 --retry-delay 2 --connect-timeout 15 --max-time 90 -I "$url" >/dev/null
-          done
+
+          echo "Verifying updater manifest with GET"
           remote_manifest=$(curl --fail --silent --show-error --location --retry 4 --retry-delay 2 --connect-timeout 15 --max-time 90 "$manifest_url")
+
+          echo "Verifying application manifest with GET"
+          remote_app_manifest=$(curl --fail --silent --show-error --location --retry 4 --retry-delay 2 --connect-timeout 15 --max-time 90 "$app_manifest_url")
+
+          echo "Verifying installer is publicly readable with a one-byte range GET"
+          curl --fail --silent --show-error --location --retry 4 --retry-delay 2 --connect-timeout 15 --max-time 90 --range 0-0 "$installer_url" --output /dev/null
+
           if ! printf '%s' "$remote_manifest" | grep -Fq "Retail Setup $v.exe"; then
             echo "Published latest.yml does not reference Retail Setup $v.exe"
             printf '%s\n' "$remote_manifest"
             exit 1
           fi
-          remote_version=$(curl --fail --silent --show-error --location --retry 4 --retry-delay 2 --connect-timeout 15 --max-time 90 "$app_manifest_url" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);process.stdout.write(String(j.version||''))})")
+          remote_version=$(printf '%s' "$remote_app_manifest" | node -e "let s='';process.stdin.on('data',d=>s+=d).on('end',()=>{const j=JSON.parse(s);process.stdout.write(String(j.version||''))})")
           if [ "$remote_version" != "$v" ]; then
             echo "Published manifest version $remote_version does not match package version $v"
             exit 1
