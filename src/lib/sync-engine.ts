@@ -725,6 +725,14 @@ export function startSyncEngine() {
   // Push queued work first, then bring central changes down, then converge the
   // terminal's own database in both directions — one cycle at a time.
   const desktopBridge = localDb();
+  if (desktopBridge?.setSyncConfig) {
+    const cfg = syncConfig();
+    void desktopBridge.setSyncConfig({
+      intervalMs: cfg.intervalMs,
+      batchSize: cfg.batchSize,
+      maxAttempts: cfg.maxAttempts,
+    });
+  }
   const applyDesktopStatus = (status: Awaited<ReturnType<NonNullable<typeof desktopBridge>["status"]>>) => {
     const batches = status.businessBatches;
     const failedRow = batches?.rows?.find((row) => row.status !== "pending");
@@ -751,6 +759,13 @@ export function startSyncEngine() {
   let appliedHeartbeat = syncConfig().heartbeatMs;
   const offConfig = subscribeSyncConfig(() => {
     const cfg = syncConfig();
+    if (desktopBridge?.setSyncConfig) {
+      void desktopBridge.setSyncConfig({
+        intervalMs: cfg.intervalMs,
+        batchSize: cfg.batchSize,
+        maxAttempts: cfg.maxAttempts,
+      });
+    }
     if (cfg.intervalMs !== appliedInterval) {
       appliedInterval = cfg.intervalMs;
       if (!desktopBridge) {
