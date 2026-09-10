@@ -48,11 +48,21 @@ describe("Electron durable business persistence", () => {
     const engine = read("src/lib/sync-engine.ts");
     expect(engine).toContain("Electron has one sync owner: the main-process worker");
     expect(engine).toContain("const desktopBridge = localDb()");
-    expect(engine).toContain("await desktopBridge.push()");
-    expect(engine).toContain("await desktopBridge.pull()");
+    expect(engine).toContain("desktopBridge.syncNow");
+    expect(engine).not.toContain("await desktopBridge.push()");
+    expect(engine).not.toContain("await desktopBridge.pull()");
     expect(engine).toContain("let timer = desktopBridge ? 0 : window.setInterval");
     expect(engine).not.toContain("export async function pushLocalPending");
     expect(engine).not.toContain("export async function pullIntoLocal");
+    const worker = read("electron/sync/worker.cjs");
+    const main = read("electron/main.cjs");
+    const privilege = read("electron/ipc-privilege.cjs");
+    expect(worker).toContain('async function request(direction = "both")');
+    expect(worker).toContain('return request("both")');
+    expect(main).toContain('worker.request("push")');
+    expect(main).toContain('worker.request("pull")');
+    expect(main).toContain('"pos:sync-now"');
+    expect(privilege).toContain('"pos:sync-now": OPEN');
   });
 
   it("allows the durable sale RPC through the relay input contract", () => {
