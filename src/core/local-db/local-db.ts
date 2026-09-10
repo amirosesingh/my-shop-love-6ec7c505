@@ -543,6 +543,8 @@ export type PosBridge = {
   verifyWrite?: () => Promise<LocalWriteCheck>;
   push: () => Promise<{ ok: boolean; pushed: number; failed: number; error?: string }>;
   pull: () => Promise<{ ok: boolean; merged: number; error?: string }>;
+  /** One mutex-protected main-process sync cycle on Electron. */
+  syncNow?: () => Promise<LocalSyncStatus & { ok: boolean }>;
   /** Operator-triggered restore of this branch's trading history. */
   restore?: (options?: { days?: number }) => Promise<RestoreRun & { ok: boolean; error?: string }>;
   restoreStatus?: () => Promise<RestoreRun | null>;
