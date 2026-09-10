@@ -67,6 +67,7 @@ contextBridge.exposeInMainWorld("pos", {
   syncContract: () => invoke("pos:sync-contract"),
 
   setSyncEnabled: (on) => invoke("pos:set-sync-enabled", on),
+  setSyncConfig: (config) => invoke("pos:set-sync-config", config),
   /** Live per-table counts for the server/shop comparison page. */
   compareSummary: (options) => invoke("pos:compare-summary", options),
   compareRows: (table, options) => invoke("pos:compare-rows", table, options),
