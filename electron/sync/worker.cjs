@@ -430,7 +430,13 @@ async function pushSqliteBusinessBatches() {
       // batch. Cloud writes above are stable-ID/RPC idempotent, so if SQL
       // Server is unavailable the intact batch can safely retry both sides on
       // the next pass without creating another sale or payment.
-      const projectionOps = ops.filter((op) => op?.kind !== "rpc" && op?.table !== "pos_store_settings");
+      const sqlProjectionTables = new Set(repo.TABLES ?? []);
+      const projectionOps = ops.filter(
+        (op) =>
+          op?.kind !== "rpc" &&
+          op?.table !== "pos_store_settings" &&
+          sqlProjectionTables.has(op?.table),
+      );
       if (projectionOps.length) await repo.applyOps(projectionOps);
       for (const op of ops) {
         const ids = (op.rows ?? []).map((row) => row?.id).filter(Boolean);
