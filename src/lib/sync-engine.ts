@@ -87,12 +87,9 @@ import {
 } from "@/core/activation/connection-health";
 import { subscribeSyncConfig, syncConfig } from "./sync-config";
 import { noteVersions } from "./row-versions";
-import { recordConflict } from "./sync-conflicts";
 import { TOMBSTONE_TABLES } from "./tombstones";
 import {
   failOp,
-  refuseOp,
-  nextAttemptDue,
   isOnline,
   isOnlineSyncEnabled,
   listQueue,
@@ -271,15 +268,6 @@ async function execute(op: SyncOp): Promise<QueryResult> {
 }
 
 
-/** Codes the relay uses when a change is refused on principle. */
-const REFUSAL_CODES = new Set([
-  "STORE_FORBIDDEN",
-  "PERMISSION_DENIED",
-  "SCOPE_MISSING",
-  "SCOPE_STALE",
-  "TABLE_FORBIDDEN",
-]);
-
 /**
  * Stamp the change with the record version this till was working from. The
  * central database keeps whichever copy is newer, so an edit made from an
@@ -304,145 +292,6 @@ function versionedOp(entry: QueuedOp): SyncOp {
       : entry.op;
   }
   return entry.op;
-}
-
-/**
- * After a change goes up, check what version the central copy ended on. If it
- * has moved further than this change could explain, someone else edited the
- * same record and the central copy was kept — that is recorded so the person
- * at the till is told rather than believing their edit stuck.
- */
-async function reconcileVersions(entry: QueuedOp): Promise<void> {
-  const versions = entry.baseVersions;
-  if (!versions || !Object.keys(versions).length) return;
-  const ids = Object.keys(versions);
-  try {
-    const { data, error } = await (
-      supabaseExternal as unknown as {
-        from: (t: string) => {
-          select: (c: string) => {
-            in: (
-              col: string,
-              values: string[],
-            ) => PromiseLike<{
-              data: Record<string, unknown>[] | null;
-              error: { message: string } | null;
-            }>;
-          };
-        };
-      }
-    )
-      .from(entry.op.table)
-      .select("id,row_version")
-      .in("id", ids);
-    if (error || !data) return;
-    noteVersions(entry.op.table, data);
-    for (const row of data) {
-      const id = String(row["id"] ?? "");
-      const central = row["row_version"];
-      const base = versions[id];
-      if (typeof central !== "number" || typeof base !== "number") continue;
-      // One step on is this till's own change landing. Anything beyond that
-      // means another change went in first and won.
-      if (central <= base + 1) continue;
-      recordConflict({
-        table: entry.op.table,
-        recordId: id,
-        context: entry.context,
-        baseVersion: base,
-        centralVersion: central,
-      });
-      logSync(
-        "push",
-        entry.op.table,
-        false,
-        `${entry.context}: the central copy of this record is newer (version ${central}), so it was kept`,
-      );
-    }
-  } catch {
-    /* the next pull brings the central copy down anyway */
-  }
-}
-
-/**
- * A refused change is parked immediately with its reason; anything else keeps
- * its place in the queue and is retried.
- */
-function recordRelayFailure(entry: QueuedOp, relayed: { error?: string; code?: string }) {
-  const message = relayed.error ?? "The server could not save this change";
-  if (relayed.error && CREDENTIAL_ERROR_RE.test(relayed.error)) noteCredentialsInvalid(relayed.error);
-  if (relayed.code && REFUSAL_CODES.has(relayed.code)) refuseOp(entry.id, message);
-  else failOp(entry.id, message);
-  logSync("push", entry.op.table, false, `${entry.context}: ${message}`);
-}
-
-async function runOne(entry: QueuedOp): Promise<boolean> {
-  // This account has already been refused on this table — go straight to the
-  // relay instead of triggering another refused request.
-  // A PIN sign-in never holds a cloud account, so it always takes the relay.
-  if (
-    (entry.op.table === "stores" || refusedTables.has(entry.op.table) || preferRelay()) &&
-    canRelay()
-  ) {
-    const relayed = await viaRelay(entry.context, versionedOp(entry));
-    if (relayed.ok) {
-      resolveOp(entry.id);
-      await reconcileVersions(entry);
-      return true;
-    }
-    recordRelayFailure(entry, relayed);
-    return false;
-  }
-
-  let res = await execute(versionedOp(entry));
-  // PGRST204 = column missing from the schema cache. Older databases simply do
-  // not have the newer columns yet, so drop whichever column the error names
-  // (falling back to the known-optional list) and retry until the core row saves.
-  if (entry.op.kind === "upsert" || entry.op.kind === "insert") {
-    const dropped: string[] = [];
-    let guard = 0;
-    while (res.error?.code === "PGRST204" && guard++ < 12) {
-      const named = missingColumn(res.error.message);
-      const next = named ? [named] : (OPTIONAL_COLUMNS[entry.op.table] ?? []);
-      if (!next.length || next.every((c) => dropped.includes(c))) break;
-      dropped.push(...next);
-      res = await execute({
-        ...versionedOp(entry),
-        rows: strip(entry.op.rows, dropped),
-      } as SyncOp);
-    }
-  }
-  if (res.error) {
-    // Keys rejected: park the whole engine; the entry keeps its place and no
-    // attempt counter burns while the credentials are wrong.
-    if (isCredentialError(res.error)) {
-      noteCredentialsInvalid(String(res.error.message ?? "credential error"));
-      return false;
-    }
-    // A till signed in with a username + PIN has no cloud account, so the row
-    // rules refuse the write. Send the very same operation through the server
-    // relay, which proves the till and writes on its behalf.
-    if (isPermissionError(res.error) && canRelay()) {
-      refusedTables.add(entry.op.table);
-      const relayed = await viaRelay(entry.context, versionedOp(entry));
-      if (relayed.ok) {
-        resolveOp(entry.id);
-        await reconcileVersions(entry);
-        return true;
-      }
-      recordRelayFailure(entry, relayed);
-      return false;
-    }
-    const message = describeError(entry.op.table, res.error);
-    if (isConnectionError(res.error)) noteConnectionLost();
-    failOp(entry.id, message);
-    logSync("push", entry.op.table, false, `${entry.context}: ${message}`);
-    return false;
-  }
-  resolveOp(entry.id);
-  logSync("push", entry.op.table, true, entry.context);
-  await reconcileVersions(entry);
-  return true;
 }
 
 /**
