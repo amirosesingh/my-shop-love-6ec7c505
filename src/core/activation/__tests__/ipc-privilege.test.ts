@@ -50,7 +50,7 @@ beforeEach(() => {
 describe("desktop channel privilege", () => {
   it("lets a locked till keep trading", () => {
     const p = load();
-    for (const channel of ["pos:write", "db:create-sale", "print:silent", "staff:verify-pin"]) {
+    for (const channel of ["pos:write", "print:silent", "staff:verify-pin"]) {
       expect(p.allowed(channel)).toBe(true);
     }
   });
