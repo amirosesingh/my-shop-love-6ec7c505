@@ -102,6 +102,18 @@ describe("Electron durable business persistence", () => {
     expect(commands).toContain(": pendingCount()");
   });
 
+  it("applies the existing sync tuning settings to the Electron worker", () => {
+    const worker = read("electron/sync/worker.cjs");
+    const engine = read("src/lib/sync-engine.ts");
+    const preload = read("electron/preload.cjs");
+    expect(worker).toContain("function setConfig(patch = {})");
+    expect(worker).toContain("workerConfig.intervalMs");
+    expect(worker).toContain("workerConfig.batchSize");
+    expect(worker).toContain("workerConfig.maxAttempts");
+    expect(engine).toContain("desktopBridge.setSyncConfig");
+    expect(preload).toContain('invoke("pos:set-sync-config", config)');
+  });
+
   it("allows the durable sale RPC through the relay input contract", () => {
     const endpoint = read("src/lib/sync-endpoint.server.ts");
     const relay = read("src/core/api/pos-relay.server.ts");
