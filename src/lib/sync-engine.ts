@@ -680,44 +680,6 @@ export async function pullDelta(): Promise<{ merged: number }> {
   return { merged: changed };
 }
 
-/**
- * Phase 1 of convergence: everything stored on this terminal and still marked
- * `pending_sync = 1` is pushed up, keyed on its own id (or the temporary id it
- * was given locally), so a replay updates rather than duplicates. The desktop
- * shell owns the local SQL Server connection and does the T-SQL side.
- */
-export async function pushLocalPending(): Promise<{ pushed: number; failed: number }> {
-  const bridge = localDb();
-  if (!bridge || !isOnline() || !isOnlineSyncEnabled()) return { pushed: 0, failed: 0 };
-  try {
-    const res = await bridge.push();
-    if (res.pushed) logSync("push", "local", true, `${res.pushed} queued local row(s) uploaded`);
-    if (res.error) logSync("push", "local", false, res.error);
-    return { pushed: res.pushed ?? 0, failed: res.failed ?? 0 };
-  } catch (e) {
-    logSync("push", "local", false, e instanceof Error ? e.message : String(e));
-    return { pushed: 0, failed: 0 };
-  }
-}
-
-/**
- * Phase 2 of convergence: bring central changes down into the terminal's own
- * database so the two stay in step even when nothing was sold here.
- */
-export async function pullIntoLocal(): Promise<{ merged: number }> {
-  const bridge = localDb();
-  if (!bridge || !isOnline() || !isOnlineSyncEnabled()) return { merged: 0 };
-  try {
-    const res = await bridge.pull();
-    if (res.merged)
-      logSync("pull", "local", true, `${res.merged} row(s) refreshed on this terminal`);
-    return { merged: res.merged ?? 0 };
-  } catch (e) {
-    logSync("pull", "local", false, e instanceof Error ? e.message : String(e));
-    return { merged: 0 };
-  }
-}
-
 let started = false;
 
 /**
@@ -744,8 +706,6 @@ async function runCycle() {
     /* the parked rows stay visible in Sync & Backup for a manual retry */
   }
   await pullDelta();
-  await pushLocalPending();
-  await pullIntoLocal();
   await checkHealth(true);
 }
 
