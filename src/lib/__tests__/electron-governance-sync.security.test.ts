@@ -9,7 +9,7 @@ vi.mock("@/lib/external-supabase-config", () => ({
 
 import { runRelayRpc } from "@/core/api/pos-relay.server";
 import {
-  authorizeRelayOp,
+  safeAuthorizeRelayOp,
   type RelayScope,
 } from "@/core/api/relay-policy.server";
 
@@ -44,7 +44,7 @@ beforeEach(() => fetchMock.mockReset());
 
 describe("Electron supervisor/governance sync relay", () => {
   it("pins an offline authorization request to the cashier branch and strips decision fields", async () => {
-    const out = await authorizeRelayOp(
+    const out = await safeAuthorizeRelayOp(
       {
         kind: "upsert",
         table: "authorization_requests",
@@ -68,7 +68,7 @@ describe("Electron supervisor/governance sync relay", () => {
   });
 
   it("allows a cashier to queue a pending request for their own branch without approval authority", async () => {
-    const out = await authorizeRelayOp(
+    const out = await safeAuthorizeRelayOp(
       {
         kind: "upsert",
         table: "authorization_requests",
@@ -96,7 +96,7 @@ describe("Electron supervisor/governance sync relay", () => {
   });
 
   it("refuses non-supervisor edits to authorization action configuration", async () => {
-    const out = await authorizeRelayOp(
+    const out = await safeAuthorizeRelayOp(
       {
         kind: "upsert",
         table: "authorization_actions",
@@ -110,7 +110,7 @@ describe("Electron supervisor/governance sync relay", () => {
   });
 
   it("allows a supervisor to sync authorization action configuration", async () => {
-    const out = await authorizeRelayOp(
+    const out = await safeAuthorizeRelayOp(
       {
         kind: "upsert",
         table: "authorization_actions",
