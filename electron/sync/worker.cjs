@@ -10,9 +10,8 @@ const { createClient } = require("@supabase/supabase-js");
 const repo = require("../db/repo.cjs");
 const sqlite = require("../db/sqlite.cjs");
 
-const BATCH = 50;
-const INTERVAL_MS = 30_000;
-const MAX_ATTEMPTS = 5;
+const DEFAULT_WORKER_CONFIG = { batchSize: 50, intervalMs: 30_000, maxAttempts: 5 };
+let workerConfig = { ...DEFAULT_WORKER_CONFIG };
 
 let supabase = null;
 let enabled = true;
@@ -382,7 +381,7 @@ async function cloudSaveRules(rows) {
  * below cannot upload the same batch a second time.
  */
 async function pushSqliteBusinessBatches() {
-  const batches = sqlite.pendingBusinessBatches?.(BATCH) ?? [];
+  const batches = sqlite.pendingBusinessBatches?.(workerConfig.batchSize) ?? [];
   let pushed = 0;
   let failed = 0;
   for (const batch of batches) {
@@ -452,7 +451,7 @@ async function pushSqliteBusinessBatches() {
       if (/unauthorized|forbidden|permission|session has ended|STORE_FORBIDDEN/i.test(message))
         mutationPath = "authorization-refused";
       lastBusinessPush = { ...lastBusinessPush, result: "failed", reason: safeFailureReason(message) };
-      sqlite.failBusinessBatch(batch.id, message, /STALE_RULES/i.test(message) ? 1 : MAX_ATTEMPTS);
+      sqlite.failBusinessBatch(batch.id, message, /STALE_RULES/i.test(message) ? 1 : workerConfig.maxAttempts);
       failed += 1;
       // Preserve batch order: a later transaction must not overtake a failed
       // earlier transaction from the same terminal.
@@ -470,13 +469,29 @@ function setEnabled(on) {
 
 function start() {
   if (timer) return;
-  timer = setInterval(() => void run(), INTERVAL_MS);
+  timer = setInterval(() => void run(), workerConfig.intervalMs);
   void run();
 }
 
 function stop() {
   if (timer) clearInterval(timer);
   timer = null;
+}
+
+function setConfig(patch = {}) {
+  const next = {
+    batchSize: Math.min(500, Math.max(1, Number(patch.batchSize ?? workerConfig.batchSize) || DEFAULT_WORKER_CONFIG.batchSize)),
+    intervalMs: Math.min(300_000, Math.max(5_000, Number(patch.intervalMs ?? workerConfig.intervalMs) || DEFAULT_WORKER_CONFIG.intervalMs)),
+    maxAttempts: Math.min(50, Math.max(1, Number(patch.maxAttempts ?? workerConfig.maxAttempts) || DEFAULT_WORKER_CONFIG.maxAttempts)),
+  };
+  const restart = next.intervalMs !== workerConfig.intervalMs && !!timer;
+  workerConfig = next;
+  if (restart) {
+    stop();
+    start();
+  }
+  notify();
+  return { ...workerConfig };
 }
 
 async function reachable() {
@@ -506,7 +521,7 @@ async function push() {
     if (retryAt && Date.now() < retryAt) continue; // parked: central schema missing
     let rows;
     try {
-      rows = await repo.pendingRows(table, BATCH);
+      rows = await repo.pendingRows(table, workerConfig.batchSize);
     } catch (err) {
       setPhase("idle");
       return { ok: false, pushed, failed, error: err.message };
@@ -572,7 +587,7 @@ async function push() {
       }
       // The attempt counter lives in the database: a parked row stays parked
       // across restarts until someone retries it from the Sync Hub.
-      await repo.markFailed(table, ids, error.message, MAX_ATTEMPTS);
+      await repo.markFailed(table, ids, error.message, workerConfig.maxAttempts);
       await repo.setWatermark(table, null, { error: error.message }).catch(() => {});
       notify();
       continue;
@@ -596,7 +611,7 @@ async function push() {
               table,
               parked,
               `Stock movement refused centrally: ${result.refused[0].reason ?? "guard"}`,
-              MAX_ATTEMPTS,
+              workerConfig.maxAttempts,
             );
             syncedIds = ids.filter((id) => !refusedIds.has(String(id).toLowerCase()));
             failed += parked.length;
@@ -1227,6 +1242,7 @@ module.exports = {
   start,
   stop,
   setEnabled,
+  setConfig,
   push,
   pull,
   request,
