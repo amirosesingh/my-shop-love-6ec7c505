@@ -424,10 +424,14 @@ function Shifts() {
                           disabled={s.refunded}
                           onClick={async () => {
                             if (!(await requirePermission("can_process_refund"))) return;
-                            refundSale(s.id);
-                            printSaleReceipt(s, member, "refund");
-                            openCashDrawer();
-                            toast.success(`${s.receiptNo} refunded`);
+                            try {
+                              await refundSale(s.id);
+                              printSaleReceipt(s, member, "refund");
+                              openCashDrawer();
+                              toast.success(`${s.receiptNo} refunded`);
+                            } catch (error) {
+                              notifyError(error, "Refunding the sale");
+                            }
                           }}
                         >
                           <RotateCcw className="size-4" />

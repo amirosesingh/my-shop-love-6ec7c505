@@ -54,9 +54,9 @@ export function TransferComposer({
   submitLabel: string;
   /** basket handed over from another page, one unit per product */
   initialProductIds?: string[];
-  onSubmit: (result: ComposerResult) => void;
+  onSubmit: (result: ComposerResult) => void | Promise<void>;
 }) {
-  const { state, stores, allStores, currentStore, adjustStock } = usePos();
+  const { state, stores, allStores, currentStore, moveStock } = usePos();
   const others = useMemo(
     () =>
       stores.filter(
@@ -75,7 +75,8 @@ export function TransferComposer({
   const productOf = (id: string) => state.products.find((p) => p.id === id) ?? null;
   const sourceStoreId = kind === "transfer" ? currentStore.id : otherStoreId;
   const sourceLevels = subWarehouses(allStores, currentStore.id);
-  const crossGroup = Boolean(otherStoreId) && scopeBetween(currentStore, otherStore) === "INTER_GROUP";
+  const crossGroup =
+    Boolean(otherStoreId) && scopeBetween(currentStore, otherStore) === "INTER_GROUP";
   const groups = useStoreGroups();
 
   function addItem(productId: string, amount = 1) {
@@ -86,7 +87,6 @@ export function TransferComposer({
         : [...prev, { productId, qty: add }],
     );
   }
-
 
   async function importSheet(file: File) {
     try {
@@ -156,7 +156,7 @@ export function TransferComposer({
     XLSX.writeFile(wb, "stock-transfer-template.xlsx");
   }
 
-  function submit() {
+  async function submit() {
     const clean = items
       .map((i) => ({ productId: i.productId, qty: Math.floor(Number(i.qty) || 0) }))
       .filter((i) => i.qty > 0);
@@ -164,33 +164,38 @@ export function TransferComposer({
       toast.error("Add at least one product with a quantity, and pick a store");
       return;
     }
-    if (kind === "transfer") {
-      // With sub-warehouse levels the check — and the pick — spans every level.
-      for (const i of clean) {
-        const p = productOf(i.productId);
-        const plan = p ? planDeduction(p, allStores, currentStore.id, i.qty) : null;
-        if (!p || !plan || plan.shortBy > 0) {
-          toast.error(
-            `Short by ${plan?.shortBy ?? i.qty} × ${p?.name ?? "item"} at ${currentStore.name}`,
-            { description: "Nothing has been moved. Reduce the quantity or restock first." },
-          );
-          return;
-        }
-      }
-      // Consolidate the picked levels into the sending location so the
-      // dispatch deduction leaves the right shelf empty.
-      if (sourceLevels.length)
+    try {
+      if (kind === "transfer") {
+        // With sub-warehouse levels the check — and the pick — spans every level.
         for (const i of clean) {
           const p = productOf(i.productId);
-          if (!p) continue;
-          for (const pick of planDeduction(p, allStores, currentStore.id, i.qty).picks) {
-            if (pick.storeId === currentStore.id) continue;
-            adjustStock(i.productId, -pick.qty, pick.storeId);
-            adjustStock(i.productId, pick.qty, currentStore.id);
+          const plan = p ? planDeduction(p, allStores, currentStore.id, i.qty) : null;
+          if (!p || !plan || plan.shortBy > 0) {
+            toast.error(
+              `Short by ${plan?.shortBy ?? i.qty} × ${p?.name ?? "item"} at ${currentStore.name}`,
+              { description: "Nothing has been moved. Reduce the quantity or restock first." },
+            );
+            return;
           }
         }
+        // Consolidate the picked levels into the sending location so the
+        // dispatch deduction leaves the right shelf empty.
+        if (sourceLevels.length)
+          for (const i of clean) {
+            const p = productOf(i.productId);
+            if (!p) continue;
+            for (const pick of planDeduction(p, allStores, currentStore.id, i.qty).picks) {
+              if (pick.storeId === currentStore.id) continue;
+              await moveStock(i.productId, pick.qty, pick.storeId, currentStore.id);
+            }
+          }
+      }
+      await onSubmit({ otherStoreId, items: clean, note });
+    } catch (error) {
+      toast.error(
+        error instanceof Error ? error.message : "The stock movement could not be saved.",
+      );
     }
-    onSubmit({ otherStoreId, items: clean, note });
   }
 
   const totalUnits = items.reduce((a, i) => a + (Number(i.qty) || 0), 0);
@@ -218,9 +223,7 @@ export function TransferComposer({
               storeId={sourceStoreId || currentStore.id}
               storeCode={stores.find((s) => s.id === sourceStoreId)?.code}
               destinationStoreId={kind === "transfer" ? otherStoreId : currentStore.id}
-              destinationStoreCode={
-                kind === "transfer" ? otherStore?.code : currentStore.code
-              }
+              destinationStoreCode={kind === "transfer" ? otherStore?.code : currentStore.code}
               onPick={(p, qty) => addItem(p.id, qty)}
             />
 
@@ -268,9 +271,9 @@ export function TransferComposer({
               <p className="mt-3 rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-xs text-amber-700 dark:text-amber-300">
                 {groupName(groups, groupOf(currentStore))} and{" "}
                 {groupName(groups, groupOf(otherStore))} are different groups, so this request
-                always waits for an authorised approver — someone other than you — before any
-                stock moves. On arrival each line is matched into the receiving group's own
-                catalogue by barcode.
+                always waits for an authorised approver — someone other than you — before any stock
+                moves. On arrival each line is matched into the receiving group's own catalogue by
+                barcode.
               </p>
             )}
             <div className="mt-4 space-y-1">
@@ -321,8 +324,8 @@ export function TransferComposer({
                       {plan &&
                         (plan.shortBy > 0 ? (
                           <div className="numeric text-[11px] text-destructive">
-                            Short by {plan.shortBy} ·{" "}
-                            {availableAt(p!, allStores, currentStore.id)} across all levels
+                            Short by {plan.shortBy} · {availableAt(p!, allStores, currentStore.id)}{" "}
+                            across all levels
                           </div>
                         ) : (
                           <div className="numeric text-[11px] text-primary">

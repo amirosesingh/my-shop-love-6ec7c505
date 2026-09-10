@@ -52,7 +52,7 @@ export function QuickMemberDialog({
     setTier("Bronze");
   }, [open, prefill]);
 
-  const save = () => {
+  const save = async () => {
     if (!name.trim()) {
       toast.error("Member name is required");
       return;
@@ -68,12 +68,16 @@ export function QuickMemberDialog({
       totalSpend: 0,
       joinedAt: new Date().toISOString().slice(0, 10),
     };
-    upsertMember(member);
-    onOpenChange(false);
-    toast.success(`${member.name} enrolled and attached`);
-    onCreated(member);
-    // Strict gateways want the number proven before the member earns points.
-    if (gateway?.active && (member.phone || member.email)) setVerifying(member);
+    try {
+      await upsertMember(member);
+      onOpenChange(false);
+      toast.success(`${member.name} enrolled and attached`);
+      onCreated(member);
+      // Strict gateways want the number proven before the member earns points.
+      if (gateway?.active && (member.phone || member.email)) setVerifying(member);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Member could not be saved.");
+    }
   };
 
   if (verifying) {
@@ -87,9 +91,15 @@ export function QuickMemberDialog({
           phone: verifying.phone,
           email: verifying.email,
         }}
-        onVerified={() => {
-          upsertMember({ ...verifying, verified: true });
-          setVerifying(null);
+        onVerified={async () => {
+          try {
+            await upsertMember({ ...verifying, verified: true });
+            setVerifying(null);
+          } catch (error) {
+            toast.error(
+              error instanceof Error ? error.message : "Verification could not be saved.",
+            );
+          }
         }}
       />
     );

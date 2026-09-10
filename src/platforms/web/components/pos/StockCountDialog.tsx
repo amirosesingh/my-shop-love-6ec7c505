@@ -206,7 +206,7 @@ export function StockCountDialog({
   const codeRef = useRef<HTMLInputElement>(null);
   const countRef = useRef<HTMLInputElement>(null);
   const draftCreatedAt = useRef<string | null>(null);
-  const savingRef = useRef(false);
+  const savingRef = useRef<Promise<{ id: string; ref: string | null } | null> | null>(null);
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const match = useMemo(() => resolveByBarcode(products, code), [products, code]);
@@ -258,42 +258,45 @@ export function StockCountDialog({
    * and the guard makes an overlapping call a no-op, so one counting session
    * can never leave two rows behind.
    */
-  const persistDraft = useCallback(() => {
-    if (savingRef.current) return;
-    if (!rows.length && !draftId) return;
-    savingRef.current = true;
-    try {
-      let id = draftId;
-      let ref = reference;
-      if (!id) {
-        id = crypto.randomUUID();
-        ref = nextStockRef(numbering, currentStore.code || currentStore.id);
-        draftCreatedAt.current = new Date().toISOString();
+  const persistDraft = useCallback((): Promise<{ id: string; ref: string | null } | null> => {
+    if (savingRef.current) return savingRef.current;
+    if (!rows.length && !draftId) return null;
+    const run = (async () => {
+      try {
+        let id = draftId;
+        let ref = reference;
+        if (!id) {
+          id = crypto.randomUUID();
+          ref = nextStockRef(numbering, currentStore.code || currentStore.id);
+          draftCreatedAt.current = new Date().toISOString();
+        }
+        await db.saveStockCountDraft({
+          id,
+          reference: ref,
+          storeId: currentStore.id,
+          storeCode: currentStore.code ?? null,
+          terminalId: localTerminalId(),
+          staffId: user?.staffId ?? null,
+          staffName: user?.name ?? null,
+          status: "draft",
+          reason: reason || null,
+          note,
+          lines: rows,
+          totalImpact: rows.reduce((s, r) => s + (r.counted - r.system) * r.cost, 0),
+          createdAt: draftCreatedAt.current ?? new Date().toISOString(),
+        });
         setDraftId(id);
         setReference(ref);
+        setSavedAt(new Date().toISOString());
+        setDirty(false);
+        onChanged();
+        return { id, ref };
+      } finally {
+        savingRef.current = null;
       }
-      db.saveStockCountDraft({
-        id,
-        reference: ref,
-        storeId: currentStore.id,
-        storeCode: currentStore.code ?? null,
-        terminalId: localTerminalId(),
-        staffId: user?.staffId ?? null,
-        staffName: user?.name ?? null,
-        status: "draft",
-        reason: reason || null,
-        note,
-        lines: rows,
-        totalImpact: rows.reduce((s, r) => s + (r.counted - r.system) * r.cost, 0),
-        createdAt: draftCreatedAt.current ?? new Date().toISOString(),
-      });
-      setSavedAt(new Date().toISOString());
-      setDirty(false);
-      onChanged();
-      return ref;
-    } finally {
-      savingRef.current = false;
-    }
+    })();
+    savingRef.current = run;
+    return run;
   }, [rows, reason, note, draftId, reference, numbering, currentStore, user, onChanged]);
 
   /** Auto-save: the same write, after the counter pauses. */
@@ -301,16 +304,27 @@ export function StockCountDialog({
     if (!open) return;
     if (!rows.length && !draftId) return;
     setDirty(true);
-    timerRef.current = setTimeout(() => persistDraft(), 800);
+    timerRef.current = setTimeout(() => {
+      void persistDraft().catch((error) => {
+        setDirty(true);
+        toast.error(
+          error instanceof Error ? error.message : "Stock-count draft could not be saved.",
+        );
+      });
+    }, 800);
     return () => {
       if (timerRef.current) clearTimeout(timerRef.current);
     };
   }, [rows, reason, note, open, draftId, persistDraft]);
 
-  const saveNow = () => {
+  const saveNow = async () => {
     if (timerRef.current) clearTimeout(timerRef.current);
-    const ref = persistDraft();
-    toast.success(ref ? `Draft ${ref} saved.` : "Draft saved.");
+    try {
+      const saved = await persistDraft();
+      if (saved) toast.success(saved.ref ? `Draft ${saved.ref} saved.` : "Draft saved.");
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Stock-count draft could not be saved.");
+    }
   };
 
   const queue = (productId: string, qty: number) => {
@@ -355,7 +369,7 @@ export function StockCountDialog({
     codeRef.current?.focus();
   };
 
-  const post = () => {
+  const post = async () => {
     if (posting) return;
     if (!reason) {
       toast.warning("Choose a reason before posting this count.");
@@ -373,20 +387,28 @@ export function StockCountDialog({
       if (timerRef.current) clearTimeout(timerRef.current);
       // What the record looked like before this posting, kept for the audit
       // trail whenever an already-posted count is being corrected.
-      const before = draft?.status === "posted"
-        ? {
-            reason: draft.reason ?? "",
-            note: draft.note ?? "",
-            lines: parseLines(draft.lines),
-            lineCount: draft.line_count ?? 0,
-            totalImpact: Number(draft.total_impact ?? 0),
-            postedAt: draft.posted_at,
-            postedBy: draft.posted_by,
-          }
-        : null;
-      persistDraft();
-      applyStockCount(entries, reason, note, currentStore.id, draftId);
-      if (draftId) db.setStockCountDraftStatus(draftId, "posted", user?.name ?? null);
+      const before =
+        draft?.status === "posted"
+          ? {
+              reason: draft.reason ?? "",
+              note: draft.note ?? "",
+              lines: parseLines(draft.lines),
+              lineCount: draft.line_count ?? 0,
+              totalImpact: Number(draft.total_impact ?? 0),
+              postedAt: draft.posted_at,
+              postedBy: draft.posted_by,
+            }
+          : null;
+      const saved = await persistDraft();
+      const persistedDraftId = saved?.id ?? draftId;
+      await applyStockCount(
+        entries,
+        reason,
+        note,
+        currentStore.id,
+        persistedDraftId,
+        user?.name ?? null,
+      );
       if (before && draftId) {
         const deltas: Record<string, number> = {};
         for (const r of rows) {
@@ -417,6 +439,8 @@ export function StockCountDialog({
       );
       onChanged();
       onOpenChange(false);
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Stock count could not be posted.");
     } finally {
       setPosting(false);
     }
@@ -437,7 +461,8 @@ export function StockCountDialog({
         if (!key) return problems.push(`Row ${i + 2}: no barcode or SKU`);
         const p = resolveByBarcode(products, key);
         if (!p) return problems.push(`Row ${i + 2}: "${key}" is not in the catalogue`);
-        if (Number.isNaN(qty) || qty < 0) return problems.push(`Row ${i + 2}: invalid counted quantity`);
+        if (Number.isNaN(qty) || qty < 0)
+          return problems.push(`Row ${i + 2}: invalid counted quantity`);
         queue(p.id, qty);
       });
       setErrors(problems);

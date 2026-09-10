@@ -337,7 +337,12 @@ function mirror(entity, rows) {
 
 /** Persist a related business transaction in one SQLite transaction. */
 function mirrorBatch(entries, operations) {
-  if (!ready() || !Array.isArray(entries)) return 0;
+  if (!ready()) {
+    const error = new Error(lastError || "Local SQLite store unavailable");
+    error.code = "ESQLITE_UNAVAILABLE";
+    throw error;
+  }
+  if (!Array.isArray(entries)) return 0;
   if (!entries.length && (!Array.isArray(operations) || !operations.length)) return 0;
   const at = nowIso();
   return tx(() => {
@@ -425,17 +430,63 @@ function mirrorBatch(entries, operations) {
   });
 }
 
+/** Prove the exact SQLite write/read/rollback boundary required by checkout. */
+function verifyDurability() {
+  if (!db) return { ok: false, code: "ESQLITE_UNAVAILABLE", error: lastError || "Local SQLite store unavailable" };
+  const id = `durability-probe:${uuid()}`;
+  try {
+    db.exec("BEGIN IMMEDIATE");
+    db.prepare(`INSERT INTO offline_sync_queue
+      (id, table_name, record_id, action_type, payload_json, status, attempts, created_at)
+      VALUES (?, '__durability_probe__', ?, 'UPDATE', '{}', 'pending', 0, ?)`)
+      .run(id, id, nowIso());
+    const written = db.prepare("SELECT id FROM offline_sync_queue WHERE id = ?").get(id);
+    db.exec("ROLLBACK");
+    return written?.id === id
+      ? { ok: true, code: null, engine: "sqlite", path: dbPath, rolledBack: true }
+      : { ok: false, code: "ESQLITE_WRITE", error: "Local SQLite write could not be read back" };
+  } catch (error) {
+    try { db.exec("ROLLBACK"); } catch { /* transaction did not start */ }
+    lastError = error instanceof Error ? error.message : String(error);
+    return { ok: false, code: "ESQLITE_WRITE", error: "Local SQLite store unavailable" };
+  }
+}
+
 function pendingBusinessBatches(limit = 25) {
   if (!ready()) return [];
   return db
     .prepare(
-      `SELECT id, payload_json, attempts, created_at
+      `SELECT id, payload_json, attempts, client_transaction_id, created_at
          FROM offline_sync_queue
         WHERE table_name = '__business_batch__' AND status IN ('pending', 'failed')
         ORDER BY created_at, id LIMIT ?`,
     )
     .all(Math.min(Math.max(Number(limit) || 25, 1), 100))
     .map((row) => ({ ...row, payload: JSON.parse(row.payload_json) }));
+}
+
+function businessBatchStatus() {
+  if (!ready()) return { pending: 0, failed: 0, parked: 0, sales: 0, rows: [] };
+  const rows = db.prepare(
+    `SELECT id, status, attempts, client_transaction_id, created_at, last_attempt_at, error_message
+       FROM offline_sync_queue WHERE table_name = '__business_batch__' ORDER BY created_at, id`,
+  ).all().map((row) => ({ ...row, error_message: row.error_message
+    ? (/PENDING_AUTH/i.test(row.error_message) ? "pending-auth"
+      : /STORE_FORBIDDEN|branch/i.test(row.error_message) ? "branch-mismatch"
+      : /permission|forbidden|unauthorized|session has ended/i.test(row.error_message)
+        ? "authorization-refused" : "cloud-refused") : null }));
+  return { pending: rows.filter((r) => r.status === "pending").length,
+    failed: rows.filter((r) => r.status === "failed").length,
+    parked: rows.filter((r) => r.status === "dead_letter").length,
+    sales: rows.filter((r) => r.client_transaction_id).length, rows };
+}
+
+function retryBusinessBatches() {
+  if (!ready()) return 0;
+  return tx(() => db.prepare(
+    `UPDATE offline_sync_queue SET status = 'pending', attempts = 0, error_message = NULL
+      WHERE table_name = '__business_batch__' AND status IN ('failed', 'dead_letter')`,
+  ).run().changes);
 }
 
 function acknowledgeBusinessBatch(id) {
@@ -831,7 +882,10 @@ module.exports = {
   setScope,
   mirror,
   mirrorBatch,
+  verifyDurability,
   pendingBusinessBatches,
+  businessBatchStatus,
+  retryBusinessBatches,
   acknowledgeBusinessBatch,
   failBusinessBatch,
   listMirror,

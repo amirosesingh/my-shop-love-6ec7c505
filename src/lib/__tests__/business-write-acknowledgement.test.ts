@@ -1,0 +1,82 @@
+import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
+
+const source = (path: string) => readFileSync(path, "utf8");
+
+describe("business UI persistence acknowledgements", () => {
+  it("awaits financial mutations before receipt or refund success", () => {
+    const store = source("src/lib/pos-store.tsx");
+    const receipts = source("src/routes/receipts.tsx");
+    const shifts = source("src/routes/shifts.tsx");
+    expect(store).toContain("await db.refundSale(saleId, `refund:${saleId}`)");
+    expect(store.indexOf("await db.refundSale")).toBeLessThan(
+      store.indexOf("sales: s.sales.map((x) => (x.id === saleId"),
+    );
+    expect(receipts).toContain("await refundSale(selected.id)");
+    expect(receipts).toContain("await changeSalePayment(selected.id");
+    expect(shifts).toContain("await refundSale(s.id)");
+  });
+
+  it("awaits product and member acceptance before changing business state", () => {
+    const store = source("src/lib/pos-store.tsx");
+    const quickMember = source("src/platforms/web/components/pos/QuickMemberDialog.tsx");
+    expect(store).toContain("const target = await db.commitProduct(stored)");
+    expect(store).toContain("const target = await db.commitProducts(updated)");
+    expect(store).toContain("await db.commitProduct(merged)");
+    expect(store).toContain("const target = await db.commitMember(member)");
+    expect(store).toContain("await db.deleteMember(id)");
+    expect(quickMember).toContain("await upsertMember(member)");
+    expect(quickMember).toContain("await upsertMember({ ...verifying, verified: true })");
+  });
+
+  it("makes stock count draft and posting states acknowledgement-driven", () => {
+    const dialog = source("src/platforms/web/components/pos/StockCountDialog.tsx");
+    const store = source("src/lib/pos-store.tsx");
+    expect(dialog).toContain("await db.saveStockCountDraft");
+    expect(dialog).toContain("await persistDraft()");
+    expect(dialog).toContain("await applyStockCount(");
+    expect(store).toContain(".commitStockAdjustments(");
+    expect(store).toContain("draftId ? { id: draftId, by: postedBy }");
+  });
+
+  it("removes the detached purchase-order writer and preserves atomic receiving", () => {
+    const db = source("src/core/api/pos-db.ts");
+    const purchasing = source("src/routes/purchasing.tsx");
+    expect(db).not.toContain("recordPurchaseOrder(");
+    expect(db).toContain('commitOps("Saving receiving invoice"');
+    expect(purchasing).toContain("await db.commitReceivingInvoice(invoice, hubId)");
+    expect(purchasing).toContain(
+      "await db.updateReceivingInvoice(invoice, draftLineRemovals, hubId)",
+    );
+  });
+
+  it("waits for each transfer transition before success UI", () => {
+    const transfer = source("src/routes/transfers.$id.tsx");
+    const request = source("src/routes/requests.$id.tsx");
+    const store = source("src/lib/pos-store.tsx");
+    expect(transfer).toContain("await approveTransfer(transfer.id, lines)");
+    expect(transfer).toContain("await dispatchTransfer(transfer.id, lines)");
+    expect(transfer).toContain("await receiveTransfer(transfer.id)");
+    expect(transfer).toContain("await rejectTransfer(transfer.id, reason)");
+    expect(request).toContain("await approveTransfer(transfer.id, lines)");
+    expect(store).toContain("await saveTransfer({");
+    expect(store).not.toContain("void dispatchTransferInDb");
+    expect(store).not.toContain("void receiveTransferInDb");
+  });
+
+  it("retains only explicitly soft or post-commit asynchronous work", () => {
+    const db = source("src/core/api/pos-db.ts");
+    expect(db).toContain("const queueSoft");
+    expect(db).toContain("void commitOps(context, [op]).catch(note)");
+    expect(db).not.toContain("void commitOps(context, [op]).catch((e) => dbError");
+  });
+
+  it("persists a no-sale audit before opening the cash drawer", () => {
+    const ledger = source("src/lib/drawer-events.ts");
+    const register = source("src/routes/index.tsx");
+    expect(ledger).toContain("await db.commitDrawerEvent({");
+    expect(register).toContain("await recordNoSale({");
+    const noSale = register.slice(register.indexOf("await recordNoSale({"));
+    expect(noSale.indexOf("await recordNoSale({")).toBeLessThan(noSale.indexOf("openCashDrawer()"));
+  });
+});

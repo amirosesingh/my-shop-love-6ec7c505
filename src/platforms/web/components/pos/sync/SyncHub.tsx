@@ -36,7 +36,7 @@ import {
   type SyncAuditRow,
 } from "@/lib/sync-audit";
 import { discardOp, queueView, retryOp, type QueueView } from "@/lib/sync-outbox";
-import { localDb, type SyncQueueRow } from "@/core/local-db/local-db";
+import { localDb, type LocalSyncStatus, type SyncQueueRow } from "@/core/local-db/local-db";
 import {
   dismissConflict,
   listConflicts,
@@ -100,6 +100,7 @@ function SyncHubDesktop() {
   const [localQueue, setLocalQueue] = useState<SyncQueueRow[]>([]);
   const [localStats, setLocalStats] = useState<{ table: string; pending: number; errored: number }[]>([]);
   const [localConnected, setLocalConnected] = useState(false);
+  const [desktopSync, setDesktopSync] = useState<LocalSyncStatus | null>(null);
   const [conflicts, setConflicts] = useState<SyncConflict[]>([]);
   const [unapplied, setUnapplied] = useState<UnappliedMovement[]>([]);
   const [diagnostics, setDiagnostics] = useState<DiagnosticEvent[]>([]);
@@ -120,6 +121,7 @@ function SyncHubDesktop() {
     if (bridge?.status) {
       try {
         const st = await bridge.status();
+        setDesktopSync(st);
         setLocalConnected(!!st.connected);
         setLocalQueue(
           (st.queue ?? []).filter((r) => r.status === "error" || r.status === "quarantined"),
@@ -128,11 +130,13 @@ function SyncHubDesktop() {
           (st as { tables?: { table: string; pending: number; errored: number }[] }).tables ?? [],
         );
       } catch {
+        setDesktopSync(null);
         setLocalConnected(false);
         setLocalQueue([]);
         setLocalStats([]);
       }
     } else {
+      setDesktopSync(null);
       setLocalConnected(false);
       setLocalQueue([]);
       setLocalStats([]);
@@ -232,6 +236,49 @@ function SyncHubDesktop() {
           <Field label="Last sync">{when(engineState.lastSyncAt)}</Field>
           <Field label="Pending changes">{badge.pending}</Field>
           <Field label="Needs attention">{badge.conflicts}</Field>
+          <Field label="Cloud route">{desktopSync?.mutationPath ?? "—"}</Field>
+          <Field label="Pending sales">{desktopSync?.businessBatches?.sales ?? 0}</Field>
+          <Field label="Sale sync status">
+            {(desktopSync?.businessBatches?.parked ?? 0) > 0
+              ? "Sync requires attention"
+              : (desktopSync?.businessBatches?.pending ?? 0) +
+                    (desktopSync?.businessBatches?.failed ?? 0) >
+                  0
+                ? "Pending sync"
+                : desktopSync?.lastBusinessPush?.result === "synced"
+                  ? "Synced to cloud"
+                  : "—"}
+          </Field>
+          <Field label="Last successful push">{when(desktopSync?.lastPushAt)}</Field>
+          <Field label="Last sale acknowledgement">
+            {when(desktopSync?.lastBusinessPush?.acknowledgedAt)}
+            {desktopSync?.lastBusinessPush?.durationMs != null && (
+              <span className="block text-xs text-muted-foreground">
+                {desktopSync.lastBusinessPush.durationMs} ms from push start
+              </span>
+            )}
+          </Field>
+          {(desktopSync?.businessBatches?.sales ?? 0) > 0 && (
+            <Field label="Sale recovery">
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={retrying}
+                onClick={async () => {
+                  setRetrying(true);
+                  try {
+                    await localDb()?.retryErrored();
+                    toast.success("Sale sync retry started");
+                  } finally {
+                    setRetrying(false);
+                    await refresh();
+                  }
+                }}
+              >
+                <RotateCcw className="size-3.5" /> Retry sync
+              </Button>
+            </Field>
+          )}
           <Field label="Offline mirror & audit file" className="sm:col-span-2 lg:col-span-1">
             <span className="break-all text-xs text-muted-foreground">{engine?.path ?? "—"}</span>
             <span className="block text-xs text-muted-foreground">

@@ -25,6 +25,7 @@ describe("Electron durable business persistence", () => {
 
   it("drains and acknowledges the SQLite outbox before the legacy SQL queue", () => {
     const worker = read("electron/sync/worker.cjs");
+    const sqlite = read("electron/db/sqlite.cjs");
     expect(worker).toContain("async function pushSqliteBusinessBatches()");
     expect(worker).toContain("sqlite.acknowledgeBusinessBatch(batch.id)");
     expect(worker).toContain("async function cloudMutation(op)");
@@ -35,6 +36,19 @@ describe("Electron durable business persistence", () => {
     expect(worker.indexOf("await pushSqliteBusinessBatches()")).toBeLessThan(
       worker.indexOf("for (const table of repo.PUSH_TABLES"),
     );
+    expect(worker).toContain('mutationPath = "relay"');
+    expect(worker).toContain('throw new Error("PENDING_AUTH:');
+    expect(worker).toContain("lastBusinessPush");
+    expect(sqlite).toContain("function businessBatchStatus()");
+    expect(sqlite).toContain("function retryBusinessBatches()");
+  });
+
+  it("allows the durable sale RPC through the relay input contract", () => {
+    const endpoint = read("src/lib/sync-endpoint.server.ts");
+    const relay = read("src/core/api/pos-relay.server.ts");
+    expect(endpoint).toContain('z.enum(["sale_refund", "pos_sale_commit"])');
+    expect(relay).toContain('if (op.fn === "pos_sale_commit")');
+    expect(relay).toContain("scope.permissions.can_process_sale !== true");
   });
 
   it("keeps the desktop state projection and cloud snapshot out of localStorage", () => {
@@ -84,5 +98,7 @@ describe("Electron durable business persistence", () => {
     expect(signIns).toContain('await commitOps("cashier-login"');
     expect(suppliers).toContain('await commitOps("Saving supplier"');
     expect(shiftClose).toContain('await commitOps("Cash count (waiting for the line)"');
+    expect(gateway).toContain('new Error("Electron database bridge unavailable")');
+    expect(gateway).toContain('code = "EBRIDGE_UNAVAILABLE"');
   });
 });

@@ -71,7 +71,7 @@ export function TransferStepDialog({
   step: TransferStep;
   transfer: Transfer | null;
   nameOf: (productId: string) => string;
-  onConfirm: (lines: { productId: string; qty: number }[], reason?: string) => void;
+  onConfirm: (lines: { productId: string; qty: number }[], reason?: string) => void | Promise<void>;
   onClose: () => void;
 }) {
   const [qty, setQty] = useState<Record<string, number>>({});
@@ -211,7 +211,7 @@ export function TransferReasonDialog({
 }: {
   transfer: Transfer | null;
   cancelling: boolean;
-  onConfirm: (reason: string) => void;
+  onConfirm: (reason: string) => void | Promise<void>;
   onClose: () => void;
 }) {
   const [reason, setReason] = useState("");

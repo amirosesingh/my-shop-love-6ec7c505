@@ -19,7 +19,10 @@ import {
   when,
 } from "@/platforms/web/components/pos/TransferWorkspace";
 import { StatusHistoryList } from "@/platforms/web/components/pos/StatusHistoryDialog";
-import { TransferStepDialog, TransferReasonDialog } from "@/platforms/web/components/pos/TransferStepDialog";
+import {
+  TransferStepDialog,
+  TransferReasonDialog,
+} from "@/platforms/web/components/pos/TransferStepDialog";
 import type { TransferStep } from "@/platforms/web/components/pos/TransferStepDialog";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
@@ -147,9 +150,7 @@ function TransferDetail() {
           />
           <Fact
             label="To"
-            value={
-              destination ? `${destination.code} · ${destination.name}` : transfer.toStoreId
-            }
+            value={destination ? `${destination.code} · ${destination.name}` : transfer.toStoreId}
           />
           <Fact label="Cluster" value={`${groupOf(source)} → ${groupOf(destination)}`} />
           <Fact label="Status" value={TRANSFER_STATUS_LABELS[transfer.status]} />
@@ -230,15 +231,21 @@ function TransferDetail() {
           transfer={transfer}
           nameOf={(pid) => state.products.find((p) => p.id === pid)?.name ?? "Unknown item"}
           onClose={() => setStep(null)}
-          onConfirm={(lines) => {
+          onConfirm={async (lines) => {
+            let result;
             if (step === "approve") {
-              approveTransfer(transfer.id, lines);
+              result = await approveTransfer(transfer.id, lines);
+              if (!result.success)
+                return void toast.error(result.error ?? "Approval was not saved");
               toast.success(`${transfer.ref} approved`);
             } else if (step === "dispatch") {
-              dispatchTransfer(transfer.id, lines);
+              result = await dispatchTransfer(transfer.id, lines);
+              if (!result.success)
+                return void toast.error(result.error ?? "Dispatch was not saved");
               toast.success(`${transfer.ref} dispatched`);
             } else if (step === "receive") {
-              receiveTransfer(transfer.id);
+              result = await receiveTransfer(transfer.id);
+              if (!result.success) return void toast.error(result.error ?? "Receipt was not saved");
               toast.success(`${transfer.ref} marked as arrived — count it in next`);
               void navigate({ to: "/receiving/$id", params: { id: transfer.id } });
             }
@@ -252,8 +259,9 @@ function TransferDetail() {
           transfer={transfer}
           cancelling={false}
           onClose={() => setRejecting(false)}
-          onConfirm={(reason) => {
-            rejectTransfer(transfer.id, reason);
+          onConfirm={async (reason) => {
+            const result = await rejectTransfer(transfer.id, reason);
+            if (!result.success) return void toast.error(result.error ?? "Rejection was not saved");
             toast.success(`${transfer.ref} rejected`);
             setRejecting(false);
           }}

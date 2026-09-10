@@ -58,8 +58,8 @@ function NewRequest() {
           initialProductIds={prefill ? prefill.split(",").filter(Boolean) : undefined}
           kind="request"
           submitLabel="Send request"
-          onSubmit={({ otherStoreId, items, note }) => {
-            const t = createTransfer({
+          onSubmit={async ({ otherStoreId, items, note }) => {
+            const t = await createTransfer({
               kind: "request",
               fromStoreId: otherStoreId,
               toStoreId: currentStore.id,

@@ -44,7 +44,10 @@ import {
   withdrawPostedEdit,
   type EditGrant,
 } from "@/lib/record-edit-flow";
-import { StockCountDialog, type StockRecordRow } from "@/platforms/web/components/pos/StockCountDialog";
+import {
+  StockCountDialog,
+  type StockRecordRow,
+} from "@/platforms/web/components/pos/StockCountDialog";
 import { StockRecordView } from "@/platforms/web/components/pos/StockRecordView";
 
 const ALL = "all";
@@ -155,12 +158,16 @@ function StockOperationsPage() {
     }
   };
 
-  const discardDraft = (id: string) => {
-    db.setStockCountDraftStatus(id, "discarded", user?.name ?? null);
-    setDiscardTarget(null);
-    setCountOpen(false);
-    toast.success("Draft discarded — no stock was changed.");
-    void refresh();
+  const discardDraft = async (id: string) => {
+    try {
+      await db.setStockCountDraftStatus(id, "discarded", user?.name ?? null);
+      setDiscardTarget(null);
+      setCountOpen(false);
+      toast.success("Draft discarded — no stock was changed.");
+      await refresh();
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : "Draft could not be discarded.");
+    }
   };
 
   return (
@@ -259,7 +266,11 @@ function StockOperationsPage() {
                           </Badge>
                         </TableCell>
                         <TableCell
-                          title={r.posted_at ? `Posted ${new Date(r.posted_at).toLocaleString()}` : undefined}
+                          title={
+                            r.posted_at
+                              ? `Posted ${new Date(r.posted_at).toLocaleString()}`
+                              : undefined
+                          }
                         >
                           {r.created_at ? new Date(r.created_at).toLocaleString() : "—"}
                         </TableCell>
@@ -269,7 +280,9 @@ function StockOperationsPage() {
                           {money(Number(r.total_impact ?? 0))}
                         </TableCell>
                         <TableCell>{r.staff_name || "—"}</TableCell>
-                        <TableCell className="text-muted-foreground">{r.posted_by || "—"}</TableCell>
+                        <TableCell className="text-muted-foreground">
+                          {r.posted_by || "—"}
+                        </TableCell>
                         <TableCell className="space-x-2 whitespace-nowrap text-right">
                           <Button size="sm" variant="ghost" onClick={() => setViewing(r)}>
                             View
@@ -405,7 +418,8 @@ export const Route = createFileRoute("/stock-operations")({
       { property: "og:title", content: "Stock Operations — Retail" },
       {
         property: "og:description",
-        content: "Reference-numbered stock count records, drafts and posted adjustments in one list.",
+        content:
+          "Reference-numbered stock count records, drafts and posted adjustments in one list.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },

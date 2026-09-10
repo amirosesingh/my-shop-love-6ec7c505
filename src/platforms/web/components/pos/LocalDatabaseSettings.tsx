@@ -389,6 +389,18 @@ export function LocalDatabaseSettings() {
 
 
       <div className="grid gap-2 text-sm sm:grid-cols-3">
+        <Stat
+          label="Electron trading durability"
+          value={status?.durability?.ok ? "SQLite ready" : "SQLite unavailable"}
+        />
+        <Stat
+          label="SQL Server projection"
+          value={status?.sqlServer?.ok ? "Write transaction ready" : "Connection unavailable"}
+        />
+        <Stat
+          label="Active database"
+          value={status?.sqlServer?.activeDb ?? status?.database ?? config.database ?? "—"}
+        />
         <Stat label="Waiting to sync" value={String(totals.pending)} />
         <Stat label="Synced" value={String(totals.synced)} />
         <Stat label="Failed" value={String(totals.errored)} />

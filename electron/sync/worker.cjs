@@ -58,6 +58,8 @@ const CLOUD_MISSING_RETRY_MS = 10 * 60 * 1000;
  * worker, which clears the flag.
  */
 let credentialsInvalid = false;
+let mutationPath = "pending-auth";
+let lastBusinessPush = null;
 const CREDENTIAL_ERROR_RE =
   /invalid api ?key|bad jwt|jwt expired|invalid token|unauthorized|not recognised|forbidden/i;
 
@@ -67,6 +69,15 @@ function isCredentialError(err) {
   const msg = String(err?.message ?? err ?? "");
   // A bare HTTP 400/401/403 embedded in a relay error message counts too.
   return CREDENTIAL_ERROR_RE.test(msg) || /\((401|403)\)/.test(msg);
+}
+
+function safeFailureReason(value) {
+  const message = String(value ?? "sync failed");
+  if (/PENDING_AUTH/i.test(message)) return "pending-auth";
+  if (/STORE_FORBIDDEN|branch/i.test(message)) return "branch-mismatch";
+  if (/permission|forbidden|unauthorized|session has ended/i.test(message)) return "authorization-refused";
+  if (/timed? ?out|network|fetch|connect|temporar/i.test(message)) return "cloud-unreachable";
+  return "cloud-refused";
 }
 
 /** Rows per request on every pull; the server caps a single read well below a
@@ -259,6 +270,7 @@ function init({
     repo.setScope({ storeId: branchId, terminalId: credentials.terminalToken ?? "" });
   }
   relayUrl = relay || null;
+  mutationPath = relayUrl ? "pending-auth" : accessToken ? "authenticated-direct" : "pending-auth";
   // Fresh credentials (re)saved: any earlier rejection no longer applies.
   credentialsInvalid = false;
   if (onChange) notify = onChange;
@@ -267,6 +279,7 @@ function init({
 async function cloudUpsert(table, rows) {
   const bearer = credentials.sessionToken || credentials.accessToken;
   if (relayUrl && (bearer || credentials.cashierToken || credentials.terminalToken)) {
+    mutationPath = "relay";
     const response = await fetch(relayUrl, {
       method: "POST",
       headers: {
@@ -290,6 +303,11 @@ async function cloudUpsert(table, rows) {
     }
     return;
   }
+  if (relayUrl || !credentials.accessToken) {
+    mutationPath = "pending-auth";
+    throw new Error("PENDING_AUTH: sign in or re-register this terminal before cloud sync");
+  }
+  mutationPath = "authenticated-direct";
   const { error } = await supabase.from(table).upsert(rows, { onConflict: "id" });
   if (error) throw error;
 }
@@ -298,6 +316,7 @@ async function cloudMutation(op) {
   if (op.kind === "insert" || op.kind === "upsert") return cloudUpsert(op.table, op.rows);
   const bearer = credentials.sessionToken || credentials.accessToken;
   if (relayUrl && (bearer || credentials.cashierToken || credentials.terminalToken)) {
+    mutationPath = "relay";
     const response = await fetch(relayUrl, {
       method: "POST",
       headers: {
@@ -317,6 +336,11 @@ async function cloudMutation(op) {
     }
     return;
   }
+  if (relayUrl || !credentials.accessToken) {
+    mutationPath = "pending-auth";
+    throw new Error("PENDING_AUTH: sign in or re-register this terminal before cloud sync");
+  }
+  mutationPath = "authenticated-direct";
   if (op.kind === "rpc") {
     const { error } = await supabase.rpc(op.fn, op.args ?? {});
     if (error) throw error;
@@ -364,6 +388,10 @@ async function pushSqliteBusinessBatches() {
   for (const batch of batches) {
     const ops = Array.isArray(batch.payload?.ops) ? batch.payload.ops : [];
     try {
+      const pushStartedAt = new Date().toISOString();
+      lastBusinessPush = { batchId: batch.id, clientTransactionId: batch.client_transaction_id ?? null,
+        localCommittedAt: batch.created_at, pushStartedAt, acknowledgedAt: null,
+        durationMs: null, result: "pushing" };
       const saleOp = ops.find((op) => op?.table === "sales" && Array.isArray(op.rows) && op.rows.length === 1);
       const atomicTables = new Set(["sales", "sale_items", "payment_transactions", "item_activity_logs"]);
       let replayOps = ops;
@@ -409,9 +437,15 @@ async function pushSqliteBusinessBatches() {
         if (ids.length) await repo.markSynced(op.table, ids).catch(() => {});
       }
       sqlite.acknowledgeBusinessBatch(batch.id);
+      const acknowledgedAt = new Date().toISOString();
+      lastBusinessPush = { ...lastBusinessPush, acknowledgedAt,
+        durationMs: Date.parse(acknowledgedAt) - Date.parse(pushStartedAt), result: "synced" };
       pushed += 1;
     } catch (error) {
       const message = error?.message ?? String(error);
+      if (/unauthorized|forbidden|permission|session has ended|STORE_FORBIDDEN/i.test(message))
+        mutationPath = "authorization-refused";
+      lastBusinessPush = { ...lastBusinessPush, result: "failed", reason: safeFailureReason(message) };
       sqlite.failBusinessBatch(batch.id, message, /STALE_RULES/i.test(message) ? 1 : MAX_ATTEMPTS);
       failed += 1;
       // Preserve batch order: a later transaction must not overtake a failed
@@ -1143,6 +1177,9 @@ async function status() {
       phase,
       enabled,
       credentialsInvalid,
+      mutationPath,
+      businessBatches: sqlite.businessBatchStatus?.() ?? { pending: 0, failed: 0, parked: 0, sales: 0, rows: [] },
+      lastBusinessPush,
       cloudMissing: [...cloudMissing.keys()],
       tables: await repo.stats(),
       queue: await repo.queueRows(60),
