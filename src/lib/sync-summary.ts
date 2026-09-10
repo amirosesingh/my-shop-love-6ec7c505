@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { classifyFailure, type SyncFailureKind } from "./sync-log";
 import { queueView, subscribeOutbox, lastSyncedAt, type QueueView } from "./sync-outbox";
 import { subscribeSyncState, syncState } from "./sync-status";
+import { hasLocalDb } from "@/core/local-db/local-db";
 
 const ACK_KEY = "pos.sync.lastAckAt";
 
@@ -61,8 +62,9 @@ export function queueFailureKind(row: QueueView): SyncFailureKind | null {
 
 export function summarise(rows: QueueView[] = queueView()): SyncSummary {
   const engine = syncState();
-  const failedRows = rows.filter((r) => r.state === "refused");
-  const waiting = rows.filter((r) => r.state !== "refused");
+  const desktop = hasLocalDb();
+  const failedRows = desktop ? [] : rows.filter((r) => r.state === "refused");
+  const waiting = desktop ? [] : rows.filter((r) => r.state !== "refused");
 
   const reasons = emptyReasons();
   for (const row of rows) {
@@ -80,7 +82,7 @@ export function summarise(rows: QueueView[] = queueView()): SyncSummary {
     busy: engine.phase === "syncing",
     lastSyncAt: engine.lastSyncAt ?? lastSyncedAt(),
     lastAckAt: lastSyncAck(),
-    pending: waiting.length,
+    pending: desktop ? engine.pending : waiting.length,
     failed: failedRows.length,
     oldestPendingAt: oldest ?? null,
     reasons,
