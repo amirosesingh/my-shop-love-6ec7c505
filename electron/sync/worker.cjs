@@ -1153,21 +1153,34 @@ async function restoreEvidence() {
   };
 }
 
-async function run() {
-  if (running || !enabled || !supabase) return;
+async function request(direction = "both") {
+  if (running || !enabled || !supabase) return { ok: false, busy: running };
   // Credentials rejected: stay parked (local trading unaffected) until an
   // admin saves fresh keys, which re-inits the worker and clears the flag.
-  if (credentialsInvalid) return;
+  if (credentialsInvalid) return { ok: false, error: "credentials" };
   running = true;
   try {
-    if (!(await reachable())) return;
-    await push();
-    await pull();
-  } catch {
-    /* next tick retries */
+    if (!(await reachable())) return { ok: false, error: "unreachable" };
+    if (direction === "push") return await push();
+    if (direction === "pull") return await pull();
+    const pushed = await push();
+    const pulled = await pull();
+    return {
+      ok: pushed?.ok !== false && pulled?.ok !== false,
+      pushed: pushed?.pushed ?? 0,
+      failed: pushed?.failed ?? 0,
+      merged: pulled?.merged ?? 0,
+      error: pushed?.error ?? pulled?.error,
+    };
+  } catch (error) {
+    return { ok: false, error: error?.message ?? String(error) };
   } finally {
     running = false;
   }
+}
+
+async function run() {
+  return request("both");
 }
 
 async function status() {
@@ -1210,6 +1223,7 @@ module.exports = {
   setEnabled,
   push,
   pull,
+  request,
   restore,
   restoreStatus,
   verifyRestore,
