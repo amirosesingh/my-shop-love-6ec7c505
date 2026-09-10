@@ -750,6 +750,42 @@ async function runCycle() {
 }
 
 export async function runExclusive(reason: string = "timer"): Promise<void> {
+  // Electron has one sync owner: the main-process worker. The renderer may
+  // request a cycle and display its status, but it never runs a competing
+  // cloud push/pull pipeline of its own.
+  const desktopBridge = localDb();
+  if (desktopBridge) {
+    if (cycleRunning) {
+      cycleQueued = true;
+      return;
+    }
+    cycleRunning = true;
+    setSyncState({ phase: "syncing" });
+    try {
+      const pushed = await desktopBridge.push();
+      const pulled = await desktopBridge.pull();
+      const status = await desktopBridge.status().catch(() => null);
+      setSyncState({
+        phase: status?.phase === "pushing" || status?.phase === "pulling" ? "syncing" : "idle",
+        pending: status?.businessBatches?.pending ?? status?.queue?.length ?? 0,
+        lastSyncAt: status?.lastPushAt ?? status?.lastPullAt ?? undefined,
+        credentialsInvalid: status?.credentialsInvalid ?? false,
+        lastError: pushed.error ?? pulled.error ?? null,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setSyncState({ phase: "idle", lastError: message });
+      recordSync({ direction: "system", entity: reason, status: "failed", error: message });
+    } finally {
+      cycleRunning = false;
+      if (cycleQueued) {
+        cycleQueued = false;
+        void runExclusive("queued");
+      }
+    }
+    return;
+  }
+
   // An unconfigured terminal has no central database to talk to. That is a
   // normal state, not a failure: no request is attempted and nothing is
   // inherited from the web deployment.
@@ -909,10 +945,14 @@ export function startSyncEngine() {
   started = true;
   // Push queued work first, then bring central changes down, then converge the
   // terminal's own database in both directions — one cycle at a time.
-  const tick = () => void runExclusive("timer");
-  // The cycle timer and the heartbeat both follow the saved settings, so a
-  // change in Settings -> Sync takes effect at once, without a restart.
-  let timer = window.setInterval(tick, syncConfig().intervalMs);
+  const desktopBridge = localDb();
+  const tick = () => {
+    if (!desktopBridge) void runExclusive("timer");
+  };
+  // Web/Android retain the renderer timer. Electron already has the worker's
+  // own interval, so the renderer only wakes it for explicit/live/reconnect
+  // events and never installs a second periodic sync loop.
+  let timer = desktopBridge ? 0 : window.setInterval(tick, syncConfig().intervalMs);
   let stopMonitor = startConnectivityMonitor(syncConfig().heartbeatMs);
   let appliedInterval = syncConfig().intervalMs;
   let appliedHeartbeat = syncConfig().heartbeatMs;
@@ -920,8 +960,10 @@ export function startSyncEngine() {
     const cfg = syncConfig();
     if (cfg.intervalMs !== appliedInterval) {
       appliedInterval = cfg.intervalMs;
-      window.clearInterval(timer);
-      timer = window.setInterval(tick, appliedInterval);
+      if (!desktopBridge) {
+        window.clearInterval(timer);
+        timer = window.setInterval(tick, appliedInterval);
+      }
     }
     if (cfg.heartbeatMs !== appliedHeartbeat) {
       appliedHeartbeat = cfg.heartbeatMs;
