@@ -2,8 +2,9 @@
  * Where this till reads and writes: the online database, or the local one.
  *
  * Web and Android are online-only and send every change straight to the central
- * database. Windows stores every change in its local SQL Server transaction
- * first, then the Electron worker synchronizes it to the central database.
+ * database. Windows first commits every business change to its embedded SQLite
+ * durability store. The Electron worker then synchronizes it centrally, while
+ * SQL Server is maintained as a compatibility projection.
  */
 import { isOnlineOnly } from "@/lib/live-mode";
 import { hasFeature } from "@/platform-config/features";
@@ -73,13 +74,52 @@ export function setCloudDirect(on: boolean) {
  * Wording for a total failure, in the operator's terms for this platform.
  *
  * Web and Android are live clients of the central server. Windows must commit
- * to local SQL before its worker can synchronize the change centrally.
+ * to its embedded SQLite durability store before a business action succeeds.
+ * SQL Server projection health is reported separately and must not reject an
+ * already durable transaction.
  */
 export function unreachableMessage(): string {
   return isOnlineOnly()
-    ? "Shift cannot be opened: Central server relay is offline. Please contact an administrator."
-    : "Local Database Required: Unable to save to this terminal's SQL database. " +
-        "Please check the local database connection.";
+    ? "Central database unavailable. Please check the network connection or contact an administrator."
+    : "Local transaction storage unavailable. The payment was not accepted. " +
+        "Open Settings → Database & Cloud Connection and check Trading Ready / SQLite durability.";
+}
+
+function localFailureMessage(cause?: unknown): string {
+  const error = cause as { message?: string; code?: string } | undefined;
+  const detail = String(error?.message ?? "");
+  const code = String(error?.code ?? "").toUpperCase();
+
+  if (code === "EBRIDGE_UNAVAILABLE" || /Electron database bridge unavailable/i.test(detail)) {
+    return "Electron database bridge unavailable. Restart the Retail desktop app.";
+  }
+
+  if (/cannot commit an atomic SQLite batch|update the app/i.test(detail)) {
+    return "This Retail desktop build cannot use the required local transaction store. Update the app before taking payments.";
+  }
+
+  if (
+    code.includes("SQLITE_SCHEMA") ||
+    /SQLite.*schema|schema.*SQLite|no such table|no such column/i.test(detail)
+  ) {
+    return "Local SQLite schema is not ready. Repair the local database from Settings before taking payments.";
+  }
+
+  if (
+    code.includes("SQLITE_WRITE") ||
+    /SQLite.*write|write.*SQLite|readonly database|database is locked|disk.*full/i.test(detail)
+  ) {
+    return "Local SQLite write failed. The payment was not accepted. Check local storage and database health, then retry.";
+  }
+
+  if (
+    code.includes("SQLITE") ||
+    /SQLite|embedded SQLite|localMirrorBatch|local transaction store/i.test(detail)
+  ) {
+    return "Local SQLite store unavailable. The payment was not accepted. Check Trading Ready / SQLite durability in Settings.";
+  }
+
+  return unreachableMessage();
 }
 
 /**
@@ -89,13 +129,7 @@ export function unreachableMessage(): string {
 export class AllTargetsFailed extends Error {
   readonly context: string;
   constructor(context: string, cause?: unknown) {
-    const detail = cause instanceof Error ? cause.message : "";
-    const precise = /Electron database bridge unavailable/i.test(detail)
-      ? "Electron database bridge unavailable. Restart the desktop app."
-      : /SQLite|embedded SQLite/i.test(detail)
-        ? "Local SQLite store unavailable. The sale was not accepted; repair local durability."
-        : unreachableMessage();
-    super(`${context}: ${precise}`);
+    super(`${context}: ${localFailureMessage(cause)}`);
     this.name = "AllTargetsFailed";
     this.context = context;
     if (cause !== undefined) (this as { cause?: unknown }).cause = cause;
@@ -119,8 +153,8 @@ export function noteConnectionRestored() {
 const online = () => !isBrowser() || window.navigator.onLine;
 
 /**
- * Where writes go on this platform: central for live clients, local SQL for
- * the Windows till.
+ * Where writes go on this platform: central for live clients, local durability
+ * first for the Windows till.
  */
 export function effectiveDatabaseMode(): DatabaseMode {
   return isOnlineOnly() ? "online" : "local";
