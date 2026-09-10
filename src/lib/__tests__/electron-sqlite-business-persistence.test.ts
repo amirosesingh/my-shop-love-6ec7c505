@@ -44,6 +44,17 @@ describe("Electron durable business persistence", () => {
     expect(sqlite).toContain("function retryBusinessBatches()");
   });
 
+  it("keeps the Electron main-process worker as the only business sync executor", () => {
+    const engine = read("src/lib/sync-engine.ts");
+    expect(engine).toContain("Electron has one sync owner: the main-process worker");
+    expect(engine).toContain("const desktopBridge = localDb()");
+    expect(engine).toContain("await desktopBridge.push()");
+    expect(engine).toContain("await desktopBridge.pull()");
+    expect(engine).toContain("let timer = desktopBridge ? 0 : window.setInterval");
+    expect(engine).not.toContain("export async function pushLocalPending");
+    expect(engine).not.toContain("export async function pullIntoLocal");
+  });
+
   it("allows the durable sale RPC through the relay input contract", () => {
     const endpoint = read("src/lib/sync-endpoint.server.ts");
     const relay = read("src/core/api/pos-relay.server.ts");
