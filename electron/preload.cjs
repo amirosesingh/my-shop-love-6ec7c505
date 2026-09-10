@@ -53,6 +53,8 @@ contextBridge.exposeInMainWorld("pos", {
   listPrinters: () => invoke("print:list"),
   push: () => invoke("pos:push"),
   pull: () => invoke("pos:pull"),
+  /** Run one mutex-protected Electron sync cycle. */
+  syncNow: () => invoke("pos:sync-now"),
   /** Operator-triggered restore of this branch's trading history. */
   restore: (options) => invoke("pos:restore", options),
   restoreStatus: () => invoke("pos:restore-status"),
