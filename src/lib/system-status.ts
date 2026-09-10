@@ -180,8 +180,11 @@ export function useSystemStatus(): SystemStatus {
   }, []);
 
   const sync = syncState();
-  const pending = pendingCount();
-  const conflicts = conflictCount();
+  // Electron's main-process worker owns the durable queue; browser/Android
+  // continue to use the renderer outbox.
+  const desktop = hasLocalDb();
+  const pending = desktop ? sync.pending : pendingCount();
+  const conflicts = desktop ? 0 : conflictCount();
   const conn = connectivity();
   const syncEnabled = isOnlineSyncEnabled();
   const { tone, label, detail } = describeStatus({
