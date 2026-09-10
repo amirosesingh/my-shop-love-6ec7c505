@@ -699,22 +699,9 @@ declare global {
 
 export type LocalSaleRow = Record<string, unknown>;
 
-export type CreateSalePayload = {
-  sale: LocalSaleRow;
-  items: LocalSaleRow[];
-  products?: LocalSaleRow[];
-  member?: LocalSaleRow | null;
-  branchId?: string | null;
-  exchangeOfBillNumber?: string | null;
-};
-
 export type BranchInfo = { branchId: string | null; branchName: string | null };
 
 export type ElectronDbApi = {
-  /** Commits a bill to local SQL Server in one transaction. Never uses HTTP. */
-  createSale: (
-    payload: CreateSalePayload,
-  ) => Promise<{ ok: boolean; error?: string; id?: string; billNumber?: string }>;
   getProducts: () => Promise<{ ok: boolean; error?: string; products?: LocalSaleRow[] }>;
   getPendingSyncCount: () => Promise<{
     ok: boolean;
