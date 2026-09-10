@@ -95,6 +95,13 @@ describe("Electron durable business persistence", () => {
     expect(pins).toContain('onConflict: "id"');
   });
 
+  it("uses the Electron worker backlog for remote terminal sync commands", () => {
+    const commands = read("src/lib/terminal-commands.ts");
+    expect(commands).toContain("bridge?.syncNow");
+    expect(commands).toContain("workerStatus.businessBatches.pending + workerStatus.businessBatches.failed");
+    expect(commands).toContain(": pendingCount()");
+  });
+
   it("allows the durable sale RPC through the relay input contract", () => {
     const endpoint = read("src/lib/sync-endpoint.server.ts");
     const relay = read("src/core/api/pos-relay.server.ts");
