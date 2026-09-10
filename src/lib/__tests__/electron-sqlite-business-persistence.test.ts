@@ -86,6 +86,15 @@ describe("Electron durable business persistence", () => {
     expect(main).toContain('worker.request("pull")');
   });
 
+  it("lets SQLite-only operations sync without requiring a SQL Server projection table", () => {
+    const worker = read("electron/sync/worker.cjs");
+    const pins = read("src/lib/nav-pins.ts");
+    expect(worker).toContain("const sqlProjectionTables = new Set(repo.TABLES ?? [])");
+    expect(worker).toContain("sqlProjectionTables.has(op?.table)");
+    expect(pins).toContain("id: crypto.randomUUID()");
+    expect(pins).toContain('onConflict: "id"');
+  });
+
   it("allows the durable sale RPC through the relay input contract", () => {
     const endpoint = read("src/lib/sync-endpoint.server.ts");
     const relay = read("src/core/api/pos-relay.server.ts");
