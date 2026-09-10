@@ -1860,17 +1860,6 @@ function registerIpc() {
 
   /* ---------------- offline register database surface ---------------- */
 
-  ipcMain.handle("db:create-sale", async (_e, payload) => {
-    try {
-      const branchId = payload?.branchId ?? (await repo.getState("branch_id"));
-      const result = await repo.createSale({ ...payload, branchId });
-      void worker.run();
-      return { ok: true, ...result };
-    } catch (err) {
-      return fail(err);
-    }
-  });
-
   ipcMain.handle("db:get-products", async () => {
     try {
       return { ok: true, products: await repo.getProducts() };
