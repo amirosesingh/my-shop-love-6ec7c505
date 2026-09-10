@@ -155,6 +155,8 @@ let reconnectDelay = 5_000;
 let reconnectAttempt = 0;
 let lastConnectionError = null;
 let cloudConfig = null;
+let sqlWriteHealth = { ok: false, code: "ENOTCONNECTED", error: "Local SQL Server connection unavailable" };
+let sqliteStartupDirectory = null;
 
 /** The till reported in, the page painted, or a person is looking at a screen. */
 function markStartupSettled() {
@@ -434,8 +436,20 @@ function broadcastStatus(payload) {
 async function statusPayload() {
   const status = await worker.status();
   const config = pool.getConfig();
+  let durability = localDb.verifyDurability?.() ?? { ok: false, code: "ESQLITE_UNAVAILABLE", error: "Local SQLite store unavailable" };
+  if (!durability.ok && sqliteStartupDirectory && !localDb.info().ready) {
+    localDb.init(sqliteStartupDirectory);
+    durability = localDb.verifyDurability?.() ?? durability;
+  }
+  const sqlServer = pool.isConnected?.()
+    ? sqlWriteHealth
+    : { ok: false, code: "ENOTCONNECTED", error: "Local SQL Server connection unavailable" };
   return {
     ...status,
+    connected: Boolean(durability.ok && sqlServer.ok),
+    tradingReady: Boolean(durability.ok),
+    durability,
+    sqlServer,
     cloudConfigured: !!cloudConfig,
     server: config?.server ?? null,
     database: config?.database ?? null,
@@ -448,6 +462,13 @@ async function connectLocal(config) {
   // A pool object is not proof of a usable database: prove it with a real
   // round-trip before anything is told the till is connected.
   const verified = await pool.verify();
+  const write = await pool.verifyWrite();
+  sqlWriteHealth = write;
+  if (!write.ok) {
+    const error = new Error(write.error || "Local SQL Server write transaction unavailable");
+    error.code = write.code || "EWRITE";
+    throw error;
+  }
   reconnectDelay = 5_000;
   reconnectAttempt = 0;
   lastConnectionError = null;
@@ -1487,6 +1508,8 @@ function registerIpc() {
         void worker.run();
         return { ok: true };
       } catch (err) {
+        sqlWriteHealth = { ok: false, code: err?.code ?? "EWRITE", error: "Local SQL Server write failed" };
+        scheduleReconnect(true);
         return fail(err);
       }
     }),
@@ -1947,6 +1970,7 @@ function registerIpc() {
   ipcMain.handle("pos:retry-errored", async () => {
     try {
       await repo.retryErrored();
+      localDb.retryBusinessBatches?.();
       void worker.run();
       return { ok: true };
     } catch (err) {
@@ -2045,7 +2069,8 @@ app.whenReady().then(async () => {
   } catch (error) {
     if (DEBUG) console.warn("[pos] storage hygiene skipped:", fail(error).error);
   }
-  const engine = localDb.init(app.getPath("userData"));
+  sqliteStartupDirectory = app.getPath("userData");
+  const engine = localDb.init(sqliteStartupDirectory);
   if (DEBUG) console.log("[pos] local database:", engine.engine, engine.path);
   registerIpc();
   const boot = health.beginBoot();

@@ -2684,17 +2684,22 @@ function Register() {
                 if (reason.length < NO_SALE_REASON_MIN) return;
                 const approved = await requirePermission("can_no_sale_open");
                 if (!approved) return;
-                recordNoSale({
-                  storeId: currentStore.id,
-                  terminalId: null,
-                  shiftId: activeShift?.id ?? null,
-                  staffId: user?.staffId ?? "unknown",
-                  staffName: user?.name ?? "Unknown",
-                  role: user?.role ?? "unknown",
-                  reason,
-                  note: noSaleNote.trim(),
-                  approvedBy: can("can_no_sale_open") ? null : "supervisor override",
-                });
+                try {
+                  await recordNoSale({
+                    storeId: currentStore.id,
+                    terminalId: null,
+                    shiftId: activeShift?.id ?? null,
+                    staffId: user?.staffId ?? "unknown",
+                    staffName: user?.name ?? "Unknown",
+                    role: user?.role ?? "unknown",
+                    reason,
+                    note: noSaleNote.trim(),
+                    approvedBy: can("can_no_sale_open") ? null : "supervisor override",
+                  });
+                } catch (error) {
+                  notifyError(error, "Logging the drawer opening");
+                  return;
+                }
                 openCashDrawer();
                 setNoSaleOpen(false);
                 setNoSaleReason("");

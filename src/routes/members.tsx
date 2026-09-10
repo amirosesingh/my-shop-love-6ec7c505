@@ -70,8 +70,8 @@ function Members() {
           <div>
             <h1 className="text-2xl font-semibold">Central membership</h1>
             <p className="text-sm text-muted-foreground">
-              {state.members.length} members · {state.members.reduce((a, m) => a + m.points, 0)} points
-              outstanding
+              {state.members.length} members · {state.members.reduce((a, m) => a + m.points, 0)}{" "}
+              points outstanding
             </p>
           </div>
           <div className="flex gap-2">
@@ -153,9 +153,13 @@ function Members() {
                   <Button
                     size="sm"
                     variant="ghost"
-                    onClick={() => {
-                      removeMember(m.id);
-                      toast.success("Member removed");
+                    onClick={async () => {
+                      try {
+                        await removeMember(m.id);
+                        toast.success("Member removed");
+                      } catch (e) {
+                        notifyError(e, "Removing the member");
+                      }
                     }}
                   >
                     <Trash2 className="size-4 text-destructive" />
@@ -167,7 +171,10 @@ function Members() {
         </div>
       </div>
 
-      <MemberHistoryDialog member={historyMember} onOpenChange={(o) => !o && setHistoryMember(null)} />
+      <MemberHistoryDialog
+        member={historyMember}
+        onOpenChange={(o) => !o && setHistoryMember(null)}
+      />
 
       {verifyMember && (
         <OtpVerificationModal
@@ -179,9 +186,13 @@ function Members() {
             phone: verifyMember.phone,
             email: verifyMember.email,
           }}
-          onVerified={() => {
-            void upsertMember({ ...verifyMember, verified: true });
-            setVerifyMember(null);
+          onVerified={async () => {
+            try {
+              await upsertMember({ ...verifyMember, verified: true });
+              setVerifyMember(null);
+            } catch (e) {
+              notifyError(e, "Saving member verification");
+            }
           }}
         />
       )}

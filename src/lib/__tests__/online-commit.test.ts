@@ -125,4 +125,101 @@ describe("commitOps on a Windows till", () => {
     expect(localWriteBatch).toHaveBeenCalledWith("Saving sale", basket);
     expect(listQueue().slice(before)).toEqual([]);
   });
+
+  it("keeps stock quantity, adjustment audit, and count posting in one durable batch", async () => {
+    const product = {
+      id: "p1",
+      name: "Grip",
+      sku: "G1",
+      barcode: "G1",
+      category: "Accessories",
+      price: 10,
+      cost: 4,
+      stockByStore: { store1: 8 },
+      reorderLevel: 2,
+      taxRate: 0,
+    } as never;
+    await db.commitStockAdjustments(
+      [product],
+      [
+        {
+          id: "adj1",
+          productId: "p1",
+          productName: "Grip",
+          sku: "G1",
+          storeId: "store1",
+          reason: "count",
+          previousStock: 5,
+          updatedStock: 8,
+          delta: 3,
+        },
+      ],
+      { id: "count1", by: "Manager" },
+    );
+    const [, batch] = localWriteBatch.mock.calls.at(-1)!;
+    expect(batch.map((op: { table: string }) => op.table)).toEqual([
+      "products",
+      "stock_adjustments",
+      "stock_count_drafts",
+    ]);
+  });
+
+  it.each([
+    [
+      "product",
+      () =>
+        db.commitProduct({
+          id: "p1",
+          name: "Grip",
+          barcode: "G1",
+          sku: "G1",
+          category: "A",
+          price: 1,
+          cost: 1,
+          stockByStore: {},
+          reorderLevel: 0,
+          taxRate: 0,
+        } as never),
+    ],
+    [
+      "member",
+      () =>
+        db.commitMember({
+          id: "m1",
+          code: "M1",
+          name: "A",
+          phone: "1",
+          email: "",
+          tier: "Bronze",
+          points: 0,
+          totalSpend: 0,
+          joinedAt: "2026-01-01",
+        } as never),
+    ],
+    ["refund", () => db.refundSale("s1", "refund:s1")],
+    ["tender correction", () => db.updateSalePayment("s1", "card")],
+    [
+      "stock draft",
+      () => db.saveStockCountDraft({ id: "c1", storeId: "store1", lines: [], totalImpact: 0 }),
+    ],
+    [
+      "stock adjustment",
+      () =>
+        db.recordStockAdjustment({
+          id: "a1",
+          productId: "p1",
+          productName: "Grip",
+          sku: "G1",
+          storeId: "store1",
+          reason: "manual",
+          previousStock: 1,
+          updatedStock: 2,
+          delta: 1,
+        }),
+    ],
+  ])("does not acknowledge a %s when SQLite rejects it", async (_name, write) => {
+    localMirrorBatch.mockResolvedValue({ ok: false, written: 0, error: "disk full" });
+    await expect(write()).rejects.toThrow();
+    expect(localWriteBatch).not.toHaveBeenCalled();
+  });
 });

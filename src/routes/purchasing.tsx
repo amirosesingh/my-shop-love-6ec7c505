@@ -140,7 +140,8 @@ function Purchasing() {
   useEffect(() => {
     void myServerId().then(setMeId);
   }, []);
-  const { state, currentStore, allStores, upsertProduct, adjustStock, syncProducts } = usePos();
+  const { state, currentStore, allStores, upsertProduct, adjustStock, moveStock, syncProducts } =
+    usePos();
   const { can, user, isAdmin, isSupervisor } = useAuth();
   const [invoiceNo, setInvoiceNo] = useState("");
   const [supplier, setSupplier] = useState("");
@@ -311,7 +312,6 @@ function Purchasing() {
     }
   };
 
-
   useEffect(() => {
     void refreshHistory();
     void refreshDrafts();
@@ -467,7 +467,6 @@ function Purchasing() {
     }
   }
 
-
   if (!can("can_receive_purchase_order")) {
     return (
       <AppShell>
@@ -484,8 +483,7 @@ function Purchasing() {
     );
   }
 
-  const findProduct = (code: string) =>
-    resolveByBarcode(state.products, code);
+  const findProduct = (code: string) => resolveByBarcode(state.products, code);
 
   const patch = (id: string, next: Partial<Line>) =>
     setLines((ls) => ls.map((l) => (l.id === id ? { ...l, ...next } : l)));
@@ -493,8 +491,7 @@ function Purchasing() {
   const addLine = (p: Product, qty = 1) =>
     setLines((ls) => {
       const existing = ls.find((l) => l.productId === p.id);
-      if (existing)
-        return ls.map((l) => (l.id === existing.id ? { ...l, qty: l.qty + qty } : l));
+      if (existing) return ls.map((l) => (l.id === existing.id ? { ...l, qty: l.qty + qty } : l));
       return [
         ...ls,
         {
@@ -546,8 +543,12 @@ function Purchasing() {
     });
   }
 
-  function saveDraft() {
-    return saveDraftInner();
+  async function saveDraft() {
+    try {
+      await saveDraftInner();
+    } catch (error) {
+      notifyError(error, "Saving the product");
+    }
   }
 
   /** Download a receiving template the buyer can fill in and upload back. */
@@ -609,7 +610,7 @@ function Purchasing() {
           reorderLevel: 10,
           taxRate: 0.05,
         };
-        upsertProduct(product);
+        await upsertProduct(product);
         addLine(product, qty);
         created++;
       }
@@ -628,11 +629,15 @@ function Purchasing() {
   }
 
   /** Moves one received line out of the hub onto its final location. */
-  function movePutAway(row: PutAwayLine) {
+  async function movePutAway(row: PutAwayLine) {
     const target = putAwayTargets.find((s) => s.id === row.targetId);
     if (!target) return toast.error("Pick a destination first");
-    adjustStock(row.productId, -row.qty, hub.id);
-    adjustStock(row.productId, row.qty, target.id);
+    try {
+      await moveStock(row.productId, row.qty, hub.id, target.id);
+    } catch (error) {
+      notifyError(error, "Moving received stock");
+      return;
+    }
     logger.log("inventory_edit", "Received stock put away", "purchasing", {
       invoiceNo: row.invoiceNo,
       productId: row.productId,
@@ -645,12 +650,12 @@ function Purchasing() {
     toast.success(`${row.qty} × ${row.name} moved to ${target.name}`);
   }
 
-  function saveDraftInner() {
+  async function saveDraftInner() {
     if (!draft) return;
     if (!draft.name.trim()) return toast.error("Item name is required");
     if (!draft.price) return toast.error("Selling price is required");
     const qty = Math.max(1, Number(draftQty) || 1);
-    upsertProduct({ ...draft, ecomPrice: draft.ecomPrice || draft.price });
+    await upsertProduct({ ...draft, ecomPrice: draft.ecomPrice || draft.price });
     addLine(draft, qty);
     toast.success(`“${draft.name}” created and added to the invoice`);
     setDraft(null);
@@ -715,14 +720,14 @@ function Purchasing() {
       if (wasDraft) await db.updateReceivingInvoice(invoice, draftLineRemovals, hubId);
       else await db.commitReceivingInvoice(invoice, hubId);
 
-
-      const movements = lines.map((l) => {
+      const movements = [];
+      for (const l of lines) {
         const previousStock = stockAt(
           state.products.find((p) => p.id === l.productId) ?? ({ stockByStore: {} } as Product),
           hubId,
         );
-        applyLineToStock(l.productId, l.qty, l.cost, l.price, hubId);
-        return {
+        await applyLineToStock(l.productId, l.qty, l.cost, l.price, hubId);
+        movements.push({
           productId: l.productId,
           barcode: l.barcode,
           name: l.name,
@@ -732,8 +737,8 @@ function Purchasing() {
           previousStock,
           updatedStock: previousStock + l.qty,
           storeId: hubId,
-        };
-      });
+        });
+      }
 
       logger.log("inventory_edit", "Receiving order finalized", "purchasing", {
         invoiceNo: ref,
@@ -770,7 +775,6 @@ function Purchasing() {
       clearForm();
       void reconcileAfterPost(invoice, postedIds);
       scanRef.current?.focus();
-
     } catch (e) {
       notifyError(e, "The invoice was not saved");
     } finally {
@@ -783,20 +787,20 @@ function Purchasing() {
    * Post a stock delta for one line and merge cost/price into the product as
    * it is *after* the movement, never a stale copy.
    */
-  function applyLineToStock(
+  async function applyLineToStock(
     productId: string,
     delta: number,
     cost: number,
     price?: number,
     locationId: string = currentStore.id,
   ) {
-    if (delta) adjustStock(productId, delta, locationId);
+    if (delta) await adjustStock(productId, delta, locationId);
     const current = state.products.find((p) => p.id === productId);
     if (!current) return;
     const nextCost = cost;
     const nextPrice = price ?? current.price;
     if (current.cost === nextCost && current.price === nextPrice) return;
-    upsertProduct({
+    await upsertProduct({
       ...current,
       cost: nextCost,
       price: nextPrice,
@@ -832,9 +836,7 @@ function Purchasing() {
         return;
       }
       const original = history.find((h) => h.id === editing.id);
-      const cost = Number(
-        editing.lines.reduce((a, l) => a + l.cost * l.qty, 0).toFixed(2),
-      );
+      const cost = Number(editing.lines.reduce((a, l) => a + l.cost * l.qty, 0).toFixed(2));
       const next: ReceivingInvoice = {
         ...editing,
         invoiceNo: ref,
@@ -846,7 +848,6 @@ function Purchasing() {
       // Corrections rewrite the same movement rows, so the item history shows
       // the corrected quantity rather than the original plus a duplicate.
       await db.updateReceivingInvoice(next, removedLineIds, next.storeId);
-
 
       // Deltas only: nothing is removed and re-added, so history stays intact.
       const deltas: Record<string, number> = {};
@@ -860,11 +861,11 @@ function Purchasing() {
       const auditDeltas: Record<string, number> = { ...deltas };
       for (const l of next.lines) {
         if (!l.productId) continue;
-        applyLineToStock(l.productId, deltas[l.productId] ?? 0, l.cost, l.price);
+        await applyLineToStock(l.productId, deltas[l.productId] ?? 0, l.cost, l.price);
         deltas[l.productId] = 0;
       }
       for (const [productId, delta] of Object.entries(deltas)) {
-        if (delta) adjustStock(productId, delta, currentStore.id);
+        if (delta) await adjustStock(productId, delta, currentStore.id);
       }
 
       logger.log("inventory_edit", "Receiving invoice corrected", "purchasing", {
@@ -929,7 +930,6 @@ function Purchasing() {
       setRemovedLineIds([]);
       showAsPosted(next);
       void reconcileAfterPost(next, next.lines.map((l) => l.productId ?? "").filter(Boolean));
-
     } catch (e) {
       notifyError(e, "The correction was not saved");
     } finally {
@@ -1120,9 +1120,8 @@ function Purchasing() {
           <div className="flex flex-wrap items-center justify-between gap-3">
             <div className="text-sm text-muted-foreground">
               <span className="numeric font-semibold text-foreground">{lines.length}</span> unique
-              items ·{" "}
-              <span className="numeric font-semibold text-foreground">{totals.units}</span> units ·
-              total cost{" "}
+              items · <span className="numeric font-semibold text-foreground">{totals.units}</span>{" "}
+              units · total cost{" "}
               <span className="numeric font-semibold text-foreground">{money(totals.cost)}</span>
               {draftSavedAt && (
                 <span className="ml-2 text-xs text-muted-foreground">
@@ -1200,7 +1199,6 @@ function Purchasing() {
             </div>
           </section>
         )}
-
 
         {pending.length > 0 && (
           <section className="space-y-3 rounded-lg border border-primary/40 bg-primary/5 p-5">
@@ -1368,8 +1366,7 @@ function Purchasing() {
                         </Button>
                       ) : h.status === "posted" ? (
                         h.pendingEditRequestId ? (
-                          !!meId &&
-                          (h.pendingEditBy ?? "").toLowerCase() === meId.toLowerCase() ? (
+                          !!meId && (h.pendingEditBy ?? "").toLowerCase() === meId.toLowerCase() ? (
                             <>
                               <Button
                                 size="sm"
@@ -1533,9 +1530,7 @@ function Purchasing() {
                           className="numeric h-9 text-right"
                           disabled={!mayEditLines}
                           value={l.cost}
-                          onChange={(e) =>
-                            patchEditLine(i, { cost: Number(e.target.value) || 0 })
-                          }
+                          onChange={(e) => patchEditLine(i, { cost: Number(e.target.value) || 0 })}
                         />
                       </TableCell>
                       <TableCell>
@@ -1543,9 +1538,7 @@ function Purchasing() {
                           className="numeric h-9 text-right"
                           disabled={!mayEditLines}
                           value={l.price}
-                          onChange={(e) =>
-                            patchEditLine(i, { price: Number(e.target.value) || 0 })
-                          }
+                          onChange={(e) => patchEditLine(i, { price: Number(e.target.value) || 0 })}
                         />
                       </TableCell>
                       <TableCell>
@@ -1637,7 +1630,10 @@ function Purchasing() {
                   ariaLabel="Category"
                   placeholder="Choose a category"
                   onChange={(v) => setDraft({ ...draft, category: v === PO_NONE ? "" : v })}
-                  options={poOptions(topCategories(selectableCategories(catalogLists)).map((c) => c.name), draft.category)}
+                  options={poOptions(
+                    topCategories(selectableCategories(catalogLists)).map((c) => c.name),
+                    draft.category,
+                  )}
                 />
               </Field>
               <Field label="Group">
@@ -1646,7 +1642,10 @@ function Purchasing() {
                   ariaLabel="Group"
                   placeholder="Choose a group"
                   onChange={(v) => setDraft({ ...draft, group: v === PO_NONE ? "" : v })}
-                  options={poOptions(groupList(selectableCategories(catalogLists)).map((c) => c.name), draft.group)}
+                  options={poOptions(
+                    groupList(selectableCategories(catalogLists)).map((c) => c.name),
+                    draft.group,
+                  )}
                 />
               </Field>
               <Field label="Sub-category">
@@ -1716,10 +1715,7 @@ function Purchasing() {
             <Button variant="outline" onClick={() => setDiscardId(null)}>
               Keep draft
             </Button>
-            <Button
-              variant="destructive"
-              onClick={() => discardId && void discardDraft(discardId)}
-            >
+            <Button variant="destructive" onClick={() => discardId && void discardDraft(discardId)}>
               Discard draft
             </Button>
           </DialogFooter>

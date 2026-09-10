@@ -89,7 +89,13 @@ export function unreachableMessage(): string {
 export class AllTargetsFailed extends Error {
   readonly context: string;
   constructor(context: string, cause?: unknown) {
-    super(`${context}: ${unreachableMessage()}`);
+    const detail = cause instanceof Error ? cause.message : "";
+    const precise = /Electron database bridge unavailable/i.test(detail)
+      ? "Electron database bridge unavailable. Restart the desktop app."
+      : /SQLite|embedded SQLite/i.test(detail)
+        ? "Local SQLite store unavailable. The sale was not accepted; repair local durability."
+        : unreachableMessage();
+    super(`${context}: ${precise}`);
     this.name = "AllTargetsFailed";
     this.context = context;
     if (cause !== undefined) (this as { cause?: unknown }).cause = cause;

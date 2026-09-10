@@ -35,7 +35,6 @@ import { useAuth } from "@/lib/pos-auth";
 import { TRANSFER_STATUS_LABELS } from "@/core/types/pos-types";
 import { exactCodeMatch } from "@/lib/product-search";
 
-
 export const Route = createFileRoute("/receiving/$id")({
   head: () => ({
     meta: [
@@ -86,7 +85,6 @@ function ReceivingWorkspace() {
     }));
     setScan("");
   }
-
 
   // Start blank so the count is a real count, not a rubber stamp.
   useEffect(() => {
@@ -187,9 +185,10 @@ function ReceivingWorkspace() {
           actions={
             inTransit && allowed ? (
               <Button
-                onClick={() => {
-                  receiveTransfer(transfer.id);
-                  toast.success("Marked as arrived — now count it in");
+                onClick={async () => {
+                  const result = await receiveTransfer(transfer.id);
+                  if (result.success) toast.success("Marked as arrived — now count it in");
+                  else toast.error(result.error ?? "Receipt was not saved");
                 }}
               >
                 Mark arrived
@@ -215,8 +214,8 @@ function ReceivingWorkspace() {
         {!mine && (
           <p className="rounded-md border border-amber-500/40 bg-amber-500/10 px-3 py-2 text-sm text-amber-700 dark:text-amber-300">
             This delivery belongs to another branch — you can read it, but only{" "}
-            {stores.find((s) => s.id === transfer.toStoreId)?.name ?? "the destination"} can count it
-            in.
+            {stores.find((s) => s.id === transfer.toStoreId)?.name ?? "the destination"} can count
+            it in.
           </p>
         )}
 
@@ -247,7 +246,6 @@ function ReceivingWorkspace() {
             </div>
           )}
           <Table>
-
             <TableHeader>
               <TableRow>
                 <TableHead>Product</TableHead>

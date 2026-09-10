@@ -53,17 +53,14 @@ function emit() {
 }
 
 /** Records a no-sale drawer open locally first, then pushes it to the cloud. */
-export function recordNoSale(input: Omit<DrawerEvent, "id" | "at">) {
+export async function recordNoSale(input: Omit<DrawerEvent, "id" | "at">) {
   const entry: DrawerEvent = {
     ...input,
     reason: input.reason.trim().slice(0, NO_SALE_REASON_MAX),
     id: crypto.randomUUID(),
     at: new Date().toISOString(),
   };
-  load();
-  events = [entry, ...events].slice(0, MAX);
-  emit();
-  db.recordDrawerEvent({
+  await db.commitDrawerEvent({
     id: entry.id,
     storeId: entry.storeId,
     terminalId: entry.terminalId,
@@ -76,6 +73,9 @@ export function recordNoSale(input: Omit<DrawerEvent, "id" | "at">) {
     approvedBy: entry.approvedBy,
     at: entry.at,
   });
+  load();
+  events = [entry, ...events].slice(0, MAX);
+  emit();
   recordActivity({
     type: "drawer_open",
     severity: "warning",

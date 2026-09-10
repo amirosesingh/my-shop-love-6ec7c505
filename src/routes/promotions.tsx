@@ -104,8 +104,8 @@ function Promotions() {
         <div className="p-6">
           <h1 className="text-2xl font-semibold">Promotions & discounts</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Promotion rules are managed by an administrator. Active offers are applied
-            automatically on your register.
+            Promotion rules are managed by an administrator. Active offers are applied automatically
+            on your register.
           </p>
         </div>
       </AppShell>
@@ -166,7 +166,11 @@ function Promotions() {
                       <div className="flex items-center gap-2">
                         <Switch
                           checked={p.active}
-                          onCheckedChange={(v) => togglePromotion(p.id, v)}
+                          onCheckedChange={(v) => {
+                            void togglePromotion(p.id, v).catch((error) =>
+                              notifyError(error, "Updating promotion"),
+                            );
+                          }}
                           aria-label={`Toggle ${p.name}`}
                         />
                         <Badge
@@ -185,9 +189,13 @@ function Promotions() {
                       <Button
                         size="sm"
                         variant="ghost"
-                        onClick={() => {
-                          removePromotion(p.id);
-                          toast.success("Promotion removed");
+                        onClick={async () => {
+                          try {
+                            await removePromotion(p.id);
+                            toast.success("Promotion removed");
+                          } catch (error) {
+                            notifyError(error, "Removing promotion");
+                          }
                         }}
                       >
                         <Trash2 className="size-4 text-destructive" />
@@ -246,8 +254,8 @@ function Promotions() {
                   placeholder="e.g. Sarah — Instagram"
                 />
                 <p className="text-[11px] text-muted-foreground">
-                  Coupon redemptions from this rule are grouped under this name in the Coupon
-                  Usage report, so collaboration payouts are easy to total.
+                  Coupon redemptions from this rule are grouped under this name in the Coupon Usage
+                  report, so collaboration payouts are easy to total.
                 </p>
               </div>
 
@@ -339,7 +347,11 @@ function Promotions() {
                     className="numeric"
                     value={draft.value ?? 0}
                     onChange={(e) =>
-                      setDraft({ ...draft, value: Number(e.target.value) || 0, valueType: "percent" })
+                      setDraft({
+                        ...draft,
+                        value: Number(e.target.value) || 0,
+                        valueType: "percent",
+                      })
                     }
                   />
                   <p className="text-[11px] text-muted-foreground">

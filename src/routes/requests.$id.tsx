@@ -21,7 +21,10 @@ import {
   when,
 } from "@/platforms/web/components/pos/TransferWorkspace";
 import { StatusHistoryList } from "@/platforms/web/components/pos/StatusHistoryDialog";
-import { TransferStepDialog, TransferReasonDialog } from "@/platforms/web/components/pos/TransferStepDialog";
+import {
+  TransferStepDialog,
+  TransferReasonDialog,
+} from "@/platforms/web/components/pos/TransferStepDialog";
 import { useTransferRecord } from "@/platforms/web/components/pos/TransferWorkspace";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
@@ -130,9 +133,7 @@ function RequestDetail() {
           />
           <Fact
             label="Requesting branch"
-            value={
-              destination ? `${destination.code} · ${destination.name}` : transfer.toStoreId
-            }
+            value={destination ? `${destination.code} · ${destination.name}` : transfer.toStoreId}
           />
           <Fact label="Cluster" value={`${groupOf(source)} → ${groupOf(destination)}`} />
           <Fact label="Status" value={TRANSFER_STATUS_LABELS[transfer.status]} />
@@ -205,8 +206,9 @@ function RequestDetail() {
           transfer={transfer}
           nameOf={(pid) => state.products.find((p) => p.id === pid)?.name ?? "Unknown item"}
           onClose={() => setApproving(false)}
-          onConfirm={(lines) => {
-            approveTransfer(transfer.id, lines);
+          onConfirm={async (lines) => {
+            const result = await approveTransfer(transfer.id, lines);
+            if (!result.success) return void toast.error(result.error ?? "Approval was not saved");
             toast.success(`${transfer.ref} approved — a transfer has been raised`);
             setApproving(false);
           }}
@@ -218,8 +220,9 @@ function RequestDetail() {
           transfer={transfer}
           cancelling={false}
           onClose={() => setRejecting(false)}
-          onConfirm={(reason) => {
-            rejectTransfer(transfer.id, reason);
+          onConfirm={async (reason) => {
+            const result = await rejectTransfer(transfer.id, reason);
+            if (!result.success) return void toast.error(result.error ?? "Rejection was not saved");
             toast.success(`${transfer.ref} rejected`);
             setRejecting(false);
           }}

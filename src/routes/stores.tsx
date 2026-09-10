@@ -2,6 +2,7 @@ import { createFileRoute } from "@tanstack/react-router";
 import { useMemo, useState } from "react";
 import { Archive, ArchiveRestore, Building2, Layers, Plus, ShieldAlert } from "lucide-react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -144,7 +145,7 @@ function Locations() {
     });
   }
 
-  function setPolicy(store: Store, key: BranchPolicyKey, value: boolean) {
+  async function setPolicy(store: Store, key: BranchPolicyKey, value: boolean) {
     const current = branchPolicy(state.settings, store.id);
     const next: BranchPolicy = { ...current, [key]: value };
     updateSettings({
@@ -155,14 +156,14 @@ function Locations() {
     });
     // The private catalogue switch also lives on the branch record, because
     // that is what the central database checks before showing an item.
-    if (key === "privateCatalogue") upsertStore({ ...store, privateCatalogue: value });
+    if (key === "privateCatalogue") await upsertStore({ ...store, privateCatalogue: value });
     toast.success(
       `${BRANCH_POLICY_COPY[key].label} ${value ? "turned on" : "turned off"} for ${store.name}`,
     );
   }
 
   /** Saves the parent, then creates or renames each level underneath it. */
-  function save() {
+  async function save() {
     if (!draft) return;
     const name = draft.name.trim();
     if (!name) return toast.error("Location name is required");
@@ -170,14 +171,19 @@ function Locations() {
     const id = draft.id ?? crypto.randomUUID();
     const code =
       draft.code.trim().toUpperCase() ||
-      `${name.replace(/[^a-zA-Z]/g, "").slice(0, 3).toUpperCase() || "STR"}${stores.length + 1}`;
+      `${
+        name
+          .replace(/[^a-zA-Z]/g, "")
+          .slice(0, 3)
+          .toUpperCase() || "STR"
+      }${stores.length + 1}`;
     const existing = allStores.find((s) => s.id === id);
 
     if (draft.isCentral)
       for (const other of allStores.filter((x) => x.isCentral && x.id !== id))
-        upsertStore({ ...other, isCentral: false });
+        await upsertStore({ ...other, isCentral: false });
 
-    upsertStore({
+    await upsertStore({
       ...(existing ?? { id, active: true }),
       id,
       code,
@@ -205,10 +211,10 @@ function Locations() {
         0,
         wanted.findIndex((s) => s.primary),
       );
-      wanted.forEach((sub, i) => {
+      for (const [i, sub] of wanted.entries()) {
         const subId = sub.id ?? crypto.randomUUID();
         const prior = allStores.find((s) => s.id === subId);
-        upsertStore({
+        await upsertStore({
           ...(prior ?? { id: subId, active: true }),
           id: subId,
           code: prior?.code || `${code}-L${i + 1}`,
@@ -222,7 +228,7 @@ function Locations() {
           groupId: draft.groupId.trim() || prior?.groupId,
           active: prior ? prior.active !== false : true,
         } as Store);
-      });
+      }
     }
 
     toast.success(`${name} ${isNew ? "created" : "saved"}`);
@@ -511,12 +517,11 @@ function Locations() {
                           {g.name}
                         </option>
                       ))}
-                      {draft.groupId &&
-                        !pickableGroups.some((g) => g.id === draft.groupId) && (
-                          <option value={draft.groupId}>
-                            {groupName(groups, draft.groupId)} (not selectable)
-                          </option>
-                        )}
+                      {draft.groupId && !pickableGroups.some((g) => g.id === draft.groupId) && (
+                        <option value={draft.groupId}>
+                          {groupName(groups, draft.groupId)} (not selectable)
+                        </option>
+                      )}
                     </select>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Groups are created in Settings → Groups &amp; clusters. Moves between two
@@ -577,7 +582,11 @@ function Locations() {
                           onWarning={copy.onWarning}
                           offWarning={copy.offWarning}
                           checked={branchPolicy(state.settings, store.id)[key]}
-                          onConfirmedChange={(v) => setPolicy(store, key, v)}
+                          onConfirmedChange={(v) => {
+                            void setPolicy(store, key, v).catch((error) =>
+                              notifyError(error, "Saving branch policy"),
+                            );
+                          }}
                         />
                       );
                     })}
@@ -585,14 +594,19 @@ function Locations() {
                 )}
 
                 <div className="flex flex-wrap gap-2">
-                  <Button className="flex-1" onClick={save}>
+                  <Button
+                    className="flex-1"
+                    onClick={() =>
+                      void save().catch((error) => notifyError(error, "Saving location"))
+                    }
+                  >
                     {draft.id ? "Save location" : "Create location"}
                   </Button>
                   {draft.id && (
                     <>
                       <Button
                         variant="outline"
-                        onClick={() => {
+                        onClick={async () => {
                           setCurrentStore(draft.id!);
                           toast.success(`Now viewing ${draft.name}`);
                         }}
@@ -601,17 +615,21 @@ function Locations() {
                       </Button>
                       <Button
                         variant="ghost"
-                        onClick={() => {
+                        onClick={async () => {
                           const store = allStores.find((x) => x.id === draft.id);
                           if (!store) return;
                           const archiving = isActiveLocation(store);
-                          const refusal = archiveStore(store.id, archiving);
-                          if (refusal)
-                            return toast.error(`${store.name} cannot be archived`, {
-                              description: refusal,
-                            });
-                          toast.success(`${store.name} ${archiving ? "archived" : "restored"}`);
-                          setDraft(null);
+                          try {
+                            const refusal = await archiveStore(store.id, archiving);
+                            if (refusal)
+                              return toast.error(`${store.name} cannot be archived`, {
+                                description: refusal,
+                              });
+                            toast.success(`${store.name} ${archiving ? "archived" : "restored"}`);
+                            setDraft(null);
+                          } catch (error) {
+                            notifyError(error, "Updating location");
+                          }
                         }}
                       >
                         {isActiveLocation(

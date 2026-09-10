@@ -649,10 +649,10 @@ function Inventory() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() => {
+                    onClick={async () => {
                       const name = bulkCategory.trim();
                       if (!name) return toast.error("Type the category to move them to");
-                      patchProducts(selected, { category: name });
+                      await patchProducts(selected, { category: name });
                       setBulkCategory("");
                       toast.success(`${selected.length} products moved to ${name}`);
                     }}
@@ -834,7 +834,15 @@ function Inventory() {
                       </Button>
                     )}
                     {canEdit && p.archived && (
-                      <Button size="sm" variant="outline" onClick={() => restoreProducts([p.id])}>
+                      <Button
+                        size="sm"
+                        variant="outline"
+                        onClick={() =>
+                          void restoreProducts([p.id]).catch((error) =>
+                            notifyError(error, "Restoring product"),
+                          )
+                        }
+                      >
                         Restore
                       </Button>
                     )}
@@ -869,10 +877,14 @@ function Inventory() {
       <ProductDeleteBlockedDialog
         blocked={blocked}
         onClose={() => setBlocked([])}
-        onHide={(ids) => {
-          archiveProducts(ids);
-          setBlocked([]);
-          toast.success(`${ids.length > 1 ? "Products" : "Product"} archived — history kept`);
+        onHide={async (ids) => {
+          try {
+            await archiveProducts(ids);
+            setBlocked([]);
+            toast.success(`${ids.length > 1 ? "Products" : "Product"} archived — history kept`);
+          } catch (error) {
+            notifyError(error, "Archiving products");
+          }
         }}
       />
       <ItemActivityDrawer product={logTarget} onClose={() => setLogTarget(null)} />

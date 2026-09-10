@@ -164,7 +164,7 @@ export function deriveLocalDbState(input: {
   available: boolean;
   configured: boolean;
   status:
-    | (Pick<LocalSyncStatus, "connected" | "error"> & {
+    | (Pick<LocalSyncStatus, "connected" | "error" | "durability" | "sqlServer"> & {
         errorHint?: string | null;
         errorCode?: string | null;
       })
@@ -174,6 +174,16 @@ export function deriveLocalDbState(input: {
   if (!input.available) return describeLocalDbState("unavailable");
   if (input.pending) return describeLocalDbState(input.pending);
   if (input.status?.connected) return describeLocalDbState("connected");
+  if (input.status?.durability && !input.status.durability.ok)
+    return describeLocalDbState(
+      "failed",
+      "Local SQLite store unavailable. Trading durability is not ready.",
+    );
+  if (input.status?.sqlServer && !input.status.sqlServer.ok)
+    return describeLocalDbState(
+      "failed",
+      "Local SQL Server connection unavailable. SQLite offline durability remains available.",
+    );
   // A repeated driver crash is deterministic: the banner says so and the till
   // stops pretending a retry is imminent.
   if (input.status?.errorCode === "EDRIVER_CRASH_LOOP") {
@@ -367,6 +377,15 @@ export type RestoreDrill = {
 export type LocalSyncStatus = {
 
   connected: boolean;
+  tradingReady?: boolean;
+  durability?: { ok: boolean; code?: string | null; error?: string; rolledBack?: boolean };
+  sqlServer?: {
+    ok: boolean;
+    code?: string | null;
+    error?: string;
+    activeDb?: string | null;
+    rolledBack?: boolean;
+  };
   error?: string;
   /** Structured reason from the shell, so the banner can be specific. */
   errorCode?: string | null;
@@ -378,6 +397,16 @@ export type LocalSyncStatus = {
   enabled?: boolean;
   /** The central project rejected this device's keys — sync is parked. */
   credentialsInvalid?: boolean;
+  mutationPath?: "relay" | "authenticated-direct" | "pending-auth" | "authorization-refused";
+  businessBatches?: {
+    pending: number; failed: number; parked: number; sales: number;
+    rows: Array<{ id: string; status: "pending" | "failed" | "dead_letter"; attempts: number;
+      client_transaction_id?: string | null; created_at: string; last_attempt_at?: string | null;
+      error_message?: string | null }>;
+  };
+  lastBusinessPush?: { batchId: string; clientTransactionId?: string | null;
+    localCommittedAt: string; pushStartedAt: string; acknowledgedAt?: string | null;
+    durationMs?: number | null; result: "pushing" | "synced" | "failed"; reason?: string } | null;
   tables: TableSyncStat[];
   queue?: SyncQueueRow[];
   lastPushAt: string | null;

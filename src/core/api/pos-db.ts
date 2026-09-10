@@ -64,7 +64,6 @@ export function dbError(context: string, error: unknown) {
   notifyError(error, context);
 }
 
-
 const num = (v: unknown, fallback = 0) => (v == null ? fallback : Number(v));
 
 /** Guard verdict: blocked with a reason, clear to delete, or not verifiable. */
@@ -578,7 +577,9 @@ const saleColumns = () =>
 /** True when a failure is "that column is not in this database (yet)". */
 export const isMissingTxnColumn = (message: string | undefined | null) =>
   !!message &&
-  /client_transaction_id|store_name_snapshot|store_address_snapshot|rounding_adjustment|rounding_label/.test(message) &&
+  /client_transaction_id|store_name_snapshot|store_address_snapshot|rounding_adjustment|rounding_label/.test(
+    message,
+  ) &&
   /does not exist|schema cache/i.test(message);
 
 /**
@@ -832,7 +833,6 @@ const receivingActivityOps = (inv: ReceivingInvoice, storeId?: string | null) =>
     : [];
 };
 
-
 /** Stable UUID children: rebuilding a checkout after a restart reuses the same keys. */
 export function stableChildId(parentId: string, group: string, index: number): string {
   const hex = parentId.replace(/-/g, "").toLowerCase();
@@ -924,13 +924,9 @@ export async function loadCloudState(storeId?: string | null): Promise<CloudSlic
 
     (async () => {
       const read = () => {
-        let query = supabase
-          .from("sales")
-          .select(saleColumns());
+        let query = supabase.from("sales").select(saleColumns());
         if (storeId) query = query.eq("store_id", storeId);
-        return query
-          .order("created_at", { ascending: false })
-          .limit(500);
+        return query.order("created_at", { ascending: false }).limit(500);
       };
       const first = await read();
       if (first.error && isMissingTxnColumn(first.error.message)) {
@@ -1416,10 +1412,9 @@ export async function loadProductsByIds(ids: string[]): Promise<Product[]> {
  * surface failure instead of pretending browser storage is a business DB.
  */
 const queue = (context: string, op: SyncOp) => {
-  // All fire-and-forget model helpers still use the same authoritative commit
-  // gateway as awaited checkout. On Electron this guarantees SQLite + outbox
-  // durability instead of creating a second SQL Server-only mutation path.
-  void commitOps(context, [op]).catch((e) => dbError(context, e));
+  // Legacy-shaped model helpers return the authoritative acknowledgement.
+  // Callers must await this promise before changing business UI state.
+  return commitOps(context, [op]);
 };
 
 /**
@@ -1574,7 +1569,6 @@ async function runBatchLive(context: string, ops: SyncOp[]) {
   }
 }
 
-
 /**
  * Store a group of writes and only resolve once they are safe somewhere:
  * the cloud database, the local desktop database, or the on-disk outbox.
@@ -1627,7 +1621,9 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
       // SQLite recovery copy.
       if (ops.length) {
         if (!bridge.localMirrorBatch) {
-          throw new Error("This desktop build cannot commit an atomic SQLite batch. Update the app.");
+          throw new Error(
+            "This desktop build cannot commit an atomic SQLite batch. Update the app.",
+          );
         }
         const shadow = await bridge.localMirrorBatch(mirrorEntries, ops);
         const expected = mirrorEntries.reduce((total, entry) => total + entry.rows.length, 0);
@@ -1677,6 +1673,15 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
     }
   }
 
+  // A Windows renderer without its preload bridge is not a browser. Failing
+  // closed here prevents a startup/IPC fault from turning into a cloud-only
+  // sale with no recoverable local ledger.
+  if (!isOnlineOnly()) {
+    const error = new Error("Electron database bridge unavailable");
+    (error as Error & { code?: string }).code = "EBRIDGE_UNAVAILABLE";
+    throw new AllTargetsFailed(context, error);
+  }
+
   // Browser build: there is no local SQL engine on this device, so every
   // write goes to the central database or the action stops. Nothing about the
   // business is parked in browser storage.
@@ -1707,6 +1712,46 @@ export const noteCommitTarget = (t: CommitTarget) => {
   lastTarget = t;
   return t;
 };
+
+export type StockAdjustmentInput = {
+  id?: string;
+  productId: string | null;
+  productName: string | null;
+  sku: string | null;
+  storeId: string | null;
+  terminalId?: string | null;
+  reason: string;
+  note?: string;
+  previousStock: number;
+  updatedStock: number;
+  delta: number;
+  costImpact?: number;
+  staffId?: string | null;
+  staffName?: string | null;
+  role?: string | null;
+  draftId?: string | null;
+  at?: string;
+};
+
+const stockAdjustmentToRow = (row: StockAdjustmentInput): Row => ({
+  id: row.id ?? crypto.randomUUID(),
+  product_id: row.productId,
+  product_name: row.productName,
+  sku: row.sku,
+  store_id: row.storeId,
+  terminal_id: row.terminalId ?? null,
+  reason: row.reason,
+  note: row.note ?? "",
+  previous_stock: Math.round(row.previousStock),
+  updated_stock: Math.round(row.updatedStock),
+  delta: Math.round(row.delta),
+  cost_impact: row.costImpact ?? 0,
+  staff_id: row.staffId ?? null,
+  staff_name: row.staffName ?? null,
+  role: row.role ?? null,
+  draft_id: row.draftId ?? null,
+  created_at: row.at ?? new Date().toISOString(),
+});
 
 export const db = {
   upsertProduct: (p: Product) =>
@@ -1843,8 +1888,6 @@ export const db = {
    * the sale was quietly lost.
    */
 
-
-
   /**
    * Hand a bill back. The till sends only the bill and the refund's own id:
    * the database works out how much may still be returned, puts exactly that
@@ -1852,7 +1895,7 @@ export const db = {
    * double tap, queued replay) changes nothing a second time.
    */
   refundSale(saleId: string, refundId: string, reason?: string) {
-    queue("Refunding sale", {
+    return queue("Refunding sale", {
       kind: "rpc",
       table: "sales",
       fn: "sale_refund",
@@ -1865,10 +1908,9 @@ export const db = {
     });
   },
 
-
   /** Correct the tender recorded against a completed bill (e.g. card -> cash). */
   updateSalePayment(saleId: string, method: PaymentMethod) {
-    queue("Correcting bill payment", {
+    return queue("Correcting bill payment", {
       kind: "update",
       table: "sales",
       values: { payment_type: method },
@@ -1940,56 +1982,6 @@ export const db = {
     });
   },
 
-  async recordPurchaseOrder(
-    po: {
-      poNumber: string;
-      supplier: string;
-      operator: string;
-      totalCost: number;
-      itemCount: number;
-    },
-    items: {
-      productId: string | null;
-      barcode: string;
-      name: string;
-      cost: number;
-      price: number;
-      qty: number;
-    }[],
-  ) {
-    // The id is minted locally so the items can reference the invoice without
-    // waiting for a server round-trip (works fully offline).
-    const poId = crypto.randomUUID();
-    queue("Saving purchase order", {
-      kind: "insert",
-      table: "purchase_orders",
-      rows: [
-        {
-          id: poId,
-          po_number: po.poNumber,
-          supplier_name: po.supplier,
-          operator_name: po.operator,
-          total_cost: po.totalCost,
-          total_items_count: po.itemCount,
-        },
-      ],
-    });
-    queue("Saving purchase order items", {
-      kind: "insert",
-      table: "purchase_order_items",
-      rows: items.map((i) => ({
-        po_id: poId,
-        product_id: i.productId,
-        barcode: i.barcode,
-        product_name: i.name,
-        cost_price: i.cost,
-        selling_price: i.price,
-        quantity_received: i.qty,
-        subtotal_cost: i.cost * i.qty,
-      })),
-    });
-  },
-
   /**
    * Store a receiving invoice and its lines, and wait until they are safe
    * (cloud, local database or the durable outbox). Nothing on screen is
@@ -2042,7 +2034,6 @@ export const db = {
       })),
       ...receivingActivityOps(inv, movementStoreId),
     ]),
-
 
   /**
    * Autosave an unfinished receiving order. Same rows as a finalized one, but
@@ -2338,50 +2329,48 @@ export const db = {
   /* ----------------------- stock adjustments ---------------------- */
 
   /** Record a stock correction with its reason and cost impact. */
-  recordStockAdjustment: (row: {
-    id?: string;
-    productId: string | null;
-    productName: string | null;
-    sku: string | null;
-    storeId: string | null;
-    terminalId?: string | null;
-    reason: string;
-    note?: string;
-    previousStock: number;
-    updatedStock: number;
-    delta: number;
-    costImpact?: number;
-    staffId?: string | null;
-    staffName?: string | null;
-    role?: string | null;
-    draftId?: string | null;
-    at?: string;
-  }) =>
+  recordStockAdjustment: (row: StockAdjustmentInput) =>
     queue("Recording stock adjustment", {
       kind: "insert",
       table: "stock_adjustments",
-      rows: [
-        {
-          id: row.id ?? crypto.randomUUID(),
-          product_id: row.productId,
-          product_name: row.productName,
-          sku: row.sku,
-          store_id: row.storeId,
-          terminal_id: row.terminalId ?? null,
-          reason: row.reason,
-          note: row.note ?? "",
-          previous_stock: Math.round(row.previousStock),
-          updated_stock: Math.round(row.updatedStock),
-          delta: Math.round(row.delta),
-          cost_impact: row.costImpact ?? 0,
-          staff_id: row.staffId ?? null,
-          staff_name: row.staffName ?? null,
-          role: row.role ?? null,
-          draft_id: row.draftId ?? null,
-          created_at: row.at ?? new Date().toISOString(),
-        },
-      ],
+      rows: [stockAdjustmentToRow(row)],
     }),
+
+  /** Product quantities and their audit movements share one durable batch. */
+  commitStockAdjustments: (
+    products: Product[],
+    adjustments: StockAdjustmentInput[],
+    postedDraft?: { id: string; by?: string | null },
+  ) =>
+    commitOps("Saving stock adjustment", [
+      ...(products.length
+        ? [{ kind: "upsert" as const, table: "products", rows: products.map(productToRow) }]
+        : []),
+      ...(adjustments.length
+        ? [
+            {
+              kind: "upsert" as const,
+              table: "stock_adjustments",
+              rows: adjustments.map(stockAdjustmentToRow),
+            },
+          ]
+        : []),
+      ...(postedDraft
+        ? [
+            {
+              kind: "update" as const,
+              table: "stock_count_drafts",
+              values: {
+                status: "posted",
+                posted_at: new Date().toISOString(),
+                posted_by: postedDraft.by ?? null,
+                updated_at: new Date().toISOString(),
+              },
+              match: { id: postedDraft.id },
+            },
+          ]
+        : []),
+    ]),
 
   /* --------------------- stock count drafts ----------------------- */
 
@@ -2435,11 +2424,7 @@ export const db = {
     }),
 
   /** Close a draft off: posted (locked) or discarded (no stock impact). */
-  setStockCountDraftStatus: (
-    id: string,
-    status: "posted" | "discarded",
-    by?: string | null,
-  ) =>
+  setStockCountDraftStatus: (id: string, status: "posted" | "discarded", by?: string | null) =>
     queue(status === "posted" ? "Posting stock count draft" : "Discarding stock count draft", {
       kind: "update",
       table: "stock_count_drafts",
@@ -2475,8 +2460,6 @@ export const db = {
     });
     return rows as Row[];
   },
-
-
 
   /* ------------------------ whatsapp outbox ----------------------- */
 

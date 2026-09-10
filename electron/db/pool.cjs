@@ -728,6 +728,10 @@ function getConfig() {
   return activeConfig;
 }
 
+function isConnected() {
+  return !!pool;
+}
+
 /** Absolute path of the single master schema file, packaged or in-repo. */
 function schemaFile() {
   const candidates = [
@@ -1497,6 +1501,7 @@ module.exports = {
   close,
   getPool,
   getConfig,
+  isConnected,
   test,
   verify,
   verifyWrite,

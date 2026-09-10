@@ -36,7 +36,13 @@ import type {
   TransferStatus,
 } from "@/core/types/pos-types";
 import { subscribeSalesChange, subscribeSettingsChange } from "./sync-engine";
-import { bookingBalance, lineDiscountTotal, lineUnitDiscount, r2, type DiscountType } from "@/core/types/pos-types";
+import {
+  bookingBalance,
+  lineDiscountTotal,
+  lineUnitDiscount,
+  r2,
+  type DiscountType,
+} from "@/core/types/pos-types";
 import { logger } from "./audit-log";
 import { toast } from "sonner";
 import {
@@ -124,8 +130,6 @@ import {
 } from "./product-import";
 import { productCodes } from "./product-lookup";
 import { nextSku, readSkuSettings } from "./sku";
-
-
 
 const KEY = "pos-state-v2";
 
@@ -242,9 +246,9 @@ type Ctx = {
   allStores: Store[];
   currentStore: Store;
   setCurrentStore: (id: string) => void;
-  upsertStore: (store: Store) => void;
+  upsertStore: (store: Store) => Promise<CommitTarget>;
   /** archive (never delete) a location; returns why it was refused, if it was */
-  archiveStore: (id: string, archived: boolean) => string | null;
+  archiveStore: (id: string, archived: boolean) => Promise<string | null>;
   openShift: (cashier: string, openingFloat: number) => Promise<CommitTarget>;
   closeShift: (
     countedCash: number,
@@ -272,8 +276,8 @@ type Ctx = {
   recordSale: (
     sale: Omit<Sale, "id" | "receiptNo" | "createdAt"> & { receiptNo?: string },
   ) => Promise<Sale>;
-  refundSale: (saleId: string) => void;
-  changeSalePayment: (saleId: string, method: PaymentMethod, reason?: string) => void;
+  refundSale: (saleId: string) => Promise<boolean>;
+  changeSalePayment: (saleId: string, method: PaymentMethod, reason?: string) => Promise<boolean>;
   createBooking: (input: NewBooking) => Promise<Booking>;
   setBookingJobStatus: (
     id: string,
@@ -320,11 +324,17 @@ type Ctx = {
 
   removeProduct: (id: string) => Promise<BlockedDelete[]>;
   removeProducts: (ids: string[]) => Promise<BlockedDelete[]>;
-  patchProducts: (ids: string[], patch: Partial<Product>) => void;
-  archiveProducts: (ids: string[]) => void;
-  restoreProducts: (ids: string[]) => void;
+  patchProducts: (ids: string[], patch: Partial<Product>) => Promise<CommitTarget>;
+  archiveProducts: (ids: string[]) => Promise<CommitTarget>;
+  restoreProducts: (ids: string[]) => Promise<CommitTarget>;
   mergeProducts: (masterId: string, duplicateIds: string[]) => Promise<BlockedDelete[]>;
-  adjustStock: (id: string, delta: number, storeId?: string) => void;
+  adjustStock: (id: string, delta: number, storeId?: string) => Promise<CommitTarget | null>;
+  moveStock: (
+    id: string,
+    qty: number,
+    fromStoreId: string,
+    toStoreId: string,
+  ) => Promise<CommitTarget | null>;
   /** Re-read the given products from the database into local state. */
   syncProducts: (ids: string[]) => Promise<void>;
   applyStockCount: (
@@ -333,12 +343,13 @@ type Ctx = {
     note?: string,
     storeId?: string,
     draftId?: string | null,
-  ) => void;
+    postedBy?: string | null,
+  ) => Promise<CommitTarget | null>;
   upsertMember: (member: Member) => Promise<CommitTarget>;
-  removeMember: (id: string) => void;
+  removeMember: (id: string) => Promise<void>;
   upsertPromotion: (promotion: Promotion) => Promise<CommitTarget>;
-  removePromotion: (id: string) => void;
-  togglePromotion: (id: string, active: boolean) => void;
+  removePromotion: (id: string) => Promise<void>;
+  togglePromotion: (id: string, active: boolean) => Promise<void>;
   updateSettings: (patch: Partial<AppSettings>) => void;
   /** Which settings blocks each tier overrides, and which are locked globally. */
   settingsScope: BranchSettingsState;
@@ -355,16 +366,16 @@ type Ctx = {
   sourceOfPath: (path: string) => SettingSource;
   /** Lock a block so no branch can override it. */
   setSectionLocked: (section: SettingsSectionId, locked: boolean) => Promise<void>;
-  createTransfer: (input: NewTransfer) => Transfer;
+  createTransfer: (input: NewTransfer) => Promise<Transfer>;
   /** authorise the note, optionally cutting quantities back */
-  approveTransfer: (id: string, lines?: LineQty[]) => void;
+  approveTransfer: (id: string, lines?: LineQty[]) => Promise<RpcResult>;
   /** send what is actually on the shelf — this closes the request */
-  dispatchTransfer: (id: string, lines?: LineQty[]) => void;
+  dispatchTransfer: (id: string, lines?: LineQty[]) => Promise<RpcResult>;
   /** the box arrived — no stock moves yet */
-  receiveTransfer: (id: string) => void;
+  receiveTransfer: (id: string) => Promise<RpcResult>;
   /** the count that puts stock on the destination shelf */
   verifyTransfer: (id: string, lines: LineQty[], reason?: string) => Promise<RpcResult>;
-  rejectTransfer: (id: string, reason: string) => void;
+  rejectTransfer: (id: string, reason: string) => Promise<RpcResult>;
   reset: () => void;
 };
 
@@ -642,7 +653,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
       });
   }, [state.stores, state.currentStoreId]);
 
-
   // Publish the branch's sync switches to the outbox drainer and the region
   // clock to every formatter, so both follow the saved settings.
   useEffect(() => {
@@ -797,7 +807,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
     const focus = () => {
       const bridge = localDb();
       if (bridge?.push) void bridge.push();
-      const active = activeBranchId(stateRef.current.currentStoreId) ?? stateRef.current.currentStoreId;
+      const active =
+        activeBranchId(stateRef.current.currentStoreId) ?? stateRef.current.currentStoreId;
       void loadCloudState(active ?? undefined)
         .then((cloud) => setState((current) => applyCloud(current, cloud)))
         .catch(() => {
@@ -815,7 +826,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
     if (!signedIn) return;
     let timer: number | undefined;
     const unsubscribe = subscribeSalesChange((change) => {
-      const active = activeBranchId(stateRef.current.currentStoreId) ?? stateRef.current.currentStoreId;
+      const active =
+        activeBranchId(stateRef.current.currentStoreId) ?? stateRef.current.currentStoreId;
       if (change.storeId && active && change.storeId !== active) return;
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => {
@@ -942,8 +954,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-  const upsertStore = useCallback((store: Store) => {
-    db.upsertStore(store);
+  const upsertStore = useCallback(async (store: Store) => {
+    const committed = await db.upsertStore(store);
     setState((s) => ({
       ...s,
       stores: s.stores.some((x) => x.id === store.id)
@@ -955,6 +967,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
           : p,
       ),
     }));
+    return committed;
   }, []);
 
   /**
@@ -962,34 +975,37 @@ export function PosProvider({ children }: { children: ReactNode }) {
    * Archiving is refused while the location still holds stock or still has
    * live sub-locations underneath it.
    */
-  const archiveStore = useCallback((id: string, archived: boolean): string | null => {
-    const snapshot = stateRef.current;
-    const target = snapshot.stores.find((x) => x.id === id);
-    if (!target) return "That location no longer exists.";
-    if (archived) {
-      const blocker = archiveBlockers(snapshot.products, snapshot.stores, id);
-      if (blocker) return blocker.reason;
-      if (activeLocations(snapshot.stores).length <= 1)
-        return "At least one active location must remain.";
-    }
-    const next: Store = {
-      ...target,
-      active: !archived,
-      archivedAt: archived ? new Date().toISOString() : null,
-    };
-    db.upsertStore(next);
-    setState((s) => {
-      const stores = s.stores.map((x) => (x.id === id ? next : x));
-      const stillActive = activeLocations(stores);
-      return {
-        ...s,
-        stores,
-        currentStoreId:
-          archived && s.currentStoreId === id ? (stillActive[0]?.id ?? "") : s.currentStoreId,
+  const archiveStore = useCallback(
+    async (id: string, archived: boolean): Promise<string | null> => {
+      const snapshot = stateRef.current;
+      const target = snapshot.stores.find((x) => x.id === id);
+      if (!target) return "That location no longer exists.";
+      if (archived) {
+        const blocker = archiveBlockers(snapshot.products, snapshot.stores, id);
+        if (blocker) return blocker.reason;
+        if (activeLocations(snapshot.stores).length <= 1)
+          return "At least one active location must remain.";
+      }
+      const next: Store = {
+        ...target,
+        active: !archived,
+        archivedAt: archived ? new Date().toISOString() : null,
       };
-    });
-    return null;
-  }, []);
+      await db.upsertStore(next);
+      setState((s) => {
+        const stores = s.stores.map((x) => (x.id === id ? next : x));
+        const stillActive = activeLocations(stores);
+        return {
+          ...s,
+          stores,
+          currentStoreId:
+            archived && s.currentStoreId === id ? (stillActive[0]?.id ?? "") : s.currentStoreId,
+        };
+      });
+      return null;
+    },
+    [],
+  );
 
   const openShift = useCallback(
     async (cashier: string, openingFloat: number) => {
@@ -1793,10 +1809,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
     [activeShift, recordSale],
   );
 
-  const refundSale = useCallback((saleId: string) => {
+  const refundSale = useCallback(async (saleId: string): Promise<boolean> => {
+    const sale = stateRef.current.sales.find((x) => x.id === saleId);
+    if (!sale || sale.refunded) return false;
+    // The stable refund id makes a retry idempotent. Nothing visible changes
+    // until the authoritative gateway has accepted the refund.
+    await db.refundSale(saleId, `refund:${saleId}`);
     logger.log("sale_event", "Sale refunded", "receipts", {
       saleId,
-      receiptNo: stateRef.current.sales.find((x) => x.id === saleId)?.receiptNo ?? null,
+      receiptNo: sale.receiptNo,
     });
     {
       const refunded = stateRef.current.sales.find((x) => x.id === saleId);
@@ -1811,16 +1832,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
         amount: refunded?.total ?? null,
       });
     }
-    {
-      const snap = stateRef.current;
-      const sale = snap.sales.find((x) => x.id === saleId);
-      if (sale && !sale.refunded) {
-        // The database decides how much stock comes back; the till only names
-        // the bill and a stable id for this refund so a replay is a no-op.
-        void db.refundSale(saleId, `refund:${saleId}`);
-      }
-    }
-
     setState((s) => {
       const sale = s.sales.find((x) => x.id === saleId);
       if (!sale || sale.refunded) return s;
@@ -1834,13 +1845,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
         sales: s.sales.map((x) => (x.id === saleId ? { ...x, refunded: true } : x)),
       };
     });
+    return true;
   }, []);
 
   /** Correct the tender recorded on a completed bill (e.g. rung up as card). */
   const changeSalePayment = useCallback(
-    (saleId: string, method: PaymentMethod, reason?: string) => {
+    async (saleId: string, method: PaymentMethod, reason?: string): Promise<boolean> => {
       const sale = stateRef.current.sales.find((x) => x.id === saleId);
-      if (!sale || sale.method === method) return;
+      if (!sale || sale.method === method) return false;
+      await db.updateSalePayment(saleId, method);
       logger.log("sale_event", "Bill payment method corrected", "receipts", {
         saleId,
         receiptNo: sale.receiptNo,
@@ -1848,11 +1861,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
         to: method,
         reason: reason ?? null,
       });
-      void db.updateSalePayment(saleId, method);
       setState((s) => ({
         ...s,
         sales: s.sales.map((x) => (x.id === saleId ? { ...x, method } : x)),
       }));
+      return true;
     },
     [],
   );
@@ -1922,7 +1935,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
    * interrupted import knows exactly where it got to.
    */
   const importProducts = useCallback(
-    async (rows: ImportRow[], options: ImportProductsOptions = {}): Promise<ImportProductsResult> => {
+    async (
+      rows: ImportRow[],
+      options: ImportProductsOptions = {},
+    ): Promise<ImportProductsResult> => {
       const size = options.batchSize ?? DEFAULT_BATCH_SIZE;
       const storeId = stateRef.current.currentStoreId;
       const skipKeys = new Set(options.alreadyDone ?? []);
@@ -2083,8 +2099,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
     [],
   );
 
-
-
   /**
    * Deletes products that the database will actually let go of.
    *
@@ -2133,7 +2147,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
   );
 
   /** Bulk field edit (category, tax, web visibility…) across a selection. */
-  const patchProducts = useCallback((ids: string[], patch: Partial<Product>) => {
+  const patchProducts = useCallback(async (ids: string[], patch: Partial<Product>) => {
     const set = new Set(ids);
     const updated = stateRef.current.products
       .filter((p) => set.has(p.id))
@@ -2143,11 +2157,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
       changes: patch,
       names: updated.slice(0, 10).map((p) => p.name),
     });
-    void db.upsertProducts(updated);
+    const target = await db.commitProducts(updated);
     setState((s) => ({
       ...s,
       products: s.products.map((p) => (set.has(p.id) ? { ...p, ...patch } : p)),
     }));
+    return target;
   }, []);
 
   /**
@@ -2198,7 +2213,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         aliasBarcodes: merged.barcodes,
       });
 
-      void db.upsertProduct(merged);
+      await db.commitProduct(merged);
       setState((s) => ({
         ...s,
         products: s.products.map((p) => (p.id === masterId ? merged : p)),
@@ -2211,7 +2226,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     [deleteProductIds],
   );
 
-  const adjustStock = useCallback((id: string, delta: number, storeId?: string) => {
+  const adjustStock = useCallback(async (id: string, delta: number, storeId?: string) => {
     const target = storeId ?? stateRef.current.currentStoreId;
     const before = stateRef.current.products.find((p) => p.id === id);
     logger.log("inventory_edit", "Stock adjusted", "inventory", {
@@ -2222,26 +2237,80 @@ export function PosProvider({ children }: { children: ReactNode }) {
       previousStock: before ? stockAt(before, target) : null,
       updatedStock: before ? stockAt(before, target) + delta : null,
     });
-    if (before) void db.upsertProduct(bump(before, target, delta));
-    if (before)
-      db.recordStockAdjustment({
-        productId: before.id,
-        productName: before.name,
-        sku: before.sku ?? null,
-        storeId: target,
-        reason: "manual",
-        previousStock: stockAt(before, target),
-        updatedStock: stockAt(before, target) + delta,
-        delta,
-        costImpact: r2(delta * (before.cost ?? 0)),
-      });
+    if (!before) return null;
+    const updated = bump(before, target, delta);
+    const committed = await db.commitStockAdjustments(
+      [updated],
+      [
+        {
+          productId: before.id,
+          productName: before.name,
+          sku: before.sku ?? null,
+          storeId: target,
+          reason: "manual",
+          previousStock: stockAt(before, target),
+          updatedStock: stockAt(before, target) + delta,
+          delta,
+          costImpact: r2(delta * (before.cost ?? 0)),
+        },
+      ],
+    );
     setState((s) => ({
       ...s,
       products: s.products.map((p) =>
         p.id === id ? bump(p, storeId ?? s.currentStoreId, delta) : p,
       ),
     }));
+    return committed;
   }, []);
+
+  /** Move stock between two branch buckets with both audit legs in one batch. */
+  const moveStock = useCallback(
+    async (id: string, qty: number, fromStoreId: string, toStoreId: string) => {
+      const before = stateRef.current.products.find((p) => p.id === id);
+      const amount = Math.max(0, Math.round(qty));
+      if (!before || !amount || fromStoreId === toStoreId) return null;
+      const fromBefore = stockAt(before, fromStoreId);
+      const toBefore = stockAt(before, toStoreId);
+      const updated = {
+        ...before,
+        stockByStore: {
+          ...before.stockByStore,
+          [fromStoreId]: fromBefore - amount,
+          [toStoreId]: toBefore + amount,
+        },
+      };
+      const common = {
+        productId: before.id,
+        productName: before.name,
+        sku: before.sku ?? null,
+        reason: "transfer",
+        costImpact: r2(amount * (before.cost ?? 0)),
+      };
+      const committed = await db.commitStockAdjustments(
+        [updated],
+        [
+          {
+            ...common,
+            storeId: fromStoreId,
+            previousStock: fromBefore,
+            updatedStock: fromBefore - amount,
+            delta: -amount,
+          },
+          {
+            ...common,
+            storeId: toStoreId,
+            previousStock: toBefore,
+            updatedStock: toBefore + amount,
+            delta: amount,
+          },
+        ],
+      );
+      setState((s) => ({ ...s, products: s.products.map((p) => (p.id === id ? updated : p)) }));
+      return committed;
+    },
+    [],
+  );
 
   /**
    * Pull the authoritative quantities back from the database for a handful of
@@ -2277,7 +2346,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
       note = "",
       storeId?: string,
       draftId?: string | null,
-    ) => {
+      postedBy?: string | null,
+    ): Promise<CommitTarget | null> => {
       const target = storeId ?? stateRef.current.currentStoreId;
       const changes = entries
         .map((e) => {
@@ -2294,7 +2364,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         counted: number;
         delta: number;
       }[];
-      if (!changes.length) return;
+      if (!changes.length) return Promise.resolve(null);
 
       for (const c of changes) {
         logger.log("inventory", "Stock adjusted", "inventory", {
@@ -2309,34 +2379,42 @@ export function PosProvider({ children }: { children: ReactNode }) {
           delta: c.delta,
           costImpact: r2(c.delta * (c.product.cost ?? 0)),
         });
-        db.recordStockAdjustment({
-          productId: c.product.id,
-          productName: c.product.name,
-          sku: c.product.sku ?? null,
-          storeId: target,
-          reason,
-          note,
-          previousStock: c.before,
-          updatedStock: c.counted,
-          delta: c.delta,
-          costImpact: r2(c.delta * (c.product.cost ?? 0)),
-          draftId: draftId ?? null,
-        });
-        void db.upsertProduct({
-          ...c.product,
-          stockByStore: { ...c.product.stockByStore, [target]: c.counted },
-        });
       }
-
-      const byId = new Map(changes.map((c) => [c.product.id, c.counted]));
-      setState((s) => ({
-        ...s,
-        products: s.products.map((p) =>
-          byId.has(p.id)
-            ? { ...p, stockByStore: { ...p.stockByStore, [target]: byId.get(p.id)! } }
-            : p,
-        ),
+      const products = changes.map((c) => ({
+        ...c.product,
+        stockByStore: { ...c.product.stockByStore, [target]: c.counted },
       }));
+      const adjustments = changes.map((c) => ({
+        productId: c.product.id,
+        productName: c.product.name,
+        sku: c.product.sku ?? null,
+        storeId: target,
+        reason,
+        note,
+        previousStock: c.before,
+        updatedStock: c.counted,
+        delta: c.delta,
+        costImpact: r2(c.delta * (c.product.cost ?? 0)),
+        draftId: draftId ?? null,
+      }));
+      return db
+        .commitStockAdjustments(
+          products,
+          adjustments,
+          draftId ? { id: draftId, by: postedBy } : undefined,
+        )
+        .then((committed) => {
+          const byId = new Map(changes.map((c) => [c.product.id, c.counted]));
+          setState((s) => ({
+            ...s,
+            products: s.products.map((p) =>
+              byId.has(p.id)
+                ? { ...p, stockByStore: { ...p.stockByStore, [target]: byId.get(p.id)! } }
+                : p,
+            ),
+          }));
+          return committed;
+        });
     },
     [],
   );
@@ -2361,14 +2439,14 @@ export function PosProvider({ children }: { children: ReactNode }) {
     return target;
   }, []);
 
-  const removeMember = useCallback((id: string) => {
+  const removeMember = useCallback(async (id: string) => {
     const member = stateRef.current.members.find((m) => m.id === id);
     logger.log("member_event", "Member deleted", "members", {
       memberId: id,
       name: member?.name ?? null,
       phone: member?.phone ?? null,
     });
-    void db.deleteMember(id);
+    await db.deleteMember(id);
     setState((s) => ({ ...s, members: s.members.filter((m) => m.id !== id) }));
   }, []);
 
@@ -2389,17 +2467,17 @@ export function PosProvider({ children }: { children: ReactNode }) {
     return target;
   }, []);
 
-  const removePromotion = useCallback((id: string) => {
+  const removePromotion = useCallback(async (id: string) => {
     const promotion = stateRef.current.promotions.find((p) => p.id === id);
     logger.log("promotion", "Promotion deleted", "promotions", {
       promotionId: id,
       name: promotion?.name ?? null,
     });
-    void db.deletePromotion(id);
+    await db.deletePromotion(id);
     setState((s) => ({ ...s, promotions: s.promotions.filter((p) => p.id !== id) }));
   }, []);
 
-  const togglePromotion = useCallback((id: string, active: boolean) => {
+  const togglePromotion = useCallback(async (id: string, active: boolean) => {
     {
       const p = stateRef.current.promotions.find((x) => x.id === id);
       if (p) {
@@ -2407,7 +2485,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
           promotionId: id,
           name: p.name,
         });
-        void db.upsertPromotion({ ...p, active });
+        await db.upsertPromotion({ ...p, active });
       }
     }
     setState((s) => ({
@@ -2419,16 +2497,18 @@ export function PosProvider({ children }: { children: ReactNode }) {
   const writeGlobalSettings = useCallback((patch: Partial<AppSettings>) => {
     {
       const prev = stateRef.current.settings;
-      void db.saveSettings({
-        tax: { ...prev.tax, ...(patch.tax ?? {}) },
-        receipt: { ...prev.receipt, ...(patch.receipt ?? {}) },
-        payment: { ...prev.payment, ...(patch.payment ?? {}) },
-        whatsapp: { ...prev.whatsapp, ...(patch.whatsapp ?? {}) },
-        review: { ...prev.review, ...(patch.review ?? {}) },
-        hours: { ...prev.hours, ...(patch.hours ?? {}) },
-        integrations: { ...prev.integrations, ...(patch.integrations ?? {}) },
-        visibility: { ...prev.visibility, ...(patch.visibility ?? {}) },
-      });
+      void db
+        .saveSettings({
+          tax: { ...prev.tax, ...(patch.tax ?? {}) },
+          receipt: { ...prev.receipt, ...(patch.receipt ?? {}) },
+          payment: { ...prev.payment, ...(patch.payment ?? {}) },
+          whatsapp: { ...prev.whatsapp, ...(patch.whatsapp ?? {}) },
+          review: { ...prev.review, ...(patch.review ?? {}) },
+          hours: { ...prev.hours, ...(patch.hours ?? {}) },
+          integrations: { ...prev.integrations, ...(patch.integrations ?? {}) },
+          visibility: { ...prev.visibility, ...(patch.visibility ?? {}) },
+        })
+        .catch((error) => dbError("Saving display settings", error));
     }
     setState((s) => ({
       ...s,
@@ -2556,9 +2636,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /** Lets approveTransfer raise the fulfilling transfer without a cycle. */
-  const createTransferRef = useRef<((input: NewTransfer) => Transfer) | null>(null);
+  const createTransferRef = useRef<((input: NewTransfer) => Promise<Transfer>) | null>(null);
 
-  const createTransfer = useCallback((input: NewTransfer) => {
+  const createTransfer = useCallback(async (input: NewTransfer) => {
     const now = new Date().toISOString();
     const { needsApproval, ...rest } = input;
     // Nothing moves at creation any more. The note either waits for a
@@ -2583,19 +2663,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
       quantity: transfer.items.reduce((sum, item) => sum + item.qty, 0),
       status: transfer.status,
     });
-    setState((s) => {
-      const transferCounter = s.transferCounter + 1;
-      transfer.ref = `${input.kind === "transfer" ? "TRF" : "REQ"}-${String(
-        transferCounter,
-      ).padStart(5, "0")}`;
-      return { ...s, transferCounter, transfers: [transfer, ...s.transfers] };
-    });
-    void saveTransfer({
+    const transferCounter = stateRef.current.transferCounter + 1;
+    transfer.ref = `${input.kind === "transfer" ? "TRF" : "REQ"}-${String(transferCounter).padStart(5, "0")}`;
+    await saveTransfer({
       transfer,
       from: stateRef.current.stores.find((x) => x.id === transfer.fromStoreId),
       to: stateRef.current.stores.find((x) => x.id === transfer.toStoreId),
       products: stateRef.current.products,
-    }).catch((e: unknown) => dbError("Saving transfer", e as Error));
+    });
+    setState((s) => ({ ...s, transferCounter, transfers: [transfer, ...s.transfers] }));
     return transfer;
   }, []);
 
@@ -2617,10 +2693,13 @@ export function PosProvider({ children }: { children: ReactNode }) {
    * Approve: only records how many of each line are allowed. No stock moves,
    * because nothing has been picked yet.
    */
-  const approveTransfer = useCallback((id: string, lines?: LineQty[]) => {
+  const approveTransfer = useCallback(async (id: string, lines?: LineQty[]): Promise<RpcResult> => {
     const before = stateRef.current.transfers.find((x) => x.id === id);
-    if (!before || before.status !== "awaiting_approval") return;
+    if (!before || before.status !== "awaiting_approval")
+      return { success: false, error: "Transfer is not awaiting approval." };
     const allowed = linesFor(before, lines, (i) => i.qty);
+    const persisted = await approveTransferInDb(id, actorRef.current, allowed);
+    if (!persisted.success) return persisted;
 
     setState((s) => ({
       ...s,
@@ -2641,17 +2720,13 @@ export function PosProvider({ children }: { children: ReactNode }) {
       ),
     }));
 
-    void approveTransferInDb(id, actorRef.current, allowed).then((r) => {
-      if (!r.success) dbError("Approving transfer", new Error(r.error ?? "Unknown error"));
-    });
-
     // A request is paperwork; the goods move on a transfer of its own. The
     // two rows stay joined by sourceRequestId so either page can reach the
     // other, and the request keeps its original quantities untouched.
     if (before.kind === "request") {
       const lines = allowed.filter((l) => l.qty > 0);
       if (lines.length)
-        createTransferRef.current?.({
+        await createTransferRef.current?.({
           kind: "transfer",
           fromStoreId: before.fromStoreId,
           toStoreId: before.toStoreId,
@@ -2678,110 +2753,109 @@ export function PosProvider({ children }: { children: ReactNode }) {
       storeId: before.fromStoreId,
       metadata: { ref: before.ref, toStoreId: before.toStoreId, lines: allowed },
     });
+    return { success: true };
   }, []);
 
   /**
    * Dispatch: the goods physically leave. Whatever was not sent is simply not
    * sent — the note closes here rather than carrying a remainder forward.
    */
-  const dispatchTransfer = useCallback((id: string, lines?: LineQty[]) => {
-    const s0 = stateRef.current;
-    const before = s0.transfers.find((x) => x.id === id);
-    if (!before || before.status !== "approved") return;
-    const sent = linesFor(before, lines, (i) => i.approvedQty ?? i.qty);
-    const moving = sent.filter((l) => l.qty > 0);
-    const asked = before.items.reduce((a, i) => a + i.qty, 0);
-    const total = sent.reduce((a, l) => a + l.qty, 0);
-    const fulfilment: Transfer["fulfilment"] =
-      total === 0 ? "none" : total >= asked ? "full" : "partial";
-    const now = new Date().toISOString();
+  const dispatchTransfer = useCallback(
+    async (id: string, lines?: LineQty[]): Promise<RpcResult> => {
+      const s0 = stateRef.current;
+      const before = s0.transfers.find((x) => x.id === id);
+      if (!before || before.status !== "approved")
+        return { success: false, error: "Transfer is not approved." };
+      const sent = linesFor(before, lines, (i) => i.approvedQty ?? i.qty);
+      const moving = sent.filter((l) => l.qty > 0);
+      const asked = before.items.reduce((a, i) => a + i.qty, 0);
+      const total = sent.reduce((a, l) => a + l.qty, 0);
+      const fulfilment: Transfer["fulfilment"] =
+        total === 0 ? "none" : total >= asked ? "full" : "partial";
+      const now = new Date().toISOString();
 
-    if (moving.length)
-      void db.upsertProducts(
-        bumpItems(s0.products, moving, before.fromStoreId, -1).filter((p) =>
-          moving.some((i) => i.productId === p.id),
-        ),
-      );
+      const persisted = await dispatchTransferInDb(id, actorRef.current, sent);
+      if (!persisted.success) return persisted;
 
-    setState((s) => ({
-      ...s,
-      products: bumpItems(s.products, moving, before.fromStoreId, -1),
-      transfers: s.transfers.map((x) =>
-        x.id === id
-          ? {
-              ...x,
-              status: "dispatched",
-              dispatchedBy: actorRef.current,
-              dispatchedAt: now,
-              closedAt: now,
-              fulfilment,
-              items: x.items.map((i) => ({
-                ...i,
-                dispatchedQty: sent.find((l) => l.productId === i.productId)?.qty ?? 0,
-              })),
-              updatedAt: now,
-            }
-          : x,
-      ),
-    }));
-
-    void dispatchTransferInDb(id, actorRef.current, sent).then((r) => {
-      if (!r.success) dbError("Dispatching transfer", new Error(r.error ?? "Unknown error"));
-    });
-
-    // The request behind this transfer closes on what was actually sent.
-    if (before.sourceRequestId) {
-      const requestId = before.sourceRequestId;
-      const request = s0.transfers.find((x) => x.id === requestId);
-      const requested = request?.items.reduce((a, i) => a + i.qty, 0) ?? asked;
-      const requestFulfilment: Transfer["fulfilment"] =
-        total === 0 ? "none" : total >= requested ? "full" : "partial";
       setState((s) => ({
         ...s,
+        products: bumpItems(s.products, moving, before.fromStoreId, -1),
         transfers: s.transfers.map((x) =>
-          x.id === requestId
+          x.id === id
             ? {
                 ...x,
-                status: "completed",
+                status: "dispatched",
+                dispatchedBy: actorRef.current,
+                dispatchedAt: now,
                 closedAt: now,
-                fulfilment: requestFulfilment,
+                fulfilment,
+                items: x.items.map((i) => ({
+                  ...i,
+                  dispatchedQty: sent.find((l) => l.productId === i.productId)?.qty ?? 0,
+                })),
                 updatedAt: now,
               }
             : x,
         ),
       }));
-      void closeRequestInDb(requestId, requestFulfilment ?? "partial").catch((e: unknown) =>
-        dbError("Closing request", e as Error),
-      );
-    }
-    logger.log("inventory", "Stock transfer dispatched", "transfers", {
-      transferId: id,
-      ref: before.ref,
-      fromStoreId: before.fromStoreId,
-      toStoreId: before.toStoreId,
-      quantity: total,
-      fulfilment,
-    });
-    trackTransition({
-      entity: "stock_transfer",
-      entityId: id,
-      from: "approved",
-      to: "dispatched",
-      actorName: actorRef.current,
-      storeId: before.fromStoreId,
-      metadata: { ref: before.ref, toStoreId: before.toStoreId, fulfilment, lines: sent },
-    });
-  }, []);
+
+      // The request behind this transfer closes on what was actually sent.
+      if (before.sourceRequestId) {
+        const requestId = before.sourceRequestId;
+        const request = s0.transfers.find((x) => x.id === requestId);
+        const requested = request?.items.reduce((a, i) => a + i.qty, 0) ?? asked;
+        const requestFulfilment: Transfer["fulfilment"] =
+          total === 0 ? "none" : total >= requested ? "full" : "partial";
+        setState((s) => ({
+          ...s,
+          transfers: s.transfers.map((x) =>
+            x.id === requestId
+              ? {
+                  ...x,
+                  status: "completed",
+                  closedAt: now,
+                  fulfilment: requestFulfilment,
+                  updatedAt: now,
+                }
+              : x,
+          ),
+        }));
+        await closeRequestInDb(requestId, requestFulfilment ?? "partial");
+      }
+      logger.log("inventory", "Stock transfer dispatched", "transfers", {
+        transferId: id,
+        ref: before.ref,
+        fromStoreId: before.fromStoreId,
+        toStoreId: before.toStoreId,
+        quantity: total,
+        fulfilment,
+      });
+      trackTransition({
+        entity: "stock_transfer",
+        entityId: id,
+        from: "approved",
+        to: "dispatched",
+        actorName: actorRef.current,
+        storeId: before.fromStoreId,
+        metadata: { ref: before.ref, toStoreId: before.toStoreId, fulfilment, lines: sent },
+      });
+      return { success: true };
+    },
+    [],
+  );
 
   /**
    * Arrival. The delivery is at the destination but nobody has opened it, so
    * no stock moves here — that happens at verification.
    */
-  const receiveTransfer = useCallback((id: string) => {
+  const receiveTransfer = useCallback(async (id: string): Promise<RpcResult> => {
     const s0 = stateRef.current;
     const before = s0.transfers.find((x) => x.id === id);
-    if (!before || before.status !== "dispatched") return;
+    if (!before || before.status !== "dispatched")
+      return { success: false, error: "Transfer is not dispatched." };
     const now = new Date().toISOString();
+    const persisted = await receiveTransferInDb(id, actorRef.current);
+    if (!persisted.success) return persisted;
 
     setState((s) => ({
       ...s,
@@ -2798,9 +2872,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
       ),
     }));
 
-    void receiveTransferInDb(id, actorRef.current).then((r) => {
-      if (!r.success) dbError("Receiving transfer", new Error(r.error ?? "Unknown error"));
-    });
     logger.log("inventory", "Stock transfer arrived", "transfers", {
       transferId: id,
       ref: before.ref,
@@ -2816,6 +2887,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       storeId: before.toStoreId,
       metadata: { ref: before.ref, fromStoreId: before.fromStoreId },
     });
+    return { success: true };
   }, []);
 
   /**
@@ -2845,13 +2917,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
       const arriving = counted.filter((l) => l.qty > 0);
       const now = new Date().toISOString();
       const status: TransferStatus = short ? "completed_with_discrepancy" : "completed";
-
-      if (arriving.length)
-        void db.upsertProducts(
-          bumpItems(stateRef.current.products, arriving, before.toStoreId, 1).filter((p) =>
-            arriving.some((i) => i.productId === p.id),
-          ),
-        );
 
       setState((s) => ({
         ...s,
@@ -2901,11 +2966,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
    * Turn the note down, or call it off after dispatch. Either way a reason is
    * required, and goods already sent come back to the sending branch.
    */
-  const rejectTransfer = useCallback((id: string, reason: string) => {
+  const rejectTransfer = useCallback(async (id: string, reason: string): Promise<RpcResult> => {
     const s0 = stateRef.current;
     const before = s0.transfers.find((x) => x.id === id);
-    if (!before) return;
-    if (!["awaiting_approval", "approved", "dispatched"].includes(before.status)) return;
+    if (!before) return { success: false, error: "Transfer does not exist." };
+    if (!["awaiting_approval", "approved", "dispatched"].includes(before.status))
+      return { success: false, error: "Transfer can no longer be changed." };
     const next: TransferStatus = before.status === "dispatched" ? "cancelled" : "rejected";
     const returning =
       before.status === "dispatched"
@@ -2915,12 +2981,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         : [];
     const now = new Date().toISOString();
 
-    if (returning.length)
-      void db.upsertProducts(
-        bumpItems(s0.products, returning, before.fromStoreId, 1).filter((p) =>
-          returning.some((i) => i.productId === p.id),
-        ),
-      );
+    await setTransferStatus(id, next, actorRef.current, reason);
 
     setState((s) => ({
       ...s,
@@ -2939,9 +3000,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
       ),
     }));
 
-    void setTransferStatus(id, next, actorRef.current, reason).catch((e: unknown) =>
-      dbError("Updating transfer", e),
-    );
     logger.log(
       "inventory",
       next === "cancelled" ? "Stock transfer cancelled" : "Stock transfer rejected",
@@ -2964,6 +3022,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       storeId: before.fromStoreId,
       metadata: { ref: before.ref, toStoreId: before.toStoreId },
     });
+    return { success: true };
   }, []);
 
   const reset = useCallback(() => setState(emptyState), []);
@@ -3034,6 +3093,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     restoreProducts,
     mergeProducts,
     adjustStock,
+    moveStock,
     applyStockCount,
     upsertMember,
     removeMember,
@@ -3096,8 +3156,9 @@ export function cartTotals(
       Math.max(0, base),
       Math.max(
         0,
-        r2(cartDiscountType === "percent" ? (base * (cartDiscount || 0)) / 100 : cartDiscount || 0) +
-          Math.max(0, r2(promoDiscount || 0)),
+        r2(
+          cartDiscountType === "percent" ? (base * (cartDiscount || 0)) / 100 : cartDiscount || 0,
+        ) + Math.max(0, r2(promoDiscount || 0)),
       ),
     ),
   );

@@ -137,18 +137,18 @@ function ReceiptVault() {
     );
   });
 
-  const selected: Sale | null =
-    rows.find((s) => s.id === selectedId) ?? rows[0] ?? null;
-  const member = selected
-    ? (state.members.find((m) => m.id === selected.memberId) ?? null)
-    : null;
+  const selected: Sale | null = rows.find((s) => s.id === selectedId) ?? rows[0] ?? null;
+  const member = selected ? (state.members.find((m) => m.id === selected.memberId) ?? null) : null;
   const shift = selected ? (state.shifts.find((s) => s.id === selected.shiftId) ?? null) : null;
 
   const previewHtml = useMemo(() => {
     if (!selected) return "";
-    if (template === "zreport")
-      return shift ? shiftReportPreview(shift, state.sales) : "";
-    return saleReceiptPreview(selected, template === "gift" ? null : member, template === "gift" ? "gift" : "sale");
+    if (template === "zreport") return shift ? shiftReportPreview(shift, state.sales) : "";
+    return saleReceiptPreview(
+      selected,
+      template === "gift" ? null : member,
+      template === "gift" ? "gift" : "sale",
+    );
   }, [selected, template, member, shift, state.sales]);
 
   function print() {
@@ -179,24 +179,28 @@ function ReceiptVault() {
     setCancelOpen(true);
   }
 
-  function confirmCancel() {
+  async function confirmCancel() {
     if (!selected) return;
     const reason = cancelReason.trim();
     if (reason.length < 3) {
       toast.error("Type why this bill is being cancelled");
       return;
     }
-    refundSale(selected.id);
-    holdCancelledBill({
-      receiptNo: selected.receiptNo,
-      total: selected.total,
-      lines: selected.lines,
-    });
-    logActivity(selected, reason);
-    setCancelOpen(false);
-    toast.success(
-      `Bill ${selected.receiptNo} cancelled — the items are waiting on the register's hold list`,
-    );
+    try {
+      await refundSale(selected.id);
+      holdCancelledBill({
+        receiptNo: selected.receiptNo,
+        total: selected.total,
+        lines: selected.lines,
+      });
+      logActivity(selected, reason);
+      setCancelOpen(false);
+      toast.success(
+        `Bill ${selected.receiptNo} cancelled — the items are waiting on the register's hold list`,
+      );
+    } catch (error) {
+      notifyError(error, "Cancelling the bill");
+    }
   }
 
   function logActivity(sale: Sale, reason: string) {
@@ -217,15 +221,19 @@ function ReceiptVault() {
     setPayOpen(true);
   }
 
-  function confirmPaymentFix() {
+  async function confirmPaymentFix() {
     if (!selected) return;
     if (payMethod === selected.method) {
       setPayOpen(false);
       return;
     }
-    changeSalePayment(selected.id, payMethod, payReason.trim() || undefined);
-    setPayOpen(false);
-    toast.success(`Bill ${selected.receiptNo} now recorded as ${payMethod.replace("_", " ")}`);
+    try {
+      await changeSalePayment(selected.id, payMethod, payReason.trim() || undefined);
+      setPayOpen(false);
+      toast.success(`Bill ${selected.receiptNo} now recorded as ${payMethod.replace("_", " ")}`);
+    } catch (error) {
+      notifyError(error, "Correcting the payment method");
+    }
   }
 
   return (
@@ -335,8 +343,8 @@ function ReceiptVault() {
                       <div className="min-w-0 flex-1">
                         <p className="numeric text-sm font-semibold">{s.receiptNo}</p>
                         <p className="text-[11px] text-muted-foreground">
-                          {new Date(s.createdAt).toLocaleString()} · {s.cashier} ·{" "}
-                          {s.lines.length} item{s.lines.length > 1 ? "s" : ""}
+                          {new Date(s.createdAt).toLocaleString()} · {s.cashier} · {s.lines.length}{" "}
+                          item{s.lines.length > 1 ? "s" : ""}
                         </p>
                       </div>
                       <Badge variant="outline" className="capitalize">
@@ -478,10 +486,8 @@ function ReceiptVault() {
           </DialogHeader>
           <p className="text-sm text-muted-foreground">
             Currently recorded as{" "}
-            <span className="font-semibold capitalize">
-              {selected?.method.replace("_", " ")}
-            </span>
-            . Pick what the customer actually paid with.
+            <span className="font-semibold capitalize">{selected?.method.replace("_", " ")}</span>.
+            Pick what the customer actually paid with.
           </p>
           <div className="grid grid-cols-3 gap-2">
             {METHODS.map((m) => (

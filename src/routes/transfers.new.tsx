@@ -58,8 +58,8 @@ function NewTransferPage() {
           initialProductIds={prefill ? prefill.split(",").filter(Boolean) : undefined}
           kind="transfer"
           submitLabel={requireApproval ? "Send for approval" : "Raise transfer"}
-          onSubmit={({ otherStoreId, items, note }) => {
-            const t = createTransfer({
+          onSubmit={async ({ otherStoreId, items, note }) => {
+            const t = await createTransfer({
               kind: "transfer",
               fromStoreId: currentStore.id,
               toStoreId: otherStoreId,

@@ -8,9 +8,18 @@
  * receipt profile, and the live preview.
  */
 import { Link } from "@tanstack/react-router";
-import { createContext, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { ArrowLeft, Eye, Loader2, RotateCcw, Save } from "lucide-react";
 import { toast } from "sonner";
+import { notifyError } from "@/lib/notify";
 import { SettingsShell } from "@/platforms/web/components/pos/settings/SettingsShell";
 import { SaveIndicator } from "@/platforms/web/components/pos/settings/SaveIndicator";
 import { useEmbeddedSettings } from "@/platforms/web/components/pos/settings/embed";
@@ -54,7 +63,9 @@ type Ctx = {
   setField: <K extends keyof ReceiptOverride>(key: K, value: ReceiptOverride[K]) => void;
   setGlobal: (patch: Partial<ReceiptSettings>) => void;
   setFont: (scope: keyof ReceiptSettings["fonts"], patch: Partial<FontStyleSettings>) => void;
-  setWhatsApp: (patch: Partial<NonNullable<ReturnType<typeof usePos>["state"]["settings"]["whatsapp"]>>) => void;
+  setWhatsApp: (
+    patch: Partial<NonNullable<ReturnType<typeof usePos>["state"]["settings"]["whatsapp"]>>,
+  ) => void;
   setPaymentQr: (patch: Partial<ReturnType<typeof defaultQr>>) => void;
   paymentQr: ReturnType<typeof defaultQr>;
 };
@@ -158,7 +169,10 @@ export function SettingsFrame({
 
   const setField = <K extends keyof ReceiptOverride>(key: K, value: ReceiptOverride[K]) => {
     if (overrideOn) {
-      upsertStore({ ...branch, receiptOverrides: { ...branch.receiptOverrides, [key]: value } });
+      void upsertStore({
+        ...branch,
+        receiptOverrides: { ...branch.receiptOverrides, [key]: value },
+      }).catch((error) => notifyError(error, "Saving branch receipt setting"));
     } else {
       updateSettings({ receipt: { ...receipt, [key]: value } as ReceiptSettings });
     }
@@ -176,8 +190,8 @@ export function SettingsFrame({
   const setPaymentQr = (patch: Partial<typeof paymentQr>) =>
     updateSettings({ payment: { ...payment, paymentQr: { ...paymentQr, ...patch } } });
 
-  const toggleOverride = (on: boolean) =>
-    upsertStore({
+  const toggleOverride = (on: boolean) => {
+    void upsertStore({
       ...branch,
       receiptOverrides: on
         ? {
@@ -186,12 +200,27 @@ export function SettingsFrame({
             footerText: receipt.footerText,
           }
         : undefined,
-    });
+    }).catch((error) => notifyError(error, "Saving branch receipt override"));
+  };
 
   const sample: Sale = useMemo(() => {
     const lines = [
-      { productId: "x1", name: "Espresso Beans 250g", price: 12.5, qty: 2, taxRate: 0.05, discount: 0 },
-      { productId: "x2", name: "Butter Croissant", price: 3.75, qty: 1, taxRate: 0.05, discount: 0 },
+      {
+        productId: "x1",
+        name: "Espresso Beans 250g",
+        price: 12.5,
+        qty: 2,
+        taxRate: 0.05,
+        discount: 0,
+      },
+      {
+        productId: "x2",
+        name: "Butter Croissant",
+        price: 3.75,
+        qty: 1,
+        taxRate: 0.05,
+        discount: 0,
+      },
     ];
     const subtotal = 28.75;
     const { tax: taxAmount, total } = computeTax(subtotal, tax);
@@ -246,9 +275,7 @@ export function SettingsFrame({
       </div>
     );
     if (embedded) return denied;
-    return (
-      <SettingsShell>{denied}</SettingsShell>
-    );
+    return <SettingsShell>{denied}</SettingsShell>;
   }
 
   const geometry = paperCss(effective.paper);
@@ -271,102 +298,106 @@ export function SettingsFrame({
 
   const body = (
     <SettingsCtx.Provider value={ctx}>
-        <div
-          className={
-            embedded
-              ? "w-full max-w-full space-y-4"
-              : `mx-auto w-full space-y-5 p-6 ${wide ? "max-w-full" : "max-w-4xl"}`
-          }
-        >
-          <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
-            {embedded ? (
-              <div />
-            ) : (
-              <div className="min-w-0 space-y-1">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl font-semibold">{title}</h1>
-                  <ScopeChip />
-                </div>
-                <p className="text-sm text-muted-foreground">{description}</p>
+      <div
+        className={
+          embedded
+            ? "w-full max-w-full space-y-4"
+            : `mx-auto w-full space-y-5 p-6 ${wide ? "max-w-full" : "max-w-4xl"}`
+        }
+      >
+        <header className="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-4">
+          {embedded ? (
+            <div />
+          ) : (
+            <div className="min-w-0 space-y-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <h1 className="text-2xl font-semibold">{title}</h1>
+                <ScopeChip />
               </div>
-            )}
-            {showPreview && (
-              <Sheet>
-                <SheetTrigger asChild>
-                  <Button variant="outline" className="shrink-0">
-                    <Eye className="size-4" /> Preview receipt
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="right" className="w-full sm:max-w-[520px]">
-                  <SheetHeader>
-                    <SheetTitle>Live receipt preview · {PAPER_LABELS[effective.paper]}</SheetTitle>
-                  </SheetHeader>
-                  <div className="overflow-auto px-4 pb-6">
-                    <div
-                      className="mx-auto overflow-hidden rounded-md bg-white p-2"
-                      style={{ maxWidth: geometry.width }}
-                    >
-                      <iframe
-                        title="Receipt preview"
-                        srcDoc={previewHtml}
-                        className="h-[70vh] w-full border-0 bg-white"
-                      />
-                    </div>
-                  </div>
-                </SheetContent>
-              </Sheet>
-            )}
-          </header>
-
-          {branchAware && (
-            <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
-              <div className="space-y-1">
-                <Label className="text-[11px] text-muted-foreground">Editing branch</Label>
-                <ThemedSelect
-                  ariaLabel="Editing branch"
-                  className="h-8 w-56"
-                  value={branchId}
-                  onChange={setBranchId}
-                  options={stores.map((s) => ({ value: s.id, label: `${s.name} (${s.code})` }))}
-                />
-              </div>
-              <div className="ml-auto flex items-center gap-2">
-                <span className="text-xs text-muted-foreground">
-                  {overrideOn ? "Custom for this branch" : "Using global profile"}
-                </span>
-                <Switch
-                  aria-label="Override for this branch"
-                  checked={overrideOn}
-                  onCheckedChange={toggleOverride}
-                />
-              </div>
+              <p className="text-sm text-muted-foreground">{description}</p>
             </div>
           )}
+          {showPreview && (
+            <Sheet>
+              <SheetTrigger asChild>
+                <Button variant="outline" className="shrink-0">
+                  <Eye className="size-4" /> Preview receipt
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="right" className="w-full sm:max-w-[520px]">
+                <SheetHeader>
+                  <SheetTitle>Live receipt preview · {PAPER_LABELS[effective.paper]}</SheetTitle>
+                </SheetHeader>
+                <div className="overflow-auto px-4 pb-6">
+                  <div
+                    className="mx-auto overflow-hidden rounded-md bg-white p-2"
+                    style={{ maxWidth: geometry.width }}
+                  >
+                    <iframe
+                      title="Receipt preview"
+                      srcDoc={previewHtml}
+                      className="h-[70vh] w-full border-0 bg-white"
+                    />
+                  </div>
+                </div>
+              </SheetContent>
+            </Sheet>
+          )}
+        </header>
 
-          {scopeSections?.length ? <ScopePanel sections={scopeSections} /> : null}
-
-          <section className="w-full min-w-0 max-w-full space-y-4 rounded-lg border border-border bg-card p-5">
-            {children}
-          </section>
-
-          {/* Nothing is considered stored until this bar confirms it. */}
-          <div
-            className={`sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-border bg-background/95 py-3 backdrop-blur ${
-              embedded ? "px-1" : "-mx-6 px-6"
-            }`}
-          >
-            <SaveIndicator dirty={dirty} saving={saving} savedAt={savedAt} error={saveError} />
-            <div className="ml-auto flex gap-2">
-              <Button variant="ghost" size="sm" disabled={!dirty || saving} onClick={discard}>
-                <RotateCcw className="size-4" /> Discard changes
-              </Button>
-              <Button size="sm" disabled={saving || (!dirty && !saveError)} onClick={() => void save()}>
-                {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-                {saving ? "Saving…" : "Save settings"}
-              </Button>
+        {branchAware && (
+          <div className="flex flex-wrap items-center gap-3 rounded-md border border-border bg-card px-3 py-2">
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground">Editing branch</Label>
+              <ThemedSelect
+                ariaLabel="Editing branch"
+                className="h-8 w-56"
+                value={branchId}
+                onChange={setBranchId}
+                options={stores.map((s) => ({ value: s.id, label: `${s.name} (${s.code})` }))}
+              />
+            </div>
+            <div className="ml-auto flex items-center gap-2">
+              <span className="text-xs text-muted-foreground">
+                {overrideOn ? "Custom for this branch" : "Using global profile"}
+              </span>
+              <Switch
+                aria-label="Override for this branch"
+                checked={overrideOn}
+                onCheckedChange={toggleOverride}
+              />
             </div>
           </div>
+        )}
+
+        {scopeSections?.length ? <ScopePanel sections={scopeSections} /> : null}
+
+        <section className="w-full min-w-0 max-w-full space-y-4 rounded-lg border border-border bg-card p-5">
+          {children}
+        </section>
+
+        {/* Nothing is considered stored until this bar confirms it. */}
+        <div
+          className={`sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-border bg-background/95 py-3 backdrop-blur ${
+            embedded ? "px-1" : "-mx-6 px-6"
+          }`}
+        >
+          <SaveIndicator dirty={dirty} saving={saving} savedAt={savedAt} error={saveError} />
+          <div className="ml-auto flex gap-2">
+            <Button variant="ghost" size="sm" disabled={!dirty || saving} onClick={discard}>
+              <RotateCcw className="size-4" /> Discard changes
+            </Button>
+            <Button
+              size="sm"
+              disabled={saving || (!dirty && !saveError)}
+              onClick={() => void save()}
+            >
+              {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+              {saving ? "Saving…" : "Save settings"}
+            </Button>
+          </div>
         </div>
+      </div>
     </SettingsCtx.Provider>
   );
 

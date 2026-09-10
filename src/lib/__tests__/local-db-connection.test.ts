@@ -31,6 +31,34 @@ const stubShell = (connect: (...a: unknown[]) => Promise<unknown>) => {
 };
 
 describe("local database connection state", () => {
+  it("does not call SQL connectivity connected when SQLite durability failed", () => {
+    const view = deriveLocalDbState({
+      available: true,
+      configured: true,
+      status: {
+        connected: false,
+        durability: { ok: false, code: "ESQLITE_UNAVAILABLE" },
+        sqlServer: { ok: true },
+      },
+    });
+    expect(view.state).toBe("failed");
+    expect(view.detail).toContain("SQLite");
+  });
+
+  it("reports SQL projection separately while SQLite remains trade-ready", () => {
+    const view = deriveLocalDbState({
+      available: true,
+      configured: true,
+      status: {
+        connected: false,
+        durability: { ok: true, rolledBack: true },
+        sqlServer: { ok: false, code: "ENOTCONNECTED" },
+      },
+    });
+    expect(view.state).toBe("failed");
+    expect(view.detail).toContain("SQL Server");
+    expect(view.detail).toContain("SQLite offline durability remains available");
+  });
   beforeEach(() => {
     store.clear();
     delete fakeWindow.pos;
