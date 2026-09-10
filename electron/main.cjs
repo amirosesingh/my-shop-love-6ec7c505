@@ -1912,6 +1912,10 @@ function registerIpc() {
 
   ipcMain.handle("pos:push", () => worker.push());
   ipcMain.handle("pos:pull", () => worker.pull());
+  ipcMain.handle("pos:sync-now", async () => {
+    await worker.run();
+    return { ok: true, ...(await worker.status()) };
+  });
   // Operator-triggered history restore; never runs on the sync timer.
   ipcMain.handle("pos:restore", (_e, options) =>
     guard.guarded(() => worker.restore(guard.options(options, { name: "restore options" }))),
