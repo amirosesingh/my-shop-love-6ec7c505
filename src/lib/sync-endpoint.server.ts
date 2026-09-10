@@ -36,8 +36,7 @@ const opSchema = z.discriminatedUnion("kind", [
     table: z.string().min(1).max(64),
     // Only routines the relay knows about are accepted, and it re-checks the
     // caller's branch and permission before running one.
-    // Electron replays a durable sale as one atomic RPC. Keep this allow-list in step with runRelayRpc().
-    fn: z.enum(["sale_refund", "pos_sale_commit"]),
+    fn: z.enum(["pos_sale_commit", "sale_refund"]),
     args: z.record(z.string(), z.unknown()),
   }),
 ]);
