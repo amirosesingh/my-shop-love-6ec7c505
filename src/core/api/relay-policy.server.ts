@@ -80,7 +80,15 @@ const PARENT_OF: Record<string, { table: string; fk: string; parentStoreColumn: 
 };
 
 /** Global catalogue tables: no branch, but permission-gated columns. */
-const GLOBAL_TABLES = new Set(["products", "members", "audit_logs", "authorization_actions"]);
+const GLOBAL_TABLES = new Set([
+  "products",
+  "members",
+  "audit_logs",
+  "authorization_actions",
+  "pos_settings",
+  "promotions",
+  "suppliers",
+]);
 
 /** Both ends of a transfer may write it. */
 const TRANSFER_TABLE = "stock_transfers";
@@ -162,6 +170,9 @@ const TABLE_PERMISSIONS: Record<string, { write?: string; remove?: string }> = {
   // Only an account allowed into POS settings may change trading rules.
   pos_store_settings: { write: "can_access_pos_settings", remove: "can_access_pos_settings" },
   authorization_actions: { write: "can_access_pos_settings", remove: "can_access_pos_settings" },
+  pos_settings: { write: "can_access_pos_settings", remove: "can_access_pos_settings" },
+  promotions: { write: "can_manage_promotions", remove: "can_manage_promotions" },
+  suppliers: { write: "can_receive_purchase_order", remove: "can_receive_purchase_order" },
 };
 
 export const RELAY_WRITABLE_TABLES = new Set([
