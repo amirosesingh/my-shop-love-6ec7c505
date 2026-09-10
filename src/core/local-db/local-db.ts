@@ -564,6 +564,7 @@ export type PosBridge = {
   syncContract?: () => Promise<{ push: string[]; pull: string[]; restore: string[] }>;
 
   setSyncEnabled: (on: boolean) => Promise<void>;
+  setSyncConfig?: (config: { intervalMs?: number; batchSize?: number; maxAttempts?: number }) => Promise<unknown>;
   /** Live per-table counts on this till, for the server/shop comparison. */
   compareSummary?: (options?: { since?: string | null; tables?: string[] }) => Promise<{
     ok: boolean;
