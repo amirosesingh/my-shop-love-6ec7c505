@@ -162,7 +162,6 @@ const TABLE_PERMISSIONS: Record<string, { write?: string; remove?: string }> = {
   // Only an account allowed into POS settings may change trading rules.
   pos_store_settings: { write: "can_access_pos_settings", remove: "can_access_pos_settings" },
   authorization_actions: { write: "can_access_pos_settings", remove: "can_access_pos_settings" },
-  authorization_requests: { write: "can_approve_requests" },
 };
 
 export const RELAY_WRITABLE_TABLES = new Set([
@@ -318,6 +317,25 @@ export async function authorizeRelayOp(
       "SCOPE_STALE",
       "Your account details could not be confirmed — sign in again to refresh them.",
     );
+
+  if (op.table === "authorization_requests" && !scope.isSupervisor) {
+    if (op.kind !== "insert" && op.kind !== "upsert")
+      return deny("PERMISSION_DENIED", "Only a supervisor can change an authorization decision.");
+    op = {
+      ...op,
+      rows: op.rows.map((row) => ({
+        ...row,
+        status: "pending",
+        decided_by: null,
+        decided_by_name: null,
+        decided_at: null,
+        decision_note: null,
+        approved_amount: null,
+        approved_payload: {},
+        consumed_at: null,
+      })),
+    } as RelayOp;
+  }
 
   const appendOnlyTables = new Set([
     "authorization_log",
