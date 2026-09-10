@@ -40,6 +40,7 @@ const CHANNEL_LEVELS = {
   "pos:push": OPEN,
   "pos:pull": OPEN,
   "pos:sync-now": OPEN,
+  "pos:set-sync-config": OPEN,
   "pos:snapshot": OPEN,
   "pos:sync-contract": OPEN,
   "pos:schema-status": OPEN,
