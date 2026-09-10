@@ -276,7 +276,7 @@ function init({
   if (onChange) notify = onChange;
 }
 
-async function cloudUpsert(table, rows) {
+async function cloudUpsert(table, rows, onConflict = "id") {
   const bearer = credentials.sessionToken || credentials.accessToken;
   if (relayUrl && (bearer || credentials.cashierToken || credentials.terminalToken)) {
     mutationPath = "relay";
@@ -290,7 +290,7 @@ async function cloudUpsert(table, rows) {
         sessionToken: credentials.sessionToken,
         cashierToken: credentials.cashierToken,
         terminalToken: credentials.terminalToken,
-        ops: [{ kind: "upsert", table, rows, onConflict: "id" }],
+        ops: [{ kind: "upsert", table, rows, onConflict }],
       }),
     });
     const body = await response.json().catch(() => null);
@@ -308,12 +308,12 @@ async function cloudUpsert(table, rows) {
     throw new Error("PENDING_AUTH: sign in or re-register this terminal before cloud sync");
   }
   mutationPath = "authenticated-direct";
-  const { error } = await supabase.from(table).upsert(rows, { onConflict: "id" });
+  const { error } = await supabase.from(table).upsert(rows, { onConflict });
   if (error) throw error;
 }
 
 async function cloudMutation(op) {
-  if (op.kind === "insert" || op.kind === "upsert") return cloudUpsert(op.table, op.rows);
+  if (op.kind === "insert" || op.kind === "upsert") return cloudUpsert(op.table, op.rows, op.onConflict ?? "id");
   const bearer = credentials.sessionToken || credentials.accessToken;
   if (relayUrl && (bearer || credentials.cashierToken || credentials.terminalToken)) {
     mutationPath = "relay";
