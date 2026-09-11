@@ -5,6 +5,7 @@
 //     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
+import webOnlyEnv from "./scripts/web-only-env-names.json";
 
 const isDesktop = Boolean(process.env["DESKTOP_BUILD"]);
 /**
@@ -31,18 +32,7 @@ const isCloudflare = Boolean(process.env["CLOUDFLARE_BUILD"]);
  *
  * The browser/Cloudflare build is untouched and keeps its own environment.
  */
-export const WEB_ONLY_ENV_NAMES = [
-  "VITE_SUPABASE_URL",
-  "VITE_SUPABASE_ANON_KEY",
-  "VITE_SUPABASE_PUBLISHABLE_KEY",
-  "VITE_SUPABASE_PROJECT_ID",
-  "VITE_POS_SUPABASE_URL",
-  "VITE_POS_SUPABASE_ANON_KEY",
-  "VITE_POS_SUPABASE_PUBLISHABLE_KEY",
-  "VITE_SUPABASE_EXTERNAL_URL",
-  "VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY",
-  "VITE_POS_SERVER_URL",
-] as const;
+export const WEB_ONLY_ENV_NAMES = webOnlyEnv.webOnly.filter((name) => name.startsWith("VITE_"));
 
 const isTerminalBuild = isMobile || isDesktop;
 
