@@ -41,7 +41,7 @@ import { hydrateBillSequence } from "@/lib/bill-number";
 import { startDatabaseModeWatch } from "@/core/local-db/db-mode";
 import { DbConnectionModal } from "@/platforms/windows/components/DbConnectionModal";
 import { UpdateHeaderButton } from "@/platforms/web/components/pos/UpdateHeaderButton";
-import type { NavItem } from "@/platforms/web/components/pos/nav-config";
+import { routePermissionForPath, type NavItem } from "@/platforms/web/components/pos/nav-config";
 import { setPrintStore, setPrintSettings, setServiceTerms } from "@/lib/pos-print";
 import { bookingRulesOf } from "@/core/types/pos-types";
 import { Badge } from "@/components/ui/badge";
@@ -75,43 +75,6 @@ import { readCredentials } from "@/lib/pos-credentials";
 import { TillLoader } from "@/components/shared/TillLoader";
 import { LocationBootGuard } from "@/platforms/web/components/pos/LocationBootGuard";
 
-/** Permission required to open each screen. Keys are path prefixes, so child
- *  pages (/settings/tax, /reports/sales …) inherit the parent gate unless they
- *  declare their own. `/` (register) and `/display` are intentionally open to
- *  every signed-in account. Keep this in sync with nav-config.ts. */
-const ROUTE_PERMISSIONS: Record<string, PermissionFlag> = {
-  "/settings/terminals": "can_manage_terminals",
-  "/settings/mobile-terminals": "can_manage_terminals",
-  "/settings/sessions": "can_manage_terminals",
-  "/settings/sync": "can_manage_sync_backup",
-  "/settings/database": "can_manage_sync_backup",
-  "/settings": "can_access_pos_settings",
-  "/staff": "can_manage_staff",
-  "/stores": "can_manage_locations",
-  "/promotions": "can_manage_promotions",
-  "/coupons": "can_manage_promotions",
-  "/suppliers": "can_receive_purchase_order",
-  "/approvals": "can_view_audit_trail",
-  "/audit": "can_view_audit_trail",
-  "/dashboard": "can_view_dashboard",
-  "/analytics": "can_view_sales_reports",
-  "/holds": "can_hold_cart",
-  "/reports/activity": "can_view_audit_trail",
-  "/reports": "can_view_sales_reports",
-  "/receipts": "can_view_sales_reports",
-  "/shifts": "can_close_shift",
-  "/inventory": "can_view_inventory",
-  "/all-shops": "can_view_inventory",
-  "/purchasing": "can_receive_purchase_order",
-  "/transfers": "can_create_transfer",
-  "/requests": "can_create_transfer",
-  "/receiving": "can_receive_transfer",
-  "/bookings": "can_manage_bookings",
-  "/members": "can_add_member",
-  "/stock-operations": "can_adjust_stock",
-  "/verifications": "can_view_member_history",
-};
-
 /** The only screens any signed-in account may open. Everything else must have
  *  an entry above — unknown paths are denied, never silently allowed. */
 const PUBLIC_ROUTES = new Set(["/", "/display"]);
@@ -139,11 +102,7 @@ const isDesktopBlocked = (pathname: string) =>
 function requiredPermission(pathname: string): PermissionFlag | null | "unknown" {
   if (PUBLIC_ROUTES.has(pathname)) return null;
   if (SECTION_HUBS.has(pathname)) return null;
-  const key =
-    Object.keys(ROUTE_PERMISSIONS)
-      .filter((p) => pathname === p || pathname.startsWith(`${p}/`))
-      .sort((a, b) => b.length - a.length)[0] ?? "";
-  return ROUTE_PERMISSIONS[key] ?? "unknown";
+  return routePermissionForPath(pathname) ?? "unknown";
 }
 
 export function AppShell({ children }: { children: ReactNode }) {
