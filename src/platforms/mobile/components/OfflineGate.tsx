@@ -18,11 +18,9 @@ import { isRecoveryPath, onRecoveryScreen } from "@/lib/recovery-route";
 import {
   connectivity,
   heartbeat,
-  startConnectivityMonitor,
   subscribeConnectivity,
   type Connectivity,
 } from "@/core/activation/connection-health";
-import { syncConfig } from "@/lib/sync-config";
 
 export function OfflineGate({ children }: { children: ReactNode }) {
   const live = isOnlineOnly();
@@ -35,13 +33,10 @@ export function OfflineGate({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     if (recovery) return;
-    // Safe on every platform: the monitor only ever starts once.
-    const stop = startConnectivityMonitor(syncConfig().heartbeatMs);
     setState(connectivity());
     const off = subscribeConnectivity(setState);
     return () => {
       off();
-      stop();
     };
   }, [recovery]);
 
