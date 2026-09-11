@@ -190,8 +190,10 @@ export function LocalDatabaseSettings() {
       <div>
         <p className="text-sm">Local database</p>
         <p className="text-xs text-muted-foreground">
-          Sales use the online database first and automatically fall back here. Connection details
-          stay encrypted on this machine.
+          On Windows, sales, shifts and stock changes are committed locally first. SQLite is the
+          durable safety copy and this Microsoft SQL Server is the operational branch database; central
+          synchronization happens separately in the background. Connection details stay encrypted on
+          this machine.
         </p>
       </div>
 
