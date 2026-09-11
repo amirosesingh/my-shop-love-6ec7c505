@@ -28,7 +28,7 @@ export const fetchCentralSchema = createServerFn({ method: "GET" }).handler(
       return {
         ok: false,
         error:
-          "The hosted POS backend is missing its central database service key. Configure POS_SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_ROLE_KEY) on the server deployment.",
+          "The hosted POS backend is missing its privileged central-database credential. Configure the server deployment before retrying.",
       };
     }
     const res = await runRelayRead({ kind: "cloudSchema" });
@@ -70,7 +70,7 @@ export const probeCentralTables = createServerFn({ method: "GET" }).handler(
       return {
         ok: false,
         error:
-          "The hosted POS backend is missing its central database service key. Configure POS_SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_ROLE_KEY) on the server deployment.",
+          "The hosted POS backend is missing its privileged central-database credential. Configure the server deployment before retrying.",
       };
     }
     const rows: CentralProbeRow[] = [];

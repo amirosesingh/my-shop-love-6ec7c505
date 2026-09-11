@@ -33,6 +33,8 @@ import { ThemeProvider, themeBootScript } from "../lib/theme";
 import { publicConfigScript } from "../lib/public-config-script";
 import { NativeBoot } from "@/platforms/mobile/components/NativeBoot";
 import { OfflineGate } from "@/platforms/mobile/components/OfflineGate";
+import { startConnectivityMonitor } from "@/core/activation/connection-health";
+import { subscribeSyncConfig, syncConfig } from "@/lib/sync-config";
 import { DesktopUpdateBanner } from "@/platforms/windows/components/DesktopUpdateBanner";
 import { AndroidUpdateBanner } from "@/platforms/mobile/components/AndroidUpdateBanner";
 import { usePublicHostLanding } from "../lib/coupon-hosts";
@@ -224,6 +226,25 @@ function RootShell({ children }: { children: ReactNode }) {
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
   usePublicHostLanding();
+
+  // One long-lived owner for connectivity on every platform. Platform-specific
+  // configuration remains separate; this only owns the shared heartbeat
+  // lifecycle so temporary screens can never stop it when they unmount.
+  useEffect(() => {
+    let appliedHeartbeat = syncConfig().heartbeatMs;
+    let stop = startConnectivityMonitor(appliedHeartbeat);
+    const offConfig = subscribeSyncConfig(() => {
+      const nextHeartbeat = syncConfig().heartbeatMs;
+      if (nextHeartbeat === appliedHeartbeat) return;
+      appliedHeartbeat = nextHeartbeat;
+      stop();
+      stop = startConnectivityMonitor(appliedHeartbeat);
+    });
+    return () => {
+      offConfig();
+      stop();
+    };
+  }, []);
 
   return (
     <QueryClientProvider client={queryClient}>

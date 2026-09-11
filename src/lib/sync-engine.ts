@@ -77,7 +77,6 @@ import { loadCloudState } from "@/core/api/pos-db";
 import { localDb } from "@/core/local-db/local-db";
 import {
   checkHealth,
-  startConnectivityMonitor,
   subscribeConnectivity,
   type Connectivity,
 } from "@/core/activation/connection-health";
@@ -761,9 +760,7 @@ export function startSyncEngine() {
   // own interval, so the renderer only wakes it for explicit/live/reconnect
   // events and never installs a second periodic sync loop.
   let timer = desktopBridge ? 0 : window.setInterval(tick, syncConfig().intervalMs);
-  let stopMonitor = startConnectivityMonitor(syncConfig().heartbeatMs);
   let appliedInterval = syncConfig().intervalMs;
-  let appliedHeartbeat = syncConfig().heartbeatMs;
   const offConfig = subscribeSyncConfig(() => {
     const cfg = syncConfig();
     if (desktopBridge?.setSyncConfig) {
@@ -779,11 +776,6 @@ export function startSyncEngine() {
         window.clearInterval(timer);
         timer = window.setInterval(tick, appliedInterval);
       }
-    }
-    if (cfg.heartbeatMs !== appliedHeartbeat) {
-      appliedHeartbeat = cfg.heartbeatMs;
-      stopMonitor();
-      stopMonitor = startConnectivityMonitor(appliedHeartbeat);
     }
   });
   let debounce: number | undefined;
@@ -850,7 +842,6 @@ export function startSyncEngine() {
   return () => {
     window.clearInterval(timer);
     offConfig();
-    stopMonitor();
     offConnectivity();
     if (debounce) window.clearTimeout(debounce);
     if (liveTimer) window.clearTimeout(liveTimer);
