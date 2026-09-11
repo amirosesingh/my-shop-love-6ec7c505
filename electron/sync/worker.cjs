@@ -276,6 +276,33 @@ function init({
   if (onChange) notify = onChange;
 }
 
+async function authenticatedDirectMutation(op) {
+  if (!credentials.accessToken) {
+    mutationPath = "pending-auth";
+    throw new Error("PENDING_AUTH: sign in or re-register this terminal before cloud sync");
+  }
+  mutationPath = "authenticated-direct";
+  if (op.kind === "insert" || op.kind === "upsert") {
+    const { error } = await supabase
+      .from(op.table)
+      .upsert(op.rows ?? [], { onConflict: op.onConflict ?? "id" });
+    if (error) throw error;
+    return;
+  }
+  if (op.kind === "rpc") {
+    const { error } = await supabase.rpc(op.fn, op.args ?? {});
+    if (error) throw error;
+    return;
+  }
+  let query =
+    op.kind === "delete"
+      ? supabase.from(op.table).delete()
+      : supabase.from(op.table).update(op.values ?? {});
+  for (const [column, value] of Object.entries(op.match ?? {})) query = query.eq(column, value);
+  const { error } = await query;
+  if (error) throw error;
+}
+
 async function cloudUpsert(table, rows, onConflict = "id") {
   const bearer = credentials.sessionToken || credentials.accessToken;
   if (relayUrl && (bearer || credentials.cashierToken || credentials.terminalToken)) {
@@ -295,6 +322,9 @@ async function cloudUpsert(table, rows, onConflict = "id") {
     });
     const body = await response.json().catch(() => null);
     if (!response.ok || !body?.ok || body.results?.some((result) => !result.ok)) {
+      if (body?.code === "NO_SERVICE_KEY" && credentials.accessToken) {
+        return authenticatedDirectMutation({ kind: "upsert", table, rows, onConflict });
+      }
       throw new Error(
         body?.error ||
           body?.results?.find((result) => !result.ok)?.error ||
@@ -303,13 +333,7 @@ async function cloudUpsert(table, rows, onConflict = "id") {
     }
     return;
   }
-  if (relayUrl || !credentials.accessToken) {
-    mutationPath = "pending-auth";
-    throw new Error("PENDING_AUTH: sign in or re-register this terminal before cloud sync");
-  }
-  mutationPath = "authenticated-direct";
-  const { error } = await supabase.from(table).upsert(rows, { onConflict });
-  if (error) throw error;
+  return authenticatedDirectMutation({ kind: "upsert", table, rows, onConflict });
 }
 
 async function cloudMutation(op) {
@@ -332,24 +356,14 @@ async function cloudMutation(op) {
     });
     const body = await response.json().catch(() => null);
     if (!response.ok || !body?.ok || body.results?.some((result) => !result.ok)) {
+      if (body?.code === "NO_SERVICE_KEY" && credentials.accessToken) {
+        return authenticatedDirectMutation(op);
+      }
       throw new Error(body?.error || body?.results?.find((result) => !result.ok)?.error || `Sync relay failed (${response.status})`);
     }
     return;
   }
-  if (relayUrl || !credentials.accessToken) {
-    mutationPath = "pending-auth";
-    throw new Error("PENDING_AUTH: sign in or re-register this terminal before cloud sync");
-  }
-  mutationPath = "authenticated-direct";
-  if (op.kind === "rpc") {
-    const { error } = await supabase.rpc(op.fn, op.args ?? {});
-    if (error) throw error;
-    return;
-  }
-  let query = op.kind === "delete" ? supabase.from(op.table).delete() : supabase.from(op.table).update(op.values ?? {});
-  for (const [column, value] of Object.entries(op.match ?? {})) query = query.eq(column, value);
-  const { error } = await query;
-  if (error) throw error;
+  return authenticatedDirectMutation(op);
 }
 
 /**
