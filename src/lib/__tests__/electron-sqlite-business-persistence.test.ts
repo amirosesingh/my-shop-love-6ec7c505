@@ -152,6 +152,24 @@ describe("Electron durable business persistence", () => {
     expect(hub).toContain("Local SQLite and SQL Server are safe.");
   });
 
+  it("routes packaged Electron sync through the configured hosted POS backend", () => {
+    const main = read("electron/main.cjs");
+    expect(main).toContain("function syncRelayUrl()");
+    expect(main).toContain('configStore.get("backendUrl")');
+    expect(main).toContain('return `${savedBackend}/api/v1/pos/sync`');
+    expect(main).toContain("return DEV_URL && baseUrl");
+    expect(main).toContain("relayUrl: syncRelayUrl()");
+    expect(main).not.toContain('relayUrl: baseUrl ? `${baseUrl}/api/v1/pos/sync` : null');
+  });
+
+  it("keeps old server-key queue warnings out of the red row-failure list", () => {
+    const hub = read("src/platforms/web/components/pos/sync/SyncHub.tsx");
+    expect(hub).toContain("const centralConfigQueue = queue.filter");
+    expect(hub).toContain("NO_SERVICE_KEY");
+    expect(hub).toContain("!centralConfigQueue.some");
+    expect(hub).toContain("Nothing needs to be re-entered at this till.");
+  });
+
   it("allows the durable sale RPC through the relay input contract", () => {
     const endpoint = read("src/lib/sync-endpoint.server.ts");
     const relay = read("src/core/api/pos-relay.server.ts");
