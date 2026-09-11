@@ -5,7 +5,6 @@ const live = vi.fn();
 const localWriteBatch = vi.fn();
 const localMirrorBatch = vi.fn();
 const localPush = vi.fn();
-const legacyCreateSale = vi.fn();
 
 vi.mock("@/lib/sync-engine", () => ({
   runOpLive: (...a: unknown[]) => live(...a),
@@ -18,7 +17,6 @@ vi.mock("@/core/local-db/local-db", () => ({
     localMirrorBatch: (...a: unknown[]) => localMirrorBatch(...a),
     push: (...a: unknown[]) => localPush(...a),
   }),
-  electronDb: () => ({ createSale: (...a: unknown[]) => legacyCreateSale(...a) }),
   readBranch: () => ({ branchId: null, branchName: null }),
 }));
 
@@ -48,7 +46,6 @@ describe("commitOps on a Windows till", () => {
     localWriteBatch.mockReset();
     localMirrorBatch.mockReset();
     localPush.mockReset();
-    legacyCreateSale.mockReset();
     localWriteBatch.mockResolvedValue({ ok: true });
     localMirrorBatch.mockImplementation(async (entries: Array<{ rows?: unknown[] }>) => ({
       ok: true,
@@ -103,12 +100,11 @@ describe("commitOps on a Windows till", () => {
     expect(target).toBe("local");
     expect(localWriteBatch).toHaveBeenCalled();
     expect(live).not.toHaveBeenCalled();
-    expect(legacyCreateSale).not.toHaveBeenCalled();
   });
 
   it("stops instead of creating a cloud-only gap when SQLite refuses the batch", async () => {
     localMirrorBatch.mockResolvedValue({ ok: false, written: 0, error: "no local engine" });
-    await expect(commitOps("Saving sale", ops)).rejects.toThrow(/Local Database Required/);
+    await expect(commitOps("Saving sale", ops)).rejects.toThrow(/Local transaction storage unavailable/);
     expect(localWriteBatch).not.toHaveBeenCalled();
     expect(live).not.toHaveBeenCalled();
   });

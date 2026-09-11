@@ -10,9 +10,8 @@ const { createClient } = require("@supabase/supabase-js");
 const repo = require("../db/repo.cjs");
 const sqlite = require("../db/sqlite.cjs");
 
-const BATCH = 50;
-const INTERVAL_MS = 30_000;
-const MAX_ATTEMPTS = 5;
+const DEFAULT_WORKER_CONFIG = { batchSize: 50, intervalMs: 30_000, maxAttempts: 5 };
+let workerConfig = { ...DEFAULT_WORKER_CONFIG };
 
 let supabase = null;
 let enabled = true;
@@ -276,7 +275,7 @@ function init({
   if (onChange) notify = onChange;
 }
 
-async function cloudUpsert(table, rows) {
+async function cloudUpsert(table, rows, onConflict = "id") {
   const bearer = credentials.sessionToken || credentials.accessToken;
   if (relayUrl && (bearer || credentials.cashierToken || credentials.terminalToken)) {
     mutationPath = "relay";
@@ -290,7 +289,7 @@ async function cloudUpsert(table, rows) {
         sessionToken: credentials.sessionToken,
         cashierToken: credentials.cashierToken,
         terminalToken: credentials.terminalToken,
-        ops: [{ kind: "upsert", table, rows, onConflict: "id" }],
+        ops: [{ kind: "upsert", table, rows, onConflict }],
       }),
     });
     const body = await response.json().catch(() => null);
@@ -308,12 +307,12 @@ async function cloudUpsert(table, rows) {
     throw new Error("PENDING_AUTH: sign in or re-register this terminal before cloud sync");
   }
   mutationPath = "authenticated-direct";
-  const { error } = await supabase.from(table).upsert(rows, { onConflict: "id" });
+  const { error } = await supabase.from(table).upsert(rows, { onConflict });
   if (error) throw error;
 }
 
 async function cloudMutation(op) {
-  if (op.kind === "insert" || op.kind === "upsert") return cloudUpsert(op.table, op.rows);
+  if (op.kind === "insert" || op.kind === "upsert") return cloudUpsert(op.table, op.rows, op.onConflict ?? "id");
   const bearer = credentials.sessionToken || credentials.accessToken;
   if (relayUrl && (bearer || credentials.cashierToken || credentials.terminalToken)) {
     mutationPath = "relay";
@@ -382,7 +381,7 @@ async function cloudSaveRules(rows) {
  * below cannot upload the same batch a second time.
  */
 async function pushSqliteBusinessBatches() {
-  const batches = sqlite.pendingBusinessBatches?.(BATCH) ?? [];
+  const batches = sqlite.pendingBusinessBatches?.(workerConfig.batchSize) ?? [];
   let pushed = 0;
   let failed = 0;
   for (const batch of batches) {
@@ -430,7 +429,13 @@ async function pushSqliteBusinessBatches() {
       // batch. Cloud writes above are stable-ID/RPC idempotent, so if SQL
       // Server is unavailable the intact batch can safely retry both sides on
       // the next pass without creating another sale or payment.
-      const projectionOps = ops.filter((op) => op?.kind !== "rpc" && op?.table !== "pos_store_settings");
+      const sqlProjectionTables = new Set(repo.TABLES ?? []);
+      const projectionOps = ops.filter(
+        (op) =>
+          op?.kind !== "rpc" &&
+          op?.table !== "pos_store_settings" &&
+          sqlProjectionTables.has(op?.table),
+      );
       if (projectionOps.length) await repo.applyOps(projectionOps);
       for (const op of ops) {
         const ids = (op.rows ?? []).map((row) => row?.id).filter(Boolean);
@@ -446,7 +451,7 @@ async function pushSqliteBusinessBatches() {
       if (/unauthorized|forbidden|permission|session has ended|STORE_FORBIDDEN/i.test(message))
         mutationPath = "authorization-refused";
       lastBusinessPush = { ...lastBusinessPush, result: "failed", reason: safeFailureReason(message) };
-      sqlite.failBusinessBatch(batch.id, message, /STALE_RULES/i.test(message) ? 1 : MAX_ATTEMPTS);
+      sqlite.failBusinessBatch(batch.id, message, /STALE_RULES/i.test(message) ? 1 : workerConfig.maxAttempts);
       failed += 1;
       // Preserve batch order: a later transaction must not overtake a failed
       // earlier transaction from the same terminal.
@@ -464,13 +469,29 @@ function setEnabled(on) {
 
 function start() {
   if (timer) return;
-  timer = setInterval(() => void run(), INTERVAL_MS);
+  timer = setInterval(() => void run(), workerConfig.intervalMs);
   void run();
 }
 
 function stop() {
   if (timer) clearInterval(timer);
   timer = null;
+}
+
+function setConfig(patch = {}) {
+  const next = {
+    batchSize: Math.min(500, Math.max(1, Number(patch.batchSize ?? workerConfig.batchSize) || DEFAULT_WORKER_CONFIG.batchSize)),
+    intervalMs: Math.min(300_000, Math.max(5_000, Number(patch.intervalMs ?? workerConfig.intervalMs) || DEFAULT_WORKER_CONFIG.intervalMs)),
+    maxAttempts: Math.min(50, Math.max(1, Number(patch.maxAttempts ?? workerConfig.maxAttempts) || DEFAULT_WORKER_CONFIG.maxAttempts)),
+  };
+  const restart = next.intervalMs !== workerConfig.intervalMs && !!timer;
+  workerConfig = next;
+  if (restart) {
+    stop();
+    start();
+  }
+  notify();
+  return { ...workerConfig };
 }
 
 async function reachable() {
@@ -500,7 +521,7 @@ async function push() {
     if (retryAt && Date.now() < retryAt) continue; // parked: central schema missing
     let rows;
     try {
-      rows = await repo.pendingRows(table, BATCH);
+      rows = await repo.pendingRows(table, workerConfig.batchSize);
     } catch (err) {
       setPhase("idle");
       return { ok: false, pushed, failed, error: err.message };
@@ -566,7 +587,7 @@ async function push() {
       }
       // The attempt counter lives in the database: a parked row stays parked
       // across restarts until someone retries it from the Sync Hub.
-      await repo.markFailed(table, ids, error.message, MAX_ATTEMPTS);
+      await repo.markFailed(table, ids, error.message, workerConfig.maxAttempts);
       await repo.setWatermark(table, null, { error: error.message }).catch(() => {});
       notify();
       continue;
@@ -590,7 +611,7 @@ async function push() {
               table,
               parked,
               `Stock movement refused centrally: ${result.refused[0].reason ?? "guard"}`,
-              MAX_ATTEMPTS,
+              workerConfig.maxAttempts,
             );
             syncedIds = ids.filter((id) => !refusedIds.has(String(id).toLowerCase()));
             failed += parked.length;
@@ -1153,21 +1174,34 @@ async function restoreEvidence() {
   };
 }
 
-async function run() {
-  if (running || !enabled || !supabase) return;
+async function request(direction = "both") {
+  if (running || !enabled || !supabase) return { ok: false, busy: running };
   // Credentials rejected: stay parked (local trading unaffected) until an
   // admin saves fresh keys, which re-inits the worker and clears the flag.
-  if (credentialsInvalid) return;
+  if (credentialsInvalid) return { ok: false, error: "credentials" };
   running = true;
   try {
-    if (!(await reachable())) return;
-    await push();
-    await pull();
-  } catch {
-    /* next tick retries */
+    if (!(await reachable())) return { ok: false, error: "unreachable" };
+    if (direction === "push") return await push();
+    if (direction === "pull") return await pull();
+    const pushed = await push();
+    const pulled = await pull();
+    return {
+      ok: pushed?.ok !== false && pulled?.ok !== false,
+      pushed: pushed?.pushed ?? 0,
+      failed: pushed?.failed ?? 0,
+      merged: pulled?.merged ?? 0,
+      error: pushed?.error ?? pulled?.error,
+    };
+  } catch (error) {
+    return { ok: false, error: error?.message ?? String(error) };
   } finally {
     running = false;
   }
+}
+
+async function run() {
+  return request("both");
 }
 
 async function status() {
@@ -1208,8 +1242,10 @@ module.exports = {
   start,
   stop,
   setEnabled,
+  setConfig,
   push,
   pull,
+  request,
   restore,
   restoreStatus,
   verifyRestore,

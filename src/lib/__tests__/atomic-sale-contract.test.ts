@@ -26,7 +26,7 @@ describe("atomic central sale contract", () => {
   it("allows the Electron atomic sale RPC through the HTTP relay contract", () => {
     const endpoint = read("src/lib/sync-endpoint.server.ts");
     const relay = read("src/core/api/pos-relay.server.ts");
-    expect(endpoint).toContain('z.enum(["pos_sale_commit", "sale_refund"])');
+    expect(endpoint).toContain('z.enum(["pos_sale_commit", "sale_refund", "shift_cash_count_submit"])');
     expect(relay).toContain('if (op.fn === "pos_sale_commit")');
     expect(relay).toContain("scope.permissions.can_process_sale");
   });

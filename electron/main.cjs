@@ -1860,17 +1860,6 @@ function registerIpc() {
 
   /* ---------------- offline register database surface ---------------- */
 
-  ipcMain.handle("db:create-sale", async (_e, payload) => {
-    try {
-      const branchId = payload?.branchId ?? (await repo.getState("branch_id"));
-      const result = await repo.createSale({ ...payload, branchId });
-      void worker.run();
-      return { ok: true, ...result };
-    } catch (err) {
-      return fail(err);
-    }
-  });
-
   ipcMain.handle("db:get-products", async () => {
     try {
       return { ok: true, products: await repo.getProducts() };
@@ -1910,8 +1899,12 @@ function registerIpc() {
     }
   });
 
-  ipcMain.handle("pos:push", () => worker.push());
-  ipcMain.handle("pos:pull", () => worker.pull());
+  ipcMain.handle("pos:push", () => worker.request("push"));
+  ipcMain.handle("pos:pull", () => worker.request("pull"));
+  ipcMain.handle("pos:sync-now", async () => {
+    const result = await worker.run();
+    return { ...(result ?? { ok: true }), ...(await worker.status()) };
+  });
   // Operator-triggered history restore; never runs on the sync timer.
   ipcMain.handle("pos:restore", (_e, options) =>
     guard.guarded(() => worker.restore(guard.options(options, { name: "restore options" }))),
@@ -1945,6 +1938,7 @@ function registerIpc() {
   });
 
   ipcMain.handle("pos:set-sync-enabled", (_e, on) => worker.setEnabled(on));
+  ipcMain.handle("pos:set-sync-config", (_e, config) => worker.setConfig(guard.options(config, { name: "sync config" })));
 
   /* ---- shop side of the server/shop data comparison ---- */
   ipcMain.handle("pos:compare-summary", async (_e, options) => {

@@ -766,6 +766,7 @@ const salePaymentRows = (s: Sale) => {
       cashier_name: s.cashier,
       note: "",
       paid_at: s.createdAt,
+      created_at: s.createdAt,
       // The ledger columns are optional on older databases, so always send a
       // concrete value rather than relying on a column default that may be missing.
       status: "completed",
@@ -1852,8 +1853,7 @@ export const db = {
     };
     const bridge = localDb();
     if (bridge) {
-      const res = await bridge.write("Saving settings", op);
-      if (!res.ok) throw new Error(res.error ?? "Local database write failed");
+      await commitOps("Saving settings", [op]);
       return;
     }
     const op2: SyncOp = op;

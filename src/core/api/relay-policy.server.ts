@@ -59,6 +59,12 @@ const STORE_COLUMN: Record<string, string> = {
   // Branch trading rules. The branch column is the row's own key, so a till
   // can only ever write its own branch's rules; supervisors reach any branch.
   pos_store_settings: "store_id",
+  authorization_requests: "store_id",
+  authorization_log: "store_id",
+  record_edits: "store_id",
+  activity_events: "store_id",
+  entity_status_history: "store_id",
+  member_verifications: "store_id",
 };
 
 /** Child rows carry no branch of their own; their parent decides. */
@@ -74,7 +80,15 @@ const PARENT_OF: Record<string, { table: string; fk: string; parentStoreColumn: 
 };
 
 /** Global catalogue tables: no branch, but permission-gated columns. */
-const GLOBAL_TABLES = new Set(["products", "members", "audit_logs"]);
+const GLOBAL_TABLES = new Set([
+  "products",
+  "members",
+  "audit_logs",
+  "authorization_actions",
+  "pos_settings",
+  "promotions",
+  "suppliers",
+]);
 
 /** Both ends of a transfer may write it. */
 const TRANSFER_TABLE = "stock_transfers";
@@ -155,6 +169,10 @@ const TABLE_PERMISSIONS: Record<string, { write?: string; remove?: string }> = {
   members: { write: "can_add_member" },
   // Only an account allowed into POS settings may change trading rules.
   pos_store_settings: { write: "can_access_pos_settings", remove: "can_access_pos_settings" },
+  authorization_actions: { write: "can_access_pos_settings", remove: "can_access_pos_settings" },
+  pos_settings: { write: "can_access_pos_settings", remove: "can_access_pos_settings" },
+  promotions: { write: "can_manage_promotions", remove: "can_manage_promotions" },
+  suppliers: { write: "can_receive_purchase_order", remove: "can_receive_purchase_order" },
 };
 
 export const RELAY_WRITABLE_TABLES = new Set([
@@ -310,6 +328,35 @@ export async function authorizeRelayOp(
       "SCOPE_STALE",
       "Your account details could not be confirmed — sign in again to refresh them.",
     );
+
+  if (op.table === "authorization_requests" && !scope.isSupervisor) {
+    if (op.kind !== "insert" && op.kind !== "upsert")
+      return deny("PERMISSION_DENIED", "Only a supervisor can change an authorization decision.");
+    op = {
+      ...op,
+      rows: op.rows.map((row) => ({
+        ...row,
+        status: "pending",
+        decided_by: null,
+        decided_by_name: null,
+        decided_at: null,
+        decision_note: null,
+        approved_amount: null,
+        approved_payload: {},
+        consumed_at: null,
+      })),
+    } as RelayOp;
+  }
+
+  const appendOnlyTables = new Set([
+    "authorization_log",
+    "record_edits",
+    "activity_events",
+    "entity_status_history",
+    "member_verifications",
+  ]);
+  if (appendOnlyTables.has(op.table) && op.kind !== "insert" && op.kind !== "upsert")
+    return deny("PERMISSION_DENIED", `"${op.table}" is append-only through terminal sync.`);
 
   const gate = TABLE_PERMISSIONS[op.table];
   if (op.kind === "delete") {

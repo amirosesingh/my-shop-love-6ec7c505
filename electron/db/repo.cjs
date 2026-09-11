@@ -1219,60 +1219,6 @@ async function setSetting(key, value) {
   );
 }
 
-/**
- * Commits a completed bill to the local branch database in one transaction:
- * the sale header, every line, the stock movement and the member update all
- * land together or not at all. Rows are stamped `is_synced = 0` so the
- * background worker pushes them whenever the branch is back online.
- */
-async function createSale({
-  sale,
-  items,
-  products = [],
-  member = null,
-  branchId = null,
-  exchangeOfBillNumber = null,
-}) {
-  // Grow any schema-declared columns before the transaction opens, so a
-  // behind-schedule local database keeps the data instead of dropping it.
-  await healOpsColumns([
-    { table: "sales", rows: [{ ...sale, branch_id: sale.branch_id ?? branchId }] },
-    { table: "sale_items", rows: items.map((l) => ({ ...l, branch_id: l.branch_id ?? branchId })) },
-    { table: "products", rows: products },
-    ...(member ? [{ table: "members", rows: [member] }] : []),
-    ...(exchangeOfBillNumber
-      ? [{ table: "sales", values: { exchanged_to_bill_number: sale.bill_number } }]
-      : []),
-  ]);
-  const run = async () => {
-    const pool = getPool();
-    const tx = new sql.Transaction(pool);
-    await tx.begin();
-    try {
-      await upsertRow(tx, "sales", { ...sale, branch_id: sale.branch_id ?? branchId });
-      for (const line of items) {
-        await upsertRow(tx, "sale_items", { ...line, branch_id: line.branch_id ?? branchId });
-      }
-      for (const product of products) await upsertRow(tx, "products", product);
-      if (member) await upsertRow(tx, "members", member);
-      if (exchangeOfBillNumber) {
-        await updateRows(
-          tx,
-          "sales",
-          { exchanged_to_bill_number: sale.bill_number },
-          { bill_number: exchangeOfBillNumber },
-        );
-      }
-      await tx.commit();
-      return { id: sale.id, billNumber: sale.bill_number };
-    } catch (err) {
-      await tx.rollback();
-      throw err;
-    }
-  };
-  return withHeal(["sales", "sale_items", "products", "members"], run);
-}
-
 /** Full local catalogue — the register never fetches products over HTTP. */
 async function getProducts() {
   return withHeal("products", async () => {
@@ -1426,7 +1372,6 @@ module.exports = {
   setScope,
   applyOp,
   applyOps,
-  createSale,
   forgetColumnCache,
   getProducts,
   housekeep,

@@ -1,19 +1,15 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { logSync } from "./sync-log";
-import { noteSyncAck } from "./sync-summary";
 import { hasRequiredPlatformConfig } from "./platform-config-ready";
 import { hasSignedInIdentity } from "./session-presence";
 
 import { replayOrder } from "./activity-journal";
-import { isTerminalRevoked } from "./use-revocation-check";
 import { tableSyncAllowed } from "./sync-policy";
 import { canRelay, hasStaffSession, relayOp } from "@/core/api/sync-relay";
 import { preferRelay } from "./pos-auth-route";
 import {
   effectiveDatabaseMode,
   isConnectionError,
-  noteConnectionLost,
-  noteConnectionRestored,
   subscribeDatabaseMode,
 } from "@/core/local-db/db-mode";
 import {
@@ -87,12 +83,9 @@ import {
 } from "@/core/activation/connection-health";
 import { subscribeSyncConfig, syncConfig } from "./sync-config";
 import { noteVersions } from "./row-versions";
-import { recordConflict } from "./sync-conflicts";
 import { TOMBSTONE_TABLES } from "./tombstones";
 import {
   failOp,
-  refuseOp,
-  nextAttemptDue,
   isOnline,
   isOnlineSyncEnabled,
   listQueue,
@@ -271,15 +264,6 @@ async function execute(op: SyncOp): Promise<QueryResult> {
 }
 
 
-/** Codes the relay uses when a change is refused on principle. */
-const REFUSAL_CODES = new Set([
-  "STORE_FORBIDDEN",
-  "PERMISSION_DENIED",
-  "SCOPE_MISSING",
-  "SCOPE_STALE",
-  "TABLE_FORBIDDEN",
-]);
-
 /**
  * Stamp the change with the record version this till was working from. The
  * central database keeps whichever copy is newer, so an edit made from an
@@ -304,145 +288,6 @@ function versionedOp(entry: QueuedOp): SyncOp {
       : entry.op;
   }
   return entry.op;
-}
-
-/**
- * After a change goes up, check what version the central copy ended on. If it
- * has moved further than this change could explain, someone else edited the
- * same record and the central copy was kept — that is recorded so the person
- * at the till is told rather than believing their edit stuck.
- */
-async function reconcileVersions(entry: QueuedOp): Promise<void> {
-  const versions = entry.baseVersions;
-  if (!versions || !Object.keys(versions).length) return;
-  const ids = Object.keys(versions);
-  try {
-    const { data, error } = await (
-      supabaseExternal as unknown as {
-        from: (t: string) => {
-          select: (c: string) => {
-            in: (
-              col: string,
-              values: string[],
-            ) => PromiseLike<{
-              data: Record<string, unknown>[] | null;
-              error: { message: string } | null;
-            }>;
-          };
-        };
-      }
-    )
-      .from(entry.op.table)
-      .select("id,row_version")
-      .in("id", ids);
-    if (error || !data) return;
-    noteVersions(entry.op.table, data);
-    for (const row of data) {
-      const id = String(row["id"] ?? "");
-      const central = row["row_version"];
-      const base = versions[id];
-      if (typeof central !== "number" || typeof base !== "number") continue;
-      // One step on is this till's own change landing. Anything beyond that
-      // means another change went in first and won.
-      if (central <= base + 1) continue;
-      recordConflict({
-        table: entry.op.table,
-        recordId: id,
-        context: entry.context,
-        baseVersion: base,
-        centralVersion: central,
-      });
-      logSync(
-        "push",
-        entry.op.table,
-        false,
-        `${entry.context}: the central copy of this record is newer (version ${central}), so it was kept`,
-      );
-    }
-  } catch {
-    /* the next pull brings the central copy down anyway */
-  }
-}
-
-/**
- * A refused change is parked immediately with its reason; anything else keeps
- * its place in the queue and is retried.
- */
-function recordRelayFailure(entry: QueuedOp, relayed: { error?: string; code?: string }) {
-  const message = relayed.error ?? "The server could not save this change";
-  if (relayed.error && CREDENTIAL_ERROR_RE.test(relayed.error)) noteCredentialsInvalid(relayed.error);
-  if (relayed.code && REFUSAL_CODES.has(relayed.code)) refuseOp(entry.id, message);
-  else failOp(entry.id, message);
-  logSync("push", entry.op.table, false, `${entry.context}: ${message}`);
-}
-
-async function runOne(entry: QueuedOp): Promise<boolean> {
-  // This account has already been refused on this table — go straight to the
-  // relay instead of triggering another refused request.
-  // A PIN sign-in never holds a cloud account, so it always takes the relay.
-  if (
-    (entry.op.table === "stores" || refusedTables.has(entry.op.table) || preferRelay()) &&
-    canRelay()
-  ) {
-    const relayed = await viaRelay(entry.context, versionedOp(entry));
-    if (relayed.ok) {
-      resolveOp(entry.id);
-      await reconcileVersions(entry);
-      return true;
-    }
-    recordRelayFailure(entry, relayed);
-    return false;
-  }
-
-  let res = await execute(versionedOp(entry));
-  // PGRST204 = column missing from the schema cache. Older databases simply do
-  // not have the newer columns yet, so drop whichever column the error names
-  // (falling back to the known-optional list) and retry until the core row saves.
-  if (entry.op.kind === "upsert" || entry.op.kind === "insert") {
-    const dropped: string[] = [];
-    let guard = 0;
-    while (res.error?.code === "PGRST204" && guard++ < 12) {
-      const named = missingColumn(res.error.message);
-      const next = named ? [named] : (OPTIONAL_COLUMNS[entry.op.table] ?? []);
-      if (!next.length || next.every((c) => dropped.includes(c))) break;
-      dropped.push(...next);
-      res = await execute({
-        ...versionedOp(entry),
-        rows: strip(entry.op.rows, dropped),
-      } as SyncOp);
-    }
-  }
-  if (res.error) {
-    // Keys rejected: park the whole engine; the entry keeps its place and no
-    // attempt counter burns while the credentials are wrong.
-    if (isCredentialError(res.error)) {
-      noteCredentialsInvalid(String(res.error.message ?? "credential error"));
-      return false;
-    }
-    // A till signed in with a username + PIN has no cloud account, so the row
-    // rules refuse the write. Send the very same operation through the server
-    // relay, which proves the till and writes on its behalf.
-    if (isPermissionError(res.error) && canRelay()) {
-      refusedTables.add(entry.op.table);
-      const relayed = await viaRelay(entry.context, versionedOp(entry));
-      if (relayed.ok) {
-        resolveOp(entry.id);
-        await reconcileVersions(entry);
-        return true;
-      }
-      recordRelayFailure(entry, relayed);
-      return false;
-    }
-    const message = describeError(entry.op.table, res.error);
-    if (isConnectionError(res.error)) noteConnectionLost();
-    failOp(entry.id, message);
-    logSync("push", entry.op.table, false, `${entry.context}: ${message}`);
-    return false;
-  }
-  resolveOp(entry.id);
-  logSync("push", entry.op.table, true, entry.context);
-  await reconcileVersions(entry);
-  return true;
 }
 
 /**
@@ -498,71 +343,45 @@ let draining = false;
  * sale_items) therefore always land in sequence.
  */
 export async function drainOutbox(): Promise<{ pushed: number; failed: number }> {
-  // A revoked terminal keeps selling locally but is cut off from the cloud.
-  if (!isOnline()) setSyncState({ phase: "offline", pending: listQueue().length });
-  // Keys rejected: stay parked until fresh ones are saved — no retry storm.
-  if (syncState().credentialsInvalid) return { pushed: 0, failed: 0 };
-  if (draining || !isOnline() || !isOnlineSyncEnabled() || isTerminalRevoked())
-    return { pushed: 0, failed: 0 };
+  // The renderer outbox is now migration-only on Electron. Any entry left by
+  // an older build is copied into SQLite's durable business outbox and then
+  // removed here; only the main-process worker is allowed to send it centrally.
+  const bridge = localDb();
+  if (!bridge?.localMirrorBatch || draining) return { pushed: 0, failed: 0 };
+
   draining = true;
-  setSyncState({ phase: "syncing", pending: listQueue().length });
-  let pushed = 0;
+  let moved = 0;
   let failed = 0;
-  const blocked = new Set<string>();
-  // One pass sends at most a batch, so a long queue can never hold the
-  // checkout UI or the rest of the cycle behind it.
-  const batchSize = syncConfig().batchSize;
   try {
     for (const entry of replayOrder(listQueue())) {
-      if (pushed + failed >= batchSize) break;
-      if (entry.quarantined) continue;
-      // Branch-level switches: held writes stay queued, never dropped.
-      if (!tableSyncAllowed(entry.op.table)) continue;
-      const terminal = entry.terminalId ?? "legacy";
-      if (blocked.has(terminal)) continue;
-      // Capped exponential backoff with spread: 5s, 15s, 45s … up to 5 min.
-      if (entry.attempts > 0 && Date.now() < nextAttemptDue(entry)) continue;
-      const ok = await runOne(entry);
-      if (ok) pushed += 1;
-      else {
+      const op = versionedOp(entry);
+      const entries =
+        op.kind === "insert" || op.kind === "upsert"
+          ? [{ entity: op.table, rows: op.rows as Record<string, unknown>[] }]
+          : [];
+      try {
+        const result = await bridge.localMirrorBatch(entries, [op]);
+        if (!result.ok) throw new Error(result.error ?? "SQLite outbox migration failed");
+        resolveOp(entry.id);
+        moved += 1;
+      } catch (error) {
+        failOp(entry.id, error instanceof Error ? error.message : String(error));
         failed += 1;
-        blocked.add(terminal);
+        // Preserve the original queue order; a later operation must not pass a
+        // predecessor that could not be made durable in SQLite.
+        break;
       }
     }
 
-    if (pushed) markSynced();
-    // The central database accepted these changes: that is the acknowledgement
-    // the Sync page shows, separate from "a pass finished".
-    if (pushed) noteSyncAck();
-    // A successful push proves the connection is back, so online mode resumes.
-    if (pushed) noteConnectionRestored();
-    // Tell the register this terminal synced, so the Terminals screen can show
-    // a truthful "last sync" instead of guessing from the check-in time.
-    if (pushed && !failed) {
-      void (async () => {
-        try {
-          const { readTerminalConfig, stampHeartbeat } = await import(
-            "@/core/activation/terminal-tokens"
-          );
-          const tokenId = readTerminalConfig()?.tokenId;
-          if (tokenId) await stampHeartbeat(tokenId, { synced: true });
-        } catch {
-          /* reporting the sync time must never break the sync itself */
-        }
-      })();
+    if (moved) {
+      markSynced();
+      if (bridge.syncNow) void bridge.syncNow();
+      else if (bridge.push) void bridge.push();
     }
   } finally {
     draining = false;
-    setSyncState({
-      phase: isOnline() ? "idle" : "offline",
-      pending: listQueue().length,
-      // A clean push proves the saved keys work — clear any earlier rejection.
-      ...(pushed && !failed
-        ? { lastSyncAt: new Date().toISOString(), lastError: null, credentialsInvalid: false }
-        : {}),
-    });
   }
-  return { pushed, failed };
+  return { pushed: moved, failed };
 }
 
 /* ---------------------------- downward sync ---------------------------- */
@@ -680,44 +499,6 @@ export async function pullDelta(): Promise<{ merged: number }> {
   return { merged: changed };
 }
 
-/**
- * Phase 1 of convergence: everything stored on this terminal and still marked
- * `pending_sync = 1` is pushed up, keyed on its own id (or the temporary id it
- * was given locally), so a replay updates rather than duplicates. The desktop
- * shell owns the local SQL Server connection and does the T-SQL side.
- */
-export async function pushLocalPending(): Promise<{ pushed: number; failed: number }> {
-  const bridge = localDb();
-  if (!bridge || !isOnline() || !isOnlineSyncEnabled()) return { pushed: 0, failed: 0 };
-  try {
-    const res = await bridge.push();
-    if (res.pushed) logSync("push", "local", true, `${res.pushed} queued local row(s) uploaded`);
-    if (res.error) logSync("push", "local", false, res.error);
-    return { pushed: res.pushed ?? 0, failed: res.failed ?? 0 };
-  } catch (e) {
-    logSync("push", "local", false, e instanceof Error ? e.message : String(e));
-    return { pushed: 0, failed: 0 };
-  }
-}
-
-/**
- * Phase 2 of convergence: bring central changes down into the terminal's own
- * database so the two stay in step even when nothing was sold here.
- */
-export async function pullIntoLocal(): Promise<{ merged: number }> {
-  const bridge = localDb();
-  if (!bridge || !isOnline() || !isOnlineSyncEnabled()) return { merged: 0 };
-  try {
-    const res = await bridge.pull();
-    if (res.merged)
-      logSync("pull", "local", true, `${res.merged} row(s) refreshed on this terminal`);
-    return { merged: res.merged ?? 0 };
-  } catch (e) {
-    logSync("pull", "local", false, e instanceof Error ? e.message : String(e));
-    return { merged: 0 };
-  }
-}
-
 let started = false;
 
 /**
@@ -744,12 +525,46 @@ async function runCycle() {
     /* the parked rows stay visible in Sync & Backup for a manual retry */
   }
   await pullDelta();
-  await pushLocalPending();
-  await pullIntoLocal();
   await checkHealth(true);
 }
 
 export async function runExclusive(reason: string = "timer"): Promise<void> {
+  // Electron has one sync owner: the main-process worker. The renderer may
+  // request a cycle and display its status, but it never runs a competing
+  // cloud push/pull pipeline of its own.
+  const desktopBridge = localDb();
+  if (desktopBridge) {
+    if (cycleRunning) {
+      cycleQueued = true;
+      return;
+    }
+    cycleRunning = true;
+    setSyncState({ phase: "syncing" });
+    try {
+      const cycle = desktopBridge.syncNow
+        ? await desktopBridge.syncNow()
+        : (await desktopBridge.status());
+      setSyncState({
+        phase: cycle?.phase === "pushing" || cycle?.phase === "pulling" ? "syncing" : "idle",
+        pending: cycle?.businessBatches?.pending ?? cycle?.queue?.length ?? 0,
+        lastSyncAt: cycle?.lastPushAt ?? cycle?.lastPullAt ?? undefined,
+        credentialsInvalid: cycle?.credentialsInvalid ?? false,
+        lastError: cycle?.error ?? null,
+      });
+    } catch (error) {
+      const message = error instanceof Error ? error.message : String(error);
+      setSyncState({ phase: "idle", lastError: message });
+      recordSync({ direction: "system", entity: reason, status: "failed", error: message });
+    } finally {
+      cycleRunning = false;
+      if (cycleQueued) {
+        cycleQueued = false;
+        void runExclusive("queued");
+      }
+    }
+    return;
+  }
+
   // An unconfigured terminal has no central database to talk to. That is a
   // normal state, not a failure: no request is attempted and nothing is
   // inherited from the web deployment.
@@ -909,19 +724,54 @@ export function startSyncEngine() {
   started = true;
   // Push queued work first, then bring central changes down, then converge the
   // terminal's own database in both directions — one cycle at a time.
-  const tick = () => void runExclusive("timer");
-  // The cycle timer and the heartbeat both follow the saved settings, so a
-  // change in Settings -> Sync takes effect at once, without a restart.
-  let timer = window.setInterval(tick, syncConfig().intervalMs);
+  const desktopBridge = localDb();
+  if (desktopBridge?.setSyncConfig) {
+    const cfg = syncConfig();
+    void desktopBridge.setSyncConfig({
+      intervalMs: cfg.intervalMs,
+      batchSize: cfg.batchSize,
+      maxAttempts: cfg.maxAttempts,
+    });
+  }
+  const applyDesktopStatus = (status: Awaited<ReturnType<NonNullable<typeof desktopBridge>["status"]>>) => {
+    const batches = status.businessBatches;
+    const failedRow = batches?.rows?.find((row) => row.status !== "pending");
+    setSyncState({
+      phase: status.phase === "pushing" || status.phase === "pulling" ? "syncing" : "idle",
+      pending: batches ? batches.pending + batches.failed : (status.queue?.length ?? 0),
+      lastSyncAt: status.lastPushAt ?? status.lastPullAt ?? null,
+      lastError: status.error ?? failedRow?.error_message ?? null,
+      credentialsInvalid: status.credentialsInvalid ?? false,
+      cloudConfigured: status.cloudConfigured ?? null,
+    });
+  };
+  const offDesktopStatus = desktopBridge?.onStatus?.(applyDesktopStatus);
+  if (desktopBridge) void desktopBridge.status().then(applyDesktopStatus).catch(() => {});
+  const tick = () => {
+    if (!desktopBridge) void runExclusive("timer");
+  };
+  // Web/Android retain the renderer timer. Electron already has the worker's
+  // own interval, so the renderer only wakes it for explicit/live/reconnect
+  // events and never installs a second periodic sync loop.
+  let timer = desktopBridge ? 0 : window.setInterval(tick, syncConfig().intervalMs);
   let stopMonitor = startConnectivityMonitor(syncConfig().heartbeatMs);
   let appliedInterval = syncConfig().intervalMs;
   let appliedHeartbeat = syncConfig().heartbeatMs;
   const offConfig = subscribeSyncConfig(() => {
     const cfg = syncConfig();
+    if (desktopBridge?.setSyncConfig) {
+      void desktopBridge.setSyncConfig({
+        intervalMs: cfg.intervalMs,
+        batchSize: cfg.batchSize,
+        maxAttempts: cfg.maxAttempts,
+      });
+    }
     if (cfg.intervalMs !== appliedInterval) {
       appliedInterval = cfg.intervalMs;
-      window.clearInterval(timer);
-      timer = window.setInterval(tick, appliedInterval);
+      if (!desktopBridge) {
+        window.clearInterval(timer);
+        timer = window.setInterval(tick, appliedInterval);
+      }
     }
     if (cfg.heartbeatMs !== appliedHeartbeat) {
       appliedHeartbeat = cfg.heartbeatMs;
@@ -999,6 +849,7 @@ export function startSyncEngine() {
     if (liveTimer) window.clearTimeout(liveTimer);
     pendingLiveChanges.clear();
     void supabaseExternal.removeChannel(live);
+    offDesktopStatus?.();
     offMode();
     started = false;
 

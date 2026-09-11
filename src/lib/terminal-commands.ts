@@ -11,6 +11,7 @@ import { terminalId } from "./activity-journal";
 import { activeBranchId } from "./active-branch";
 import { drainOutbox } from "./sync-engine";
 import { pendingCount } from "./sync-outbox";
+import { localDb } from "@/core/local-db/local-db";
 
 export type CommandName = "sync_now" | "refresh_catalog";
 
@@ -95,8 +96,17 @@ export async function runPendingCommands(onRefresh: () => Promise<void>): Promis
       .eq("id", row.id);
 
     // Sync priority guard: unsynced sales always go up before anything else.
+    // First migrate any renderer queue left by an older Electron build, then
+    // ask the authoritative main-process worker for one serialized cycle.
     const drained = await drainOutbox();
-    const left = pendingCount();
+    const bridge = localDb();
+    const cycle = bridge?.syncNow ? await bridge.syncNow() : null;
+    const workerStatus = bridge ? await bridge.status().catch(() => null) : null;
+    const left = workerStatus?.businessBatches
+      ? workerStatus.businessBatches.pending + workerStatus.businessBatches.failed
+      : bridge
+        ? workerStatus?.queue?.length ?? 0
+        : pendingCount();
     if (left > 0) {
       await finish(
         row.id,
@@ -115,7 +125,7 @@ export async function runPendingCommands(onRefresh: () => Promise<void>): Promis
         "done",
         row.command === "refresh_catalog"
           ? "Catalogue and cache refreshed after the queue was clear."
-          : `Queue synced (${drained.pushed} change${drained.pushed === 1 ? "" : "s"} sent).`,
+          : `Queue synced (${cycle && "pushed" in cycle ? Number(cycle.pushed ?? 0) : drained.pushed} change(s) sent).`,
       );
       ran += 1;
     } catch (e) {

@@ -21,6 +21,7 @@ describe("Electron durable business persistence", () => {
     );
     expect(gateway).toContain('kind: "compatibility_projection_failed"');
     expect(gateway).toContain('return noteCommitTarget("local")');
+    expect(gateway).toContain("created_at: s.createdAt");
   });
 
   it("drains and acknowledges the SQLite outbox before the legacy SQL queue", () => {
@@ -43,10 +44,80 @@ describe("Electron durable business persistence", () => {
     expect(sqlite).toContain("function retryBusinessBatches()");
   });
 
+  it("keeps the Electron main-process worker as the only business sync executor", () => {
+    const engine = read("src/lib/sync-engine.ts");
+    expect(engine).toContain("Electron has one sync owner: the main-process worker");
+    expect(engine).toContain("const desktopBridge = localDb()");
+    expect(engine).toContain("desktopBridge.syncNow");
+    expect(engine).not.toContain("await desktopBridge.push()");
+    expect(engine).not.toContain("await desktopBridge.pull()");
+    expect(engine).toContain("let timer = desktopBridge ? 0 : window.setInterval");
+    expect(engine).not.toContain("export async function pushLocalPending");
+    expect(engine).not.toContain("export async function pullIntoLocal");
+    const worker = read("electron/sync/worker.cjs");
+    const main = read("electron/main.cjs");
+    const privilege = read("electron/ipc-privilege.cjs");
+    expect(worker).toContain('async function request(direction = "both")');
+    expect(worker).toContain('return request("both")');
+    expect(main).toContain('worker.request("push")');
+    expect(main).toContain('worker.request("pull")');
+    expect(main).toContain('"pos:sync-now"');
+    expect(privilege).toContain('"pos:sync-now": OPEN');
+  });
+
+  it("migrates the old renderer outbox into SQLite instead of uploading it directly on Electron", () => {
+    const engine = read("src/lib/sync-engine.ts");
+    expect(engine).toContain("The renderer outbox is now migration-only on Electron");
+    expect(engine).toContain("await bridge.localMirrorBatch(entries, [op])");
+    expect(engine).toContain("if (bridge.syncNow) void bridge.syncNow()");
+    expect(engine).not.toContain("async function runOne(entry");
+    expect(engine).not.toContain("function recordRelayFailure");
+  });
+
+  it("serializes push-only, pull-only and full Electron sync through one worker mutex", () => {
+    const worker = read("electron/sync/worker.cjs");
+    const main = read("electron/main.cjs");
+    expect(worker).toContain('async function request(direction = "both")');
+    expect(worker).toContain('if (running || !enabled || !supabase)');
+    expect(worker).toContain('if (direction === "push") return await push()');
+    expect(worker).toContain('if (direction === "pull") return await pull()');
+    expect(worker).toContain('return request("both")');
+    expect(main).toContain('worker.request("push")');
+    expect(main).toContain('worker.request("pull")');
+  });
+
+  it("lets SQLite-only operations sync without requiring a SQL Server projection table", () => {
+    const worker = read("electron/sync/worker.cjs");
+    const pins = read("src/lib/nav-pins.ts");
+    expect(worker).toContain("const sqlProjectionTables = new Set(repo.TABLES ?? [])");
+    expect(worker).toContain("sqlProjectionTables.has(op?.table)");
+    expect(pins).toContain("id: crypto.randomUUID()");
+    expect(pins).toContain('onConflict: "id"');
+  });
+
+  it("uses the Electron worker backlog for remote terminal sync commands", () => {
+    const commands = read("src/lib/terminal-commands.ts");
+    expect(commands).toContain("bridge?.syncNow");
+    expect(commands).toContain("workerStatus.businessBatches.pending + workerStatus.businessBatches.failed");
+    expect(commands).toContain(": pendingCount()");
+  });
+
+  it("applies the existing sync tuning settings to the Electron worker", () => {
+    const worker = read("electron/sync/worker.cjs");
+    const engine = read("src/lib/sync-engine.ts");
+    const preload = read("electron/preload.cjs");
+    expect(worker).toContain("function setConfig(patch = {})");
+    expect(worker).toContain("workerConfig.intervalMs");
+    expect(worker).toContain("workerConfig.batchSize");
+    expect(worker).toContain("workerConfig.maxAttempts");
+    expect(engine).toContain("desktopBridge.setSyncConfig");
+    expect(preload).toContain('invoke("pos:set-sync-config", config)');
+  });
+
   it("allows the durable sale RPC through the relay input contract", () => {
     const endpoint = read("src/lib/sync-endpoint.server.ts");
     const relay = read("src/core/api/pos-relay.server.ts");
-    expect(endpoint).toContain('z.enum(["sale_refund", "pos_sale_commit"])');
+    expect(endpoint).toContain('z.enum(["pos_sale_commit", "sale_refund", "shift_cash_count_submit"])');
     expect(relay).toContain('if (op.fn === "pos_sale_commit")');
     expect(relay).toContain("scope.permissions.can_process_sale !== true");
   });

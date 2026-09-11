@@ -393,6 +393,7 @@ export type LocalSyncStatus = {
   errorStage?: string | null;
   reconnecting?: boolean;
   configured?: boolean;
+  cloudConfigured?: boolean;
   phase?: "idle" | "pushing" | "pulling";
   enabled?: boolean;
   /** The central project rejected this device's keys — sync is parked. */
@@ -543,6 +544,8 @@ export type PosBridge = {
   verifyWrite?: () => Promise<LocalWriteCheck>;
   push: () => Promise<{ ok: boolean; pushed: number; failed: number; error?: string }>;
   pull: () => Promise<{ ok: boolean; merged: number; error?: string }>;
+  /** One mutex-protected main-process sync cycle on Electron. */
+  syncNow?: () => Promise<LocalSyncStatus & { ok: boolean; busy?: boolean; pushed?: number; failed?: number; merged?: number }>;
   /** Operator-triggered restore of this branch's trading history. */
   restore?: (options?: { days?: number }) => Promise<RestoreRun & { ok: boolean; error?: string }>;
   restoreStatus?: () => Promise<RestoreRun | null>;
@@ -561,6 +564,7 @@ export type PosBridge = {
   syncContract?: () => Promise<{ push: string[]; pull: string[]; restore: string[] }>;
 
   setSyncEnabled: (on: boolean) => Promise<void>;
+  setSyncConfig?: (config: { intervalMs?: number; batchSize?: number; maxAttempts?: number }) => Promise<unknown>;
   /** Live per-table counts on this till, for the server/shop comparison. */
   compareSummary?: (options?: { since?: string | null; tables?: string[] }) => Promise<{
     ok: boolean;
@@ -697,22 +701,9 @@ declare global {
 
 export type LocalSaleRow = Record<string, unknown>;
 
-export type CreateSalePayload = {
-  sale: LocalSaleRow;
-  items: LocalSaleRow[];
-  products?: LocalSaleRow[];
-  member?: LocalSaleRow | null;
-  branchId?: string | null;
-  exchangeOfBillNumber?: string | null;
-};
-
 export type BranchInfo = { branchId: string | null; branchName: string | null };
 
 export type ElectronDbApi = {
-  /** Commits a bill to local SQL Server in one transaction. Never uses HTTP. */
-  createSale: (
-    payload: CreateSalePayload,
-  ) => Promise<{ ok: boolean; error?: string; id?: string; billNumber?: string }>;
   getProducts: () => Promise<{ ok: boolean; error?: string; products?: LocalSaleRow[] }>;
   getPendingSyncCount: () => Promise<{
     ok: boolean;

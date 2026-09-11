@@ -73,6 +73,16 @@ export const RELAY_TABLES = new Set([
   "whatsapp_queue",
   "stores",
   "pos_store_settings",
+  "pos_settings",
+  "promotions",
+  "suppliers",
+  "authorization_actions",
+  "authorization_requests",
+  "authorization_log",
+  "record_edits",
+  "activity_events",
+  "entity_status_history",
+  "member_verifications",
 ]);
 
 /** Conflict keys are owned by the server; callers cannot choose arbitrary unique columns. */
@@ -359,6 +369,34 @@ export async function runRelayRpc(
     });
     return res.ok ? { ok: true } : { ok: false, error: (await res.text()).slice(0, 400) };
   }
+  if (op.fn === "shift_cash_count_submit") {
+    if (
+      !scope.isSupervisor &&
+      scope.permissions.can_shift_cash_count !== true &&
+      scope.permissions.can_close_shift !== true
+    ) {
+      return { ok: false, code: "PERMISSION_DENIED", error: "You are not allowed to submit a shift cash count." };
+    }
+    const shiftId = op.args.p_shift;
+    if (typeof shiftId !== "string" || !shiftId)
+      return { ok: false, code: "SCOPE_MISSING", error: "The shift is missing." };
+    const lookup = await serviceRest(
+      `shifts?id=eq.${encodeURIComponent(shiftId)}&select=store_id&limit=1`,
+    );
+    if (!lookup.ok) return { ok: false, error: (await lookup.text()).slice(0, 300) };
+    const rows = (await lookup.json()) as Record<string, unknown>[];
+    const owner = rows[0];
+    if (!owner) return { ok: false, code: "SCOPE_MISSING", error: "That shift no longer exists." };
+    const storeId = owner.store_id;
+    if (!scope.isSupervisor && storeId !== scope.storeId)
+      return { ok: false, code: "STORE_FORBIDDEN", error: "You can only count cash for your own branch." };
+    const res = await serviceRest("rpc/shift_cash_count_submit", {
+      method: "POST",
+      body: JSON.stringify(op.args),
+    });
+    return res.ok ? { ok: true } : { ok: false, error: (await res.text()).slice(0, 400) };
+  }
+
   const spec = RELAY_RPCS[op.fn];
   if (!spec) return { ok: false, code: "TABLE_FORBIDDEN", error: `"${op.fn}" cannot be run` };
   if (!scope.isSupervisor && scope.permissions[spec.permission] !== true)

@@ -53,6 +53,8 @@ contextBridge.exposeInMainWorld("pos", {
   listPrinters: () => invoke("print:list"),
   push: () => invoke("pos:push"),
   pull: () => invoke("pos:pull"),
+  /** Run one mutex-protected Electron sync cycle. */
+  syncNow: () => invoke("pos:sync-now"),
   /** Operator-triggered restore of this branch's trading history. */
   restore: (options) => invoke("pos:restore", options),
   restoreStatus: () => invoke("pos:restore-status"),
@@ -65,6 +67,7 @@ contextBridge.exposeInMainWorld("pos", {
   syncContract: () => invoke("pos:sync-contract"),
 
   setSyncEnabled: (on) => invoke("pos:set-sync-enabled", on),
+  setSyncConfig: (config) => invoke("pos:set-sync-config", config),
   /** Live per-table counts for the server/shop comparison page. */
   compareSummary: (options) => invoke("pos:compare-summary", options),
   compareRows: (table, options) => invoke("pos:compare-rows", table, options),
@@ -190,7 +193,6 @@ contextBridge.exposeInMainWorld("pos", {
  * these calls — never over HTTP.
  */
 contextBridge.exposeInMainWorld("electronAPI", {
-  createSale: (payload) => invoke("db:create-sale", payload),
   getProducts: () => invoke("db:get-products"),
   getPendingSyncCount: () => invoke("db:get-pending-sync-count"),
   getBranch: () => invoke("db:get-branch"),
