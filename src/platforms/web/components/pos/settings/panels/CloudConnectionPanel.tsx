@@ -40,6 +40,7 @@ import { isTerminalApp } from "@/platform-config/platform";
 import { useAuthOptional } from "@/lib/pos-auth";
 import {
   cloudKeyStatus,
+  connectionProfile,
   removeCloudCredentials,
   saveConnectionProfile,
   subscribeCloudKeys,
@@ -47,7 +48,7 @@ import {
   type CloudKeyStatus,
   type CloudProbe,
 } from "@/lib/secure-cloud-config";
-import { backendUrl, type BackendTestResult } from "@/lib/backend-config";
+import { type BackendTestResult } from "@/lib/backend-config";
 
 export function CloudConnectionPanel({ onConnected }: { onConnected?: () => void | Promise<void> } = {}) {
   const auth = useAuthOptional();
@@ -62,14 +63,14 @@ export function CloudConnectionPanel({ onConnected }: { onConnected?: () => void
   const [unlocked, setUnlocked] = useState(false);
 
   const refresh = useCallback(async () => {
-    const next = await cloudKeyStatus();
+    const [next, profile] = await Promise.all([cloudKeyStatus(), connectionProfile()]);
     setStatus(next);
-    // Prefill from what is saved: an operator changing one value must never be
-    // shown blank fields for the other two.
-    if (next.configured && next.url) setUrl((current) => current || next.url);
-    const current = await backendUrl();
-    setSavedBackend(current);
-    setBackend((value) => value || current);
+    // Read the same complete profile that saveConnectionProfile() writes.
+    // This keeps the visible backend field tied to the exact persisted value
+    // used by server-origin.ts instead of maintaining a second UI-only source.
+    if (profile.supabaseUrl) setUrl((current) => current || profile.supabaseUrl);
+    setSavedBackend(profile.backendUrl);
+    setBackend((value) => value || profile.backendUrl);
   }, []);
 
 
@@ -292,7 +293,7 @@ export function CloudConnectionPanel({ onConnected }: { onConnected?: () => void
       <div className="space-y-1 border-t border-border pt-4">
         <Label htmlFor="backend-url" className="flex items-center gap-2">
           <Server className="size-4 text-muted-foreground" />
-          POS backend address
+          POS backend / website address
         </Label>
         <Input
           id="backend-url"
