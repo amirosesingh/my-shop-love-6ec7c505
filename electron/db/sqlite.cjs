@@ -471,7 +471,8 @@ function businessBatchStatus() {
     `SELECT id, status, attempts, client_transaction_id, created_at, last_attempt_at, error_message
        FROM offline_sync_queue WHERE table_name = '__business_batch__' ORDER BY created_at, id`,
   ).all().map((row) => ({ ...row, error_message: row.error_message
-    ? (/PENDING_AUTH/i.test(row.error_message) ? "pending-auth"
+    ? (/central database key missing|NO_SERVICE_KEY/i.test(row.error_message) ? "central-config"
+      : /PENDING_AUTH/i.test(row.error_message) ? "pending-auth"
       : /STORE_FORBIDDEN|branch/i.test(row.error_message) ? "branch-mismatch"
       : /permission|forbidden|unauthorized|session has ended/i.test(row.error_message)
         ? "authorization-refused" : "cloud-refused") : null }));
@@ -492,6 +493,20 @@ function retryBusinessBatches() {
 function acknowledgeBusinessBatch(id) {
   if (!ready()) return false;
   return tx(() => db.prepare("DELETE FROM offline_sync_queue WHERE id = ?").run(String(id)).changes > 0);
+}
+
+function deferBusinessBatch(id, error) {
+  if (!ready()) return false;
+  return tx(
+    () =>
+      db
+        .prepare(
+          `UPDATE offline_sync_queue
+              SET status = 'pending', error_message = ?, last_attempt_at = ?
+            WHERE id = ?`,
+        )
+        .run(String(error ?? "central sync pending").slice(0, 1000), nowIso(), String(id)).changes > 0,
+  );
 }
 
 function failBusinessBatch(id, error, maxAttempts = 5) {
@@ -887,6 +902,7 @@ module.exports = {
   businessBatchStatus,
   retryBusinessBatches,
   acknowledgeBusinessBatch,
+  deferBusinessBatch,
   failBusinessBatch,
   listMirror,
   counts,
