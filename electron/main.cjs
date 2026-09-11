@@ -735,12 +735,23 @@ function withSealedCloud(cloud) {
   return cloud;
 }
 
+function syncRelayUrl() {
+  const savedBackend = String(configStore.get("backendUrl") ?? "")
+    .trim()
+    .replace(/\/+$/, "");
+  if (/^https?:\/\/.+/i.test(savedBackend)) return `${savedBackend}/api/v1/pos/sync`;
+  // Local relay is development-only. Packaged tills must never send privileged
+  // sync through the bundled localhost server because it intentionally carries
+  // no central service-role credential.
+  return DEV_URL && baseUrl ? `${baseUrl}/api/v1/pos/sync` : null;
+}
+
 async function initializeWorker(config) {
   if (!config?.url || !config?.key) return null;
   cloudConfig = config;
   worker.init({
     ...config,
-    relayUrl: baseUrl ? `${baseUrl}/api/v1/pos/sync` : null,
+    relayUrl: syncRelayUrl(),
     onChange: async () => broadcastStatus(await statusPayload()),
   });
   worker.start();
