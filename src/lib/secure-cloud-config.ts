@@ -156,8 +156,14 @@ const NOT_REACHED = (detail: string): CloudProbe => ({
 /** A. Does the address answer, and does it accept this key? */
 async function probeAuth(url: string, key: string): Promise<CloudProbe | null> {
   try {
+    const headers: Record<string, string> = { apikey: key };
+    // New Supabase publishable keys are opaque API keys, not JWT bearer tokens.
+    // Keep legacy anon JWT behavior for older projects.
+    if (!key.startsWith("sb_publishable_") && !key.startsWith("sb_secret_")) {
+      headers.Authorization = `Bearer ${key}`;
+    }
     const res = await fetch(`${url}/auth/v1/health`, {
-      headers: { apikey: key, Authorization: `Bearer ${key}` },
+      headers,
       cache: "no-store",
     });
     if (res.status === 401 || res.status === 403)
