@@ -239,15 +239,17 @@ function SyncHubDesktop() {
           <Field label="Cloud route">{desktopSync?.mutationPath ?? "—"}</Field>
           <Field label="Pending sales">{desktopSync?.businessBatches?.sales ?? 0}</Field>
           <Field label="Sale sync status">
-            {(desktopSync?.businessBatches?.parked ?? 0) > 0
-              ? "Sync requires attention"
-              : (desktopSync?.businessBatches?.pending ?? 0) +
-                    (desktopSync?.businessBatches?.failed ?? 0) >
-                  0
-                ? "Pending sync"
-                : desktopSync?.lastBusinessPush?.result === "synced"
-                  ? "Synced to cloud"
-                  : "—"}
+            {desktopSync?.lastBusinessPush?.reason === "central-config"
+              ? "Saved locally · central sync pending"
+              : (desktopSync?.businessBatches?.parked ?? 0) > 0
+                ? "Sync requires attention"
+                : (desktopSync?.businessBatches?.pending ?? 0) +
+                      (desktopSync?.businessBatches?.failed ?? 0) >
+                    0
+                  ? "Pending sync"
+                  : desktopSync?.lastBusinessPush?.result === "synced"
+                    ? "Synced to central database"
+                    : "—"}
           </Field>
           <Field label="Last successful push">{when(desktopSync?.lastPushAt)}</Field>
           <Field label="Last sale acknowledgement">
@@ -285,12 +287,17 @@ function SyncHubDesktop() {
               Holds the catalogue copy and the sync ledger — not the till&apos;s sales database.
             </span>
           </Field>
-          {engineState.lastError && (
+          {desktopSync?.lastBusinessPush?.reason === "central-config" ? (
+            <p className="sm:col-span-2 lg:col-span-4 flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-warning-foreground">
+              <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
+              Local SQLite and SQL Server are safe. Central synchronization is waiting for the server connection to be restored; the queued work will retry automatically.
+            </p>
+          ) : engineState.lastError ? (
             <p className="sm:col-span-2 lg:col-span-4 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
               <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
               {engineState.lastError}
             </p>
-          )}
+          ) : null}
         </CardContent>
       </Card>
 
