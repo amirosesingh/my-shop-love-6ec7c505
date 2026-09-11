@@ -72,6 +72,7 @@ function isCredentialError(err) {
 
 function safeFailureReason(value) {
   const message = String(value ?? "sync failed");
+  if (/central database key missing|NO_SERVICE_KEY/i.test(message)) return "central-config";
   if (/PENDING_AUTH/i.test(message)) return "pending-auth";
   if (/STORE_FORBIDDEN|branch/i.test(message)) return "branch-mismatch";
   if (/permission|forbidden|unauthorized|session has ended/i.test(message)) return "authorization-refused";
@@ -275,6 +276,33 @@ function init({
   if (onChange) notify = onChange;
 }
 
+async function authenticatedDirectMutation(op) {
+  if (!credentials.accessToken) {
+    mutationPath = "pending-auth";
+    throw new Error("PENDING_AUTH: sign in or re-register this terminal before cloud sync");
+  }
+  mutationPath = "authenticated-direct";
+  if (op.kind === "insert" || op.kind === "upsert") {
+    const { error } = await supabase
+      .from(op.table)
+      .upsert(op.rows ?? [], { onConflict: op.onConflict ?? "id" });
+    if (error) throw error;
+    return;
+  }
+  if (op.kind === "rpc") {
+    const { error } = await supabase.rpc(op.fn, op.args ?? {});
+    if (error) throw error;
+    return;
+  }
+  let query =
+    op.kind === "delete"
+      ? supabase.from(op.table).delete()
+      : supabase.from(op.table).update(op.values ?? {});
+  for (const [column, value] of Object.entries(op.match ?? {})) query = query.eq(column, value);
+  const { error } = await query;
+  if (error) throw error;
+}
+
 async function cloudUpsert(table, rows, onConflict = "id") {
   const bearer = credentials.sessionToken || credentials.accessToken;
   if (relayUrl && (bearer || credentials.cashierToken || credentials.terminalToken)) {
@@ -294,6 +322,9 @@ async function cloudUpsert(table, rows, onConflict = "id") {
     });
     const body = await response.json().catch(() => null);
     if (!response.ok || !body?.ok || body.results?.some((result) => !result.ok)) {
+      if (body?.code === "NO_SERVICE_KEY" && credentials.accessToken) {
+        return authenticatedDirectMutation({ kind: "upsert", table, rows, onConflict });
+      }
       throw new Error(
         body?.error ||
           body?.results?.find((result) => !result.ok)?.error ||
@@ -302,13 +333,7 @@ async function cloudUpsert(table, rows, onConflict = "id") {
     }
     return;
   }
-  if (relayUrl || !credentials.accessToken) {
-    mutationPath = "pending-auth";
-    throw new Error("PENDING_AUTH: sign in or re-register this terminal before cloud sync");
-  }
-  mutationPath = "authenticated-direct";
-  const { error } = await supabase.from(table).upsert(rows, { onConflict });
-  if (error) throw error;
+  return authenticatedDirectMutation({ kind: "upsert", table, rows, onConflict });
 }
 
 async function cloudMutation(op) {
@@ -331,24 +356,14 @@ async function cloudMutation(op) {
     });
     const body = await response.json().catch(() => null);
     if (!response.ok || !body?.ok || body.results?.some((result) => !result.ok)) {
+      if (body?.code === "NO_SERVICE_KEY" && credentials.accessToken) {
+        return authenticatedDirectMutation(op);
+      }
       throw new Error(body?.error || body?.results?.find((result) => !result.ok)?.error || `Sync relay failed (${response.status})`);
     }
     return;
   }
-  if (relayUrl || !credentials.accessToken) {
-    mutationPath = "pending-auth";
-    throw new Error("PENDING_AUTH: sign in or re-register this terminal before cloud sync");
-  }
-  mutationPath = "authenticated-direct";
-  if (op.kind === "rpc") {
-    const { error } = await supabase.rpc(op.fn, op.args ?? {});
-    if (error) throw error;
-    return;
-  }
-  let query = op.kind === "delete" ? supabase.from(op.table).delete() : supabase.from(op.table).update(op.values ?? {});
-  for (const [column, value] of Object.entries(op.match ?? {})) query = query.eq(column, value);
-  const { error } = await query;
-  if (error) throw error;
+  return authenticatedDirectMutation(op);
 }
 
 /**
@@ -391,6 +406,18 @@ async function pushSqliteBusinessBatches() {
       lastBusinessPush = { batchId: batch.id, clientTransactionId: batch.client_transaction_id ?? null,
         localCommittedAt: batch.created_at, pushStartedAt, acknowledgedAt: null,
         durationMs: null, result: "pushing" };
+      // Repair the direct local SQL Server projection first. Cloud availability
+      // must never decide whether a durable SQLite transaction becomes visible
+      // in the shop's operational SQL database.
+      const sqlProjectionTables = new Set(repo.TABLES ?? []);
+      const projectionOps = ops.filter(
+        (op) =>
+          op?.kind !== "rpc" &&
+          op?.table !== "pos_store_settings" &&
+          sqlProjectionTables.has(op?.table),
+      );
+      if (projectionOps.length) await repo.applyOps(projectionOps);
+
       const saleOp = ops.find((op) => op?.table === "sales" && Array.isArray(op.rows) && op.rows.length === 1);
       const atomicTables = new Set(["sales", "sale_items", "payment_transactions", "item_activity_logs"]);
       let replayOps = ops;
@@ -425,18 +452,6 @@ async function pushSqliteBusinessBatches() {
           if (delta?.error) throw new Error(delta.error);
         }
       }
-      // Repair the compatibility projection before acknowledging the SQLite
-      // batch. Cloud writes above are stable-ID/RPC idempotent, so if SQL
-      // Server is unavailable the intact batch can safely retry both sides on
-      // the next pass without creating another sale or payment.
-      const sqlProjectionTables = new Set(repo.TABLES ?? []);
-      const projectionOps = ops.filter(
-        (op) =>
-          op?.kind !== "rpc" &&
-          op?.table !== "pos_store_settings" &&
-          sqlProjectionTables.has(op?.table),
-      );
-      if (projectionOps.length) await repo.applyOps(projectionOps);
       for (const op of ops) {
         const ids = (op.rows ?? []).map((row) => row?.id).filter(Boolean);
         if (ids.length) await repo.markSynced(op.table, ids).catch(() => {});
@@ -450,7 +465,15 @@ async function pushSqliteBusinessBatches() {
       const message = error?.message ?? String(error);
       if (/unauthorized|forbidden|permission|session has ended|STORE_FORBIDDEN/i.test(message))
         mutationPath = "authorization-refused";
-      lastBusinessPush = { ...lastBusinessPush, result: "failed", reason: safeFailureReason(message) };
+      const reason = safeFailureReason(message);
+      lastBusinessPush = { ...lastBusinessPush, result: reason === "central-config" ? "pending" : "failed", reason };
+      if (reason === "central-config") {
+        // The till and its SQL Server are healthy; only the central relay is
+        // missing its server-side key. Keep the batch pending without burning
+        // retry attempts or moving a valid sale into Needs attention.
+        sqlite.deferBusinessBatch?.(batch.id, message);
+        return { pushed, failed, deferred: true, error: "central-config" };
+      }
       sqlite.failBusinessBatch(batch.id, message, /STALE_RULES/i.test(message) ? 1 : workerConfig.maxAttempts);
       failed += 1;
       // Preserve batch order: a later transaction must not overtake a failed
@@ -511,10 +534,16 @@ async function push() {
   const sqliteResult = await pushSqliteBusinessBatches();
   pushed += sqliteResult.pushed;
   failed += sqliteResult.failed;
-  if (sqliteResult.failed) {
+  if (sqliteResult.failed || sqliteResult.deferred) {
     setPhase("idle");
     notify();
-    return { ok: false, pushed, failed, error: "SQLite business batch upload failed" };
+    return {
+      ok: sqliteResult.failed === 0,
+      pushed,
+      failed,
+      deferred: !!sqliteResult.deferred,
+      error: sqliteResult.deferred ? "central-config" : "SQLite business batch upload failed",
+    };
   }
   for (const table of repo.PUSH_TABLES ?? repo.TABLES) {
     const retryAt = cloudMissing.get(table);
