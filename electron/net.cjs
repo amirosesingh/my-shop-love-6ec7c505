@@ -282,6 +282,13 @@ function downloadTo(url, destination, { onProgress, timeoutMs = 900000, resume =
       done(reject, error instanceof Error ? error : new Error(String(error)));
       return;
     }
+    // Ask the CDN for the installer bytes exactly as published. Compression
+    // transforms and stale intermediary caches make resumed executable
+    // downloads fragile, especially when a Range request is involved.
+    req.setHeader("Accept", "application/octet-stream");
+    req.setHeader("Accept-Encoding", "identity");
+    req.setHeader("Cache-Control", "no-cache");
+    req.setHeader("Pragma", "no-cache");
     if (already > 0) req.setHeader("Range", `bytes=${already}-`);
 
     let hops = 0;
@@ -305,21 +312,97 @@ function downloadTo(url, destination, { onProgress, timeoutMs = 900000, resume =
       const partial = status === 206 && already > 0;
       if (status !== 200 && !partial) {
         res.resume?.();
+        // A stale/oversized partial commonly receives 416. Remove it so the
+        // next retry starts clean instead of repeating the same bad Range.
+        if (status === 416 && already > 0) {
+          try {
+            fs.truncateSync(destination, 0);
+          } catch {
+            /* next retry will still fall back to a clean full response */
+          }
+        }
         done(reject, new Error(`The update server answered HTTP ${status}.`));
         return;
       }
-      const start = partial ? already : 0;
-      const total = Number(res.headers["content-length"] || 0) + start;
+
+      let start = partial ? already : 0;
+      let total = Number(res.headers["content-length"] || 0) + start;
+
+      if (partial) {
+        const rawRange = String(res.headers["content-range"] || "");
+        const match = /^bytes\s+(\d+)-(\d+)\/(\d+|\*)$/i.exec(rawRange);
+        const rangeStart = match ? Number(match[1]) : NaN;
+        const rangeTotal = match && match[3] !== "*" ? Number(match[3]) : NaN;
+        if (!match || rangeStart !== already) {
+          res.resume?.();
+          try {
+            fs.truncateSync(destination, 0);
+          } catch {
+            /* best effort; the following retry opens with flags=w if size is 0 */
+          }
+          done(
+            reject,
+            new Error(
+              `The update server returned an invalid resume range (${rawRange || "missing Content-Range"}).`,
+            ),
+          );
+          return;
+        }
+        if (Number.isFinite(rangeTotal) && rangeTotal > 0) total = rangeTotal;
+      } else if (already > 0) {
+        // The server ignored Range and sent a normal 200. This is valid: write
+        // the full object from byte zero instead of appending it to the partial.
+        start = 0;
+        total = Number(res.headers["content-length"] || 0);
+      }
+
+      const expectedBodyBytes = Number(res.headers["content-length"] || 0);
       let received = start;
+      let bodyBytes = 0;
       const out = fs.createWriteStream(destination, partial ? { flags: "a" } : { flags: "w" });
-      out.on("error", (error) => done(reject, error));
+
+      const failStream = (error) => {
+        try {
+          out.destroy();
+        } catch {
+          /* already closed */
+        }
+        done(reject, error instanceof Error ? error : new Error(String(error)));
+      };
+
+      out.on("error", failStream);
       res.on("data", (chunk) => {
+        bodyBytes += chunk.length;
         received += chunk.length;
-        out.write(chunk);
+        if (!out.write(chunk)) res.pause();
         if (total && onProgress) onProgress(Math.min(99, Math.round((received / total) * 100)));
       });
-      res.on("end", () => out.end(() => done(resolve, { file: destination, bytes: received })));
-      res.on("error", (error) => done(reject, error));
+      out.on("drain", () => res.resume());
+      res.on("end", () =>
+        out.end(() => {
+          if (expectedBodyBytes > 0 && bodyBytes !== expectedBodyBytes) {
+            done(
+              reject,
+              new Error(
+                `The update download ended early (received ${bodyBytes} of ${expectedBodyBytes} bytes).`,
+              ),
+            );
+            return;
+          }
+          if (total > 0 && received !== total) {
+            done(
+              reject,
+              new Error(
+                `The update download is incomplete (received ${received} of ${total} bytes).`,
+              ),
+            );
+            return;
+          }
+          done(resolve, { file: destination, bytes: received });
+        }),
+      );
+      res.on("aborted", () => failStream(new Error("The update server stopped the download early.")));
+      res.on("error", failStream);
     });
     req.on("error", (error) => done(reject, error));
     req.end();
