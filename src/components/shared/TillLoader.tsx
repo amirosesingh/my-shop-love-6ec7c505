@@ -13,12 +13,10 @@ import { Button } from "@/components/ui/button";
 import {
   connectivity,
   lastHealth,
-  startConnectivityMonitor,
   subscribeConnectivity,
   type Connectivity,
   type HealthReport,
 } from "@/core/activation/connection-health";
-import { syncConfig } from "@/lib/sync-config";
 import { subscribeSyncState, syncState } from "@/lib/sync-status";
 import { CloudStateIcon } from "@/platforms/web/components/pos/status/SystemStatus";
 import type { StatusTone } from "@/lib/system-status";
@@ -56,7 +54,6 @@ export function TillLoader({
   const [stalled, setStalled] = useState(false);
 
   useEffect(() => {
-    const stop = startConnectivityMonitor(syncConfig().heartbeatMs);
     const off = subscribeConnectivity((next) => {
       setState(next);
       setHealth(lastHealth());
@@ -65,7 +62,6 @@ export function TillLoader({
     return () => {
       off();
       offSync();
-      stop();
     };
   }, []);
 
