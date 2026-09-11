@@ -19,7 +19,7 @@
 import { APP_VERSION } from "@/lib/app-updates";
 import { isNative } from "@/platform-config/platform";
 import { firstReachableUrl, httpGetBase64, httpGetJson } from "@/platforms/mobile/native-http";
-import { fetchManifest, withTimeout } from "@/lib/update-manifest";
+import { fetchManifest, isNewerVersion, withTimeout } from "@/lib/update-manifest";
 import { BUNDLE_EPOCH, isBundleEpochCompatible } from "@/lib/bundle-epoch";
 
 const BASE = "https://updatecms.luckycharmsdnbhd.com/pos-app";
@@ -82,15 +82,9 @@ export async function purgeStoredBundle(stored: StoredBundle | null): Promise<vo
   if (stored) await removeStoredBundle(stored);
 }
 
-/** "1.2.10" > "1.2.9" — plain numeric compare, missing parts count as 0. */
+/** Keep web-bundle version ordering identical to every other updater. */
 export function isNewerBundle(candidate: string, current: string): boolean {
-  const a = candidate.split(".").map((n) => Number.parseInt(n, 10) || 0);
-  const b = current.split(".").map((n) => Number.parseInt(n, 10) || 0);
-  for (let i = 0; i < Math.max(a.length, b.length); i += 1) {
-    const d = (a[i] ?? 0) - (b[i] ?? 0);
-    if (d !== 0) return d > 0;
-  }
-  return false;
+  return isNewerVersion(candidate, current);
 }
 
 /**
