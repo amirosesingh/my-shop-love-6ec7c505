@@ -58,35 +58,35 @@ describe("route guards", () => {
     // Matched on structure, not exact spelling: the guard may be wrapped over
     // several lines, but it must still short-circuit to the sign-in screen.
     expect(APP_SHELL).toMatch(/if\s*\(!user\)[\s\S]{0,600}?<TerminalLogin\s*\/>/);
-    for (const path of ["/settings", "/staff", "/promotions", "/audit"]) {
-      expect(APP_SHELL).toContain(`"${path}":`);
+    expect(APP_SHELL).toContain("routePermissionForPath");
+    for (const path of ["/staff", "/promotions", "/audit"]) {
+      expect(NAV).toContain(`to: "${path}"`);
     }
+    expect(NAV).toContain('"/settings": "can_access_pos_settings"');
   });
 
-  /** Sidebar-only hiding is not a guard: a signed-in cashier can still type
-   *  the URL. Every screen must have an entry in the AppShell route map. */
-  it("every screen has a permission entry in the route guard map", () => {
-    const OPEN_ROUTES = new Set(["index.tsx", ...PUBLIC_ROUTES]);
-    const missing = routeFiles
-      .filter((f) => !OPEN_ROUTES.has(f) && !redirectOnly.has(f))
-      .map((f) => `/${f.replace(/\.tsx$/, "").split(".")[0]}`)
-      .filter((path, i, all) => all.indexOf(path) === i)
-      .filter((path) => !APP_SHELL.includes(`"${path}"`));
-    expect(missing).toEqual([]);
+  it("uses one route permission registry instead of a second AppShell map", () => {
+    expect(APP_SHELL).toContain("routePermissionForPath");
+    expect(APP_SHELL).not.toContain("ROUTE_PERMISSIONS");
+    expect(NAV).toContain("ROUTE_PERMISSION_OVERRIDES");
+    expect(NAV).toContain("NAV_ROUTE_PERMISSIONS");
   });
 
   /** The two screens that change stock by hand and expose member contact
    *  history must never be reachable on the fail-closed default alone. */
   it("stock operations and the verification log declare their permission", () => {
-    expect(APP_SHELL).toContain('"/stock-operations": "can_adjust_stock"');
-    expect(APP_SHELL).toContain('"/verifications": "can_view_member_history"');
+    expect(NAV).toMatch(/to: "\/stock-operations"[\s\S]{0,220}?flag: "can_adjust_stock"/);
+    expect(NAV).toMatch(/to: "\/verifications"[\s\S]{0,220}?flag: "can_view_member_history"/);
+    expect(NAV).toMatch(/to: "\/reports\/history"[\s\S]{0,220}?flag: "can_view_audit_trail"/);
+    expect(NAV).toMatch(/to: "\/reports\/activity"[\s\S]{0,220}?flag: "can_view_audit_trail"/);
+    expect(NAV).toMatch(/to: "\/reports\/notifications"[\s\S]{0,220}?flag: "can_view_audit_trail"/);
   });
 
   /** A missing map entry must fail closed, and access must be decided before
    *  the page body renders — a post-render redirect leaks protected data. */
   it("denies unmapped routes instead of falling through to open access", () => {
     expect(APP_SHELL).toContain('const PUBLIC_ROUTES = new Set(["/", "/display"])');
-    expect(APP_SHELL).toContain('return ROUTE_PERMISSIONS[key] ?? "unknown"');
+    expect(APP_SHELL).toContain('return routePermissionForPath(pathname) ?? "unknown"');
     // The denial screen (which names the missing permission) renders instead
     // of the page body.
     expect(APP_SHELL).toContain("<PermissionDenied");

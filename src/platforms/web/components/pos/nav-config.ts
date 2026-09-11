@@ -241,7 +241,7 @@ export const navGroups: NavGroup[] = [
         to: "/verifications",
         label: "Verification Log",
         icon: ShieldCheck,
-        flag: "can_add_member",
+        flag: "can_view_member_history",
         keywords: "otp verify code sms whatsapp email member",
         blurb: "Every one-time code sent to a member and whether it was confirmed.",
       },
@@ -409,7 +409,7 @@ export const navGroups: NavGroup[] = [
         to: "/reports/activity",
         label: "Register Activity",
         icon: Activity,
-        flag: "can_view_sales_reports",
+        flag: "can_view_audit_trail",
         keywords: "hold resume void split drawer timeline",
         blurb: "Holds, voids, splits and drawer opens in order.",
       },
@@ -462,3 +462,35 @@ export const navItemKey = (i: NavItem) => `${i.to}#${i.hash ?? ""}?${i.section ?
 /** Top-level entries pinned above the groups in the sidebar. */
 export const standaloneNavItems: NavItem[] = [];
 export { Store };
+
+
+/**
+ * Route access comes from the same navigation registry that decides whether a
+ * link is visible. Only non-navigation settings routes need explicit entries.
+ * Longest prefix wins so child settings pages may tighten their parent gate.
+ */
+const ROUTE_PERMISSION_OVERRIDES: Record<string, PermissionFlag> = {
+  "/settings/terminals": "can_manage_terminals",
+  "/settings/mobile-terminals": "can_manage_terminals",
+  "/settings/sessions": "can_manage_terminals",
+  "/settings/sync": "can_manage_sync_backup",
+  "/settings/database": "can_manage_sync_backup",
+  "/settings": "can_access_pos_settings",
+};
+
+const NAV_ROUTE_PERMISSIONS: Record<string, PermissionFlag> = Object.fromEntries(
+  navGroups.flatMap((group) =>
+    group.items
+      .filter((item): item is NavItem & { flag: PermissionFlag } => Boolean(item.flag))
+      .map((item) => [item.to, item.flag]),
+  ),
+);
+
+export function routePermissionForPath(pathname: string): PermissionFlag | null {
+  const routes = { ...NAV_ROUTE_PERMISSIONS, ...ROUTE_PERMISSION_OVERRIDES };
+  const key =
+    Object.keys(routes)
+      .filter((path) => pathname === path || pathname.startsWith(`${path}/`))
+      .sort((a, b) => b.length - a.length)[0] ?? "";
+  return routes[key] ?? null;
+}

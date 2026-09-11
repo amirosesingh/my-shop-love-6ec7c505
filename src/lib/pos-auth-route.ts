@@ -17,18 +17,8 @@ import type { SyncOp } from "./sync-outbox";
  * they are never parked in browser storage: they must land in the local SQL
  * database or the central database, or the action is refused.
  */
-export const OPERATIONAL_TABLES = new Set([
-  "sales",
-  "sale_items",
-  "shifts",
-  "shift_sessions",
-  "drawer_events",
-  "stock_adjustments",
-  "stock_count_drafts",
-  "booking_payments",
-]);
-
-export const isOperationalTable = (table: string): boolean => OPERATIONAL_TABLES.has(table);
+export { OPERATIONAL_TABLES, isOperationalTable } from "./data-ownership";
+import { isOperationalTable } from "./data-ownership";
 
 /** True when every operation in the batch is operational business data. */
 export const isOperationalBatch = (ops: SyncOp[]): boolean =>

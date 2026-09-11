@@ -12,6 +12,7 @@ const read = (p: string) => readFileSync(resolve(root, p), "utf8");
 
 describe("device builds are isolated from web configuration", () => {
   const viteConfig = read("vite.config.ts");
+  const envRegistry = JSON.parse(read("scripts/web-only-env-names.json")) as { webOnly: string[] };
 
   it("loads no .env file for a mobile or desktop build", () => {
     expect(viteConfig).toContain("const isTerminalBuild = isMobile || isDesktop");
@@ -27,8 +28,9 @@ describe("device builds are isolated from web configuration", () => {
       "VITE_POS_SUPABASE_ANON_KEY",
       "VITE_POS_SERVER_URL",
     ]) {
-      expect(viteConfig).toContain(`"${name}"`);
+      expect(envRegistry.webOnly).toContain(name);
     }
+    expect(viteConfig).toContain("web-only-env-names.json");
     expect(viteConfig).toContain("blankWebEnv");
   });
 
@@ -43,8 +45,9 @@ describe("device builds are isolated from web configuration", () => {
       "VITE_POS_SUPABASE_URL",
       "VITE_POS_SERVER_URL",
     ]) {
-      expect(shared).toContain(`"${name}"`);
+      expect(envRegistry.webOnly).toContain(name);
     }
+    expect(shared).toContain("web-only-env-names.json");
     for (const script of ["scripts/mobile-build.cjs", "scripts/desktop-release.cjs"]) {
       const text = read(script);
       expect(text).toContain("web-only-env.cjs");

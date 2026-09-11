@@ -155,15 +155,17 @@ const paymentRows = (b: Booking) =>
     change_given: p.changeGiven ?? 0,
   }));
 
-/** Write (or re-write) a booking and its payment history. */
-export async function saveBooking(b: Booking) {
-  const head = await sb.from("bookings").upsert(toRow(b) as never);
-  if (head.error) throw new Error(head.error.message);
-  if (!b.payments.length) return;
-  // Upsert on the payment id: re-saving the same booking must never collide
-  // with the payment rows already stored.
-  const res = await sb.from("booking_payments").upsert(paymentRows(b) as never);
-  if (res.error) throw new Error(res.error.message);
+/** Write (or re-write) a booking and its payment history through the durable POS gateway. */
+export async function saveBooking(b: Booking): Promise<CommitTarget> {
+  const ops: SyncOp[] = [{ kind: "upsert", table: "bookings", rows: [toRow(b)] }];
+  if (b.payments.length) {
+    ops.push({
+      kind: "upsert",
+      table: "booking_payments",
+      rows: paymentRows(b),
+    });
+  }
+  return await commitOps("Saving booking", ops);
 }
 
 /** Best-effort mirror — never blocks the till when the network is down. */
@@ -171,11 +173,12 @@ export const saveBookingQuietly = (b: Booking) => {
   void saveBooking(b).catch(() => undefined);
 };
 
-/** Remove a booking (and its payment history) for good. */
-export async function deleteBookingRow(id: string) {
-  await sb.from("booking_payments").delete().eq("booking_id", id);
-  const res = await sb.from("bookings").delete().eq("id", id);
-  if (res.error) throw new Error(res.error.message);
+/** Remove a booking (and its payment history) through the durable POS gateway. */
+export async function deleteBookingRow(id: string): Promise<CommitTarget> {
+  return await commitOps("Deleting booking", [
+    { kind: "delete", table: "booking_payments", match: { booking_id: id } },
+    { kind: "delete", table: "bookings", match: { id } },
+  ]);
 }
 
 /**
@@ -183,23 +186,7 @@ export async function deleteBookingRow(id: string) {
  * the connection is up, otherwise into the offline queue on this device.
  */
 export async function commitBooking(b: Booking): Promise<CommitTarget> {
-  try {
-    await saveBooking(b);
-    return "cloud";
-  } catch (err) {
-    const ops: SyncOp[] = [{ kind: "upsert", table: "bookings", rows: [toRow(b)] }];
-    if (b.payments.length)
-      ops.push({
-        kind: "upsert",
-        table: "booking_payments",
-        rows: paymentRows(b),
-      });
-    try {
-      return await commitOps("Saving booking", ops);
-    } catch {
-      throw err instanceof Error ? err : new Error(String(err));
-    }
-  }
+  return await saveBooking(b);
 }
 
 /** Every booking raised in the company, newest first. */

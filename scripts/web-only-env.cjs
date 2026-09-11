@@ -11,28 +11,7 @@
  * process.env) and the older VITE_-prefixed aliases are listed: a device build
  * must not inherit either.
  */
-const WEB_ONLY_ENV_NAMES = [
-  // Canonical web runtime pair (Cloudflare variables).
-  "SUPABASE_URL",
-  "SUPABASE_ANON_KEY",
-  // Server-only secrets that must never be near a device artifact.
-  "POS_SUPABASE_SERVICE_ROLE_KEY",
-  "SUPABASE_SERVICE_ROLE_KEY",
-  "SETTINGS_ENCRYPTION_KEY",
-  // Platform-managed and legacy aliases of the same values.
-  "SUPABASE_PUBLISHABLE_KEY",
-  "SUPABASE_PROJECT_ID",
-  "VITE_SUPABASE_URL",
-  "VITE_SUPABASE_ANON_KEY",
-  "VITE_SUPABASE_PUBLISHABLE_KEY",
-  "VITE_SUPABASE_PROJECT_ID",
-  "VITE_POS_SUPABASE_URL",
-  "VITE_POS_SUPABASE_ANON_KEY",
-  "VITE_POS_SUPABASE_PUBLISHABLE_KEY",
-  "VITE_SUPABASE_EXTERNAL_URL",
-  "VITE_SUPABASE_EXTERNAL_PUBLISHABLE_KEY",
-  "VITE_POS_SERVER_URL",
-];
+const { webOnly: WEB_ONLY_ENV_NAMES } = require("./web-only-env-names.json");
 
 /** A copy of `source` with every web-only name removed. */
 function withoutWebEnv(source = process.env) {
