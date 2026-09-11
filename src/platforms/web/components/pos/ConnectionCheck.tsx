@@ -78,7 +78,7 @@ export function ConnectionCheck() {
         ? health.reason
         : health.health.serviceKey
           ? `Key present on ${health.health.host}`
-          : `Key missing on ${health.health.host} — an administrator needs to re-save it`,
+          : `Key missing on ${health.health.host} — configure the service key on the hosted POS backend`,
     });
 
 

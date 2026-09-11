@@ -87,7 +87,7 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
         ok: false,
         code: "NO_SERVICE_KEY",
         error:
-          "Central database key missing on this server — an administrator needs to re-save it. Work is being queued locally in the meantime.",
+          "Central database service key is missing on the hosted POS backend. Configure POS_SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_ROLE_KEY) on the server deployment. Work is being queued locally in the meantime.",
       },
       { status: 503 },
     );

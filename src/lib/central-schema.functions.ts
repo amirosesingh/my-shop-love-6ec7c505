@@ -28,7 +28,7 @@ export const fetchCentralSchema = createServerFn({ method: "GET" }).handler(
       return {
         ok: false,
         error:
-          "The central database service key is not configured — open System status and save it first.",
+          "The hosted POS backend is missing its central database service key. Configure POS_SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_ROLE_KEY) on the server deployment.",
       };
     }
     const res = await runRelayRead({ kind: "cloudSchema" });
@@ -70,7 +70,7 @@ export const probeCentralTables = createServerFn({ method: "GET" }).handler(
       return {
         ok: false,
         error:
-          "The central database service key is not configured — open System status and save it first.",
+          "The hosted POS backend is missing its central database service key. Configure POS_SUPABASE_SERVICE_ROLE_KEY (or SUPABASE_SERVICE_ROLE_KEY) on the server deployment.",
       };
     }
     const rows: CentralProbeRow[] = [];

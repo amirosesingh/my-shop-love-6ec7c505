@@ -583,10 +583,19 @@ async function applyOp(op) {
 async function pendingRows(table, limit = 200) {
   assertTable(table);
   return withHeal(table, async () => {
+    // Not every historical/local table has created_at. Choose a real
+    // timestamp column from the installed schema so one older table cannot
+    // stop the entire sync worker with "Invalid column name 'created_at'".
+    const known = await tableColumns(table);
+    const orderColumn = known.has("created_at")
+      ? "created_at"
+      : known.has("updated_at")
+        ? "updated_at"
+        : "id";
     const res = await getPool().request().input("limit", sql.Int, limit).query(`
         SELECT TOP (@limit) * FROM dbo.[${table}]
          WHERE is_synced = 0 AND sync_status <> N'quarantined'
-         ORDER BY created_at ASC;
+         ORDER BY [${orderColumn}] ASC;
       `);
     return res.recordset;
   });

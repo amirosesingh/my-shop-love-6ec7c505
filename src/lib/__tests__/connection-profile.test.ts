@@ -15,6 +15,11 @@ const net = vi.hoisted(() => ({
   backendOk: true,
   cloudOk: true,
 }));
+const electronStore = vi.hoisted(() => ({
+  backendUrl: "",
+  cloudUrl: "",
+  cloudKey: "",
+}));
 
 vi.mock("@/platform-config/platform", () => ({
   isTerminalApp: () => true,
@@ -93,6 +98,34 @@ function installWindow() {
   };
   (globalThis as { window?: unknown }).window = globalThis;
   (globalThis as { localStorage?: unknown }).localStorage = localStorage;
+  (globalThis as { pos?: unknown }).pos = {
+    backendUrl: async () => ({ ok: true, url: electronStore.backendUrl }),
+    setBackendUrl: async (value: string) => {
+      electronStore.backendUrl = value;
+      return { ok: true, url: value };
+    },
+    cloudKeyStatus: async () => ({
+      ok: true,
+      configured: Boolean(electronStore.cloudUrl && electronStore.cloudKey),
+      url: electronStore.cloudUrl,
+      keyHint: electronStore.cloudKey ? "test-p…key-a" : "",
+      encrypted: true,
+    }),
+    bootstrapCloudCredentials: async () =>
+      electronStore.cloudUrl && electronStore.cloudKey
+        ? { ok: true, url: electronStore.cloudUrl, key: electronStore.cloudKey }
+        : { ok: false },
+    setCloudCredentials: async ({ url, key }: { url: string; key: string }) => {
+      electronStore.cloudUrl = url;
+      electronStore.cloudKey = key;
+      return { ok: true, configured: true, url, keyHint: "test-p…key-a", encrypted: true };
+    },
+    removeCloudCredentials: async () => {
+      electronStore.cloudUrl = "";
+      electronStore.cloudKey = "";
+      return { ok: true };
+    },
+  };
 }
 
 /** Android's start-up purge: plain storage goes, the sealed store stays. */
@@ -118,6 +151,9 @@ describe("connection profile", () => {
   beforeEach(() => {
     installWindow();
     secure.clear();
+    electronStore.backendUrl = "";
+    electronStore.cloudUrl = "";
+    electronStore.cloudKey = "";
     window.localStorage.clear();
     syncRuns.length = 0;
     net.backendOk = true;
@@ -163,6 +199,20 @@ describe("connection profile", () => {
     await saveBackendUrl("https://pos.example.com");
     restart();
     expect(await backendUrl()).toBe("https://pos.example.com");
+  });
+
+  it("writes and reads the exact backend address through the Windows Electron bridge", async () => {
+    shell.mobile = false;
+    shell.windows = true;
+    const res = await saveConnectionProfile({
+      supabaseUrl: "https://tenant.example.co",
+      supabaseKey: KEY_A,
+      backendUrl: "pws.mycompanywebsite.com/",
+    });
+    expect(res.ok).toBe(true);
+    expect(electronStore.backendUrl).toBe("https://pws.mycompanywebsite.com");
+    expect(await backendUrl()).toBe("https://pws.mycompanywebsite.com");
+    expect((await connectionProfile()).backendUrl).toBe("https://pws.mycompanywebsite.com");
   });
 
   it("survives a backend change: A → B → restart still reads B", async () => {
