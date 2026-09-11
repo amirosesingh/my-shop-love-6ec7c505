@@ -114,6 +114,62 @@ describe("Electron durable business persistence", () => {
     expect(preload).toContain('invoke("pos:set-sync-config", config)');
   });
 
+  it("repairs SQL Server before attempting central upload for a durable Electron batch", () => {
+    const worker = read("electron/sync/worker.cjs");
+    const projection = worker.indexOf("if (projectionOps.length) await repo.applyOps(projectionOps)");
+    const cloud = worker.indexOf('fn: "pos_sale_commit"');
+    expect(projection).toBeGreaterThan(-1);
+    expect(cloud).toBeGreaterThan(-1);
+    expect(projection).toBeLessThan(cloud);
+  });
+
+  it("keeps a missing relay service key pending without consuming sale retry attempts", () => {
+    const worker = read("electron/sync/worker.cjs");
+    const sqlite = read("electron/db/sqlite.cjs");
+    expect(worker).toContain('return "central-config"');
+    expect(worker).toContain("sqlite.deferBusinessBatch?.(batch.id, message)");
+    expect(worker).toContain('result: reason === "central-config" ? "pending" : "failed"');
+    expect(sqlite).toContain("function deferBusinessBatch(id, error)");
+    expect(sqlite).toContain("SET status = 'pending', error_message = ?, last_attempt_at = ?");
+    expect(sqlite).toContain("Central database key missing");
+    expect(sqlite).toContain("status IN ('failed', 'dead_letter')");
+  });
+
+  it("falls back to the authenticated Electron session when the relay server key is missing", () => {
+    const worker = read("electron/sync/worker.cjs");
+    expect(worker).toContain("async function authenticatedDirectMutation(op)");
+    expect(worker).toContain('body?.code === "NO_SERVICE_KEY" && credentials.accessToken');
+    expect(worker).toContain('mutationPath = "authenticated-direct"');
+    expect(worker).toContain('throw new Error("PENDING_AUTH:');
+  });
+
+  it("shows a local-safe central-pending message instead of Needs attention for a server-key outage", () => {
+    const engine = read("src/lib/sync-engine.ts");
+    const hub = read("src/platforms/web/components/pos/sync/SyncHub.tsx");
+    expect(engine).toContain('status.lastBusinessPush?.reason === "central-config"');
+    expect(engine).toContain("lastError: centralPending ? null");
+    expect(hub).toContain("Saved locally · central sync pending");
+    expect(hub).toContain("Local SQLite and SQL Server are safe.");
+  });
+
+  it("routes packaged Electron sync through the configured hosted POS backend", () => {
+    const main = read("electron/main.cjs");
+    expect(main).toContain("function syncRelayUrl()");
+    expect(main).toContain('configStore.get("backendUrl")');
+    expect(main).toContain('return `${savedBackend}/api/v1/pos/sync`');
+    expect(main).toContain("return DEV_URL && baseUrl");
+    expect(main).toContain("relayUrl: syncRelayUrl()");
+    expect(main).not.toContain('relayUrl: baseUrl ? `${baseUrl}/api/v1/pos/sync` : null');
+  });
+
+  it("keeps old server-key queue warnings out of the red row-failure list", () => {
+    const hub = read("src/platforms/web/components/pos/sync/SyncHub.tsx");
+    expect(hub).toContain("const centralConfigQueue = queue.filter");
+    expect(hub).toContain("NO_SERVICE_KEY");
+    expect(hub).toContain("!centralConfigQueue.some");
+    expect(hub).toContain("Nothing needs to be re-entered at this till.");
+  });
+
   it("allows the durable sale RPC through the relay input contract", () => {
     const endpoint = read("src/lib/sync-endpoint.server.ts");
     const relay = read("src/core/api/pos-relay.server.ts");

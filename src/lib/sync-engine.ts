@@ -549,7 +549,10 @@ export async function runExclusive(reason: string = "timer"): Promise<void> {
         pending: cycle?.businessBatches?.pending ?? cycle?.queue?.length ?? 0,
         lastSyncAt: cycle?.lastPushAt ?? cycle?.lastPullAt ?? undefined,
         credentialsInvalid: cycle?.credentialsInvalid ?? false,
-        lastError: cycle?.error ?? null,
+        lastError:
+          cycle?.error === "central-config" || cycle?.lastBusinessPush?.reason === "central-config"
+            ? null
+            : (cycle?.error ?? null),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -736,11 +739,15 @@ export function startSyncEngine() {
   const applyDesktopStatus = (status: Awaited<ReturnType<NonNullable<typeof desktopBridge>["status"]>>) => {
     const batches = status.businessBatches;
     const failedRow = batches?.rows?.find((row) => row.status !== "pending");
+    const centralPending =
+      status.lastBusinessPush?.reason === "central-config" ||
+      status.error === "central-config" ||
+      failedRow?.error_message === "central-config";
     setSyncState({
       phase: status.phase === "pushing" || status.phase === "pulling" ? "syncing" : "idle",
       pending: batches ? batches.pending + batches.failed : (status.queue?.length ?? 0),
       lastSyncAt: status.lastPushAt ?? status.lastPullAt ?? null,
-      lastError: status.error ?? failedRow?.error_message ?? null,
+      lastError: centralPending ? null : (status.error ?? failedRow?.error_message ?? null),
       credentialsInvalid: status.credentialsInvalid ?? false,
       cloudConfigured: status.cloudConfigured ?? null,
     });
