@@ -13,6 +13,30 @@ const sqlite = require("../db/sqlite.cjs");
 const DEFAULT_WORKER_CONFIG = { batchSize: 50, intervalMs: 30_000, maxAttempts: 5 };
 let workerConfig = { ...DEFAULT_WORKER_CONFIG };
 
+function isNewSupabaseApiKey(value) {
+  const key = String(value ?? "");
+  return key.startsWith("sb_publishable_") || key.startsWith("sb_secret_");
+}
+
+function supabaseKeyFetch(key) {
+  return async (input, init) => {
+    const requestHeaders =
+      typeof Request !== "undefined" && input instanceof Request ? input.headers : undefined;
+    const headers = new Headers(requestHeaders);
+    if (init?.headers) {
+      new Headers(init.headers).forEach((value, name) => headers.set(name, value));
+    }
+    if (isNewSupabaseApiKey(key) && headers.get("Authorization") === `Bearer ${key}`) {
+      headers.delete("Authorization");
+    }
+    headers.set("apikey", key);
+    if (typeof Request !== "undefined" && input instanceof Request) {
+      return fetch(new Request(input, { ...init, headers }));
+    }
+    return fetch(input, { ...init, headers });
+  };
+}
+
 let supabase = null;
 let enabled = true;
 let timer = null;
@@ -261,7 +285,10 @@ function init({
 }) {
   supabase = createClient(url, key, {
     auth: { persistSession: false, autoRefreshToken: false },
-    global: accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : undefined,
+    global: {
+      fetch: supabaseKeyFetch(key),
+      ...(accessToken ? { headers: { Authorization: `Bearer ${accessToken}` } } : {}),
+    },
   });
   credentials = { accessToken, sessionToken, cashierToken, terminalToken, branchId };
   // Watermarks are per branch and per till, so one machine moved between

@@ -109,6 +109,13 @@ function load() {
   // most fragile link in the chain on tills behind security software. One
   // plain file download is slower but far more likely to complete.
   autoUpdater.disableDifferentialDownload = true;
+  // Keep manifests fresh and ask proxies/CDNs not to transform installer bytes.
+  // A transformed body is particularly unsafe when a retry resumes by Range.
+  autoUpdater.requestHeaders = {
+    "Cache-Control": "no-cache",
+    Pragma: "no-cache",
+    "Accept-Encoding": "identity",
+  };
   autoUpdater.setFeedURL(target);
   autoUpdater.on("checking-for-update", () =>
     set({ status: "checking", error: null, stage: null, detail: null, code: null }),
@@ -206,8 +213,25 @@ async function fallbackDownload() {
         });
         const verified = await verifyInstaller(file, version);
         if (!verified.ok) {
-          fs.rm(file, { force: true }, () => {});
-          set({ status: "error", stage: "verify", error: verified.error, detail: verified.error, url });
+          // Never keep or resume a file that failed integrity verification.
+          // Retry from byte zero because the transfer may have ended cleanly
+          // at HTTP level while still being truncated or transformed.
+          try {
+            fs.rmSync(file, { force: true });
+          } catch {
+            /* the next download still opens with flags=w when no partial remains */
+          }
+          set({
+            status: "error",
+            stage: "verify",
+            error: verified.error,
+            detail: `${verified.error} (attempt ${attempt} of ${ATTEMPTS})`,
+            url,
+          });
+          if (attempt < ATTEMPTS) {
+            await wait(attempt * 3000);
+            continue;
+          }
           return state;
         }
         set({
