@@ -264,18 +264,28 @@ function downloadTo(url, destination, { onProgress, timeoutMs = 900000, resume =
     }
 
     let settled = false;
+    let req = null;
+    let activeOut = null;
     const done = (fn, value) => {
       if (settled) return;
       settled = true;
       clearTimeout(timer);
       fn(value);
     };
-    const timer = setTimeout(
-      () => done(reject, new Error("The update server stopped responding during the download.")),
-      timeoutMs,
-    );
+    const timer = setTimeout(() => {
+      try {
+        req?.abort();
+      } catch {
+        /* request already closed */
+      }
+      try {
+        activeOut?.destroy();
+      } catch {
+        /* file stream already closed */
+      }
+      done(reject, new Error("The update server stopped responding during the download."));
+    }, timeoutMs);
 
-    let req;
     try {
       req = net.request({ method: "GET", url: allowed.url, redirect: "manual" });
     } catch (error) {
@@ -360,6 +370,7 @@ function downloadTo(url, destination, { onProgress, timeoutMs = 900000, resume =
       let received = start;
       let bodyBytes = 0;
       const out = fs.createWriteStream(destination, partial ? { flags: "a" } : { flags: "w" });
+      activeOut = out;
 
       const failStream = (error) => {
         try {
@@ -367,6 +378,7 @@ function downloadTo(url, destination, { onProgress, timeoutMs = 900000, resume =
         } catch {
           /* already closed */
         }
+        if (activeOut === out) activeOut = null;
         done(reject, error instanceof Error ? error : new Error(String(error)));
       };
 
@@ -380,6 +392,7 @@ function downloadTo(url, destination, { onProgress, timeoutMs = 900000, resume =
       out.on("drain", () => res.resume());
       res.on("end", () =>
         out.end(() => {
+          if (activeOut === out) activeOut = null;
           if (expectedBodyBytes > 0 && bodyBytes !== expectedBodyBytes) {
             done(
               reject,
