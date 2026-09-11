@@ -407,7 +407,7 @@ export type LocalSyncStatus = {
   };
   lastBusinessPush?: { batchId: string; clientTransactionId?: string | null;
     localCommittedAt: string; pushStartedAt: string; acknowledgedAt?: string | null;
-    durationMs?: number | null; result: "pushing" | "synced" | "failed"; reason?: string } | null;
+    durationMs?: number | null; result: "pushing" | "synced" | "pending" | "failed"; reason?: string } | null;
   tables: TableSyncStat[];
   queue?: SyncQueueRow[];
   lastPushAt: string | null;
