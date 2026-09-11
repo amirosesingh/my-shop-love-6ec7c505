@@ -279,6 +279,20 @@ function migrate() {
     }
   }
 
+  // Recover rows parked by older builds when the central relay server was
+  // missing its service key. That condition is temporary infrastructure state,
+  // not a bad sale, so it must never stay failed/dead-letter after upgrade.
+  if (columnsOf("offline_sync_queue").size) {
+    db.prepare(
+      `UPDATE offline_sync_queue
+          SET status = 'pending', attempts = 0
+        WHERE table_name = '__business_batch__'
+          AND status IN ('failed', 'dead_letter')
+          AND (error_message LIKE '%NO_SERVICE_KEY%'
+               OR error_message LIKE '%Central database key missing%')`,
+    ).run();
+  }
+
   // 4. Watermarks keyed by table + branch + till.
   const meta = columnsOf("sync_metadata");
   if (meta.size && !meta.has("store_id")) {
