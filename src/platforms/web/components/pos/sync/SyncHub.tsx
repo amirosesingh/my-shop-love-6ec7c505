@@ -204,7 +204,14 @@ function SyncHubDesktop() {
     bookings: state.bookings?.length ?? 0,
   };
 
-  const failedQueue = queue.filter((q) => q.state === "refused" || q.reason);
+  const centralConfigQueue = queue.filter((q) =>
+    /central database key|NO_SERVICE_KEY|administrator must re-save/i.test(q.reason ?? ""),
+  );
+  const failedQueue = queue.filter(
+    (q) =>
+      !centralConfigQueue.some((pending) => pending.id === q.id) &&
+      (q.state === "refused" || Boolean(q.reason)),
+  );
   const engineState = syncState();
   // Two different stores, named for what they are: the branch SQL Server is the
   // operational database, the file below is only a mirror plus the audit ledger.
@@ -287,10 +294,16 @@ function SyncHubDesktop() {
               Holds the catalogue copy and the sync ledger — not the till&apos;s sales database.
             </span>
           </Field>
-          {desktopSync?.lastBusinessPush?.reason === "central-config" ? (
+          {desktopSync?.lastBusinessPush?.reason === "central-config" || centralConfigQueue.length > 0 ? (
             <p className="sm:col-span-2 lg:col-span-4 flex items-start gap-2 rounded-md border border-warning/40 bg-warning/10 p-2 text-xs text-warning-foreground">
               <TriangleAlert className="mt-0.5 size-3.5 shrink-0" />
-              Local SQLite and SQL Server are safe. Central synchronization is waiting for the server connection to be restored; the queued work will retry automatically.
+              <span>
+                Local SQLite and SQL Server are safe. Central synchronization is waiting for the configured POS backend to have its server-side database access restored.
+                {centralConfigQueue.length > 0
+                  ? ` ${centralConfigQueue.length} older queued change${centralConfigQueue.length === 1 ? "" : "s"} will migrate and retry automatically.`
+                  : ""}
+                {" "}Nothing needs to be re-entered at this till.
+              </span>
             </p>
           ) : engineState.lastError ? (
             <p className="sm:col-span-2 lg:col-span-4 flex items-start gap-2 rounded-md border border-destructive/40 bg-destructive/10 p-2 text-xs text-destructive">
