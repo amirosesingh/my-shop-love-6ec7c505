@@ -65,7 +65,13 @@ function ensureLocalPoll() {
   if (localTimer || !hasLocalDb()) return;
   const bridge = localDb();
   if (!bridge) return;
-  const read = () => void bridge.status().then(absorb).catch(() => {});
+  const read = () =>
+    void bridge.status().then(absorb).catch(() => {
+      // An unanswered main-process probe is not evidence that the last known
+      // connection is still alive.
+      localHealth = { ...EMPTY_LOCAL };
+      for (const listener of localListeners) listener();
+    });
   read();
   localTimer = setInterval(read, 10_000);
   localOff = bridge.onStatus?.((s) => absorb(s));

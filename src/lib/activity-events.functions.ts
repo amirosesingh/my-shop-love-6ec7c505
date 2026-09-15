@@ -26,7 +26,7 @@ const eventInput = z.object({
 });
 
 export const pushActivityEvent = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => eventInput.parse(input))
+  .validator((input: unknown) => eventInput.parse(input))
   .handler(async ({ data }) => {
     // The feed is an audit trail: an unattested caller must not be able to
     // invent sign-ins, refunds or branch activity in it.
@@ -84,7 +84,7 @@ export const loadNotificationSettings = createServerFn({ method: "POST" }).handl
 });
 
 export const saveNotificationSettings = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ accessToken: z.string().min(10), settings: settingsInput }).parse(input),
   )
   .handler(async ({ data }) => {

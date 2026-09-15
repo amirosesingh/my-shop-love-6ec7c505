@@ -8,7 +8,7 @@
  */
 import { useRef, useState } from "react";
 import { toast } from "sonner";
-import { notifyError } from "@/lib/notify";
+import { describeError, notifyError } from "@/lib/notify";
 import { runWhatsAppSend } from "@/lib/register/wa-send";
 import { openCashDrawer, printBookingSlip, printJobTag, printSaleReceipt } from "@/lib/pos-print";
 import { buildBookingMessage, buildSaleMessage, sendBillOnWhatsApp } from "@/lib/whatsapp";
@@ -283,7 +283,7 @@ export function useCheckout(deps: CheckoutDeps) {
       booking = await createBooking(newBooking);
     } catch (e) {
       toast.error("Booking was not saved", {
-        description: (e as { message?: string })?.message ?? "Nothing was stored — try again.",
+        description: describeError(e, "Saving the booking"),
       });
       return;
     } finally {
@@ -515,14 +515,11 @@ export function useCheckout(deps: CheckoutDeps) {
       } else if (stored === "unknown") {
         toast.error("Could not confirm whether the payment was saved", {
           description:
-            (e as { message?: string })?.message ??
-            "Check Sales for this bill before taking payment again.",
+            "Check Sales for this bill before taking payment again. If it is not listed, verify the database connection and retry.",
         });
       } else {
         toast.error("Payment was not saved", {
-          description:
-            (e as { message?: string })?.message ??
-            "Nothing was stored, so the ticket is untouched — try again.",
+          description: describeError(e, "Saving the payment"),
         });
       }
       return;

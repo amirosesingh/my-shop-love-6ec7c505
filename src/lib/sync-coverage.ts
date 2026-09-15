@@ -82,9 +82,14 @@ export const TABLE_INTENT: Record<
   bookings: { syncDirection: "both", restoreRequired: false, securityClass: "operational" },
   shifts: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
   shift_sessions: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
+  shift_cash_counts: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
+  shift_close_events: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
+  shift_reconciliations: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
+  shift_variance_alerts: { syncDirection: "push", restoreRequired: true, securityClass: "governance" },
   drawer_events: { syncDirection: "push", restoreRequired: true, securityClass: "financial" },
   held_orders: { syncDirection: "push", restoreRequired: true, securityClass: "operational" },
   stock_adjustments: { syncDirection: "push", restoreRequired: true, securityClass: "operational" },
+  stock_count_drafts: { syncDirection: "push", restoreRequired: true, securityClass: "operational" },
   item_activity_logs: { syncDirection: "push", restoreRequired: true, securityClass: "governance" },
   purchase_orders: { syncDirection: "push", restoreRequired: true, securityClass: "operational" },
   purchase_order_items: {
@@ -101,6 +106,10 @@ export const TABLE_INTENT: Record<
     securityClass: "operational",
   },
   activity_events: { syncDirection: "push", restoreRequired: true, securityClass: "governance" },
+  record_edits: { syncDirection: "push", restoreRequired: true, securityClass: "governance" },
+  authorization_requests: { syncDirection: "push", restoreRequired: true, securityClass: "governance" },
+  authorization_log: { syncDirection: "push", restoreRequired: true, securityClass: "governance" },
+  member_verifications: { syncDirection: "push", restoreRequired: true, securityClass: "governance" },
   // Now branch-stamped centrally, so a rebuilt till can recover its own trail.
   audit_logs: { syncDirection: "push", restoreRequired: true, securityClass: "governance" },
   // The state history of everything this branch handled. Append-only centrally
@@ -126,7 +135,10 @@ export const TABLE_INTENT: Record<
 
 /** Every table any feature touches, in one sorted list. RPC ops are skipped. */
 export function registryTables(): string[] {
-  const seen = new Set<string>();
+  // Explicit table intent is itself part of the contract. Including it here
+  // prevents durable worker tables with no schema-probe UI entry from silently
+  // disappearing from the generated coverage report.
+  const seen = new Set<string>(Object.keys(TABLE_INTENT));
   for (const feature of FEATURES) {
     for (const op of feature.ops) if (!op.table.startsWith("rpc:")) seen.add(op.table);
   }

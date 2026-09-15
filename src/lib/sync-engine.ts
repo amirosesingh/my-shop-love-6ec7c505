@@ -30,7 +30,7 @@ import {
 import { mirrorToLocal } from "./sync-audit";
 
 /**
- * The central project rejecting this device's keys (HTTP 401/403, "Invalid
+ * The central project rejecting this device's keys (HTTP 401, "Invalid
  * API key", an expired JWT). Never a row fault: queued writes keep their
  * place, sync parks, and the badge points at Settings → Database & Cloud
  * Connection. Saving fresh keys clears the flag and wakes the engine.
@@ -41,7 +41,10 @@ function isCredentialError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const e = error as { status?: unknown; message?: unknown };
   const status = Number(e.status ?? 0);
-  if (status === 401 || status === 403) return true;
+  // 403 is an authorised caller being denied a particular action (RLS,
+  // branch, or role). It must remain a row-level sync error, not falsely park
+  // every table as though the API key were invalid.
+  if (status === 401) return true;
   return CREDENTIAL_ERROR_RE.test(String(e.message ?? ""));
 }
 
@@ -705,6 +708,9 @@ function flushLiveChanges(): void {
 export async function syncNow(reason: string, attempt = 0): Promise<void> {
   try {
     await runExclusive(reason);
+    const completed = syncState();
+    if (completed.credentialsInvalid) throw new Error("Cloud credentials were rejected");
+    if (completed.lastError) throw new Error(completed.lastError);
     await refreshStaffMirror();
     logSync("push", reason, true, "sent to this shop's database");
     recordSync({ direction: "push", entity: reason, status: "success" });
@@ -733,6 +739,7 @@ export function startSyncEngine() {
       intervalMs: cfg.intervalMs,
       batchSize: cfg.batchSize,
       maxAttempts: cfg.maxAttempts,
+      maxBackoffMs: cfg.maxBackoffMs,
     });
   }
   const applyDesktopStatus = (status: Awaited<ReturnType<NonNullable<typeof desktopBridge>["status"]>>) => {
@@ -768,6 +775,7 @@ export function startSyncEngine() {
         intervalMs: cfg.intervalMs,
         batchSize: cfg.batchSize,
         maxAttempts: cfg.maxAttempts,
+        maxBackoffMs: cfg.maxBackoffMs,
       });
     }
     if (cfg.intervalMs !== appliedInterval) {

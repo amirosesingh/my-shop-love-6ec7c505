@@ -521,7 +521,7 @@ is logged to `connection.log` via `logConnection`. IPC: `driver:list`,
 ## 12. SQLite local mirror
 
 `electron/db/sqlite.cjs` with schema `electron/db/offline_sqlite_v2.sql` and
-metadata `db/offline/pos-offline-sync-metadata.sql`. It is a **mirror**, not a
+metadata embedded in the canonical generated SQL Server installer. It is a **mirror**, not a
 second source of truth: rows already safe centrally are copied in via
 `mirrorToLocal`; pending local writes live in the mirror's own queue and are
 reported by `local:pending`. `local:relational-health` cross-checks parent/child

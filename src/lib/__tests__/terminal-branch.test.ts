@@ -48,13 +48,15 @@ describe("error messages", () => {
     expect(message).toContain("other records still point at this entry");
   });
 
-  it("says an offline action is stored and will sync", () => {
-    expect(describeError(new Error("Failed to fetch"), "Saving the sale")).toContain("sync");
+  it("does not promise an online-only action was stored", () => {
+    expect(describeError(new Error("Failed to fetch"), "Saving the sale")).toContain(
+      "internet connection",
+    );
   });
 
   it("turns an access-rule refusal into an actionable sentence", () => {
     expect(describeError({ code: "42501", message: "permission denied for table sales" })).toContain(
-      "not allowed for this account",
+      "don't have permission",
     );
   });
 });

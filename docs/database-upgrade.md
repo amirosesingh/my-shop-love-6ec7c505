@@ -22,4 +22,4 @@ Automatic; no manual SQL is required. Electron applies the guarded local schema 
 
 ## Fresh installation
 
-Use the repository's existing canonical/fresh-install process. `supabase/schema.sql` and `supabase/retail_cloud_full.sql` are not production incremental upgrade files.
+Use the repository's existing canonical/fresh-install process. `supabase/schema.sql` is not a production incremental upgrade file.

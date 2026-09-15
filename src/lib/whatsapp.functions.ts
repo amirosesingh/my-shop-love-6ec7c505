@@ -17,7 +17,7 @@ const payload = z.object({
  * The permanent access token lives server-side in the WHATSAPP_TOKEN secret.
  */
 export const sendWhatsAppBill = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => payload.parse(data))
+  .validator((data: unknown) => payload.parse(data))
   .handler(async ({ data }) => {
     // Only signed-in POS staff may send from the business account.
     const { verifyCashierSession } = await import("./pos-session.server");

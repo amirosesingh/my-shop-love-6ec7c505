@@ -12,7 +12,7 @@ const input = z.object({
  * accepted by the central database under the normal row rules.
  */
 export const getTerminalAccount = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => input.parse(data))
+  .validator((data: unknown) => input.parse(data))
   .handler(async ({ data }): Promise<
     { ok: true; email: string; password: string } | { ok: false; error: string }
   > => {

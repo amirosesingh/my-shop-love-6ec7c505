@@ -62,7 +62,6 @@ describe("manual production upgrade", () => {
   it("matches canonical schemas, generated types and authorization model", () => {
     const targets = [
       read("supabase/schema.sql"),
-      read("supabase/retail_cloud_full.sql"),
       read("src/integrations/supabase/types.ts"),
     ];
     for (const column of allColumns) {

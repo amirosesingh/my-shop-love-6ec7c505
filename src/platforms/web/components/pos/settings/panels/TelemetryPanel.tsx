@@ -17,6 +17,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/lib/pos-auth";
+import { describeError } from "@/lib/notify";
 import {
   CONNECTION_LABEL,
   ENGINE_LABEL,
@@ -65,7 +66,9 @@ export function TelemetryPanel() {
 
       setCommands(c);
     } catch (e) {
-      toast.error("Could not load terminal health", { description: (e as Error).message });
+      toast.error("Could not load terminal health", {
+        description: describeError(e, "Loading terminal health"),
+      });
     } finally {
       setLoading(false);
     }
@@ -92,7 +95,9 @@ export function TelemetryPanel() {
       });
       await load();
     } catch (e) {
-      toast.error("Could not send the request", { description: (e as Error).message });
+      toast.error("Could not send the request", {
+        description: describeError(e, "Sending the terminal request"),
+      });
     } finally {
       setBusy(null);
     }

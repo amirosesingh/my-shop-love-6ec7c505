@@ -19,6 +19,7 @@ import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import { OtpVerificationModal } from "@/platforms/web/components/pos/OtpVerificationModal";
 import { usePos } from "@/lib/pos-store";
 import { useVerificationGateway } from "@/lib/verification-gateway";
+import { describeError } from "@/lib/notify";
 import type { Member } from "@/core/types/pos-types";
 
 const looksNumeric = (v: string) => /^[\d+\s-]+$/.test(v.trim());
@@ -76,7 +77,7 @@ export function QuickMemberDialog({
       // Strict gateways want the number proven before the member earns points.
       if (gateway?.active && (member.phone || member.email)) setVerifying(member);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Member could not be saved.");
+      toast.error("Member was not saved", { description: describeError(error, "Saving the member") });
     }
   };
 
@@ -96,9 +97,9 @@ export function QuickMemberDialog({
             await upsertMember({ ...verifying, verified: true });
             setVerifying(null);
           } catch (error) {
-            toast.error(
-              error instanceof Error ? error.message : "Verification could not be saved.",
-            );
+            toast.error("Verification was not saved", {
+              description: describeError(error, "Saving member verification"),
+            });
           }
         }}
       />

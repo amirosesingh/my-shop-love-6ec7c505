@@ -91,6 +91,12 @@ describe("local database connection state", () => {
     );
   });
 
+  it("never trusts a stale connected status when no database is configured", () => {
+    expect(
+      deriveLocalDbState({ available: true, configured: false, status: { connected: true } }).state,
+    ).toBe("not_configured");
+  });
+
   it("says unavailable, not connected, when the shell reports an error", () => {
     const view = deriveLocalDbState({
       available: true,

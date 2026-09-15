@@ -38,9 +38,14 @@ jobs:
           java-version: 21
 
       - uses: android-actions/setup-android@v3
+        with:
+          # The old SDK `tools` package was removed from Google's repository.
+          # Command-line tools are installed by the action itself; requesting
+          # only platform-tools avoids `sdkmanager: Failed to find package tools`.
+          packages: platform-tools
 
       - name: Install dependencies
-        run: npm install
+        run: npm ci
 
       - name: Resolve release identity
         id: meta
