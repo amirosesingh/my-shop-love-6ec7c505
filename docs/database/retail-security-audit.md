@@ -15,7 +15,7 @@ SQLite and SQL Server do not claim RLS. Access is enforced by the Electron IPC a
 
 ## Production application
 
-For an **existing Supabase database**, apply only `supabase/migrations/20260908120000_retail_production_stabilization.sql` through normal migration tooling. Never apply the full reference file to production. For a **new database**, use `supabase/retail_cloud_full.sql` as the canonical fresh-install reference.
+For an **existing Supabase database**, apply only `supabase/migrations/20260908120000_retail_production_stabilization.sql` through normal migration tooling. Never apply the full reference file to production. For a **new database**, use `supabase/schema.sql` as the single canonical fresh-install reference.
 
 ## Compatibility aliases
 

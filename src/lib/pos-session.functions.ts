@@ -7,7 +7,7 @@ import { z } from "zod";
  * place of a Supabase access token.
  */
 export const issueCashierSession = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     z.object({
       username: z.string().min(1).max(64),
       pin: z.string().min(4).max(32),

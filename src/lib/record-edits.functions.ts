@@ -37,7 +37,7 @@ async function assertCaller(data: z.infer<typeof caller>): Promise<Caller> {
 
 /** Who the server thinks is asking — used to show "your" pending edits. */
 export const whoAmI = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => caller.parse(data))
+  .validator((data: unknown) => caller.parse(data))
   .handler(async ({ data }) => {
     try {
       const who = await assertCaller(data);
@@ -49,7 +49,7 @@ export const whoAmI = createServerFn({ method: "POST" })
 
 /** Hold a posted record while its edit request waits for a decision. */
 export const holdRecordForEdit = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     caller
       .extend({ kind, recordId: z.string().min(1).max(64), requestId: z.string().uuid() })
       .parse(data),
@@ -87,7 +87,7 @@ export const holdRecordForEdit = createServerFn({ method: "POST" })
  * that is no longer pending releases the record on the way out.
  */
 export const resumeRecordEdit = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     caller.extend({ kind, recordId: z.string().min(1).max(64) }).parse(data),
   )
   .handler(async ({ data }) => {
@@ -142,7 +142,7 @@ export const resumeRecordEdit = createServerFn({ method: "POST" })
 
 /** The requester takes their own request back; the record unlocks. */
 export const withdrawRecordEdit = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     caller.extend({ kind, recordId: z.string().min(1).max(64) }).parse(data),
   )
   .handler(async ({ data }) => {
@@ -167,7 +167,7 @@ const jsonish = z.unknown();
 
 /** Record what an authorised edit changed: the old values and the new ones. */
 export const logRecordEdit = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     caller
       .extend({
         kind,
@@ -218,7 +218,7 @@ export const logRecordEdit = createServerFn({ method: "POST" })
 
 /** The before/after history of one record, for the audit trail. */
 export const getRecordEdits = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     caller.extend({ kind, recordId: z.string().min(1).max(64) }).parse(data),
   )
   .handler(async ({ data }) => {

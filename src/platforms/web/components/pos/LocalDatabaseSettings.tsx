@@ -16,7 +16,7 @@ import {
   defaultLocalDbConfig,
   hasLocalDb,
   localDb,
-  loadLocalDbConfig,
+  loadLocalDbConfigState,
   reconnectLocalDatabase,
   removeStoredConnection,
   readConnectionAudit,
@@ -99,9 +99,9 @@ export function LocalDatabaseSettings() {
   };
 
   useEffect(() => {
-    void loadLocalDbConfig().then((saved) => {
+    void loadLocalDbConfigState().then(({ config: saved, configured: isConfigured }) => {
       setConfig(saved);
-      setConfigured(!!saved.server && !!saved.database);
+      setConfigured(isConfigured);
     });
   }, []);
 
@@ -124,8 +124,8 @@ export function LocalDatabaseSettings() {
       <div className="rounded-md border border-border px-3 py-2">
         <p className="text-sm">Local database</p>
         <p className="text-xs text-muted-foreground">
-          A local Microsoft SQL Server is only used by the Windows desktop app. In the browser this
-          terminal queues changes on the device instead, which works the same way offline.
+          A local Microsoft SQL Server is only used by the Windows desktop app. Web and Android use
+          the online service and require connectivity for database operations.
         </p>
       </div>
     );
@@ -204,9 +204,6 @@ export function LocalDatabaseSettings() {
           <div>
             <p className="text-sm">{view.message}</p>
             {view.detail && <p className="text-xs text-muted-foreground">{view.detail}</p>}
-            {savedLabel && (
-              <p className="text-xs text-muted-foreground">Saved connection: {savedLabel}</p>
-            )}
           </div>
         </div>
         <div className="flex shrink-0 flex-wrap justify-end gap-2">
@@ -227,13 +224,9 @@ export function LocalDatabaseSettings() {
               variant="outline"
               disabled={removing}
               onClick={() => setConfirmRemove(true)}
-              title={`Delete the stored details for ${savedLabel || "this machine"}.`}
+              title="Delete the stored database connection details from this machine."
             >
-              {removing
-                ? "Removing…"
-                : savedLabel
-                  ? `Remove saved connection (${savedLabel})`
-                  : "Remove saved connection"}
+              {removing ? "Removing…" : "Remove saved connection"}
             </Button>
           )}
           <Button
@@ -372,15 +365,31 @@ export function LocalDatabaseSettings() {
         {showDetails && (
           <div className="mt-2 space-y-2 text-xs">
             <p>
-              <span className="text-muted-foreground">Server</span> {config.server || "not set"}
+              <span className="text-muted-foreground">Connection</span>{" "}
+              {status?.connected ? "Connected" : configured ? "Disconnected" : "Not Connected"}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Server</span>{" "}
+              {configured ? config.server || "Not Configured" : "Not Configured"}
               {" · "}
               <span className="text-muted-foreground">Database</span>{" "}
-              {config.database || "not set"}
+              {configured ? config.database || "Not Configured" : "Not Configured"}
             </p>
             <p className="text-muted-foreground">
               {config.auth === "windows"
                 ? "Signs in with this Windows account."
-                : `SQL Server login${config.user ? ` (${config.user})` : ""}`}
+                : "Signs in with a SQL Server login."}
+            </p>
+            <p>
+              <span className="text-muted-foreground">Last connection check</span>{" "}
+              {status?.lastConnectionCheckAt
+                ? new Date(status.lastConnectionCheckAt).toLocaleString()
+                : "Never"}
+              {" · "}
+              <span className="text-muted-foreground">Last successful connection</span>{" "}
+              {status?.lastSuccessfulConnectionAt
+                ? new Date(status.lastSuccessfulConnectionAt).toLocaleString()
+                : "Never"}
             </p>
           </div>
         )}
@@ -398,10 +407,6 @@ export function LocalDatabaseSettings() {
         <Stat
           label="SQL Server projection"
           value={status?.sqlServer?.ok ? "Write transaction ready" : "Connection unavailable"}
-        />
-        <Stat
-          label="Active database"
-          value={status?.sqlServer?.activeDb ?? status?.database ?? config.database ?? "—"}
         />
         <Stat label="Waiting to sync" value={String(totals.pending)} />
         <Stat label="Synced" value={String(totals.synced)} />

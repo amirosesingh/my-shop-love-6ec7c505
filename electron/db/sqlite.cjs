@@ -466,17 +466,25 @@ function verifyDurability() {
   }
 }
 
-function pendingBusinessBatches(limit = 25) {
+function pendingBusinessBatches(limit = 25, maxBackoffMs = 300_000) {
   if (!ready()) return [];
   return db
     .prepare(
-      `SELECT id, payload_json, attempts, client_transaction_id, created_at
+      `SELECT id, payload_json, attempts, client_transaction_id, created_at, last_attempt_at
          FROM offline_sync_queue
         WHERE table_name = '__business_batch__' AND status IN ('pending', 'failed')
         ORDER BY created_at, id LIMIT ?`,
     )
     .all(Math.min(Math.max(Number(limit) || 25, 1), 100))
-    .map((row) => ({ ...row, payload: JSON.parse(row.payload_json) }));
+    .map((row) => ({ ...row, payload: JSON.parse(row.payload_json) }))
+    .filter((row) => {
+      if (!row.last_attempt_at || Number(row.attempts ?? 0) <= 0) return true;
+      const delay = Math.min(
+        Math.max(30_000, Number(maxBackoffMs) || 300_000),
+        5_000 * 3 ** Math.max(0, Number(row.attempts) - 1),
+      );
+      return Date.now() >= Date.parse(row.last_attempt_at) + delay;
+    });
 }
 
 function businessBatchStatus() {
@@ -484,7 +492,9 @@ function businessBatchStatus() {
   const rows = db.prepare(
     `SELECT id, status, attempts, client_transaction_id, created_at, last_attempt_at, error_message
        FROM offline_sync_queue WHERE table_name = '__business_batch__' ORDER BY created_at, id`,
-  ).all().map((row) => ({ ...row, error_message: row.error_message
+  ).all().map((row) => ({ ...row,
+    error_detail: row.error_message ? String(row.error_message).slice(0, 1000) : null,
+    error_message: row.error_message
     ? (/central database key missing|NO_SERVICE_KEY/i.test(row.error_message) ? "central-config"
       : /PENDING_AUTH/i.test(row.error_message) ? "pending-auth"
       : /STORE_FORBIDDEN|branch/i.test(row.error_message) ? "branch-mismatch"

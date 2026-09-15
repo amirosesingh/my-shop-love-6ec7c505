@@ -30,7 +30,7 @@ async function audit(entry: {
 
 /** Create or update a staff member and the account behind them. */
 export const saveStaffAccount = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     z.object({
       accessToken: z.string().min(10).max(4000),
       displayName: z.string().trim().min(1).max(120),
@@ -78,7 +78,7 @@ export const saveStaffAccount = createServerFn({ method: "POST" })
 
 /** Switch a staff account on or off. */
 export const setStaffAccountActive = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({
+  .validator((data: unknown) => z.object({
     accessToken: z.string().min(10).max(4000),
     username: z.string().min(2).max(160),
     active: z.boolean(),
@@ -107,7 +107,7 @@ export const setStaffAccountActive = createServerFn({ method: "POST" })
  * before anything is created or changed.
  */
 export const preparePinSignIn = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({
+  .validator((data: unknown) => z.object({
     username: z.string().min(2).max(120),
     pin: z.string().min(4).max(32),
   }).parse(data))
@@ -122,7 +122,7 @@ export const preparePinSignIn = createServerFn({ method: "POST" })
 
 /** The sign-in grid for a till: active staff who hold a PIN. */
 export const listTerminalStaffAccounts = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ storeId: z.string().max(60).nullable().optional() }).parse(data))
+  .validator((data: unknown) => z.object({ storeId: z.string().max(60).nullable().optional() }).parse(data))
   .handler(async ({ data }) => {
     try {
       const mod = await import("./staff-admin.server");
@@ -135,7 +135,7 @@ export const listTerminalStaffAccounts = createServerFn({ method: "POST" })
 
 /** One-off catch-up for tills that still have old cashier-only records. */
 export const migrateCashiersToAccounts = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({ accessToken: z.string().min(10).max(4000) }).parse(data))
+  .validator((data: unknown) => z.object({ accessToken: z.string().min(10).max(4000) }).parse(data))
   .handler(async ({ data }): Promise<{ ok: true; migrated: number } | { ok: false; error: string }> => {
     try {
       const mod = await import("./staff-admin.server");
@@ -149,7 +149,7 @@ export const migrateCashiersToAccounts = createServerFn({ method: "POST" })
 
 /** Update profile fields and optionally replace the credential. */
 export const updateStaffAccount = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({
+  .validator((data: unknown) => z.object({
     accessToken: z.string().min(10).max(4000),
     username: z.string().min(2).max(160),
     displayName: z.string().trim().min(1).max(120),
@@ -188,7 +188,7 @@ export const updateStaffAccount = createServerFn({ method: "POST" })
 
 /** Permanently remove an inactive account after server-side safety checks. */
 export const deleteStaffAccount = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object({
+  .validator((data: unknown) => z.object({
     accessToken: z.string().min(10).max(4000),
     username: z.string().min(2).max(160),
   }).parse(data))

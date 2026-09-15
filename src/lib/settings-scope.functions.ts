@@ -29,7 +29,7 @@ const batchInput = z.object({
 
 /** GET /api/settings — effective values plus inheritance metadata. */
 export const getScopedSettings = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => readInput.parse(data))
+  .validator((data: unknown) => readInput.parse(data))
   .handler(async ({ data }) => {
     const { verifyPosStaff } = await import("./secure-settings.server");
     const { readScopedSettings } = await import("./settings-scope.server");
@@ -44,7 +44,7 @@ export const getScopedSettings = createServerFn({ method: "POST" })
 
 /** PUT /api/settings/upsert — write or clear overrides for one scope. */
 export const upsertScopedSettings = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => upsertInput.parse(data))
+  .validator((data: unknown) => upsertInput.parse(data))
   .handler(async ({ data }) => {
     const { verifyPosStaff } = await import("./secure-settings.server");
     const { writeScopedSettings, writeScopedSettingsWithService } = await import(
@@ -74,7 +74,7 @@ export const upsertScopedSettings = createServerFn({ method: "POST" })
 
 /** POST /api/settings/sync-batch — push a scope's values to its child branches. */
 export const syncSettingsBatch = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => batchInput.parse(data))
+  .validator((data: unknown) => batchInput.parse(data))
   .handler(async ({ data }) => {
     const { verifyPosStaff } = await import("./secure-settings.server");
     const { pushScopedSettings } = await import("./settings-scope.server");

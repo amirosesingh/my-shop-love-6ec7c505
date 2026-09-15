@@ -1,6 +1,7 @@
 import { useCallback, useRef, useState } from "react";
 import { toast } from "sonner";
 import { commitLabel, type CommitTarget } from "@/core/api/pos-db";
+import { describeError } from "@/lib/notify";
 
 /**
  * Runs an action that must be stored before anything else happens.
@@ -37,8 +38,7 @@ export function useCommit() {
         await after?.(result, target);
         return true;
       } catch (e) {
-        const message = (e as { message?: string })?.message ?? String(e);
-        toast.error(`${label} was not saved`, { description: message });
+        toast.error(`${label} was not saved`, { description: describeError(e, label) });
         return false;
       } finally {
         busy.current = false;

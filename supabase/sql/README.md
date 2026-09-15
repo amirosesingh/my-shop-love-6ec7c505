@@ -14,7 +14,7 @@ It is the scoped, transactional, re-runnable upgrade for the current approval-au
 
 ## Fresh installation
 
-Use the repository's existing full canonical schema process with `../schema.sql`. `../retail_cloud_full.sql` is also a full canonical representation, not this release's incremental production upgrade.
+Use the repository's single full canonical schema process with `../schema.sql`. It is a fresh-install reference, not this release's incremental production upgrade.
 
 ## Windows and Electron
 

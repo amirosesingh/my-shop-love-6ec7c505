@@ -38,7 +38,7 @@ const startSchema = z.object({
 
 /** Mint a session record for a caller that has already proved itself. */
 export const startDeviceSession = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => startSchema.parse(input))
+  .validator((input: unknown) => startSchema.parse(input))
   .handler(async ({ data }) => {
     const { verifyRelayCaller } = await import("@/core/api/pos-relay.server");
     const { startSession } = await import("./session-guard.server");
@@ -70,7 +70,7 @@ export const startDeviceSession = createServerFn({ method: "POST" })
 
 /** Sign out: the record stops proving anything immediately. */
 export const endDeviceSession = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ sessionToken: z.string().max(400) }).parse(input),
   )
   .handler(async ({ data }) => {
@@ -96,7 +96,7 @@ async function assertSupervisor(accessToken: string): Promise<void> {
 
 /** Everything currently signed in, newest activity first. */
 export const listDeviceSessions = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ accessToken: z.string().max(4000) }).parse(input),
   )
   .handler(async ({ data }) => {
@@ -118,7 +118,7 @@ export const listDeviceSessions = createServerFn({ method: "POST" })
 
 /** Remote reset: end one session, or everything on a terminal or branch. */
 export const revokeDeviceSessions = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         accessToken: z.string().max(4000),

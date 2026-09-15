@@ -717,6 +717,10 @@ async function close() {
     }
     pool = null;
   }
+  // A closed pool has no active target.  Keeping this value populated made
+  // diagnostics look as though reads and writes could still reach the old
+  // database after disconnect/removal.
+  activeConfig = null;
 }
 
 function getPool() {

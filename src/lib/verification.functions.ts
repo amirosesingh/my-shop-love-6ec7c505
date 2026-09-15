@@ -45,7 +45,7 @@ async function requireStaff(data: { accessToken?: string; cashierToken?: string 
 
 /** Send a one-time code to a member on the configured channel. */
 export const startMemberVerification = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => startInput.parse(data))
+  .validator((data: unknown) => startInput.parse(data))
   .handler(async ({ data }) => {
     try {
       const staff = await requireStaff(data);
@@ -65,7 +65,7 @@ export const startMemberVerification = createServerFn({ method: "POST" })
 
 /** Check the code the member read back. */
 export const confirmMemberVerification = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => confirmInput.parse(data))
+  .validator((data: unknown) => confirmInput.parse(data))
   .handler(async ({ data }) => {
     try {
       await requireStaff(data);
@@ -81,7 +81,7 @@ export const confirmMemberVerification = createServerFn({ method: "POST" })
 
 /** Which channel is live, and whether verification is compulsory. */
 export const getVerificationSettings = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => z.object(caller).parse(data))
+  .validator((data: unknown) => z.object(caller).parse(data))
   .handler(async ({ data }) => {
     try {
       await requireStaff(data);
@@ -94,7 +94,7 @@ export const getVerificationSettings = createServerFn({ method: "POST" })
 
 /** Admins and managers choose the channel and the strict rule. */
 export const saveVerificationSettings = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => configInput.parse(data))
+  .validator((data: unknown) => configInput.parse(data))
   .handler(async ({ data }) => {
     try {
       const staff = await requireStaff(data);
@@ -112,7 +112,7 @@ export const saveVerificationSettings = createServerFn({ method: "POST" })
 
 /** The verification log, for the staff-facing audit screen. */
 export const listMemberVerifications = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => listInput.parse(data))
+  .validator((data: unknown) => listInput.parse(data))
   .handler(async ({ data }) => {
     try {
       await requireStaff(data);

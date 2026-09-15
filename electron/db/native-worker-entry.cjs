@@ -139,7 +139,22 @@ async function handle(message) {
 
       // A dropped pool must not turn an ordinary network blip into a crash.
       opening.on("error", () => {});
-      await opening.connect();
+      try {
+        await opening.connect();
+      } catch (error) {
+        // msnodesqlv8 5 can return a native object without a JavaScript message
+        // when unixODBC cannot load the SQL Server driver. Never propagate
+        // "[object Object]" to diagnostics or the connection wizard.
+        if (!error?.message || error.message === "[object Object]") {
+          const readable = new Error(
+            "Windows authentication could not open the ODBC Driver for SQL Server. Install ODBC Driver 18 for SQL Server, or use a SQL Server login.",
+          );
+          readable.code = "EDRIVER";
+          readable.originalError = error;
+          throw readable;
+        }
+        throw error;
+      }
       pool = opening;
       return { connected: true, spid: await readSpid() };
     }

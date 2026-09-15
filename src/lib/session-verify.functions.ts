@@ -11,7 +11,7 @@ const schema = z.object({
 
 /** `/auth/verify-session` for tills: token still live and branch still there. */
 export const verifySession = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => schema.parse(input))
+  .validator((input: unknown) => schema.parse(input))
   .handler(async ({ data }) => {
     const { verifySessionServer } = await import("./session-verify.server");
     return verifySessionServer(data);

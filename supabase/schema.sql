@@ -1041,6 +1041,10 @@ CREATE TABLE IF NOT EXISTS public.whatsapp_queue (
 -- Additive column top-up: brings an older database up to date.
 -- Existing rows are never touched.
 -- ============================================================
+ALTER TABLE public.authorization_actions ADD COLUMN IF NOT EXISTS requester_roles text[] NOT NULL DEFAULT ARRAY['cashier','staff','manager','admin']::text[];
+ALTER TABLE public.authorization_actions ADD COLUMN IF NOT EXISTS requester_user_ids text[] NOT NULL DEFAULT ARRAY[]::text[];
+ALTER TABLE public.authorization_actions ADD COLUMN IF NOT EXISTS authority_limits jsonb NOT NULL DEFAULT '{}'::jsonb;
+
 ALTER TABLE public.authorization_actions ADD COLUMN IF NOT EXISTS extra_authority jsonb NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE public.authorization_actions ADD COLUMN IF NOT EXISTS absolute_ceilings jsonb NOT NULL DEFAULT '{}'::jsonb;
 ALTER TABLE public.authorization_requests ADD COLUMN IF NOT EXISTS requester_direct_limit numeric;

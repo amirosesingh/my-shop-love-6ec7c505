@@ -139,7 +139,7 @@ async function assertCaller(data: z.infer<typeof caller>): Promise<Caller> {
 
 /** Effective rules for the caller's branch. */
 export const getAuthorizationRules = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => rulesInput.parse(data))
+  .validator((data: unknown) => rulesInput.parse(data))
   .handler(async ({ data }) => {
     const { loadRuleRows } = await import("./authorization.server");
     try {
@@ -153,7 +153,7 @@ export const getAuthorizationRules = createServerFn({ method: "POST" })
 
 /** Administrators only; the write itself is made with service rights. */
 export const saveAuthorizationRule = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => saveRuleInput.parse(data))
+  .validator((data: unknown) => saveRuleInput.parse(data))
   .handler(async ({ data }) => {
     try {
       const who = await assertCaller(data);
@@ -186,7 +186,7 @@ export const saveAuthorizationRule = createServerFn({ method: "POST" })
  * people the rule allows, and a short-lived signed grant is returned.
  */
 export const authorizeWithPin = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => pinInput.parse(data))
+  .validator((data: unknown) => pinInput.parse(data))
   .handler(async ({ data }) => {
     const { loadRuleRows, verifyAuthorizationPin, writeLog } =
       await import("./authorization.server");
@@ -303,7 +303,7 @@ export const authorizeWithPin = createServerFn({ method: "POST" })
  * approved. Only people allowed to decide the action are told about it.
  */
 export const submitAuthorizationRequest = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => submitInput.parse(data))
+  .validator((data: unknown) => submitInput.parse(data))
   .handler(async ({ data }) => {
     try {
       const who = await assertCaller(data);
@@ -416,7 +416,7 @@ async function notifyRequester(
 
 /** The approvals queue, for anyone allowed to decide something. */
 export const listAuthorizationRequests = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => listInput.parse(data))
+  .validator((data: unknown) => listInput.parse(data))
   .handler(async ({ data }) => {
     try {
       const who = await assertCaller(data);
@@ -460,7 +460,7 @@ export const listAuthorizationRequests = createServerFn({ method: "POST" })
 
 /** Approve or reject from the decider's own signed-in session — no PIN. */
 export const decideAuthorizationRequest = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => decideInput.parse(data))
+  .validator((data: unknown) => decideInput.parse(data))
   .handler(async ({ data }) => {
     try {
       const who = await assertCaller(data);
@@ -585,7 +585,7 @@ export const decideAuthorizationRequest = createServerFn({ method: "POST" })
  * ticket it was granted against and that nobody has used it already.
  */
 export const claimAuthorizationRequest = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => claimInput.parse(data))
+  .validator((data: unknown) => claimInput.parse(data))
   .handler(async ({ data }) => {
     try {
       const who = await assertCaller(data);
@@ -635,7 +635,7 @@ export const claimAuthorizationRequest = createServerFn({ method: "POST" })
 
 /** The requester may take back a request nobody has decided yet. */
 export const cancelAuthorizationRequest = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => idInput.parse(data))
+  .validator((data: unknown) => idInput.parse(data))
   .handler(async ({ data }) => {
     try {
       const who = await assertCaller(data);
@@ -651,7 +651,7 @@ export const cancelAuthorizationRequest = createServerFn({ method: "POST" })
 
 /** Administrators set another person's authorisation PIN; it is never read back. */
 export const setStaffAuthorizationPin = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) =>
+  .validator((data: unknown) =>
     caller.extend({ userId: z.string().min(1), pin: z.string().regex(/^\d{4,6}$/) }).parse(data),
   )
   .handler(async ({ data }) => {

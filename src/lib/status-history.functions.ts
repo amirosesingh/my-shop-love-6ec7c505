@@ -41,7 +41,7 @@ const recordInput = z.object({
  * they are a supervisor, exactly as the activity feed does.
  */
 export const recordStatusHistory = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => recordInput.parse(input))
+  .validator((input: unknown) => recordInput.parse(input))
   .handler(async ({ data }) => {
     const { verifyRelayCaller } = await import("@/core/api/pos-relay.server");
     const { resolveRelayScope } = await import("@/core/api/relay-policy.server");
@@ -91,7 +91,7 @@ const readInput = z.object({
 
 /** Read one record's timeline for the history panel. */
 export const loadStatusHistory = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => readInput.parse(input))
+  .validator((input: unknown) => readInput.parse(input))
   .handler(async ({ data }) => {
     const { verifyRelayCaller } = await import("@/core/api/pos-relay.server");
     try {

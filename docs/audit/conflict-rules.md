@@ -8,6 +8,8 @@ Generated from the feature registry — do not edit by hand. Run
 | --- | --- | --- |
 | activity_events | append-only | Nothing is overwritten — each entry is kept in its own right. |
 | audit_logs | append-only | Nothing is overwritten — each entry is kept in its own right. |
+| authorization_log | append-only | Nothing is overwritten — each entry is kept in its own right. |
+| authorization_requests | append-only | Nothing is overwritten — each entry is kept in its own right. |
 | booking_payments | append-only | Nothing is overwritten — each entry is kept in its own right. |
 | bookings | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
 | coupon_campaigns | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
@@ -17,6 +19,7 @@ Generated from the feature registry — do not edit by hand. Run
 | held_orders | till-wins | The till wins while it holds the record; head office accepts what it sends. |
 | issued_vouchers | immutable | Written once and never changed; a correction is a new record. |
 | item_activity_logs | append-only | Nothing is overwritten — each entry is kept in its own right. |
+| member_verifications | append-only | Nothing is overwritten — each entry is kept in its own right. |
 | members | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
 | membership_tiers | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
 | payment_transactions | immutable | Written once and never changed; a correction is a new record. |
@@ -26,11 +29,17 @@ Generated from the feature registry — do not edit by hand. Run
 | promotions | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
 | purchase_order_items | immutable | Written once and never changed; a correction is a new record. |
 | purchase_orders | immutable | Written once and never changed; a correction is a new record. |
+| record_edits | append-only | Nothing is overwritten — each entry is kept in its own right. |
 | sale_items | immutable | Written once and never changed; a correction is a new record. |
 | sales | immutable | Written once and never changed; a correction is a new record. |
+| shift_cash_counts | immutable | Written once and never changed; a correction is a new record. |
+| shift_close_events | immutable | Written once and never changed; a correction is a new record. |
+| shift_reconciliations | immutable | Written once and never changed; a correction is a new record. |
 | shift_sessions | immutable | Written once and never changed; a correction is a new record. |
+| shift_variance_alerts | append-only | Nothing is overwritten — each entry is kept in its own right. |
 | shifts | immutable | Written once and never changed; a correction is a new record. |
 | stock_adjustments | append-only | Nothing is overwritten — each entry is kept in its own right. |
+| stock_count_drafts | immutable | Written once and never changed; a correction is a new record. |
 | stock_transfer_items | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
 | stock_transfers | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
 | suppliers | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
