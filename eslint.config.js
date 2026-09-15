@@ -30,7 +30,12 @@ export default tseslint.config(
       "react-refresh": reactRefresh,
     },
     rules: {
-      ...reactHooks.configs.recommended.rules,
+      // react-hooks 7 adds React Compiler adoption rules to its recommended
+      // preset. Keep the two correctness rules this codebase already enforces;
+      // compiler migration is a separate source refactor, not a package-update
+      // side effect that should suddenly fail every existing screen.
+      "react-hooks/rules-of-hooks": "error",
+      "react-hooks/exhaustive-deps": "warn",
       "no-restricted-imports": [
         "error",
         {
