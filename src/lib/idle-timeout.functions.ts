@@ -23,7 +23,7 @@ async function rpc(accessToken: string, name: string, args: Record<string, unkno
 
 /** The default idle limit that applies to a branch. */
 export const getIdleTimeout = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ storeId: z.string().max(64).optional() }).parse(input),
   )
   .handler(async ({ data }) => {
@@ -33,7 +33,7 @@ export const getIdleTimeout = createServerFn({ method: "POST" })
   });
 
 export const saveIdleTimeout = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         accessToken: z.string().max(4000),
@@ -56,7 +56,7 @@ export const saveIdleTimeout = createServerFn({ method: "POST" })
 
 /** Per-person override. `minutes: 0` clears it and falls back to the branch. */
 export const saveStaffIdleTimeout = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z
       .object({
         accessToken: z.string().max(4000),

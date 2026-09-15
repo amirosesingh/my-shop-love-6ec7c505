@@ -156,6 +156,8 @@ let reconnectAttempt = 0;
 let lastConnectionError = null;
 let cloudConfig = null;
 let sqlWriteHealth = { ok: false, code: "ENOTCONNECTED", error: "Local SQL Server connection unavailable" };
+let lastSuccessfulConnectionAt = null;
+let lastConnectionCheckAt = null;
 let sqliteStartupDirectory = null;
 
 /** The till reported in, the page painted, or a person is looking at a screen. */
@@ -435,25 +437,43 @@ function broadcastStatus(payload) {
 
 async function statusPayload() {
   const status = await worker.status();
+  const savedConfig = dbConfigStore.read();
   const config = pool.getConfig();
   let durability = localDb.verifyDurability?.() ?? { ok: false, code: "ESQLITE_UNAVAILABLE", error: "Local SQLite store unavailable" };
   if (!durability.ok && sqliteStartupDirectory && !localDb.info().ready) {
     localDb.init(sqliteStartupDirectory);
     durability = localDb.verifyDurability?.() ?? durability;
   }
-  const sqlServer = pool.isConnected?.()
-    ? sqlWriteHealth
-    : { ok: false, code: "ENOTCONNECTED", error: "Local SQL Server connection unavailable" };
+  let sqlServer = { ok: false, code: "ENOTCONNECTED", error: "Local SQL Server connection unavailable" };
+  lastConnectionCheckAt = new Date().toISOString();
+  if (savedConfig && pool.isConnected?.()) {
+    try {
+      const verified = await pool.verify();
+      sqlServer = { ...sqlWriteHealth, ...verified, ok: Boolean(sqlWriteHealth.ok && verified.ok) };
+      if (sqlServer.ok) lastSuccessfulConnectionAt = lastConnectionCheckAt;
+    } catch (error) {
+      const described = pool.describeSqlError(error);
+      sqlWriteHealth = { ok: false, code: described.code ?? "ENOTCONNECTED", error: described.error };
+      sqlServer = sqlWriteHealth;
+      lastConnectionError = described.error;
+      lastConnectionDetail = described;
+      await pool.close().catch(() => {});
+      scheduleReconnect();
+    }
+  }
   return {
     ...status,
-    connected: Boolean(durability.ok && sqlServer.ok),
+    configured: Boolean(savedConfig),
+    connected: Boolean(savedConfig && durability.ok && sqlServer.ok),
     tradingReady: Boolean(durability.ok),
     durability,
     sqlServer,
     cloudConfigured: !!cloudConfig,
-    server: config?.server ?? null,
-    database: config?.database ?? null,
+    server: savedConfig?.server ?? null,
+    database: savedConfig?.database ?? null,
     resolved: config?.resolved ?? null,
+    lastConnectionCheckAt,
+    lastSuccessfulConnectionAt,
   };
 }
 
@@ -472,6 +492,7 @@ async function connectLocal(config) {
   reconnectDelay = 5_000;
   reconnectAttempt = 0;
   lastConnectionError = null;
+  lastSuccessfulConnectionAt = new Date().toISOString();
   broadcastStatus(await statusPayload());
   return verified;
 }

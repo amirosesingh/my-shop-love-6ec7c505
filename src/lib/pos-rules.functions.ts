@@ -72,7 +72,7 @@ async function assertCaller(data: { accessToken?: string; terminalToken?: string
  * for, so a till registered to one branch cannot read another branch's rules.
  */
 export const getPosRules = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => callerInput.parse(data))
+  .validator((data: unknown) => callerInput.parse(data))
   .handler(async ({ data }) => {
     const { loadRulesResult } = await import("./pos-rules.server");
     const anySignIn =
@@ -145,7 +145,7 @@ export const getPosRules = createServerFn({ method: "POST" })
 
 /** Supervisor-only write; the database re-checks the role as well. */
 export const savePosRules = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => saveInput.parse(data))
+  .validator((data: unknown) => saveInput.parse(data))
   .handler(async ({ data }) => {
     const { saveRules } = await import("./pos-rules.server");
     try {
@@ -171,7 +171,7 @@ export const savePosRules = createServerFn({ method: "POST" })
  * browser — and a short-lived signed grant is returned for the action.
  */
 export const verifyManagerPin = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => pinInput.parse(data))
+  .validator((data: unknown) => pinInput.parse(data))
   .handler(async ({ data }) => {
     const { verifyManagerPinInDb, signOverrideGrant } = await import(
       "./pos-rules.server"
@@ -235,7 +235,7 @@ export const verifyManagerPin = createServerFn({ method: "POST" })
  * the audit trail is identical to a PIN-approved action.
  */
 export const authorizeAsAdmin = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => bypassInput.parse(data))
+  .validator((data: unknown) => bypassInput.parse(data))
   .handler(async ({ data }) => {
     const { signOverrideGrant, logOverride } = await import("./pos-rules.server");
     try {
@@ -272,7 +272,7 @@ export const authorizeAsAdmin = createServerFn({ method: "POST" })
   });
 
 export const assertShiftClosable = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => closeInput.parse(data))
+  .validator((data: unknown) => closeInput.parse(data))
   .handler(async ({ data }) => {
     const { loadRulesResult, heldOrderCountResult, verifyOverrideGrant } = await import(
       "./pos-rules.server"

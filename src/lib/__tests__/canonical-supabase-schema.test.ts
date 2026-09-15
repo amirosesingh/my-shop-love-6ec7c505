@@ -15,6 +15,7 @@ describe("canonical Supabase schema", () => {
       "production_upgrade_current.sql",
     ]);
     expect(existsSync(schemaPath)).toBe(true);
+    expect(existsSync(resolve(root, "supabase/retail_cloud_full.sql"))).toBe(false);
   });
 
   it("repairs legacy transfer quantity types before transfer backfills", () => {

@@ -4,6 +4,15 @@ import { readFileSync } from "node:fs";
 const read = (file: string) => readFileSync(file, "utf8");
 
 describe("Electron durable business persistence", () => {
+  it("does not misreport a permission-level cloud refusal as bad credentials", () => {
+    const worker = read("electron/sync/worker.cjs");
+    expect(worker).toContain("if (status === 401) return true");
+    expect(worker).toContain("HTTP 403 normally means valid credentials without permission");
+    expect(worker).toContain("error.status = response.status");
+    expect(worker).toContain("error.code = body?.code ?? null");
+    expect(worker).not.toContain("status === 401 || status === 403");
+  });
+
   it("makes the atomic SQLite copy the first mandatory desktop commit boundary", () => {
     const sqlite = read("electron/db/sqlite.cjs");
     const gateway = read("src/core/api/pos-db.ts");
@@ -11,7 +20,7 @@ describe("Electron durable business persistence", () => {
     expect(sqlite).toContain("return tx(() =>");
     expect(sqlite).toContain("INSERT INTO mirror (entity, id, payload, updated_at)");
     expect(sqlite).toContain('INSERT INTO "${entity}"');
-    expect(sqlite).toContain("function pendingBusinessBatches(limit = 25)");
+    expect(sqlite).toContain("function pendingBusinessBatches(limit = 25, maxBackoffMs = 300_000)");
     expect(sqlite).toContain("function acknowledgeBusinessBatch(id)");
     expect(sqlite).not.toContain('.filter((op) => op?.table !== "pos_store_settings")');
     expect(gateway).toContain("bridge.localMirrorBatch(mirrorEntries, ops)");
@@ -110,17 +119,53 @@ describe("Electron durable business persistence", () => {
     expect(worker).toContain("workerConfig.intervalMs");
     expect(worker).toContain("workerConfig.batchSize");
     expect(worker).toContain("workerConfig.maxAttempts");
+    expect(worker).toContain("workerConfig.maxBackoffMs");
     expect(engine).toContain("desktopBridge.setSyncConfig");
+    expect(engine).toContain("maxBackoffMs: cfg.maxBackoffMs");
     expect(preload).toContain('invoke("pos:set-sync-config", config)');
   });
 
-  it("repairs SQL Server before attempting central upload for a durable Electron batch", () => {
+  it("attempts SQL Server repair without letting it block central upload", () => {
     const worker = read("electron/sync/worker.cjs");
-    const projection = worker.indexOf("if (projectionOps.length) await repo.applyOps(projectionOps)");
+    const projection = worker.indexOf("await repo.applyOps(projectionOps)");
     const cloud = worker.indexOf('fn: "pos_sale_commit"');
     expect(projection).toBeGreaterThan(-1);
     expect(cloud).toBeGreaterThan(-1);
     expect(projection).toBeLessThan(cloud);
+    expect(worker).toContain("SQL Server compatibility projection pending");
+    expect(worker).toContain("let projectionApplied = false");
+    expect(worker).toContain('op.kind === "update" && op.match?.id');
+  });
+
+  it("refreshes the offline staff roster in the main-process pull", () => {
+    const worker = read("electron/sync/worker.cjs");
+    expect(worker).toContain('supabase.rpc("list_app_users")');
+    expect(worker).toContain("sqlite.upsertStaffRoster?.(staff ?? [])");
+  });
+
+  it("does not report a failed worker cycle as a successful manual sync", () => {
+    const engine = read("src/lib/sync-engine.ts");
+    expect(engine).toContain("const completed = syncState()");
+    expect(engine).toContain("if (completed.lastError) throw new Error(completed.lastError)");
+  });
+
+  it("exposes the exact failing sync stage without discarding the database message", () => {
+    const worker = read("electron/sync/worker.cjs");
+    const sqlite = read("electron/db/sqlite.cjs");
+    const hub = read("src/platforms/web/components/pos/sync/SyncHub.tsx");
+    expect(worker).toContain("function noteFailure(stage, error, details = {})");
+    expect(worker).toContain('noteFailure("sql-projection", projectionError');
+    expect(worker).toContain('noteFailure("cloud-push", error');
+    expect(worker).toContain('noteFailure("cloud-pull", error');
+    expect(worker).toContain('noteFailure("connectivity"');
+    expect(worker).toContain('noteFailure("staff-roster", err');
+    expect(worker).toContain("lastFailure,");
+    expect(worker).toContain('sqlite.setState?.("last_sync_failure", JSON.stringify(lastFailure))');
+    expect(worker).toContain('sqlite.getState?.("last_sync_failure")');
+    expect(sqlite).toContain("error_detail: row.error_message");
+    expect(hub).toContain("Why synchronization is not completing");
+    expect(hub).toContain("Database response");
+    expect(hub).toContain("Open database diagnostics");
   });
 
   it("keeps a missing relay service key pending without consuming sale retry attempts", () => {

@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 import qrcode from "qrcode-generator";
 import { toast } from "sonner";
+import { describeError } from "@/lib/notify";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -249,11 +250,8 @@ export function TerminalTokens({
       toast.success("Activation token generated");
       await refresh();
     } catch (e) {
-      const message = (e as { message?: string })?.message ?? "Unknown error";
       toast.error("Could not generate the token", {
-        description: /foreign key|location_id/i.test(message)
-          ? `${message} — the selected location could not be saved to the central directory. Check that you are signed in with a staff account.`
-          : message,
+        description: describeError(e, "Terminal registration"),
       });
     } finally {
       setIssuing(false);
@@ -277,7 +275,7 @@ export function TerminalTokens({
       await refresh();
     } catch (e) {
       toast.error("Could not revoke the token", {
-        description: (e as { message?: string })?.message,
+        description: describeError(e, "Revoking the terminal"),
       });
     }
   };
@@ -289,7 +287,7 @@ export function TerminalTokens({
       await refresh();
     } catch (e) {
       toast.error("Could not restore the token", {
-        description: (e as { message?: string })?.message,
+        description: describeError(e, "Restoring the terminal"),
       });
     }
   };
@@ -305,7 +303,7 @@ export function TerminalTokens({
       await refresh();
     } catch (e) {
       toast.error("Could not delete the terminal", {
-        description: (e as { message?: string })?.message,
+        description: describeError(e, "Deleting the terminal registration"),
       });
     }
   };
@@ -324,7 +322,7 @@ export function TerminalTokens({
       await refresh();
     } catch (e) {
       toast.error("Could not re-issue the code", {
-        description: (e as { message?: string })?.message,
+        description: describeError(e, "Re-registering the terminal"),
       });
     } finally {
       setReissuing("");

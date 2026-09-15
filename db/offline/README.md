@@ -101,7 +101,7 @@ emptied or recreated, and the file can be run again at any time.
 A test (`src/lib/__tests__/offline-sqlserver-file.test.ts`) fails the build if a
 new table lands in `database/schema.sql` without this file being rebuilt.
 
-The cloud counterpart is `supabase/schema.sql`: one file that installs the whole
+The cloud counterpart is `supabase/schema.sql`: the single file that installs the whole
 Postgres schema on an empty project and tops up a live one, including grants,
 row-level security and every policy and routine.
 

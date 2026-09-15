@@ -53,7 +53,6 @@ const TABLES = [
   // stored on the till first and pushed like everything else.
   "activity_events",
   "record_edits",
-  "authorization_actions",
   "authorization_requests",
   "authorization_log",
   "member_verifications",

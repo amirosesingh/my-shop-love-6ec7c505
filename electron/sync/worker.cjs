@@ -10,7 +10,12 @@ const { createClient } = require("@supabase/supabase-js");
 const repo = require("../db/repo.cjs");
 const sqlite = require("../db/sqlite.cjs");
 
-const DEFAULT_WORKER_CONFIG = { batchSize: 50, intervalMs: 30_000, maxAttempts: 5 };
+const DEFAULT_WORKER_CONFIG = {
+  batchSize: 50,
+  intervalMs: 30_000,
+  maxAttempts: 5,
+  maxBackoffMs: 300_000,
+};
 let workerConfig = { ...DEFAULT_WORKER_CONFIG };
 
 function isNewSupabaseApiKey(value) {
@@ -74,7 +79,8 @@ const cloudMissing = new Map(); // table -> retry-after epoch ms
 const CLOUD_MISSING_RETRY_MS = 10 * 60 * 1000;
 
 /**
- * The central project rejecting our credentials (HTTP 401/403, "Invalid API
+ * The central project rejecting our credentials (HTTP 401, an explicitly
+ * invalid-session response, "Invalid API
  * key", a bad JWT). This is never a row fault: every queued row keeps its
  * place, all cloud traffic parks silently, and the Sync Hub points at
  * Settings → Database & Cloud Connection. Saving fresh keys re-inits the
@@ -83,15 +89,31 @@ const CLOUD_MISSING_RETRY_MS = 10 * 60 * 1000;
 let credentialsInvalid = false;
 let mutationPath = "pending-auth";
 let lastBusinessPush = null;
+let lastFailure = null;
 const CREDENTIAL_ERROR_RE =
-  /invalid api ?key|bad jwt|jwt expired|invalid token|unauthorized|not recognised|forbidden/i;
+  /invalid api ?key|bad jwt|jwt expired|invalid token|unauthorized|not recognised/i;
 
 function isCredentialError(err) {
   const status = Number(err?.status ?? err?.statusCode ?? 0);
-  if (status === 401 || status === 403) return true;
+  if (status === 401) return true;
+  // HTTP 403 normally means valid credentials without permission. Parking the
+  // whole worker as "bad credentials" hid the actual table/branch refusal.
+  if (status === 403 && /SESSION_INVALID|jwt|invalid token/i.test(String(err?.code ?? "")))
+    return true;
   const msg = String(err?.message ?? err ?? "");
-  // A bare HTTP 400/401/403 embedded in a relay error message counts too.
-  return CREDENTIAL_ERROR_RE.test(msg) || /\((401|403)\)/.test(msg);
+  return CREDENTIAL_ERROR_RE.test(msg) || /\(401\)/.test(msg);
+}
+
+function relayError(response, body) {
+  const error = new Error(
+    body?.error ||
+      body?.results?.find((result) => !result.ok)?.error ||
+      `Sync relay failed (${response.status})`,
+  );
+  error.status = response.status;
+  error.code = body?.code ?? null;
+  error.detail = body?.detail ?? null;
+  return error;
 }
 
 function safeFailureReason(value) {
@@ -102,6 +124,27 @@ function safeFailureReason(value) {
   if (/permission|forbidden|unauthorized|session has ended/i.test(message)) return "authorization-refused";
   if (/timed? ?out|network|fetch|connect|temporar/i.test(message)) return "cloud-unreachable";
   return "cloud-refused";
+}
+
+function noteFailure(stage, error, details = {}) {
+  const message = String(error?.message ?? error ?? "Unknown synchronization error").slice(0, 2000);
+  lastFailure = {
+    stage,
+    message,
+    reason: safeFailureReason(message),
+    at: new Date().toISOString(),
+    ...details,
+  };
+  sqlite.setState?.("last_sync_failure", JSON.stringify(lastFailure));
+  notify();
+  return message;
+}
+
+function clearFailure(stage) {
+  if (lastFailure?.stage === stage) {
+    lastFailure = null;
+    sqlite.setState?.("last_sync_failure", null);
+  }
 }
 
 /** Rows per request on every pull; the server caps a single read well below a
@@ -300,6 +343,12 @@ function init({
   mutationPath = relayUrl ? "pending-auth" : accessToken ? "authenticated-direct" : "pending-auth";
   // Fresh credentials (re)saved: any earlier rejection no longer applies.
   credentialsInvalid = false;
+  try {
+    const savedFailure = sqlite.getState?.("last_sync_failure");
+    lastFailure = savedFailure ? JSON.parse(savedFailure) : null;
+  } catch {
+    lastFailure = null;
+  }
   if (onChange) notify = onChange;
 }
 
@@ -352,11 +401,7 @@ async function cloudUpsert(table, rows, onConflict = "id") {
       if (body?.code === "NO_SERVICE_KEY" && credentials.accessToken) {
         return authenticatedDirectMutation({ kind: "upsert", table, rows, onConflict });
       }
-      throw new Error(
-        body?.error ||
-          body?.results?.find((result) => !result.ok)?.error ||
-          `Sync relay failed (${response.status})`,
-      );
+      throw relayError(response, body);
     }
     return;
   }
@@ -386,7 +431,7 @@ async function cloudMutation(op) {
       if (body?.code === "NO_SERVICE_KEY" && credentials.accessToken) {
         return authenticatedDirectMutation(op);
       }
-      throw new Error(body?.error || body?.results?.find((result) => !result.ok)?.error || `Sync relay failed (${response.status})`);
+      throw relayError(response, body);
     }
     return;
   }
@@ -423,7 +468,8 @@ async function cloudSaveRules(rows) {
  * below cannot upload the same batch a second time.
  */
 async function pushSqliteBusinessBatches() {
-  const batches = sqlite.pendingBusinessBatches?.(workerConfig.batchSize) ?? [];
+  const batches =
+    sqlite.pendingBusinessBatches?.(workerConfig.batchSize, workerConfig.maxBackoffMs) ?? [];
   let pushed = 0;
   let failed = 0;
   for (const batch of batches) {
@@ -443,7 +489,26 @@ async function pushSqliteBusinessBatches() {
           op?.table !== "pos_store_settings" &&
           sqlProjectionTables.has(op?.table),
       );
-      if (projectionOps.length) await repo.applyOps(projectionOps);
+      let projectionApplied = false;
+      if (projectionOps.length) {
+        try {
+          await repo.applyOps(projectionOps);
+          projectionApplied = true;
+        } catch (projectionError) {
+          // SQLite is the durable source and the central database is the sync
+          // destination. A broken compatibility projection must never strand a
+          // locally accepted sale; its own pending-row repair can catch up once
+          // SQL Server is available again.
+          console.warn(
+            "[sync] SQL Server compatibility projection pending:",
+            projectionError?.message ?? projectionError,
+          );
+          noteFailure("sql-projection", projectionError, {
+            batchId: batch.id,
+            table: projectionOps[0]?.table ?? null,
+          });
+        }
+      }
 
       const saleOp = ops.find((op) => op?.table === "sales" && Array.isArray(op.rows) && op.rows.length === 1);
       const atomicTables = new Set(["sales", "sale_items", "payment_transactions", "item_activity_logs"]);
@@ -480,16 +545,22 @@ async function pushSqliteBusinessBatches() {
         }
       }
       for (const op of ops) {
-        const ids = (op.rows ?? []).map((row) => row?.id).filter(Boolean);
+        if (!projectionApplied || !sqlProjectionTables.has(op?.table)) continue;
+        const ids = [
+          ...(op.rows ?? []).map((row) => row?.id),
+          ...(op.kind === "update" && op.match?.id ? [op.match.id] : []),
+        ].filter(Boolean);
         if (ids.length) await repo.markSynced(op.table, ids).catch(() => {});
       }
       sqlite.acknowledgeBusinessBatch(batch.id);
+      clearFailure("cloud-push");
       const acknowledgedAt = new Date().toISOString();
       lastBusinessPush = { ...lastBusinessPush, acknowledgedAt,
         durationMs: Date.parse(acknowledgedAt) - Date.parse(pushStartedAt), result: "synced" };
       pushed += 1;
     } catch (error) {
       const message = error?.message ?? String(error);
+      noteFailure("cloud-push", error, { batchId: batch.id });
       if (/unauthorized|forbidden|permission|session has ended|STORE_FORBIDDEN/i.test(message))
         mutationPath = "authorization-refused";
       const reason = safeFailureReason(message);
@@ -533,6 +604,13 @@ function setConfig(patch = {}) {
     batchSize: Math.min(500, Math.max(1, Number(patch.batchSize ?? workerConfig.batchSize) || DEFAULT_WORKER_CONFIG.batchSize)),
     intervalMs: Math.min(300_000, Math.max(5_000, Number(patch.intervalMs ?? workerConfig.intervalMs) || DEFAULT_WORKER_CONFIG.intervalMs)),
     maxAttempts: Math.min(50, Math.max(1, Number(patch.maxAttempts ?? workerConfig.maxAttempts) || DEFAULT_WORKER_CONFIG.maxAttempts)),
+    maxBackoffMs: Math.min(
+      1_800_000,
+      Math.max(
+        30_000,
+        Number(patch.maxBackoffMs ?? workerConfig.maxBackoffMs) || DEFAULT_WORKER_CONFIG.maxBackoffMs,
+      ),
+    ),
   };
   const restart = next.intervalMs !== workerConfig.intervalMs && !!timer;
   workerConfig = next;
@@ -706,7 +784,8 @@ async function pull() {
     const startedAt = new Date().toISOString();
     // Delta only: anything the cloud has touched since our last clean pull.
     const { data, error } = await selectChangedSince(table, since);
-    if (error) {
+      if (error) {
+        noteFailure("cloud-pull", error, { table });
       if (isCredentialError(error)) {
         credentialsInvalid = true;
         await repo
@@ -800,6 +879,20 @@ async function pull() {
     await repo.setWatermark("pos_store_settings", rulesStartedAt, { error: null }).catch(() => {});
   } catch (err) {
     await repo.setWatermark("pos_store_settings", null, { error: String(err) }).catch(() => {});
+  }
+
+  // Offline sign-in is operationally critical on a till. Refresh it as part
+  // of the main-process pull rather than depending on a renderer live event.
+  try {
+    const { data: staff, error: staffError } = await supabase.rpc("list_app_users");
+    if (staffError) throw staffError;
+    sqlite.upsertStaffRoster?.(staff ?? []);
+    clearFailure("staff-roster");
+  } catch (err) {
+    noteFailure("staff-roster", err, { table: "app_users" });
+    await repo
+      .setWatermark("app_users", null, { error: String(err?.message ?? err) })
+      .catch(() => {});
   }
 
   await repo.setState("last_pull_at", new Date().toISOString());
@@ -1237,7 +1330,11 @@ async function request(direction = "both") {
   if (credentialsInvalid) return { ok: false, error: "credentials" };
   running = true;
   try {
-    if (!(await reachable())) return { ok: false, error: "unreachable" };
+    if (!(await reachable())) {
+      noteFailure("connectivity", "The central database health endpoint is unreachable");
+      return { ok: false, error: "unreachable" };
+    }
+    clearFailure("connectivity");
     if (direction === "push") return await push();
     if (direction === "pull") return await pull();
     const pushed = await push();
@@ -1250,6 +1347,7 @@ async function request(direction = "both") {
       error: pushed?.error ?? pulled?.error,
     };
   } catch (error) {
+    noteFailure("worker", error);
     return { ok: false, error: error?.message ?? String(error) };
   } finally {
     running = false;
@@ -1263,13 +1361,16 @@ async function run() {
 async function status() {
   try {
     return {
-      connected: true,
+      // This reports worker health only. The main process owns the authoritative
+      // database connection status and adds it after a live SQL round-trip.
+      workerReady: true,
       phase,
       enabled,
       credentialsInvalid,
       mutationPath,
       businessBatches: sqlite.businessBatchStatus?.() ?? { pending: 0, failed: 0, parked: 0, sales: 0, rows: [] },
       lastBusinessPush,
+      lastFailure,
       cloudMissing: [...cloudMissing.keys()],
       tables: await repo.stats(),
       queue: await repo.queueRows(60),
@@ -1281,7 +1382,7 @@ async function status() {
     };
   } catch (err) {
     return {
-      connected: false,
+      workerReady: false,
       phase,
       enabled,
       error: err.message,

@@ -51,7 +51,7 @@ describe("secrets hygiene", () => {
       for (const key of [
         "POS_SUPABASE_SERVICE_ROLE_KEY",
         "SETTINGS_ENCRYPTION_KEY",
-        "SECURITY_ALERTS_WEBHOOK_SECRET",
+        "SECURITY_ALERT_INGEST_SECRET",
       ]) {
         const match = new RegExp(`^${key}=(.+)$`, "m").exec(text);
         expect(match?.[1]?.trim() ?? "", `${name} sets ${key}`).toBe("");

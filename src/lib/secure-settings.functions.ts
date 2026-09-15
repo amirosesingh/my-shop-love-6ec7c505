@@ -32,7 +32,7 @@ const listInput = z.object({ accessToken: z.string().min(10) });
 
 /** Encrypt and store a sensitive configuration value. Admins/managers only. */
 export const saveSecureSetting = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => saveInput.parse(data))
+  .validator((data: unknown) => saveInput.parse(data))
   .handler(async ({ data }) => {
     const { verifyPosStaff, writeSecureSetting } = await import("./secure-settings.server");
     try {
@@ -47,7 +47,7 @@ export const saveSecureSetting = createServerFn({ method: "POST" })
 
 /** Masked hints so the UI can show that a value is set without revealing it. */
 export const listSecureSettings = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => listInput.parse(data))
+  .validator((data: unknown) => listInput.parse(data))
   .handler(async ({ data }) => {
     const { verifyPosStaff, listSecureSettingHints } = await import("./secure-settings.server");
     try {
@@ -61,7 +61,7 @@ export const listSecureSettings = createServerFn({ method: "POST" })
 
 /** Forget a stored credential. */
 export const clearSecureSetting = createServerFn({ method: "POST" })
-  .inputValidator((data: unknown) => keyInput.parse(data))
+  .validator((data: unknown) => keyInput.parse(data))
   .handler(async ({ data }) => {
     const { verifyPosStaff, removeSecureSetting } = await import("./secure-settings.server");
     try {

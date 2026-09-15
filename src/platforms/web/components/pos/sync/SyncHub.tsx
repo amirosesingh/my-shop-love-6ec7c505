@@ -60,6 +60,20 @@ import {
 
 const when = (iso?: string | null) => (iso ? new Date(iso).toLocaleString() : "—");
 
+const failureHelp = (stage?: string, message?: string) => {
+  if (stage === "sql-projection")
+    return "The sale is safe in SQLite. Check the local SQL Server service, saved connection, driver, and schema, then retry.";
+  if (stage === "connectivity")
+    return "Check this PC's internet connection, the configured backend address, firewall, and central database availability.";
+  if (stage === "staff-roster")
+    return "Sales sync may still be healthy, but offline sign-in data is stale. Check the cloud connection and list_app_users routine.";
+  if (/column|schema cache|does not exist|PGRST20[45]/i.test(message ?? ""))
+    return "The database schema does not match this app version. Open Database & Cloud Connection and run the schema comparison/repair.";
+  if (/permission|forbidden|unauthorized|jwt|credential/i.test(message ?? ""))
+    return "Sign in again and verify this terminal's branch, permissions, and cloud credentials.";
+  return "Open Database & Cloud Connection for a live check, then retry this row or cycle after correcting the reported cause.";
+};
+
 const STATUS_TONE: Record<SyncAuditRow["status"], string> = {
   success: "border-success/40 bg-success/10 text-success",
   failed: "border-destructive/40 bg-destructive/10 text-destructive",
@@ -213,6 +227,27 @@ function SyncHubDesktop() {
       (q.state === "refused" || Boolean(q.reason)),
   );
   const engineState = syncState();
+  const workerFailure = desktopSync?.lastFailure;
+  const queuedFailure = desktopSync?.businessBatches?.rows.find(
+    (row) => row.error_detail || row.error_message,
+  );
+  const visibleFailure = workerFailure
+    ? {
+        stage: workerFailure.stage,
+        message: workerFailure.message,
+        at: workerFailure.at,
+        table: workerFailure.table,
+        batchId: workerFailure.batchId,
+      }
+    : queuedFailure
+      ? {
+          stage: "queued-record",
+          message: queuedFailure.error_detail ?? queuedFailure.error_message ?? "Queued sync failed",
+          at: queuedFailure.last_attempt_at ?? queuedFailure.created_at,
+          batchId: queuedFailure.id,
+          table: null,
+        }
+      : null;
   // Two different stores, named for what they are: the branch SQL Server is the
   // operational database, the file below is only a mirror plus the audit ledger.
   const operational = localDb()
@@ -223,6 +258,36 @@ function SyncHubDesktop() {
 
   return (
     <div className="space-y-4">
+      {visibleFailure && (
+        <Card className="border-destructive/50 bg-destructive/5">
+          <CardHeader className="pb-2">
+            <CardTitle className="flex items-center gap-2 text-base text-destructive">
+              <TriangleAlert className="size-4" /> Why synchronization is not completing
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3 text-sm">
+            <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-4">
+              <Field label="Failed stage">{visibleFailure.stage.replace(/-/g, " ")}</Field>
+              <Field label="Table">{visibleFailure.table ?? "—"}</Field>
+              <Field label="Last attempt">{when(visibleFailure.at)}</Field>
+              <Field label="Batch">{visibleFailure.batchId ?? "—"}</Field>
+            </div>
+            <div className="rounded-md border border-destructive/30 bg-background p-3">
+              <p className="font-medium">Database response</p>
+              <p className="mt-1 break-words font-mono text-xs text-destructive">
+                {visibleFailure.message}
+              </p>
+            </div>
+            <p className="text-muted-foreground">
+              <span className="font-medium text-foreground">What to check: </span>
+              {failureHelp(visibleFailure.stage, visibleFailure.message)}
+            </p>
+            <Button asChild size="sm" variant="outline">
+              <Link to="/settings/database">Open database diagnostics</Link>
+            </Button>
+          </CardContent>
+        </Card>
+      )}
       {/* ------------------------------ engine ------------------------------ */}
       <Card>
         <CardHeader className="pb-2">

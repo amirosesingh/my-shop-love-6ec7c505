@@ -6,6 +6,7 @@
  */
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
+import { runtimeEnvValue } from "@/lib/external-supabase-config";
 
 const payload = z.object({
   deploymentRef: z.string().max(200).default(""),
@@ -28,7 +29,7 @@ async function handle({ request }: { request: Request }) {
   const denied = verifyHmacSignature({
     raw,
     signature: request.headers.get("x-security-signature"),
-    secret: process.env["SECURITY_ALERT_INGEST_SECRET"],
+    secret: runtimeEnvValue("SECURITY_ALERT_INGEST_SECRET") ?? process.env["SECURITY_ALERT_INGEST_SECRET"],
     label: "Security alert ingest",
   });
   if (denied) return denied;

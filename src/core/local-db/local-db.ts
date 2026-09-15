@@ -137,7 +137,7 @@ const STATE_MESSAGE: Record<LocalDbConnectionState, string> = {
   testing: "Checking the local database…",
   saving: "Saving the connection…",
   initializing: "Reconnecting…",
-  connected: "Local database connected",
+  connected: "Database: Connected",
   failed: "Local database unavailable",
   driver_blocked: "Local database driver stopped",
 };
@@ -173,6 +173,9 @@ export function deriveLocalDbState(input: {
 }): LocalDbConnectionView {
   if (!input.available) return describeLocalDbState("unavailable");
   if (input.pending) return describeLocalDbState(input.pending);
+  // Configuration is the first invariant: no runtime or cached status may
+  // turn a fresh/unconfigured installation green.
+  if (!input.configured) return describeLocalDbState("not_configured");
   if (input.status?.connected) return describeLocalDbState("connected");
   if (input.status?.durability && !input.status.durability.ok)
     return describeLocalDbState(
@@ -190,7 +193,6 @@ export function deriveLocalDbState(input: {
     return describeLocalDbState("driver_blocked", reconnectReason(input.status));
   }
   if (input.status?.error) return describeLocalDbState("failed", reconnectReason(input.status));
-  if (!input.configured) return describeLocalDbState("not_configured");
   return describeLocalDbState("initializing", "Trying to reach the saved database.");
 }
 
@@ -393,6 +395,8 @@ export type LocalSyncStatus = {
   errorStage?: string | null;
   reconnecting?: boolean;
   configured?: boolean;
+  lastConnectionCheckAt?: string | null;
+  lastSuccessfulConnectionAt?: string | null;
   cloudConfigured?: boolean;
   phase?: "idle" | "pushing" | "pulling";
   enabled?: boolean;
@@ -403,11 +407,19 @@ export type LocalSyncStatus = {
     pending: number; failed: number; parked: number; sales: number;
     rows: Array<{ id: string; status: "pending" | "failed" | "dead_letter"; attempts: number;
       client_transaction_id?: string | null; created_at: string; last_attempt_at?: string | null;
-      error_message?: string | null }>;
+      error_message?: string | null; error_detail?: string | null }>;
   };
   lastBusinessPush?: { batchId: string; clientTransactionId?: string | null;
     localCommittedAt: string; pushStartedAt: string; acknowledgedAt?: string | null;
     durationMs?: number | null; result: "pushing" | "synced" | "pending" | "failed"; reason?: string } | null;
+  lastFailure?: {
+    stage: "sqlite" | "sql-projection" | "cloud-push" | "cloud-pull" | "connectivity" | "staff-roster" | "worker";
+    message: string;
+    reason: string;
+    at: string;
+    batchId?: string | null;
+    table?: string | null;
+  } | null;
   tables: TableSyncStat[];
   queue?: SyncQueueRow[];
   lastPushAt: string | null;
@@ -564,7 +576,12 @@ export type PosBridge = {
   syncContract?: () => Promise<{ push: string[]; pull: string[]; restore: string[] }>;
 
   setSyncEnabled: (on: boolean) => Promise<void>;
-  setSyncConfig?: (config: { intervalMs?: number; batchSize?: number; maxAttempts?: number }) => Promise<unknown>;
+  setSyncConfig?: (config: {
+    intervalMs?: number;
+    batchSize?: number;
+    maxAttempts?: number;
+    maxBackoffMs?: number;
+  }) => Promise<unknown>;
   /** Live per-table counts on this till, for the server/shop comparison. */
   compareSummary?: (options?: { since?: string | null; tables?: string[] }) => Promise<{
     ok: boolean;
@@ -895,6 +912,21 @@ export async function loadLocalDbConfig(): Promise<LocalDbConfig> {
   }
   cachedConfig = defaultLocalDbConfig;
   return cachedConfig;
+}
+
+/** Load form values without confusing defaults with persisted authority. */
+export async function loadLocalDbConfigState(): Promise<{
+  config: LocalDbConfig;
+  configured: boolean;
+}> {
+  if (typeof window === "undefined") return { config: defaultLocalDbConfig, configured: false };
+  const sealed = await localDb()?.getDatabaseConfig?.();
+  if (!sealed) {
+    cachedConfig = defaultLocalDbConfig;
+    return { config: cachedConfig, configured: false };
+  }
+  cachedConfig = { ...defaultLocalDbConfig, ...sealed };
+  return { config: cachedConfig, configured: true };
 }
 
 /**

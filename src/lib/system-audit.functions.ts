@@ -20,7 +20,7 @@ const entryInput = z.object({
 });
 
 export const recordSystemAudit = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) => entryInput.parse(input))
+  .validator((input: unknown) => entryInput.parse(input))
   .handler(async ({ data }) => {
     // The edit history is only worth keeping if every line came from a proven
     // caller, filed against the branch that caller belongs to.
@@ -50,7 +50,7 @@ export const recordSystemAudit = createServerFn({ method: "POST" })
   });
 
 export const listSystemAudit = createServerFn({ method: "POST" })
-  .inputValidator((input: unknown) =>
+  .validator((input: unknown) =>
     z.object({ accessToken: z.string().min(10), limit: z.number().int().min(1).max(1000).optional() }).parse(input),
   )
   .handler(async ({ data }) => {
