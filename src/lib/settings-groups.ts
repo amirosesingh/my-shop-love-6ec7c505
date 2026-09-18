@@ -83,29 +83,19 @@ const GROUP_SPECS: GroupSpec[] = [
   {
     id: "system",
     label: "System & general",
-    blurb: "Connection health, data sync, security and code health.",
+    blurb: "Online connection, security and code health.",
     members: [
       { card: "system" },
-      { card: "database-health", shared: true },
       { card: "logic-health", shared: true },
       { card: "security-alerts", shared: true },
       { card: "database", shared: true },
-      { card: "sync", shared: true },
-      { card: "data-comparison", shared: true },
       { card: "inheritance", shared: true },
     ],
   },
 ];
 
 /** Tabs of the System & general hub, rendered in place rather than as routes. */
-export const SYSTEM_TAB_IDS = [
-  "system",
-  "database-health",
-  "logic-health",
-  "security-alerts",
-  "data-comparison",
-  "inheritance",
-] as const;
+export const SYSTEM_TAB_IDS = ["system", "logic-health", "security-alerts", "inheritance"] as const;
 
 export type SystemTabId = (typeof SYSTEM_TAB_IDS)[number];
 
@@ -150,7 +140,7 @@ export function systemTab(id: SystemTabId): { label: string; blurb: string } {
   const tab = group?.tabs.find((t) => t.tab === id);
   return {
     label: tab?.label ?? "System & general",
-    blurb: tab?.blurb ?? "Connection health, data sync, security and code health.",
+    blurb: tab?.blurb ?? "Online connection, security and code health.",
   };
 }
 

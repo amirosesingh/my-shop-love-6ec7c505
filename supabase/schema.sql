@@ -1,6 +1,9 @@
 -- ============================================================
 -- supabase/schema.sql - full cloud schema (Postgres / Supabase)
 -- Retail
+-- Target: the Supabase project currently open in the SQL editor. Supabase
+-- selects the PostgreSQL database for the project, so no database name or
+-- CREATE DATABASE statement should be added to this portable online script.
 --
 -- Works for BOTH cases:
 --   * fresh project  -> every table, view, function, trigger, grant and
@@ -10903,3 +10906,1013 @@ $$;
 
 REVOKE ALL ON FUNCTION public.pos_sale_commit(jsonb,jsonb,jsonb,jsonb,jsonb,text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.pos_sale_commit(jsonb,jsonb,jsonb,jsonb,jsonb,text) TO authenticated, service_role;
+
+
+-- Consolidated online security/schema change: 20260904070156_26e6d957-510b-454c-82ee-69ba378abe1a.sql
+-- Branch isolation for stock transfers and their items.
+
+DROP POLICY IF EXISTS "Staff read transfer items" ON public.stock_transfer_items;
+DROP POLICY IF EXISTS "Staff write transfer items" ON public.stock_transfer_items;
+DROP POLICY IF EXISTS "Branch staff write transfer items" ON public.stock_transfer_items;
+
+DROP POLICY IF EXISTS "Staff read transfers" ON public.stock_transfers;
+DROP POLICY IF EXISTS "Staff raise transfers" ON public.stock_transfers;
+DROP POLICY IF EXISTS "Staff update transfers" ON public.stock_transfers;
+DROP POLICY IF EXISTS "Supervisors delete transfers" ON public.stock_transfers;
+
+CREATE OR REPLACE FUNCTION public.transfer_in_my_branch(_transfer_id uuid)
+RETURNS boolean
+LANGUAGE sql
+STABLE SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+  SELECT EXISTS (
+    SELECT 1 FROM public.stock_transfers t
+     WHERE t.id = _transfer_id
+       AND (public.user_has_store_access(t.from_store_id)
+            OR public.user_has_store_access(t.to_store_id))
+  )
+$$;
+
+REVOKE ALL ON FUNCTION public.transfer_in_my_branch(uuid) FROM public;
+GRANT EXECUTE ON FUNCTION public.transfer_in_my_branch(uuid) TO authenticated, service_role;
+
+CREATE POLICY "Branch staff read transfers"
+ON public.stock_transfers FOR SELECT TO authenticated
+USING (
+  public.is_staff_now()
+  AND (public.user_has_store_access(from_store_id) OR public.user_has_store_access(to_store_id))
+);
+
+CREATE POLICY "Branch staff raise transfers"
+ON public.stock_transfers FOR INSERT TO authenticated
+WITH CHECK (public.is_staff_now() AND public.user_has_store_access(from_store_id));
+
+CREATE POLICY "Branch staff update transfers"
+ON public.stock_transfers FOR UPDATE TO authenticated
+USING (
+  public.is_staff_now()
+  AND (public.user_has_store_access(from_store_id) OR public.user_has_store_access(to_store_id))
+)
+WITH CHECK (
+  public.is_staff_now()
+  AND (public.user_has_store_access(from_store_id) OR public.user_has_store_access(to_store_id))
+);
+
+CREATE POLICY "Branch supervisors delete transfers"
+ON public.stock_transfers FOR DELETE TO authenticated
+USING (
+  public.is_supervisor_now()
+  AND (public.user_has_store_access(from_store_id) OR public.user_has_store_access(to_store_id))
+);
+
+CREATE POLICY "Branch staff read transfer items"
+ON public.stock_transfer_items FOR SELECT TO authenticated
+USING (public.is_staff_now() AND public.transfer_in_my_branch(transfer_id));
+
+CREATE POLICY "Branch staff add transfer items"
+ON public.stock_transfer_items FOR INSERT TO authenticated
+WITH CHECK (public.is_staff_now() AND public.transfer_in_my_branch(transfer_id));
+
+CREATE POLICY "Branch staff update transfer items"
+ON public.stock_transfer_items FOR UPDATE TO authenticated
+USING (public.is_staff_now() AND public.transfer_in_my_branch(transfer_id))
+WITH CHECK (public.is_staff_now() AND public.transfer_in_my_branch(transfer_id));
+
+CREATE POLICY "Branch staff delete transfer items"
+ON public.stock_transfer_items FOR DELETE TO authenticated
+USING (public.is_staff_now() AND public.transfer_in_my_branch(transfer_id));
+
+-- A row may never be re-pointed at a transfer the caller cannot reach.
+CREATE OR REPLACE FUNCTION public.stock_transfer_items_guard_parent()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+BEGIN
+  IF auth.uid() IS NULL THEN
+    RETURN NEW; -- server-side/service-role paths re-check the caller themselves
+  END IF;
+  IF TG_OP = 'UPDATE' AND NEW.transfer_id IS DISTINCT FROM OLD.transfer_id THEN
+    IF NOT public.transfer_in_my_branch(NEW.transfer_id) THEN
+      RAISE EXCEPTION 'You cannot move this item onto another branch''s transfer';
+    END IF;
+  END IF;
+  IF NOT public.transfer_in_my_branch(NEW.transfer_id) THEN
+    RAISE EXCEPTION 'You can only change transfer items for your own branch';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS stock_transfer_items_guard_parent ON public.stock_transfer_items;
+CREATE TRIGGER stock_transfer_items_guard_parent
+BEFORE INSERT OR UPDATE ON public.stock_transfer_items
+FOR EACH ROW EXECUTE FUNCTION public.stock_transfer_items_guard_parent();
+
+-- Consolidated online security/schema change: 20260904070308_14eef988-b966-4fd0-b0a8-36d5183033c0.sql
+-- 1. Per-line refunded quantity ------------------------------------------
+ALTER TABLE public.sale_items
+  ADD COLUMN IF NOT EXISTS refunded_qty integer NOT NULL DEFAULT 0;
+
+ALTER TABLE public.sale_items
+  DROP CONSTRAINT IF EXISTS sale_items_refunded_qty_bounds;
+ALTER TABLE public.sale_items
+  ADD CONSTRAINT sale_items_refunded_qty_bounds
+  CHECK (refunded_qty >= 0 AND refunded_qty <= GREATEST(quantity, 0));
+
+-- 2. Only the refund routine may move those figures ------------------------
+CREATE OR REPLACE FUNCTION public.guard_refund_fields()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+BEGIN
+  IF coalesce(current_setting('pos.refunding', true), '') = 'on' THEN
+    RETURN NEW;
+  END IF;
+  IF auth.uid() IS NULL THEN
+    RETURN NEW; -- trusted server paths (service role) do their own checks
+  END IF;
+  IF TG_TABLE_NAME = 'sale_items'
+     AND NEW.refunded_qty IS DISTINCT FROM OLD.refunded_qty THEN
+    RAISE EXCEPTION 'Refunded quantity can only be changed by processing a refund';
+  END IF;
+  IF TG_TABLE_NAME = 'sales'
+     AND coalesce(NEW.is_refunded, false) IS DISTINCT FROM coalesce(OLD.is_refunded, false) THEN
+    RAISE EXCEPTION 'A bill can only be marked refunded by processing a refund';
+  END IF;
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS guard_sale_items_refunded_qty ON public.sale_items;
+CREATE TRIGGER guard_sale_items_refunded_qty
+BEFORE UPDATE ON public.sale_items
+FOR EACH ROW EXECUTE FUNCTION public.guard_refund_fields();
+
+DROP TRIGGER IF EXISTS guard_sales_refunded ON public.sales;
+CREATE TRIGGER guard_sales_refunded
+BEFORE UPDATE ON public.sales
+FOR EACH ROW EXECUTE FUNCTION public.guard_refund_fields();
+
+-- 3. The refund routine ----------------------------------------------------
+CREATE OR REPLACE FUNCTION public.sale_refund(
+  _sale_id uuid,
+  _lines jsonb DEFAULT NULL,
+  _client_refund_id text DEFAULT NULL,
+  _reason text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  _sale public.sales%ROWTYPE;
+  _key text := coalesce(nullif(btrim(coalesce(_client_refund_id, '')), ''), _sale_id::text);
+  _item record;
+  _want integer;
+  _remaining integer;
+  _movement uuid;
+  _stock integer;
+  _results jsonb := '[]'::jsonb;
+  _outstanding integer;
+BEGIN
+  IF NOT public.is_staff_now() THEN
+    RAISE EXCEPTION 'Sign in with a staff account to process a refund';
+  END IF;
+  IF NOT public.has_perm('can_process_refund') THEN
+    RAISE EXCEPTION 'You are not allowed to process refunds';
+  END IF;
+
+  SELECT * INTO _sale FROM public.sales WHERE id = _sale_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Unknown bill';
+  END IF;
+  IF NOT public.user_has_store_access(_sale.store_id) THEN
+    RAISE EXCEPTION 'You can only refund bills from your own branch';
+  END IF;
+
+  PERFORM set_config('pos.refunding', 'on', true);
+
+  FOR _item IN
+    SELECT si.id, si.product_id, si.quantity, si.refunded_qty
+      FROM public.sale_items si
+     WHERE si.sale_id = _sale_id
+     ORDER BY si.id
+     FOR UPDATE
+  LOOP
+    IF _lines IS NULL OR jsonb_array_length(_lines) = 0 THEN
+      _want := GREATEST(_item.quantity, 0) - _item.refunded_qty;
+    ELSE
+      SELECT COALESCE(SUM(GREATEST((l ->> 'qty')::int, 0)), 0) INTO _want
+        FROM jsonb_array_elements(_lines) l
+       WHERE (l ->> 'item_id') = _item.id::text
+          OR ((l ->> 'item_id') IS NULL AND (l ->> 'product_id') = _item.product_id::text);
+    END IF;
+
+    CONTINUE WHEN coalesce(_want, 0) <= 0;
+
+    _remaining := GREATEST(_item.quantity, 0) - _item.refunded_qty;
+    IF _want > _remaining THEN
+      RAISE EXCEPTION 'Cannot return % of "%": only % left to return',
+        _want, _item.product_id, _remaining;
+    END IF;
+
+    UPDATE public.sale_items
+       SET refunded_qty = refunded_qty + _want
+     WHERE id = _item.id;
+
+    -- Deterministic movement id: replaying the same refund moves no stock.
+    _movement := md5(_key || ':' || _item.id::text)::uuid;
+    _stock := public.stock_apply_delta(_movement, _item.product_id, _sale.store_id, _want);
+    _results := _results || jsonb_build_object(
+      'item_id', _item.id,
+      'product_id', _item.product_id,
+      'qty', _want,
+      'stock', _stock
+    );
+  END LOOP;
+
+  SELECT COALESCE(SUM(GREATEST(si.quantity, 0) - si.refunded_qty), 0) INTO _outstanding
+    FROM public.sale_items si WHERE si.sale_id = _sale_id;
+
+  IF _outstanding = 0 THEN
+    UPDATE public.sales
+       SET is_refunded = true, updated_by = coalesce(auth.uid()::text, updated_by)
+     WHERE id = _sale_id AND coalesce(is_refunded, false) = false;
+  END IF;
+
+  BEGIN
+    INSERT INTO public.audit_logs (action, entity_type, entity_id, user_id, details)
+    VALUES ('sale_refund', 'sale', _sale_id::text, auth.uid(),
+            jsonb_build_object('reason', _reason, 'lines', _results, 'refund_id', _key));
+  EXCEPTION WHEN others THEN
+    NULL; -- the audit shape varies by deployment; never block the refund
+  END;
+
+  PERFORM set_config('pos.refunding', 'off', true);
+
+  RETURN jsonb_build_object(
+    'sale_id', _sale_id,
+    'fully_refunded', _outstanding = 0,
+    'lines', _results
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.sale_refund(uuid, jsonb, text, text) FROM public;
+GRANT EXECUTE ON FUNCTION public.sale_refund(uuid, jsonb, text, text) TO authenticated, service_role;
+
+-- 4. Narrow a couple of over-broad read policies ---------------------------
+DROP POLICY IF EXISTS payment_types_read ON public.payment_types;
+CREATE POLICY payment_types_read ON public.payment_types
+FOR SELECT TO authenticated USING (public.is_staff_now());
+
+DROP POLICY IF EXISTS "Staff read authorisation rules" ON public.authorization_actions;
+CREATE POLICY "Staff read authorisation rules" ON public.authorization_actions
+FOR SELECT TO authenticated
+USING (public.is_staff_now() AND (scope_id = '' OR public.store_visible(scope_id)));
+
+DROP POLICY IF EXISTS "Staff read authorisation log" ON public.authorization_log;
+CREATE POLICY "Staff read authorisation log" ON public.authorization_log
+FOR SELECT TO authenticated
+USING (public.is_staff_now() AND (store_id = '' OR public.store_visible(store_id)));
+
+DROP POLICY IF EXISTS "Staff read authorisation requests" ON public.authorization_requests;
+CREATE POLICY "Staff read authorisation requests" ON public.authorization_requests
+FOR SELECT TO authenticated
+USING (public.is_staff_now() AND (store_id = '' OR public.store_visible(store_id)));
+
+-- Consolidated online security/schema change: 20260904070344_c60837bc-e193-4eff-abe5-6590ef45f400.sql
+REVOKE ALL ON FUNCTION public.guard_refund_fields() FROM public, anon, authenticated;
+REVOKE ALL ON FUNCTION public.stock_transfer_items_guard_parent() FROM public, anon, authenticated;
+
+-- Consolidated online security/schema change: 20260904070825_10fd6b13-5f44-402d-8c41-c80dc5989e87.sql
+CREATE OR REPLACE FUNCTION public.sale_refund(
+  _sale_id uuid,
+  _lines jsonb DEFAULT NULL,
+  _client_refund_id text DEFAULT NULL,
+  _reason text DEFAULT NULL
+)
+RETURNS jsonb
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+DECLARE
+  _sale public.sales%ROWTYPE;
+  _key text := coalesce(nullif(btrim(coalesce(_client_refund_id, '')), ''), _sale_id::text);
+  _item record;
+  _want integer;
+  _remaining integer;
+  _movement uuid;
+  _stock integer;
+  _results jsonb := '[]'::jsonb;
+  _outstanding integer;
+  _direct boolean := auth.uid() IS NOT NULL;
+BEGIN
+  -- A direct caller must be staff with the refund permission. A call with no
+  -- signed-in user can only come from the trusted server relay, which has
+  -- already proved the caller, their branch and their permission.
+  IF _direct THEN
+    IF NOT public.is_staff_now() THEN
+      RAISE EXCEPTION 'Sign in with a staff account to process a refund';
+    END IF;
+    IF NOT public.has_perm('can_process_refund') THEN
+      RAISE EXCEPTION 'You are not allowed to process refunds';
+    END IF;
+  END IF;
+
+  SELECT * INTO _sale FROM public.sales WHERE id = _sale_id FOR UPDATE;
+  IF NOT FOUND THEN
+    RAISE EXCEPTION 'Unknown bill';
+  END IF;
+  IF _direct AND NOT public.user_has_store_access(_sale.store_id) THEN
+    RAISE EXCEPTION 'You can only refund bills from your own branch';
+  END IF;
+
+  PERFORM set_config('pos.refunding', 'on', true);
+
+  FOR _item IN
+    SELECT si.id, si.product_id, si.quantity, si.refunded_qty
+      FROM public.sale_items si
+     WHERE si.sale_id = _sale_id
+     ORDER BY si.id
+     FOR UPDATE
+  LOOP
+    IF _lines IS NULL OR jsonb_array_length(_lines) = 0 THEN
+      _want := GREATEST(_item.quantity, 0) - _item.refunded_qty;
+    ELSE
+      SELECT COALESCE(SUM(GREATEST((l ->> 'qty')::int, 0)), 0) INTO _want
+        FROM jsonb_array_elements(_lines) l
+       WHERE (l ->> 'item_id') = _item.id::text
+          OR ((l ->> 'item_id') IS NULL AND (l ->> 'product_id') = _item.product_id::text);
+    END IF;
+
+    CONTINUE WHEN coalesce(_want, 0) <= 0;
+
+    _remaining := GREATEST(_item.quantity, 0) - _item.refunded_qty;
+    IF _want > _remaining THEN
+      RAISE EXCEPTION 'Cannot return % of "%": only % left to return',
+        _want, _item.product_id, _remaining;
+    END IF;
+
+    UPDATE public.sale_items
+       SET refunded_qty = refunded_qty + _want
+     WHERE id = _item.id;
+
+    _movement := md5(_key || ':' || _item.id::text)::uuid;
+    _stock := public.stock_apply_delta(_movement, _item.product_id, _sale.store_id, _want);
+    _results := _results || jsonb_build_object(
+      'item_id', _item.id,
+      'product_id', _item.product_id,
+      'qty', _want,
+      'stock', _stock
+    );
+  END LOOP;
+
+  SELECT COALESCE(SUM(GREATEST(si.quantity, 0) - si.refunded_qty), 0) INTO _outstanding
+    FROM public.sale_items si WHERE si.sale_id = _sale_id;
+
+  IF _outstanding = 0 THEN
+    UPDATE public.sales
+       SET is_refunded = true, updated_by = coalesce(auth.uid()::text, updated_by)
+     WHERE id = _sale_id AND coalesce(is_refunded, false) = false;
+  END IF;
+
+  BEGIN
+    INSERT INTO public.audit_logs (action, entity_type, entity_id, user_id, details)
+    VALUES ('sale_refund', 'sale', _sale_id::text, auth.uid(),
+            jsonb_build_object('reason', _reason, 'lines', _results, 'refund_id', _key));
+  EXCEPTION WHEN others THEN
+    NULL;
+  END;
+
+  PERFORM set_config('pos.refunding', 'off', true);
+
+  RETURN jsonb_build_object(
+    'sale_id', _sale_id,
+    'fully_refunded', _outstanding = 0,
+    'lines', _results
+  );
+END;
+$$;
+
+REVOKE ALL ON FUNCTION public.sale_refund(uuid, jsonb, text, text) FROM public, anon;
+GRANT EXECUTE ON FUNCTION public.sale_refund(uuid, jsonb, text, text) TO authenticated, service_role;
+
+-- Consolidated online security/schema change: 20260904071927_886b38d0-c8be-4ba0-a75e-0a96fba0b61a.sql
+-- Defence in depth: even with a permissive access rule, a signed-in staff
+-- member may never lift their own role, permissions, branch or active flag.
+CREATE OR REPLACE FUNCTION public.app_users_block_self_privilege_change()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+BEGIN
+  -- Server-side maintenance (service role) and administrators are unaffected.
+  IF auth.uid() IS NULL OR public.has_role(auth.uid(), 'admin') THEN
+    RETURN NEW;
+  END IF;
+
+  IF NEW.auth_user_id IS NOT DISTINCT FROM auth.uid() THEN
+    IF NEW.role IS DISTINCT FROM OLD.role
+       OR NEW.permissions IS DISTINCT FROM OLD.permissions
+       OR NEW.store_id IS DISTINCT FROM OLD.store_id
+       OR NEW.is_active IS DISTINCT FROM OLD.is_active THEN
+      RAISE EXCEPTION 'You cannot change your own role, permissions, branch or access.'
+        USING ERRCODE = '42501';
+    END IF;
+  END IF;
+
+  RETURN NEW;
+END;
+$$;
+
+DROP TRIGGER IF EXISTS app_users_block_self_privilege_change ON public.app_users;
+CREATE TRIGGER app_users_block_self_privilege_change
+BEFORE UPDATE ON public.app_users
+FOR EACH ROW EXECUTE FUNCTION public.app_users_block_self_privilege_change();
+
+-- Nobody grants themselves a role, whatever the access rules say.
+CREATE OR REPLACE FUNCTION public.user_roles_block_self_grant()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public
+AS $$
+DECLARE
+  subject uuid := COALESCE(NEW.user_id, OLD.user_id);
+BEGIN
+  IF auth.uid() IS NOT NULL AND subject IS NOT DISTINCT FROM auth.uid() THEN
+    RAISE EXCEPTION 'You cannot change your own role.' USING ERRCODE = '42501';
+  END IF;
+  RETURN COALESCE(NEW, OLD);
+END;
+$$;
+
+DROP TRIGGER IF EXISTS user_roles_block_self_grant ON public.user_roles;
+CREATE TRIGGER user_roles_block_self_grant
+BEFORE INSERT OR UPDATE OR DELETE ON public.user_roles
+FOR EACH ROW EXECUTE FUNCTION public.user_roles_block_self_grant();
+
+-- These three tables carry protection with no access rules on purpose: they
+-- are reachable only by the server. The note keeps that decision visible.
+COMMENT ON TABLE public.cashiers IS
+  'Server-only. Row protection is on with no access rules by design: reached solely through security-definer routines. Do not add a client-facing rule.';
+COMMENT ON TABLE public.pin_attempts IS
+  'Server-only. Row protection is on with no access rules by design: throttling state is written only by security-definer routines. Do not add a client-facing rule.';
+COMMENT ON TABLE public.terminal_recovery_secrets IS
+  'Server-only. Row protection is on with no access rules by design: device recovery material must never be readable by a signed-in client.';
+
+-- Consolidated online security/schema change: 20260904071954_b53cc509-55cb-475c-a374-717470113dbf.sql
+REVOKE EXECUTE ON FUNCTION public.app_users_block_self_privilege_change() FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.user_roles_block_self_grant() FROM PUBLIC, anon, authenticated;
+
+-- Consolidated online security/schema change: 20260904072036_a1008e23-f180-495c-a8df-328f2819de8b.sql
+REVOKE EXECUTE ON FUNCTION public.bookings_block_unpaid_collection() FROM PUBLIC, anon, authenticated;
+
+-- Consolidated online security/schema change: 20260905054633_a41d6738-b9ad-4597-aecb-6eddb7ece87f.sql
+-- ---------------------------------------------------------------- groups ---
+CREATE TABLE IF NOT EXISTS public.store_groups (
+  id text NOT NULL PRIMARY KEY,
+  code text NOT NULL,
+  name text NOT NULL,
+  is_active boolean NOT NULL DEFAULT true,
+  archived_at timestamptz,
+  created_at timestamptz NOT NULL DEFAULT now(),
+  updated_at timestamptz NOT NULL DEFAULT now()
+);
+
+GRANT SELECT, INSERT, UPDATE ON public.store_groups TO authenticated;
+GRANT ALL ON public.store_groups TO service_role;
+
+ALTER TABLE public.store_groups ENABLE ROW LEVEL SECURITY;
+
+DROP POLICY IF EXISTS "Staff can read store groups" ON public.store_groups;
+CREATE POLICY "Staff can read store groups" ON public.store_groups
+  FOR SELECT TO authenticated USING (public.is_staff(auth.uid()));
+
+DROP POLICY IF EXISTS "Supervisors manage store groups" ON public.store_groups;
+CREATE POLICY "Supervisors manage store groups" ON public.store_groups
+  FOR INSERT TO authenticated WITH CHECK (public.is_app_supervisor());
+
+DROP POLICY IF EXISTS "Supervisors update store groups" ON public.store_groups;
+CREATE POLICY "Supervisors update store groups" ON public.store_groups
+  FOR UPDATE TO authenticated USING (public.is_app_supervisor())
+  WITH CHECK (public.is_app_supervisor());
+
+DROP TRIGGER IF EXISTS store_groups_touch ON public.store_groups;
+CREATE TRIGGER store_groups_touch BEFORE UPDATE ON public.store_groups
+  FOR EACH ROW EXECUTE FUNCTION public.update_updated_at_column();
+
+CREATE UNIQUE INDEX IF NOT EXISTS store_groups_code_uidx
+  ON public.store_groups (upper(code));
+
+-- Keep the group ids the branches already carry, so nothing changes meaning.
+INSERT INTO public.store_groups (id, code, name)
+SELECT DISTINCT btrim(s.group_id),
+       upper(left(regexp_replace(btrim(s.group_id), '[^a-zA-Z0-9]', '', 'g'), 12)),
+       btrim(s.group_id)
+  FROM public.stores s
+ WHERE COALESCE(btrim(s.group_id), '') <> ''
+ON CONFLICT (id) DO NOTHING;
+
+INSERT INTO public.store_groups (id, code, name)
+VALUES ('default', 'DEFAULT', 'Default group')
+ON CONFLICT (id) DO NOTHING;
+
+UPDATE public.stores SET group_id = NULL WHERE COALESCE(btrim(group_id), '') = '';
+
+ALTER TABLE public.stores DROP CONSTRAINT IF EXISTS stores_group_id_fkey;
+ALTER TABLE public.stores
+  ADD CONSTRAINT stores_group_id_fkey FOREIGN KEY (group_id)
+  REFERENCES public.store_groups(id) ON UPDATE CASCADE ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS stores_group_id_idx ON public.stores (group_id);
+
+-- --------------------------------------------------- cross-group approval ---
+CREATE OR REPLACE FUNCTION public.store_group_of(_store_id text)
+RETURNS text
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT COALESCE(NULLIF(btrim(s.group_id), ''), 'default')
+    FROM public.stores s WHERE s.id = _store_id
+$$;
+
+REVOKE ALL ON FUNCTION public.store_group_of(text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.store_group_of(text) TO authenticated, service_role;
+
+CREATE OR REPLACE FUNCTION public.is_cross_group_transfer(_from text, _to text)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT public.store_group_of(_from) IS DISTINCT FROM public.store_group_of(_to)
+$$;
+
+REVOKE ALL ON FUNCTION public.is_cross_group_transfer(text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.is_cross_group_transfer(text, text) TO authenticated, service_role;
+
+-- Cross-group always wins; otherwise the branch/cluster/global setting decides.
+CREATE OR REPLACE FUNCTION public.stock_transfer_approval_required(_store_id text, _to_store_id text)
+RETURNS boolean
+LANGUAGE sql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+  SELECT public.is_cross_group_transfer(_store_id, _to_store_id)
+      OR public.stock_transfer_approval_required(_store_id)
+$$;
+
+REVOKE ALL ON FUNCTION public.stock_transfer_approval_required(text, text) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.stock_transfer_approval_required(text, text)
+  TO authenticated, service_role;
+
+-- Who may approve a cross-group transfer: roles plus named people.
+INSERT INTO public.authorization_actions
+  (action_key, scope_type, scope_id, mode, allowed_roles, allowed_user_ids, is_enabled)
+VALUES
+  ('cross_group_transfer_approval', 'global', '', 'required',
+   ARRAY['admin','manager']::text[], ARRAY[]::text[], true)
+ON CONFLICT (action_key, scope_type, scope_id) DO NOTHING;
+
+CREATE OR REPLACE FUNCTION public.may_approve_cross_group_transfer()
+RETURNS boolean
+LANGUAGE plpgsql STABLE SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  u record;
+  rule public.authorization_actions;
+BEGIN
+  IF public.is_app_supervisor() THEN RETURN true; END IF;
+  SELECT * INTO u FROM public.current_app_user();
+  IF u.id IS NULL OR NOT COALESCE(u.is_active, false) THEN RETURN false; END IF;
+
+  SELECT * INTO rule FROM public.authorization_actions
+   WHERE action_key = 'cross_group_transfer_approval'
+     AND scope_type = 'global' AND scope_id = '' LIMIT 1;
+
+  IF rule.id IS NULL OR NOT rule.is_enabled THEN
+    RETURN public.has_perm('can_approve_transfer');
+  END IF;
+
+  RETURN (u.role::text = ANY (rule.allowed_roles))
+      OR (COALESCE(u.user_id, '') <> '' AND u.user_id = ANY (rule.allowed_user_ids))
+      OR (u.id::text = ANY (rule.allowed_user_ids));
+END $$;
+
+REVOKE ALL ON FUNCTION public.may_approve_cross_group_transfer() FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.may_approve_cross_group_transfer() TO authenticated, service_role;
+
+-- Lifecycle trigger: use the two-branch rule and guard cross-group approval.
+CREATE OR REPLACE FUNCTION public.stock_transfers_enforce_lifecycle()
+RETURNS trigger
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $function$
+DECLARE
+  v_needs_approval boolean;
+  v_cross boolean;
+  v_may_approve boolean := public.is_supervisor_now()
+    OR public.has_perm('can_approve_transfer')
+    OR public.has_perm('can_receive_transfer');
+BEGIN
+  IF TG_OP = 'INSERT' THEN
+    v_needs_approval := public.stock_transfer_approval_required(NEW.from_store_id, NEW.to_store_id);
+
+    IF v_needs_approval THEN
+      NEW.status := 'awaiting_approval';
+    ELSIF NEW.status IS NULL OR NEW.status NOT IN ('awaiting_approval', 'approved') THEN
+      NEW.status := 'approved';
+    END IF;
+
+    IF NEW.status = 'approved' AND NOT v_needs_approval THEN
+      NEW.approved_by := COALESCE(NEW.approved_by, NEW.created_by);
+      NEW.approved_at := COALESCE(NEW.approved_at, now());
+    ELSE
+      NEW.approved_by := NULL;
+      NEW.approved_at := NULL;
+    END IF;
+
+    NEW.dispatched_by := NULL;
+    NEW.dispatched_at := NULL;
+    NEW.received_by := NULL;
+    NEW.received_at := NULL;
+    NEW.verified_by := NULL;
+    NEW.verified_at := NULL;
+    NEW.posted_at := NULL;
+    NEW.closed_at := NULL;
+    NEW.fulfilment := NULL;
+    RETURN NEW;
+  END IF;
+
+  IF OLD.status = NEW.status THEN
+    RETURN NEW;
+  END IF;
+
+  IF OLD.status IN ('rejected', 'cancelled', 'completed', 'completed_with_discrepancy') THEN
+    RAISE EXCEPTION 'Transfer % is closed (%) and cannot change', OLD.ref, OLD.status
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NOT (
+    (OLD.status = 'awaiting_approval' AND NEW.status IN ('approved', 'rejected', 'cancelled'))
+    OR (OLD.status = 'approved' AND NEW.status IN ('dispatched', 'rejected', 'cancelled'))
+    OR (OLD.status = 'dispatched' AND NEW.status = 'received')
+    OR (OLD.status = 'received' AND NEW.status IN ('verified', 'completed', 'completed_with_discrepancy'))
+    OR (OLD.status = 'verified' AND NEW.status IN ('completed', 'completed_with_discrepancy'))
+  ) THEN
+    RAISE EXCEPTION 'Transfer % cannot go from % to %', OLD.ref, OLD.status, NEW.status
+      USING ERRCODE = 'check_violation';
+  END IF;
+
+  v_cross := public.is_cross_group_transfer(NEW.from_store_id, NEW.to_store_id);
+
+  IF NEW.status IN ('approved', 'rejected') AND NOT v_may_approve THEN
+    RAISE EXCEPTION 'You are not allowed to approve or reject transfers'
+      USING ERRCODE = 'insufficient_privilege';
+  END IF;
+
+  IF v_cross AND NEW.status = 'approved' THEN
+    IF NOT public.may_approve_cross_group_transfer() THEN
+      RAISE EXCEPTION 'Only an authorised approver can approve a transfer between groups'
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF COALESCE(btrim(NEW.approved_by), '') = ''
+       OR btrim(lower(NEW.approved_by)) = btrim(lower(COALESCE(NEW.created_by, ''))) THEN
+      RAISE EXCEPTION 'A transfer between groups must be approved by someone other than the requester'
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+  END IF;
+
+  IF NEW.status = 'approved' THEN
+    NEW.approved_at := COALESCE(NEW.approved_at, now());
+  END IF;
+
+  IF NEW.status = 'rejected' AND COALESCE(btrim(NEW.rejected_reason), '') = '' THEN
+    RAISE EXCEPTION 'A rejection needs a reason' USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NEW.status = 'cancelled' AND COALESCE(btrim(NEW.cancelled_reason), '') = '' THEN
+    RAISE EXCEPTION 'A cancellation needs a reason' USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NEW.status = 'completed_with_discrepancy'
+     AND COALESCE(btrim(NEW.discrepancy_reason), '') = '' THEN
+    RAISE EXCEPTION 'A discrepancy needs a reason' USING ERRCODE = 'check_violation';
+  END IF;
+
+  IF NEW.status = 'dispatched' THEN
+    IF v_cross AND (
+         COALESCE(btrim(NEW.approved_by), '') = ''
+         OR NEW.approved_at IS NULL
+         OR btrim(lower(NEW.approved_by)) = btrim(lower(COALESCE(NEW.created_by, '')))
+       ) THEN
+      RAISE EXCEPTION 'This transfer crosses groups and has no valid approval'
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    NEW.dispatched_at := COALESCE(NEW.dispatched_at, now());
+    NEW.closed_at := COALESCE(NEW.closed_at, now());
+    NEW.fulfilment := (
+      SELECT CASE
+        WHEN COALESCE(SUM(COALESCE(i.quantity_dispatched, 0)), 0) = 0 THEN 'none'
+        WHEN COALESCE(SUM(COALESCE(i.quantity_dispatched, 0)), 0)
+             >= COALESCE(SUM(i.quantity), 0) THEN 'full'
+        ELSE 'partial'
+      END
+      FROM public.stock_transfer_items i WHERE i.transfer_id = NEW.id
+    );
+  END IF;
+
+  IF NEW.status = 'received' THEN
+    NEW.received_at := COALESCE(NEW.received_at, now());
+  END IF;
+
+  IF NEW.status IN ('verified', 'completed', 'completed_with_discrepancy') THEN
+    NEW.received_at := COALESCE(NEW.received_at, now());
+    NEW.verified_at := COALESCE(NEW.verified_at, now());
+  END IF;
+
+  RETURN NEW;
+END;
+$function$;
+
+-- Approve routine: enforce the same cross-group rules server-side.
+CREATE OR REPLACE FUNCTION public.stock_transfer_approve(
+  p_transfer_id uuid,
+  p_approved_by text DEFAULT NULL,
+  p_lines jsonb DEFAULT NULL
+) RETURNS void
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path = public, pg_temp
+AS $$
+DECLARE
+  t public.stock_transfers;
+  v_cross boolean;
+BEGIN
+  IF NOT public.is_staff(auth.uid()) THEN
+    RAISE EXCEPTION 'Only staff can approve a transfer';
+  END IF;
+
+  SELECT * INTO t FROM public.stock_transfers WHERE id = p_transfer_id FOR UPDATE;
+  IF NOT FOUND THEN RAISE EXCEPTION 'TRANSFER_NOT_FOUND'; END IF;
+  IF t.status <> 'awaiting_approval' THEN
+    RAISE EXCEPTION 'Transfer % is % and is not waiting for approval', t.ref, t.status;
+  END IF;
+
+  v_cross := public.is_cross_group_transfer(t.from_store_id, t.to_store_id);
+  IF v_cross THEN
+    IF NOT public.may_approve_cross_group_transfer() THEN
+      RAISE EXCEPTION 'Only an authorised approver can approve a transfer between groups'
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+    IF COALESCE(btrim(p_approved_by), '') = ''
+       OR btrim(lower(p_approved_by)) = btrim(lower(COALESCE(t.created_by, ''))) THEN
+      RAISE EXCEPTION 'A transfer between groups must be approved by someone other than the requester'
+        USING ERRCODE = 'insufficient_privilege';
+    END IF;
+  END IF;
+
+  -- No list means "everything as asked for".
+  UPDATE public.stock_transfer_items i
+     SET quantity_approved = COALESCE(
+           (SELECT (l ->> 'qty')::int FROM jsonb_array_elements(COALESCE(p_lines, '[]'::jsonb)) l
+             WHERE l ->> 'product_id' = i.product_id::text LIMIT 1),
+           i.quantity)
+   WHERE i.transfer_id = t.id;
+
+  UPDATE public.stock_transfers
+     SET status = 'approved', approved_by = COALESCE(p_approved_by, approved_by), approved_at = now()
+   WHERE id = t.id;
+END $$;
+
+REVOKE ALL ON FUNCTION public.stock_transfer_approve(uuid, text, jsonb) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.stock_transfer_approve(uuid, text, jsonb) TO authenticated, service_role;
+
+-- Consolidated online security/schema change: 20260905071437_8b5f5d70-3890-4e70-8ae6-e1b5740cb3c0.sql
+ALTER TABLE public.uom_units ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
+ALTER TABLE public.product_categories ADD COLUMN IF NOT EXISTS is_active boolean NOT NULL DEFAULT true;
+
+-- Consolidated online security/schema change: 20260905072647_7ecc74a0-edad-450e-b93d-18bed25d0420.sql
+-- 1) Branches carry the private-catalogue switch centrally.
+ALTER TABLE public.stores
+  ADD COLUMN IF NOT EXISTS private_catalogue boolean NOT NULL DEFAULT false;
+
+-- 2) Products carry the branch that owns them (null = shared with everyone).
+ALTER TABLE public.products
+  ADD COLUMN IF NOT EXISTS owner_store_id text REFERENCES public.stores(id) ON DELETE SET NULL;
+
+CREATE INDEX IF NOT EXISTS products_owner_store_id_idx
+  ON public.products (owner_store_id) WHERE owner_store_id IS NOT NULL;
+
+-- Is this product on offer to the caller's branch?
+CREATE OR REPLACE FUNCTION public.product_visible_to_me(_owner_store_id text)
+RETURNS boolean
+LANGUAGE sql
+STABLE
+SECURITY DEFINER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+  SELECT CASE
+    WHEN _owner_store_id IS NULL THEN true
+    WHEN public.user_has_store_access(_owner_store_id) THEN true
+    ELSE NOT EXISTS (
+      SELECT 1 FROM public.stores s
+       WHERE s.id = _owner_store_id AND s.private_catalogue
+    )
+  END
+$$;
+
+DROP POLICY IF EXISTS "Staff can read products" ON public.products;
+CREATE POLICY "Staff can read products"
+  ON public.products FOR SELECT TO authenticated
+  USING (public.is_staff_now() AND public.product_visible_to_me(owner_store_id));
+
+DROP POLICY IF EXISTS "Staff can update" ON public.products;
+CREATE POLICY "Staff can update"
+  ON public.products FOR UPDATE TO authenticated
+  USING (public.is_staff_now() AND public.product_visible_to_me(owner_store_id))
+  WITH CHECK (public.is_staff_now() AND public.product_visible_to_me(owner_store_id));
+
+-- 3) Activation tokens belong to a branch, and only supervisors may issue them.
+DROP POLICY IF EXISTS "Staff can read tokens" ON public.terminal_tokens;
+CREATE POLICY "Staff can read tokens"
+  ON public.terminal_tokens FOR SELECT TO authenticated
+  USING (public.is_staff_now() AND public.user_has_store_access(location_id));
+
+DROP POLICY IF EXISTS "Staff can issue tokens" ON public.terminal_tokens;
+CREATE POLICY "Supervisors can issue tokens"
+  ON public.terminal_tokens FOR INSERT TO authenticated
+  WITH CHECK (public.is_supervisor_now() AND public.user_has_store_access(location_id));
+
+DROP POLICY IF EXISTS "Staff can manage tokens" ON public.terminal_tokens;
+CREATE POLICY "Supervisors can manage tokens"
+  ON public.terminal_tokens FOR UPDATE TO authenticated
+  USING (public.is_supervisor_now() AND public.user_has_store_access(location_id))
+  WITH CHECK (public.is_supervisor_now() AND public.user_has_store_access(location_id));
+
+DROP POLICY IF EXISTS "Staff can delete tokens" ON public.terminal_tokens;
+CREATE POLICY "Supervisors can delete tokens"
+  ON public.terminal_tokens FOR DELETE TO authenticated
+  USING (public.is_supervisor_now() AND public.user_has_store_access(location_id));
+
+-- Consolidated online security/schema change: 20260905072726_c2d95046-07c2-4f23-9fa1-6789dcb3cec6.sql
+REVOKE ALL ON FUNCTION public.product_visible_to_me(text) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.product_visible_to_me(text) FROM anon;
+GRANT EXECUTE ON FUNCTION public.product_visible_to_me(text) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.product_visible_to_me(text) TO service_role;
+
+-- Consolidated online security/schema change: 20260906040020_e50df23d-3265-4b60-9889-2f5ac298a464.sql
+ALTER TABLE public.pos_store_settings
+  ADD COLUMN IF NOT EXISTS allow_offline_approvals boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS offline_approval_requires_pin boolean NOT NULL DEFAULT true,
+  ADD COLUMN IF NOT EXISTS online_only_void_cart boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS online_only_void_line boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS online_only_reduce_qty boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS online_only_manual_discount boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS online_only_price_override boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS online_only_stock_adjustment boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS online_only_shift_close boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS online_only_edit_tenders boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS online_only_terminal_reset boolean NOT NULL DEFAULT false,
+  ADD COLUMN IF NOT EXISTS online_only_refund boolean NOT NULL DEFAULT false;
+
+CREATE OR REPLACE FUNCTION public.pos_rules_defaults()
+ RETURNS jsonb
+ LANGUAGE sql
+ IMMUTABLE
+ SET search_path TO 'public', 'pg_temp'
+AS $function$
+  SELECT '{
+    "block_shift_close_on_hold": true,
+    "require_daily_sales_for_shift_close": true,
+    "require_counted_cash_on_close": true,
+    "require_opening_float_count": true,
+    "enable_blind_cash_count": true,
+    "max_drawer_cash_limit": 1000,
+    "require_reason_for_payout": true,
+    "allow_multiple_shifts_per_terminal": false,
+    "enable_cashier_x_report": false,
+    "show_opening_float_at_close": true,
+    "show_expected_totals_at_close": false,
+    "show_live_variance_at_close": false,
+    "show_itemized_tender_breakdown": true,
+    "require_manager_pin_on_variance": true,
+    "variance_pin_threshold": 10,
+    "max_cashier_discount_percent": 10,
+    "max_cart_discount_amount": 100,
+    "allow_discount_stacking": false,
+    "require_reason_for_price_override": true,
+    "prevent_below_cost_sale": true,
+    "allow_tax_exemption": false,
+    "prevent_negative_stock_sale": false,
+    "require_receipt_for_refund": true,
+    "require_manager_pin_for_refund": true,
+    "max_refund_days_limit": 30,
+    "track_item_voids": true,
+    "auto_lock_timeout_seconds": 90,
+    "require_manager_pin_for_cash_drawer_open": true,
+    "enable_manager_pin_audit_log": true,
+    "require_pin_void_cart": true,
+    "require_pin_void_line": false,
+    "require_pin_reduce_qty": false,
+    "require_pin_manual_discount": true,
+    "require_pin_price_override": true,
+    "require_pin_stock_adjustment": true,
+    "require_pin_shift_close": false,
+    "require_pin_edit_tenders": false,
+    "require_pin_terminal_reset": true,
+    "allow_offline_approvals": true,
+    "offline_approval_requires_pin": true,
+    "online_only_void_cart": false,
+    "online_only_void_line": false,
+    "online_only_reduce_qty": false,
+    "online_only_manual_discount": false,
+    "online_only_price_override": false,
+    "online_only_stock_adjustment": false,
+    "online_only_shift_close": false,
+    "online_only_edit_tenders": false,
+    "online_only_terminal_reset": false,
+    "online_only_refund": false
+  }'::jsonb;
+$function$;
+
+
+-- Consolidated final RLS hardening: 20260820155255_12675704-07b6-4797-96df-1c956af681d9.sql
+-- 1. audit_logs: drop the wide-open duplicates, keep staff-gated rules
+DROP POLICY IF EXISTS "audit_logs_staff_read" ON public.audit_logs;
+DROP POLICY IF EXISTS "audit_logs_staff_insert" ON public.audit_logs;
+
+-- 2. branch_telemetry: drop wide-open duplicates and scope to the caller's branch
+DROP POLICY IF EXISTS "branch_telemetry_staff_read" ON public.branch_telemetry;
+DROP POLICY IF EXISTS "branch_telemetry_staff_write" ON public.branch_telemetry;
+DROP POLICY IF EXISTS "branch_telemetry_staff_update" ON public.branch_telemetry;
+DROP POLICY IF EXISTS "Staff read telemetry" ON public.branch_telemetry;
+DROP POLICY IF EXISTS "Staff refresh telemetry" ON public.branch_telemetry;
+DROP POLICY IF EXISTS "Staff report telemetry" ON public.branch_telemetry;
+
+CREATE POLICY "Telemetry visible in own branch" ON public.branch_telemetry
+  FOR SELECT TO authenticated
+  USING (public.user_has_store_access(store_id));
+
+CREATE POLICY "Telemetry reported for own branch" ON public.branch_telemetry
+  FOR INSERT TO authenticated
+  WITH CHECK (public.user_has_store_access(store_id));
+
+CREATE POLICY "Telemetry refreshed for own branch" ON public.branch_telemetry
+  FOR UPDATE TO authenticated
+  USING (public.user_has_store_access(store_id))
+  WITH CHECK (public.user_has_store_access(store_id));
+
+REVOKE ALL ON public.branch_telemetry FROM anon;
+GRANT SELECT, INSERT, UPDATE ON public.branch_telemetry TO authenticated;
+GRANT ALL ON public.branch_telemetry TO service_role;
+
+-- 3. payment_types: remove the permissive staff duplicates; keep supervisor-only writes
+DROP POLICY IF EXISTS "payment_types_staff_read" ON public.payment_types;
+DROP POLICY IF EXISTS "payment_types_staff_write" ON public.payment_types;
+
+-- 4. login-support tables stay unreachable through the data API
+REVOKE ALL ON public.pin_attempts FROM anon, authenticated;
+REVOKE ALL ON public.cashiers FROM anon, authenticated;
+GRANT ALL ON public.pin_attempts TO service_role;
+GRANT ALL ON public.cashiers TO service_role;
+
+GRANT SELECT, INSERT ON public.audit_logs TO authenticated;
+GRANT ALL ON public.audit_logs TO service_role;
+
+-- ---------------------------------------------------------------------------
+-- Final security invariant
+-- ---------------------------------------------------------------------------
+-- Every application table is protected by row-level security. A table may
+-- intentionally have no client policy (for example a service-role-only secret
+-- table); with RLS enabled that means authenticated and anonymous clients are
+-- denied by default. Abort the installer rather than leave a new table open.
+DO $retail_verify_rls$
+DECLARE unprotected text;
+BEGIN
+  SELECT string_agg(format('%I.%I', n.nspname, c.relname), ', ' ORDER BY c.relname)
+  INTO unprotected
+  FROM pg_class AS c
+  JOIN pg_namespace AS n ON n.oid = c.relnamespace
+  WHERE n.nspname = 'public'
+    AND c.relkind IN ('r', 'p')
+    AND NOT c.relrowsecurity;
+
+  IF unprotected IS NOT NULL THEN
+    RAISE EXCEPTION 'Retail schema refused: RLS is disabled for %', unprotected;
+  END IF;
+END;
+$retail_verify_rls$;
+
+RESET check_function_bodies;
+RESET client_min_messages;

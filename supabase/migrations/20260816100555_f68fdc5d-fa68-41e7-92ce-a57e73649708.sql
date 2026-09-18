@@ -1,1 +1,0 @@
-ALTER TABLE public.pos_settings ADD COLUMN IF NOT EXISTS logo_data_url text;

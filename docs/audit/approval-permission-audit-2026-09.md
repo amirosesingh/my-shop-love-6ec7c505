@@ -72,4 +72,4 @@ When a matching `extra_authority` exists, effective maximum is `min(direct limit
 
 ## SQL deployment
 
-The additive cloud migration is `supabase/migrations/20260909130000_relative_approval_authority.sql`. Apply it to Supabase before deploying application code. The earlier `20260909090000_approval_authority_limits.sql` remains required only on a database where that preceding change has not already been applied. Windows SQL Server upgrades are generated from `database/schema.sql` and run through the existing POS Schema Manager/startup upgrade; the generated `db/offline/pos-offline-sqlserver.sql` is for a technician provisioning/upgrading SQL Server, not Supabase. Electron SQLite additions are applied by the existing additive local-schema upgrader; reset scripts must never be used.
+The approval-authority schema is consolidated into `supabase/schema.sql`, the only installer to run against Supabase.

@@ -1,7 +1,7 @@
 /**
  * Deep comparison for the local Microsoft SQL Server database.
  *
- * The master file (`database/schema.sql`, returned by the bridge alongside the
+ * The retired local schema (formerly returned by the desktop bridge alongside the
  * table manifest) is the definition; the bridge's read-only inventory is the
  * reality. Row-level security and policies do not exist on SQL Server, so the
  * comparison covers nullability, defaults, primary keys and indexes.

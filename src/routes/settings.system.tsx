@@ -4,11 +4,9 @@ import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsF
 import { SettingsTabs } from "@/platforms/web/components/pos/settings/SettingsTabs";
 import { SystemStatusPanel } from "@/platforms/web/components/pos/settings/panels/SystemStatusPanel";
 import { CloudConnectionPanel } from "@/platforms/web/components/pos/settings/panels/CloudConnectionPanel";
-import { DatabaseHealthPanel } from "@/platforms/web/components/pos/settings/panels/DatabaseHealthPanel";
 import { LogicHealthPanel } from "@/platforms/web/components/pos/settings/panels/LogicHealthPanel";
 import { SecurityAlertsPanel } from "@/platforms/web/components/pos/settings/panels/SecurityAlertsPanel";
 import { InheritancePanel } from "@/platforms/web/components/pos/settings/panels/InheritancePanel";
-import { DataComparison } from "@/platforms/web/components/pos/sync/DataComparison";
 import { SYSTEM_TAB_IDS, systemTab, type SystemTabId } from "@/lib/settings-groups";
 
 export const Route = createFileRoute("/settings/system")({
@@ -22,12 +20,12 @@ export const Route = createFileRoute("/settings/system")({
       {
         name: "description",
         content:
-          "One window for connection health, database integrity, code logic health, security alerts, data sync and settings inheritance on this till.",
+          "One window for connection health, code logic health, security alerts and settings inheritance on this till.",
       },
       { property: "og:title", content: "System & General Settings — Retail" },
       {
         property: "og:description",
-        content: "Diagnose, sync and configure every service this till depends on, in one view.",
+        content: "Diagnose and configure the online services this device depends on.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -46,9 +44,7 @@ function SystemSettingsPage() {
       <SettingsTabs
         current="/settings/system"
         activeTab={tab}
-        onTab={(next) =>
-          void navigate({ search: { tab: next as SystemTabId }, replace: true })
-        }
+        onTab={(next) => void navigate({ search: { tab: next as SystemTabId }, replace: true })}
       />
 
       <div className="w-full min-w-0 max-w-full">
@@ -58,10 +54,8 @@ function SystemSettingsPage() {
             <SystemStatusPanel />
           </div>
         )}
-        {tab === "database-health" && <DatabaseHealthPanel />}
         {tab === "logic-health" && <LogicHealthPanel />}
         {tab === "security-alerts" && <SecurityAlertsPanel />}
-        {tab === "data-comparison" && <DataComparison />}
         {tab === "inheritance" && <InheritancePanel />}
       </div>
     </SettingsFrame>

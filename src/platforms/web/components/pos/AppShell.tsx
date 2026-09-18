@@ -13,7 +13,10 @@ import { usePos } from "@/lib/pos-store";
 import { useAuth, type PermissionFlag } from "@/lib/pos-auth";
 import { Link, useLocation } from "@tanstack/react-router";
 import { TerminalLogin } from "@/platforms/web/components/pos/TerminalLogin";
-import { TerminalActivation, TerminalRevokedScreen } from "@/platforms/web/components/pos/TerminalActivation";
+import {
+  TerminalActivation,
+  TerminalRevokedScreen,
+} from "@/platforms/web/components/pos/TerminalActivation";
 import { clearRevocation, useRevocationCheck } from "@/lib/use-revocation-check";
 import { useStartupGate, startupDecision } from "@/core/activation/registration-status";
 import { hasFeature } from "@/platform-config/features";
@@ -27,7 +30,6 @@ import {
 } from "@/platforms/web/components/pos/StatusCluster";
 import { WindowControls } from "@/platforms/windows/components/WindowControls";
 
-
 import { ActivityBell } from "@/platforms/web/components/pos/ActivityBell";
 import { MobileStatusSheet } from "@/platforms/web/components/pos/MobileStatusSheet";
 import { ShiftGuard } from "@/platforms/web/components/pos/ShiftGuard";
@@ -36,9 +38,7 @@ import { useVisibility } from "@/lib/ui-visibility";
 
 import { LiveClock } from "@/platforms/web/components/pos/LiveClock";
 import { ThemeToggle } from "@/platforms/web/components/pos/ThemeToggle";
-import { startSyncEngine } from "@/lib/sync-engine";
 import { hydrateBillSequence } from "@/lib/bill-number";
-import { startDatabaseModeWatch } from "@/core/local-db/db-mode";
 import { DbConnectionModal } from "@/platforms/windows/components/DbConnectionModal";
 import { UpdateHeaderButton } from "@/platforms/web/components/pos/UpdateHeaderButton";
 import { routePermissionForPath, type NavItem } from "@/platforms/web/components/pos/nav-config";
@@ -64,14 +64,8 @@ import { soleBranchId } from "@/lib/active-branch";
 import { flushWhatsAppQueue } from "@/lib/whatsapp";
 import { closeCustomerDisplay } from "@/lib/customer-display";
 import { reportAppReady } from "@/lib/app-health";
-import { localDb } from "@/core/local-db/local-db";
-import { supabaseConfig } from "@/lib/external-supabase-config";
-import {
-  hydrateConnectionProfile,
-  isConnectionProfileHydrated,
-} from "@/lib/connection-profile";
+import { hydrateConnectionProfile, isConnectionProfileHydrated } from "@/lib/connection-profile";
 import { CloudSetupGate } from "@/platforms/web/components/pos/CloudSetupGate";
-import { readCredentials } from "@/lib/pos-credentials";
 import { TillLoader } from "@/components/shared/TillLoader";
 import { LocationBootGuard } from "@/platforms/web/components/pos/LocationBootGuard";
 
@@ -146,49 +140,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     ruleLockSeconds,
   );
 
-  // Background outbox drain: keeps offline sales flowing once the link returns.
-  useEffect(() => startSyncEngine(), []);
   // The bill counter lives in the branch database; restore it before the first
   // sale so a cleared browser profile cannot restart numbering.
   useEffect(() => {
     void hydrateBillSequence();
   }, []);
-  // Hand this device's cloud connection details to Electron's sync worker on
-  // every launch. The keys sealed in the platform vault win over anything
-  // baked into the build; with no keys saved yet the shell boots its worker
-  // from its own sealed store once an admin saves them in Settings.
+  // Restore the OS-sealed cloud profile before the online client is used.
   useEffect(() => {
-    const bridge = localDb();
-    if (!bridge) return;
-    void (async () => {
-      // One restore for the whole profile — the same promise the start-up
-      // gate below waits on, so nothing runs against a half-restored device.
-      await hydrateConnectionProfile();
-
-      let cloud: { url: string; key: string } | null = null;
-      try {
-        cloud = supabaseConfig();
-      } catch {
-        // Unconfigured device — trading stays local, sync stays parked.
-      }
-      if (!cloud) return;
-      const credentials = await readCredentials();
-      void bridge.configureCloud({
-        url: cloud.url,
-        key: cloud.key,
-        ...credentials,
-        branchId: terminal.config?.locationId ?? currentStore?.id,
-      });
-    })();
-  }, [
-    terminal.config?.supabaseUrl,
-    terminal.config?.supabaseKey,
-    terminal.config?.locationId,
-    currentStore?.id,
-    user?.staffId,
-  ]);
-  // Keeps the database-mode pill and the automatic local failover honest.
-  useEffect(() => startDatabaseModeWatch(), []);
+    void hydrateConnectionProfile();
+  }, []);
 
   // Tells the desktop shell this build actually started, so it never falls
   // back into safe mode after a healthy launch.
@@ -225,7 +185,11 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [currentStore]);
 
   useEffect(() => {
-    setPrintSettings(state.settings.receipt, state.settings.tax, state.settings.integrations.rounding);
+    setPrintSettings(
+      state.settings.receipt,
+      state.settings.tax,
+      state.settings.integrations.rounding,
+    );
   }, [state.settings]);
 
   // The liability wording lives with the booking rules but is printed by the
@@ -255,7 +219,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       cancelled = true;
     };
   }, [profileHydrated]);
-
 
   if (!ready) return null;
   // Every activated terminal, including a browser-based till, must finish
@@ -338,7 +301,6 @@ export function AppShell({ children }: { children: ReactNode }) {
         (t.status === "awaiting_approval" || t.status === "approved")),
   ).length;
 
-
   // Receipt identity wins; the locally captured install name is the fallback.
   const companyName = state.settings.receipt.companyName?.trim() || branding.company;
 
@@ -351,7 +313,6 @@ export function AppShell({ children }: { children: ReactNode }) {
     if (item.adminOnly && !isAdmin && !item.flag) return false;
     return visibleRoute(item.to);
   };
-
 
   const Brand = ({ mini }: { mini?: boolean }) => (
     <div className={cn("flex items-center gap-2 px-3 py-4", mini && "justify-center px-0")}>
@@ -437,195 +398,196 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   return (
     <TooltipProvider delayDuration={0}>
-    <div className="pos-scaled flex h-dvh min-h-dvh flex-col overflow-hidden bg-background text-foreground">
-      <DbConnectionModal />
-      <CloudSetupGate />
-      {/* Frameless desktop shell: draggable strip under the native window buttons. */}
-      {isDesktop() && (
-        <div className="app-drag flex h-[34px] shrink-0 items-center gap-2 border-b border-border bg-sidebar pl-3">
-          <ReceiptText className="size-3.5 shrink-0 text-primary" />
-          <span className="truncate text-[11px] font-semibold text-muted-foreground">
-            {companyName}
-          </span>
-          <WindowControls />
-        </div>
-      )}
-      <ShiftGuard>
-        <div className="flex min-h-0 min-w-0 flex-1">
-          {/* Desktop / tablet sidebar */}
-          <aside
-            className={cn(
-              "hidden shrink-0 flex-col border-r border-border bg-sidebar md:flex",
-              collapsed ? "w-16" : "w-60",
-            )}
-          >
-            <SidebarNav
-              collapsed={collapsed}
-              onToggleCollapse={() => setCollapsed(!collapsed)}
-              canSee={canSee}
-              inbound={inbound}
-              header={
-                <>
-                  <Brand mini={collapsed} />
-                  {!collapsed && <div className="px-3 pb-3">{<StorePicker />}</div>}
-                </>
-              }
-              footer={<div className="mt-auto">{<Footer mini={collapsed} />}</div>}
-            />
-          </aside>
+      <div className="pos-scaled flex h-dvh min-h-dvh flex-col overflow-hidden bg-background text-foreground">
+        <DbConnectionModal />
+        <CloudSetupGate />
+        {/* Frameless desktop shell: draggable strip under the native window buttons. */}
+        {isDesktop() && (
+          <div className="app-drag flex h-[34px] shrink-0 items-center gap-2 border-b border-border bg-sidebar pl-3">
+            <ReceiptText className="size-3.5 shrink-0 text-primary" />
+            <span className="truncate text-[11px] font-semibold text-muted-foreground">
+              {companyName}
+            </span>
+            <WindowControls />
+          </div>
+        )}
+        <ShiftGuard>
+          <div className="flex min-h-0 min-w-0 flex-1">
+            {/* Desktop / tablet sidebar */}
+            <aside
+              className={cn(
+                "hidden shrink-0 flex-col border-r border-border bg-sidebar md:flex",
+                collapsed ? "w-16" : "w-60",
+              )}
+            >
+              <SidebarNav
+                collapsed={collapsed}
+                onToggleCollapse={() => setCollapsed(!collapsed)}
+                canSee={canSee}
+                inbound={inbound}
+                header={
+                  <>
+                    <Brand mini={collapsed} />
+                    {!collapsed && <div className="px-3 pb-3">{<StorePicker />}</div>}
+                  </>
+                }
+                footer={<div className="mt-auto">{<Footer mini={collapsed} />}</div>}
+              />
+            </aside>
 
-          <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-            {/* Mobile top bar + slide-out drawer */}
-            <header className="pt-safe sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b border-border bg-sidebar px-3 pb-2 md:hidden">
-              <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
-                <SheetTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon"
-                    aria-label="Open menu"
-                    className="touch-target"
-                  >
-                    <Menu className="size-5" />
-                  </Button>
-                </SheetTrigger>
-                <SheetContent side="left" className="pt-safe pb-safe z-50 w-72 bg-sidebar p-0">
-                  <SheetTitle className="sr-only">Navigation</SheetTitle>
-                  <SidebarNav
-                    canSee={canSee}
-                    inbound={inbound}
-                    onNavigate={() => setDrawerOpen(false)}
-                    header={
-                      <>
-                        <Brand />
-                        <div className="px-3 pb-3">
-                          <StorePicker />
-                        </div>
-                      </>
-                    }
-                    footer={<div className="mt-auto">{<Footer />}</div>}
-                  />
-                </SheetContent>
-              </Sheet>
-              <div className="flex min-w-0 items-center gap-2">
-                <ReceiptText className="size-4 shrink-0 text-primary" />
-                <span className="truncate text-sm font-semibold">{companyName}</span>
-              </div>
-              {/* The branch picker lives in the side menu only; the top bar
+            <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+              {/* Mobile top bar + slide-out drawer */}
+              <header className="pt-safe sticky top-0 z-30 flex shrink-0 items-center gap-2 border-b border-border bg-sidebar px-3 pb-2 md:hidden">
+                <Sheet open={drawerOpen} onOpenChange={setDrawerOpen}>
+                  <SheetTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      aria-label="Open menu"
+                      className="touch-target"
+                    >
+                      <Menu className="size-5" />
+                    </Button>
+                  </SheetTrigger>
+                  <SheetContent side="left" className="pt-safe pb-safe z-50 w-72 bg-sidebar p-0">
+                    <SheetTitle className="sr-only">Navigation</SheetTitle>
+                    <SidebarNav
+                      canSee={canSee}
+                      inbound={inbound}
+                      onNavigate={() => setDrawerOpen(false)}
+                      header={
+                        <>
+                          <Brand />
+                          <div className="px-3 pb-3">
+                            <StorePicker />
+                          </div>
+                        </>
+                      }
+                      footer={<div className="mt-auto">{<Footer />}</div>}
+                    />
+                  </SheetContent>
+                </Sheet>
+                <div className="flex min-w-0 items-center gap-2">
+                  <ReceiptText className="size-4 shrink-0 text-primary" />
+                  <span className="truncate text-sm font-semibold">{companyName}</span>
+                </div>
+                {/* The branch picker lives in the side menu only; the top bar
                   just states which branch is in use. */}
-              <Badge
-                variant="outline"
-                className={cn(
-                  "ml-auto shrink-0 text-[10px]",
-                  activeShift
-                    ? "border-success/40 bg-success/10 text-success"
-                    : "border-destructive/40 bg-destructive/10 text-destructive",
-                )}
-              >
-                {currentStore.code}
-              </Badge>
-              {/* Narrow phones only get the essentials; the rest lives in the sheet. */}
-              <span className="hidden sm:inline-flex">
-                <LiveClock compact />
-              </span>
-              <MobileStatusSheet />
-              <UpdateHeaderButton />
-              <Button
-                asChild
-                variant="ghost"
-                size="icon"
-                className="shrink-0"
-                aria-label="Settings"
-              >
-                <Link to="/settings">
-                  <SettingsIcon className="size-4" />
-                </Link>
-              </Button>
-              <ThemeToggle />
-              <Button
-                variant="outline"
-                size="sm"
-                className="touch-target shrink-0 px-2 text-[11px]"
-                onClick={() => void lock()}
-              >
-                <Lock className="size-3.5" /> Lock
-              </Button>
-            </header>
-
-            {/* Desktop header: signed-in cashier + quick lock / switch user */}
-            <header className="sticky top-0 z-30 hidden shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 py-2 md:flex">
-              <div className="min-w-0">
-                <p className="truncate text-sm font-medium">{user.name}</p>
-                <p className="text-[11px] capitalize text-muted-foreground">
-                  {user.staffId} · {user.role}
-                </p>
-              </div>
-              <div className="ml-auto" />
-              <LiveClock />
-              <ConnectionStatusButton />
-              <SystemAlertsButton />
-              <ActivityBell />
-
-              {terminal.config && (
                 <Badge
                   variant="outline"
-                  className="shrink-0 gap-1 border-primary/40 bg-primary/10 text-[11px] text-primary"
+                  className={cn(
+                    "ml-auto shrink-0 text-[10px]",
+                    activeShift
+                      ? "border-success/40 bg-success/10 text-success"
+                      : "border-destructive/40 bg-destructive/10 text-destructive",
+                  )}
                 >
-                  <MapPin className="size-3" />
-                  {terminal.config.locationName || currentStore.name}
+                  {currentStore.code}
                 </Badge>
-              )}
-              <UpdateHeaderButton />
-              <Button
-                asChild
-                variant="ghost"
-                size="icon"
-                className="shrink-0"
-                aria-label="Settings"
-              >
-                <Link to="/settings">
-                  <SettingsIcon className="size-4" />
-                </Link>
-              </Button>
-              <ThemeToggle />
-              <Button
-                variant="outline"
-                size="sm"
-                className="h-8 text-xs"
-                onClick={() => void lock()}
-              >
-                <Lock className="size-3.5" /> Lock / Switch user
-              </Button>
-            </header>
+                {/* Narrow phones only get the essentials; the rest lives in the sheet. */}
+                <span className="hidden sm:inline-flex">
+                  <LiveClock compact />
+                </span>
+                <MobileStatusSheet />
+                <UpdateHeaderButton />
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  aria-label="Settings"
+                >
+                  <Link to="/settings">
+                    <SettingsIcon className="size-4" />
+                  </Link>
+                </Button>
+                <ThemeToggle />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="touch-target shrink-0 px-2 text-[11px]"
+                  onClick={() => void lock()}
+                >
+                  <Lock className="size-3.5" /> Lock
+                </Button>
+              </header>
 
-            <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
-              {(() => {
-                // Decided before the page body renders: no flash of protected data.
-                if (isDesktop() && isDesktopBlocked(location.pathname))
-                  return (
-                    <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center">
-                      <Lock className="size-8 text-muted-foreground" />
-                      <h1 className="text-lg font-semibold">Managed in the web console</h1>
-                      <p className="max-w-sm text-sm text-muted-foreground">
-                        Accounts, branches, messaging credentials and device activation are handled
-                        centrally, not from a till. Open the web admin console to change them.
-                      </p>
-                      <Button asChild variant="outline" size="sm">
-                        <Link to="/">Back to the register</Link>
-                      </Button>
-                    </div>
-                  );
-                const required = requiredPermission(location.pathname);
-                const allowed =
-                  required === null ? true : required === "unknown" ? isAdmin : can(required);
-                if (allowed && visibleRoute(location.pathname)) return children;
-                if (allowed) return <PermissionDenied title="Hidden for your role" flag={null} />;
-                return <PermissionDenied flag={required === "unknown" ? null : required} />;
-              })()}
-            </main>
+              {/* Desktop header: signed-in cashier + quick lock / switch user */}
+              <header className="sticky top-0 z-30 hidden shrink-0 items-center gap-3 border-b border-border bg-sidebar px-4 py-2 md:flex">
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-medium">{user.name}</p>
+                  <p className="text-[11px] capitalize text-muted-foreground">
+                    {user.staffId} · {user.role}
+                  </p>
+                </div>
+                <div className="ml-auto" />
+                <LiveClock />
+                <ConnectionStatusButton />
+                <SystemAlertsButton />
+                <ActivityBell />
+
+                {terminal.config && (
+                  <Badge
+                    variant="outline"
+                    className="shrink-0 gap-1 border-primary/40 bg-primary/10 text-[11px] text-primary"
+                  >
+                    <MapPin className="size-3" />
+                    {terminal.config.locationName || currentStore.name}
+                  </Badge>
+                )}
+                <UpdateHeaderButton />
+                <Button
+                  asChild
+                  variant="ghost"
+                  size="icon"
+                  className="shrink-0"
+                  aria-label="Settings"
+                >
+                  <Link to="/settings">
+                    <SettingsIcon className="size-4" />
+                  </Link>
+                </Button>
+                <ThemeToggle />
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="h-8 text-xs"
+                  onClick={() => void lock()}
+                >
+                  <Lock className="size-3.5" /> Lock / Switch user
+                </Button>
+              </header>
+
+              <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+                {(() => {
+                  // Decided before the page body renders: no flash of protected data.
+                  if (isDesktop() && isDesktopBlocked(location.pathname))
+                    return (
+                      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center">
+                        <Lock className="size-8 text-muted-foreground" />
+                        <h1 className="text-lg font-semibold">Managed in the web console</h1>
+                        <p className="max-w-sm text-sm text-muted-foreground">
+                          Accounts, branches, messaging credentials and device activation are
+                          handled centrally, not from a till. Open the web admin console to change
+                          them.
+                        </p>
+                        <Button asChild variant="outline" size="sm">
+                          <Link to="/">Back to the register</Link>
+                        </Button>
+                      </div>
+                    );
+                  const required = requiredPermission(location.pathname);
+                  const allowed =
+                    required === null ? true : required === "unknown" ? isAdmin : can(required);
+                  if (allowed && visibleRoute(location.pathname)) return children;
+                  if (allowed) return <PermissionDenied title="Hidden for your role" flag={null} />;
+                  return <PermissionDenied flag={required === "unknown" ? null : required} />;
+                })()}
+              </main>
+            </div>
           </div>
-        </div>
-      </ShiftGuard>
-    </div>
+        </ShiftGuard>
+      </div>
     </TooltipProvider>
   );
 }

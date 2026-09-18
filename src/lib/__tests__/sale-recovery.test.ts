@@ -35,13 +35,3 @@ describe("checkout row identity", () => {
     expect(stableChildId(parent, "2", 0)).toMatch(/^[0-9a-f-]{36}$/);
   });
 });
-
-describe("local write whitelist", () => {
-  it("allows the sign-in log and drawer openings", async () => {
-    const { readFileSync } = await import("node:fs");
-    const source = readFileSync("electron/db/repo.cjs", "utf8");
-    const list = source.slice(source.indexOf("const TABLES = ["), source.indexOf("];"));
-    expect(list).toContain('"shift_sessions"');
-    expect(list).toContain('"drawer_events"');
-  });
-});

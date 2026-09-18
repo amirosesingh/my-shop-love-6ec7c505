@@ -9,21 +9,12 @@
  * signed-in user or a working database.
  */
 import { Component, useEffect, useState, type ReactNode } from "react";
-import {
-  Building2,
-  ChevronDown,
-  Database,
-  KeyRound,
-  MonitorCog,
-  Server,
-  ShieldCheck,
-} from "lucide-react";
+import { Building2, ChevronDown, KeyRound, MonitorCog, Server, ShieldCheck } from "lucide-react";
 
 import { CloudConnectionPanel } from "@/platforms/web/components/pos/settings/panels/CloudConnectionPanel";
-import { LocalDatabaseSettings } from "@/platforms/web/components/pos/LocalDatabaseSettings";
 import { ReceiptPrinterSettings } from "@/platforms/web/components/pos/ReceiptPrinterSettings";
 import { TerminalActivation } from "@/platforms/web/components/pos/TerminalActivation";
-import { isElectron, isTerminalApp } from "@/platform-config/platform";
+import { isTerminalApp } from "@/platform-config/platform";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { cloudKeyStatus, subscribeCloudKeys } from "@/lib/secure-cloud-config";
 import { boundBranchName } from "@/lib/active-branch";
@@ -56,9 +47,7 @@ function Chip({ health, label }: { health: Health; label: string }) {
       : health === "todo"
         ? "border-warning/40 bg-warning/10 text-warning"
         : "border-border bg-muted text-muted-foreground";
-  return (
-    <span className={`rounded-full border px-2 py-0.5 text-[11px] ${tone}`}>{label}</span>
-  );
+  return <span className={`rounded-full border px-2 py-0.5 text-[11px] ${tone}`}>{label}</span>;
 }
 
 function Card({
@@ -131,16 +120,11 @@ function ModeBanner() {
     },
   };
   const { tone, text } = copy[mode]!;
-  return (
-    <div className={`rounded-lg border px-3 py-2 text-xs ${tone}`}>
-      {text}
-    </div>
-  );
+  return <div className={`rounded-lg border px-3 py-2 text-xs ${tone}`}>{text}</div>;
 }
 
 export function RecoveryHub() {
   const terminalApp = isTerminalApp();
-  const desktop = isElectron();
   const [activated, setActivated] = useState<boolean | null>(null);
   const [cloud, setCloud] = useState<boolean | null>(null);
   const [branch, setBranch] = useState<string | null>(null);
@@ -189,18 +173,6 @@ export function RecoveryHub() {
       >
         <CloudConnectionPanel />
       </Card>
-
-      {desktop && (
-        <Card
-          icon={Database}
-          title="Local database (SQL Server)"
-          blurb="The Microsoft SQL Server on this machine, its driver and the connection test."
-          health="info"
-          status="This PC only"
-        >
-          <LocalDatabaseSettings />
-        </Card>
-      )}
 
       <Card
         icon={Building2}

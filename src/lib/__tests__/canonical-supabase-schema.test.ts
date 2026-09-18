@@ -1,47 +1,48 @@
-import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { resolve } from "node:path";
+import { readFileSync, readdirSync, statSync } from "node:fs";
+import { resolve, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
-const schemaPath = resolve(root, "supabase/schema.sql");
+const read = (path: string) => readFileSync(resolve(root, path), "utf8");
 
-describe("canonical Supabase schema", () => {
-  it("keeps one scoped production upgrade beside the canonical installer", () => {
-    const sqlDir = resolve(root, "supabase/sql");
-    // 99_reset_data.sql is a deliberate one-off data wipe, not a schema installer.
-    expect(readdirSync(sqlDir).sort()).toEqual([
-      "99_reset_data.sql",
-      "README.md",
-      "production_upgrade_current.sql",
-    ]);
-    expect(existsSync(schemaPath)).toBe(true);
-    expect(existsSync(resolve(root, "supabase/retail_cloud_full.sql"))).toBe(false);
+function sqlFiles(directory = root): string[] {
+  const files: string[] = [];
+  for (const entry of readdirSync(directory)) {
+    if ([".git", "node_modules", ".output", ".wrangler"].includes(entry)) continue;
+    const absolute = resolve(directory, entry);
+    if (statSync(absolute).isDirectory()) files.push(...sqlFiles(absolute));
+    else if (entry.endsWith(".sql")) files.push(relative(root, absolute).replaceAll("\\\\", "/"));
+  }
+  return files.sort();
+}
+
+describe("canonical Supabase SQL", () => {
+  it("keeps only the online installer and deliberate reset", () => {
+    expect(sqlFiles()).toEqual(["supabase/reset.sql", "supabase/schema.sql"]);
   });
 
-  it("repairs legacy transfer quantity types before transfer backfills", () => {
-    const sql = readFileSync(schemaPath, "utf8");
-    const repair = sql.indexOf("DO $quantity_types$");
-    const backfill = sql.indexOf("SET quantity_verified = COALESCE");
-
-    expect(repair).toBeGreaterThan(0);
-    expect(backfill).toBeGreaterThan(repair);
-    for (const column of [
-      "quantity",
-      "quantity_received",
-      "quantity_approved",
-      "quantity_dispatched",
-      "quantity_verified",
-    ]) {
-      expect(sql).toContain(`'${column}'`);
-    }
-  });
-
-  it("includes the deep inventory helper and final verification", () => {
-    const sql = readFileSync(schemaPath, "utf8");
-    expect(sql).toContain("CREATE OR REPLACE FUNCTION public.schema_inventory_deep()");
-    expect(sql).toContain(
-      "REVOKE ALL ON FUNCTION public.schema_inventory_deep() FROM PUBLIC, anon, authenticated",
+  it("contains the complete schema and enforces RLS on every app table", () => {
+    const sql = read("supabase/schema.sql");
+    const tables = [...sql.matchAll(/CREATE TABLE IF NOT EXISTS public\.([a-z0-9_]+)/gi)].map(
+      (match) => match[1],
     );
-    expect(sql).toContain("Schema check: everything present.");
+    expect(tables.length).toBeGreaterThan(60);
+    for (const table of tables) {
+      expect(sql, `${table} must enable RLS`).toMatch(
+        new RegExp(`ALTER TABLE(?: ONLY)? public\\.${table} ENABLE ROW LEVEL SECURITY`, "i"),
+      );
+    }
+    expect(sql).toContain("CREATE OR REPLACE FUNCTION public.schema_inventory_deep()");
+    expect(sql).toContain("Retail schema refused: RLS is disabled for");
+    expect(sql).toContain("FUNCTION public.pos_sale_commit");
+  });
+
+  it("resets data transactionally and restores RLS before commit", () => {
+    const sql = read("supabase/reset.sql");
+    expect(sql).toMatch(/BEGIN;[\s\S]*DISABLE ROW LEVEL SECURITY/);
+    expect(sql).toMatch(/DISABLE ROW LEVEL SECURITY[\s\S]*DELETE FROM/);
+    expect(sql).toMatch(/DELETE FROM[\s\S]*ENABLE ROW LEVEL SECURITY/);
+    expect(sql).toMatch(/RLS was not restored[\s\S]*COMMIT;/);
+    expect(sql).not.toMatch(/DROP (?:TABLE|SCHEMA|POLICY)/i);
   });
 });

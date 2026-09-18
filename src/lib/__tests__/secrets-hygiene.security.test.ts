@@ -72,8 +72,10 @@ describe("secrets hygiene", () => {
     );
     const offenders: string[] = [];
     for (const file of sources) {
+      if (!existsSync(join(root, file))) continue;
       const text = readFileSync(join(root, file), "utf8");
-      if (/https:\/\/[a-z0-9]{20}\.supabase\.co/.test(text)) offenders.push(`${file}: project address`);
+      if (/https:\/\/[a-z0-9]{20}\.supabase\.co/.test(text))
+        offenders.push(`${file}: project address`);
       if (/sb_(publishable|secret)_[A-Za-z0-9_-]{10,}/.test(text)) offenders.push(`${file}: key`);
       for (const shape of SECRET_SHAPES) if (shape.test(text)) offenders.push(`${file}: secret`);
     }

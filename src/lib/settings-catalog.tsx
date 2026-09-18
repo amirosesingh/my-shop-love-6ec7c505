@@ -486,19 +486,9 @@ export const SETTINGS_CARDS: SettingsCard[] = [
 
   /* ---- Data & connectivity ----------------------------------------------------- */
   {
-    id: "sync",
-    label: "Sync",
-    blurb: "Run a sync, watch each table and clear the queue.",
-    icon: RefreshCw,
-    category: "data",
-    scope: "terminal",
-    to: "/settings/sync",
-    panel: page(() => import("@/routes/settings.sync")),
-  },
-  {
     id: "database",
     label: "Database connection",
-    blurb: "Central and local database connections, tests and schema health.",
+    blurb: "Central database credentials and connection test.",
     icon: Database,
     category: "data",
     scope: "terminal",
@@ -553,20 +543,6 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     })),
   },
   {
-    id: "database-health",
-    label: "Database health",
-    blurb: "Table links, orphan records and read / write checks.",
-    icon: Database,
-    category: "health",
-    scope: "terminal",
-    to: "/settings/system?tab=database-health",
-    raw: true,
-    panel: lazy(async () => ({
-      default: (await import("@/platforms/web/components/pos/settings/panels/DatabaseHealthPanel"))
-        .DatabaseHealthPanel,
-    })),
-  },
-  {
     id: "logic-health",
     label: "Logic health",
     blurb: "Unfinished logic, dead actions and missing guards.",
@@ -576,7 +552,8 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     to: "/settings/system?tab=logic-health",
     raw: true,
     panel: lazy(async () => ({
-      default: (await import("@/platforms/web/components/pos/settings/panels/LogicHealthPanel")).LogicHealthPanel,
+      default: (await import("@/platforms/web/components/pos/settings/panels/LogicHealthPanel"))
+        .LogicHealthPanel,
     })),
   },
   {
@@ -594,19 +571,6 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     })),
   },
   {
-    id: "data-comparison",
-    label: "Server vs. shop data",
-    blurb: "Record counts here against the company server.",
-    icon: Database,
-    category: "data",
-    scope: "branch",
-    to: "/settings/system?tab=data-comparison",
-    raw: true,
-    panel: lazy(async () => ({
-      default: (await import("@/platforms/web/components/pos/sync/DataComparison")).DataComparison,
-    })),
-  },
-  {
     id: "inheritance",
     label: "Settings inheritance",
     blurb: "Which values come from global, cluster or this branch.",
@@ -616,19 +580,9 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     to: "/settings/system?tab=inheritance",
     raw: true,
     panel: lazy(async () => ({
-      default: (await import("@/platforms/web/components/pos/settings/panels/InheritancePanel")).InheritancePanel,
+      default: (await import("@/platforms/web/components/pos/settings/panels/InheritancePanel"))
+        .InheritancePanel,
     })),
-  },
-  {
-    id: "database-explorer",
-    label: "Database explorer",
-    blurb: "Browse the SQL Server on this machine and run read-only checks.",
-    icon: Database,
-    category: "data",
-    scope: "terminal",
-    to: "/settings/database-explorer",
-    panel: page(() => import("@/routes/settings.database-explorer")),
-    desktopOnly: true,
   },
 
   /* ---- Staff & security --------------------------------------------- */

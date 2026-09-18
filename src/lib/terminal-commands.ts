@@ -9,11 +9,8 @@
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { terminalId } from "./activity-journal";
 import { activeBranchId } from "./active-branch";
-import { drainOutbox } from "./sync-engine";
-import { pendingCount } from "./sync-outbox";
-import { localDb } from "@/core/local-db/local-db";
 
-export type CommandName = "sync_now" | "refresh_catalog";
+export type CommandName = "refresh_catalog";
 
 export type TerminalCommand = {
   id: string;
@@ -30,7 +27,6 @@ export type TerminalCommand = {
 };
 
 export const COMMAND_LABEL: Record<string, string> = {
-  sync_now: "Force immediate queue sync",
   refresh_catalog: "Refresh master catalogue & cache",
 };
 
@@ -95,38 +91,9 @@ export async function runPendingCommands(onRefresh: () => Promise<void>): Promis
       .update({ status: "running", picked_up_at: new Date().toISOString() } as never)
       .eq("id", row.id);
 
-    // Sync priority guard: unsynced sales always go up before anything else.
-    // First migrate any renderer queue left by an older Electron build, then
-    // ask the authoritative main-process worker for one serialized cycle.
-    const drained = await drainOutbox();
-    const bridge = localDb();
-    const cycle = bridge?.syncNow ? await bridge.syncNow() : null;
-    const workerStatus = bridge ? await bridge.status().catch(() => null) : null;
-    const left = workerStatus?.businessBatches
-      ? workerStatus.businessBatches.pending + workerStatus.businessBatches.failed
-      : bridge
-        ? workerStatus?.queue?.length ?? 0
-        : pendingCount();
-    if (left > 0) {
-      await finish(
-        row.id,
-        "blocked",
-        `${left} offline change${left === 1 ? "" : "s"} still waiting to sync — command will retry.`,
-      );
-      // Put it back in line so the next poll tries again once the queue clears.
-      await supabase.from("terminal_commands").update({ status: "pending" } as never).eq("id", row.id);
-      continue;
-    }
-
     try {
-      if (row.command === "refresh_catalog") await onRefresh();
-      await finish(
-        row.id,
-        "done",
-        row.command === "refresh_catalog"
-          ? "Catalogue and cache refreshed after the queue was clear."
-          : `Queue synced (${cycle && "pushed" in cycle ? Number(cycle.pushed ?? 0) : drained.pushed} change(s) sent).`,
-      );
+      await onRefresh();
+      await finish(row.id, "done", "Catalogue refreshed from the central database.");
       ran += 1;
     } catch (e) {
       await finish(row.id, "failed", (e as Error).message);

@@ -15,8 +15,6 @@
     "lint": "eslint .",
     "logic:scan": "node scripts/logic-scan.cjs",
     "verify:merge": "node scripts/merge-readiness.cjs",
-    "offline:sql": "node scripts/build-offline-sql.cjs",
-    "offline:sql:check": "node scripts/build-offline-sql.cjs --check",
     "test": "vitest run",
     "format": "prettier --write .",
     "desktop:dev": "cross-env VITE_DEV_SERVER_URL=http://localhost:8080 electron .",
@@ -79,7 +77,6 @@
     "html5-qrcode": "^2.3.8",
     "input-otp": "^1.5.0",
     "lucide-react": "^1.47.0",
-    "mssql": "^12.7.2",
     "qrcode-generator": "^2.0.4",
     "react": "^19.3.0",
     "react-day-picker": "^10.0.1",
@@ -97,9 +94,6 @@
     "vite-tsconfig-paths": "file:vendor/vite-tsconfig-paths",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "zod": "^4.6.5"
-  },
-  "optionalDependencies": {
-    "msnodesqlv8": "^5.5.0"
   },
   "devDependencies": {
     "@capacitor/cli": "^8.5.2",
@@ -131,15 +125,9 @@
     "productName": "Retail",
     "files": [
       "electron/**",
-      "database/**",
       "dist-desktop/**",
       "package.json",
       "node_modules/**"
-    ],
-    "asarUnpack": [
-      "node_modules/msnodesqlv8/**",
-      "node_modules/mssql/**",
-      "electron/db/**"
     ],
     "win": {
       "target": [
