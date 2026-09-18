@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { Printer, Search, X } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
@@ -25,12 +25,12 @@ export function MemberHistoryDialog({
   const [to, setTo] = useState("");
   const [preview, setPreview] = useState<Sale | null>(null);
 
-  const inRange = (iso: string) => {
+  const inRange = useCallback((iso: string) => {
     const d = iso.slice(0, 10);
     if (from && d < from) return false;
     if (to && d > to) return false;
     return true;
-  };
+  }, [from, to]);
 
   const sales = useMemo(
     () =>
@@ -39,7 +39,7 @@ export function MemberHistoryDialog({
             .filter((s) => s.memberId === member.id && inRange(s.createdAt))
             .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
         : [],
-    [member, state.sales, from, to],
+    [member, state.sales, inRange],
   );
 
   const q = query.trim().toLowerCase();

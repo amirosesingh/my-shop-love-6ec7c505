@@ -69,7 +69,7 @@ export function traceAttempt(
   status: SqlAttemptStatus | "running",
   elapsedMs?: number,
 ) {
-  // eslint-disable-next-line no-console
+
   console.info(
     `[sql-wizard] attempt=${attemptId} stage=${stage} status=${status}${
       elapsedMs === undefined ? "" : ` elapsed=${elapsedMs}ms`

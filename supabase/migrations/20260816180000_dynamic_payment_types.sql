@@ -1,3 +1,4 @@
+-- Named release checkpoint retained because deployed migration names are immutable.
 CREATE TABLE IF NOT EXISTS public.payment_types (
   id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
   name text NOT NULL,

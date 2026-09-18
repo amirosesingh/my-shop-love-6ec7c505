@@ -930,7 +930,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       staffName: name,
       role: user?.role ?? terminalUser?.role ?? null,
     });
-  }, [activeShift?.id, user?.staffId, user?.name, terminalUser?.userCode]);
+  }, [activeShift, user?.staffId, user?.name, user?.role, terminalUser?.userCode, terminalUser?.name, terminalUser?.role]);
 
   // Signing in on a shift somebody else already opened is never interrupted by
   // the opening screen — say so once, then get out of the way.
@@ -947,7 +947,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     toast.success(`Continuing active shift opened at ${branch}`, {
       description: `Opened by ${activeShift.cashier} · float ${money(activeShift.openingFloat)}`,
     });
-  }, [activeShift?.id, signedIn]);
+  }, [activeShift, signedIn]);
 
   const setCurrentStore = useCallback(
     (id: string) => setState((s) => ({ ...s, currentStoreId: id })),

@@ -184,6 +184,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     terminal.config?.supabaseUrl,
     terminal.config?.supabaseKey,
     terminal.config?.locationId,
+    currentStore?.id,
     user?.staffId,
   ]);
   // Keeps the database-mode pill and the automatic local failover honest.

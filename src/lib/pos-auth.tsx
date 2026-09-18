@@ -32,6 +32,10 @@ import { onSessionExpired } from "@/lib/session-expiry";
 import { bumpSessionEpoch, isCurrentEpoch, sessionEpoch } from "@/lib/session-epoch";
 import { awaitProfileHydrated } from "@/lib/connection-profile";
 import {
+  hydrateTerminalConfig,
+  readTerminalConfig,
+} from "@/core/activation/terminal-tokens";
+import {
   hasRequiredPlatformConfig,
   subscribeConfigReady,
 } from "@/lib/platform-config-ready";
@@ -943,7 +947,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // states are set by the teardown that produced them.
   useEffect(() => {
     if (user) setSessionState("active");
-  }, [user?.staffId]);
+  }, [user]);
 
   // Local, per-terminal record of who signed in today. Lets a shift opened by
   // one cashier be continued by another while still showing every user.
@@ -954,7 +958,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       name: user.name,
       role: user.metaRole ?? user.role,
     });
-  }, [user?.staffId, user?.name, user?.role, user?.metaRole]);
+  }, [user]);
 
   // The server rejected our token (missing, stale or revoked): end the session
   // here rather than leaving a signed-out screen that still looks signed in.
@@ -1012,7 +1016,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", check);
     };
-  }, [user?.staffId, endSession]);
+  }, [user, endSession]);
 
   // Boot / resume check: before the dashboard trusts what it has, ask the
   // server whether this device's token is still live and its branch still
@@ -1061,7 +1065,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let alive = true;
     const read = async () => {
-      const { hydrateTerminalConfig, readTerminalConfig } = await import("@/core/activation/terminal-tokens");
       const config = readTerminalConfig() ?? (await hydrateTerminalConfig());
       if (!alive) return;
       // Persist the terminal's branch so every sign-in on this device inherits

@@ -127,7 +127,10 @@ function PermissionsInner({ children }: { children: ReactNode }) {
   const [error, setError] = useState("");
   const resolver = useRef<((ok: boolean) => void) | null>(null);
 
-  const permissions = (user?.permissions ?? {}) as StaffPermissions;
+  const permissions = useMemo(
+    () => (user?.permissions ?? {}) as StaffPermissions,
+    [user?.permissions],
+  );
 
   const hasPermission = useCallback(
     (flag: PermissionFlag | string) => can(flag as PermissionFlag),

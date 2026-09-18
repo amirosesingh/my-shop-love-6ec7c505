@@ -24,10 +24,6 @@ import {
   inventoryFromPayload,
   DEEP_CATEGORY_LABEL,
 } from "@/lib/deep-drift";
-import {
-  DEEP_INVENTORY_INSTALLER_FILENAME,
-  DEEP_INVENTORY_INSTALLER_SQL,
-} from "@/lib/deep-inventory-sql";
 import { computeLocalDeepDrift, parseLocalExpectations } from "@/core/local-db/local-drift";
 import { hasLocalDb, localDb } from "@/core/local-db/local-db";
 import {
@@ -192,11 +188,14 @@ export function SchemaHealthPanel() {
   };
 
   const copyInstaller = async () => {
+    const { DEEP_INVENTORY_INSTALLER_SQL } = await import("@/lib/deep-inventory-sql");
     await navigator.clipboard.writeText(DEEP_INVENTORY_INSTALLER_SQL);
     toast.success("Deep inventory installer copied");
   };
 
-  const downloadInstaller = () => {
+  const downloadInstaller = async () => {
+    const { DEEP_INVENTORY_INSTALLER_FILENAME, DEEP_INVENTORY_INSTALLER_SQL } =
+      await import("@/lib/deep-inventory-sql");
     const url = URL.createObjectURL(new Blob([DEEP_INVENTORY_INSTALLER_SQL], { type: "text/sql" }));
     const anchor = document.createElement("a");
     anchor.href = url;

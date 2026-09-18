@@ -7,7 +7,7 @@ import { describe, expect, it, vi } from "vitest";
  * us. These tests pin the corrected behaviour.
  */
 
-// eslint-disable-next-line @typescript-eslint/no-var-requires
+
 const pool = require("../../../electron/db/pool.cjs");
 
 /** Mirrors the wizard's resolvedPort(): an explicit port always wins. */

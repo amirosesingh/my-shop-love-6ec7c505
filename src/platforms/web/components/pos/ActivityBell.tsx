@@ -22,6 +22,7 @@ import {
   isActivityLogMissing,
   listActivityEvents,
   markActivitySeen,
+  mergeRemoteActivityPreferences,
   unseenEvents,
   clearActivityEntry,
   clearedIds,
@@ -79,13 +80,14 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
       return;
     }
     setRows(list);
-    const fresh = unseenEvents(list);
+    mergeRemoteActivityPreferences(meKey, list);
+    const fresh = unseenEvents(list, meKey);
     setUnread(fresh.length);
     const critical = fresh.find((r) => r.severity === "critical");
     if (critical) {
       toast.warning(critical.title, { description: critical.message || undefined });
     }
-  }, []);
+  }, [meKey, showActivity]);
 
   // Live decisions, with the existing poll kept as reconciliation.
   useEffect(() => {
@@ -115,7 +117,7 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
     return () => clearInterval(t);
   }, [showActivity, refresh]);
 
-  const hidden = useMemo(() => new Set(clearedIds(meKey)), [meKey, clearedTick]);
+  const hidden = new Set(clearedIds(meKey));
   const visibleRows = rows.filter((r) => !hidden.has(r.id));
   // Unresolved business records never consult notification clear/read preferences.
   const toDecide = centre?.toDecide ?? [];
@@ -138,7 +140,7 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
       onOpenChange={(v) => {
         setOpen(v);
         if (v) {
-          markActivitySeen(rows[0]?.createdAt ?? new Date().toISOString());
+          markActivitySeen(rows[0]?.createdAt ?? new Date().toISOString(), meKey);
           setUnread(0);
         }
       }}

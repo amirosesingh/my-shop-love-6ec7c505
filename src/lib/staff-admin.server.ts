@@ -142,11 +142,10 @@ export async function provisionStaffAccount(payload: StaffPayload): Promise<{ us
     }),
   });
 
-  let userId: string | null = null;
-  if (created.ok) {
-    userId = ((await created.json()) as { id?: string }).id ?? null;
-  } else {
-    userId = await findUserId(email);
+  const userId: string | null = created.ok
+    ? ((await created.json()) as { id?: string }).id ?? null
+    : await findUserId(email);
+  if (!created.ok) {
     if (!userId) {
       throw new Error((await created.text()).slice(0, 200) || "Could not create this account");
     }
@@ -467,4 +466,3 @@ export async function listTerminalStaff(storeId: string | null) {
     pinLength: 0,
   }));
 }
-

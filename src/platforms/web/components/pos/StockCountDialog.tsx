@@ -188,7 +188,10 @@ export function StockCountDialog({
   const { state, currentStore, applyStockCount } = usePos();
   const { user } = useAuth();
   const products = state.products;
-  const numbering = state.settings.integrations.stockNumbering ?? {};
+  const numbering = useMemo(
+    () => state.settings.integrations.stockNumbering ?? {},
+    [state.settings.integrations.stockNumbering],
+  );
 
   const [code, setCode] = useState("");
   const [counted, setCounted] = useState("");
@@ -260,7 +263,7 @@ export function StockCountDialog({
    */
   const persistDraft = useCallback((): Promise<{ id: string; ref: string | null } | null> => {
     if (savingRef.current) return savingRef.current;
-    if (!rows.length && !draftId) return null;
+    if (!rows.length && !draftId) return Promise.resolve(null);
     const run = (async () => {
       try {
         let id = draftId;

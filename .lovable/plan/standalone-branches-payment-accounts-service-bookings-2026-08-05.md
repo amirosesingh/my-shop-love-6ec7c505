@@ -1,3 +1,5 @@
+<!-- Historical Lovable plan snapshot retained under its original generated task name. -->
+
 # Saved settings, 58mm printing, audit categories and coupon voucher tracking
 
 ## 1. Settings that stay saved

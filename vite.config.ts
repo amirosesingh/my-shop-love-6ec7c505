@@ -5,7 +5,48 @@
 //     React/TanStack dedupe, error logger plugins, and sandbox detection (port/host/strictPort).
 // You can pass additional config via defineConfig({ vite: { ... }, etc... }) if needed.
 import { defineConfig } from "@lovable.dev/vite-tanstack-config";
-import webOnlyEnv from "./scripts/web-only-env-names.json";
+import type { Plugin } from "vite";
+import webOnlyEnv from "./scripts/web-only-env-names.json" with { type: "json" };
+
+/**
+ * `use client` is an RSC package-boundary marker, not a runtime directive.
+ * This application uses TanStack Start rather than React Server Components,
+ * and its client/server boundaries are already compiled by TanStack before
+ * Rolldown runs. Remove the inert marker from known UI dependencies so it is
+ * not carried into ordinary browser/SSR chunks as an unknown directive.
+ */
+function stripThirdPartyRscMarkers(): Plugin {
+  const clientPackages =
+    /node_modules\/(?:@tanstack\/react-(?:query|router)|@radix-ui\/react-[^/]+|lucide-react|sonner)\//;
+  return {
+    name: "strip-inert-third-party-rsc-markers",
+    enforce: "pre",
+    transform(code, id) {
+      if (!clientPackages.test(id) || !/^\s*["']use client["'];?/m.test(code)) return null;
+      return {
+        code: code.replace(/^\s*["']use client["'];?\s*/m, ""),
+        map: null,
+      };
+    },
+  };
+}
+
+/**
+ * Nitro currently supplies both Rollup's legacy `inlineDynamicImports` flag
+ * and Rolldown's chunk-group configuration. Keep the intentional chunk groups
+ * and remove only the obsolete Rollup flag before Rolldown validates options.
+ */
+function alignNitroRolldownOutput(): Plugin {
+  return {
+    name: "align-nitro-rolldown-output",
+    enforce: "post",
+    configEnvironment(name, config) {
+      if (name !== "nitro") return;
+      const output = config.build?.rolldownOptions?.output;
+      if (output && !Array.isArray(output)) delete output.inlineDynamicImports;
+    },
+  };
+}
 
 const isDesktop = Boolean(process.env["DESKTOP_BUILD"]);
 /**
@@ -41,6 +82,7 @@ const blankWebEnv = Object.fromEntries(
 );
 
 export default defineConfig({
+  plugins: [stripThirdPartyRscMarkers(), alignNitroRolldownOutput()],
   ...(isCloudflare
     ? {
         nitro: {

@@ -94,7 +94,7 @@ describe("local trading path", () => {
       "src/lib/pos-auth.tsx",
     ];
     for (const file of files) {
-      let source = "";
+      let source: string;
       try {
         source = readFileSync(file, "utf8");
       } catch {

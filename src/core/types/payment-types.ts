@@ -10,12 +10,41 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { useEffect, useState } from "react";
-import * as Icons from "lucide-react";
-import type { LucideIcon } from "lucide-react";
+import {
+  BadgeCheck,
+  Banknote,
+  CircleDollarSign,
+  Coins,
+  CreditCard,
+  Gift,
+  Landmark,
+  QrCode,
+  ReceiptText,
+  Smartphone,
+  Star,
+  Ticket,
+  Wallet,
+  type LucideIcon,
+} from "lucide-react";
 import { describeError } from "@/lib/notify";
 
 const sb = supabaseExternal as unknown as SupabaseClient;
 const CACHE_KEY = "pos.payment-types.v1";
+const TENDER_ICONS: Record<string, LucideIcon> = {
+  BadgeCheck,
+  Banknote,
+  CircleDollarSign,
+  Coins,
+  CreditCard,
+  Gift,
+  Landmark,
+  QrCode,
+  ReceiptText,
+  Smartphone,
+  Star,
+  Ticket,
+  Wallet,
+};
 
 export type PaymentType = {
   id: string;
@@ -194,7 +223,7 @@ export function paymentTypeLabel(code: string, types: PaymentType[] = cachedPaym
 export function tenderIcon(icon: string, code: string) {
   const key = (icon || "").trim();
   const pick =
-    (Icons as unknown as Record<string, LucideIcon | undefined>)[key] ??
-    ({ cash: Icons.Banknote, card: Icons.CreditCard, wallet: Icons.Wallet, points: Icons.BadgeCheck, bank_transfer: Icons.Landmark } as Record<string, LucideIcon | undefined>)[code];
-  return pick ?? Icons.Wallet;
+    TENDER_ICONS[key] ??
+    ({ cash: Banknote, card: CreditCard, wallet: Wallet, points: BadgeCheck, bank_transfer: Landmark } as Record<string, LucideIcon | undefined>)[code];
+  return pick ?? Wallet;
 }

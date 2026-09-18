@@ -3,7 +3,6 @@
  * mode, padding, icon, colour and the page/modal/action it fires.
  */
 import { useState } from "react";
-import { icons, Zap } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -17,7 +16,7 @@ import {
   type ModuleStyle,
   type ModuleTone,
 } from "@/lib/register-layout";
-import { CUSTOM_ICONS } from "./CustomActionButton";
+import { CUSTOM_ICON_MAP, CUSTOM_ICONS, fallbackCustomIcon } from "./custom-icons";
 
 const TONES: ModuleTone[] = ["neutral", "primary", "success", "warning", "destructive"];
 const HEX = /^#[0-9a-fA-F]{6}$/;
@@ -122,7 +121,7 @@ export function CustomButtonDialog({
               <p className="mb-1 text-sm font-medium">Icon</p>
               <div className="grid grid-cols-10 gap-1">
                 {CUSTOM_ICONS.map((name) => {
-                  const Icon = (icons as Record<string, typeof Zap>)[name] ?? Zap;
+                  const Icon = CUSTOM_ICON_MAP[name] ?? fallbackCustomIcon;
                   return (
                     <Button
                       key={name}

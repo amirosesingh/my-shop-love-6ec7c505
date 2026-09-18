@@ -18,10 +18,17 @@ import { notifyError, showNotification } from "@/lib/notify";
 import { logSync } from "@/lib/sync-log";
 import { recordDiagnostic, reasonCode } from "@/lib/diagnostics";
 import { applyStockDeltaBatch } from "@/lib/stock-recovery";
-import { canRelay, relayStores } from "@/core/api/sync-relay";
+import {
+  canRelay,
+  hasStaffSession,
+  relayActiveShift,
+  relayStores,
+} from "@/core/api/sync-relay";
+import { hydrateTerminalConfig } from "@/core/activation/terminal-tokens";
 import { isOperationalTable } from "@/lib/pos-auth-route";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "@/lib/keyset";
 import { readAllPages } from "@/lib/paged-read";
+import { loadCashierToken } from "@/lib/pos-credentials";
 
 import { isLinkedRecordError, usageBlock, type ProductUsage } from "@/lib/product-delete";
 import type {
@@ -889,7 +896,6 @@ export async function importSampleData() {
 
 /** Load every cloud-backed slice of the POS state. */
 export async function loadCloudState(storeId?: string | null): Promise<CloudSlice> {
-  const { hydrateTerminalConfig } = await import("@/core/activation/terminal-tokens");
   await hydrateTerminalConfig();
   const tiers = await supabase.from("membership_tiers").select("id, name").is("deleted_at", null);
   if (tiers.error) return loadLocalState(tiers.error);
@@ -952,7 +958,6 @@ export async function loadCloudState(storeId?: string | null): Promise<CloudSlic
     // builders are thenables, not Promises, so guard with try/catch.
     (async (): Promise<{ data: Row[] | null }> => {
       try {
-        const { loadCashierToken } = await import("@/lib/pos-credentials");
         const cashierToken = await loadCashierToken();
         // A PIN-only cashier has no database auth session, so use the proven
         // relay immediately instead of accepting an RLS-filtered empty list.
@@ -1092,8 +1097,6 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
   // the direct read is refused or filtered out. The proven server relay answers
   // for those tills — without it the register would flip back to "locked"
   // moments after a shift was opened.
-  const { hasStaffSession, canRelay, relayActiveShift } = await import("@/core/api/sync-relay");
-
   if (hasStaffSession()) {
     // The server routine answers for every staff account, whatever branch is
     // written on their profile, and hands back the whole row in one call.
@@ -1142,7 +1145,6 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
  * caller falls back to the usual local/offline commit path.
  */
 export async function openShiftOnServer(s: Shift): Promise<Shift | null> {
-  const { hasStaffSession } = await import("@/core/api/sync-relay");
   if (!hasStaffSession()) return null;
   try {
     const res = await supabase.rpc(
@@ -1581,7 +1583,6 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   if (!ops.length) return noteCommitTarget("cloud");
   // A packaged or browser till may carry an encrypted tenant override. Never
   // let an early write resolve the client against the build-time tenant first.
-  const { hydrateTerminalConfig } = await import("@/core/activation/terminal-tokens");
   await hydrateTerminalConfig();
 
   // Stock never travels centrally as an absolute figure: the movement rows go

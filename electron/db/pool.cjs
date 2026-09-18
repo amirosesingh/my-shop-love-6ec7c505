@@ -56,7 +56,7 @@ function logConnection(event, detail) {
   const line = `${new Date().toISOString()} [sqlconn] ${event}${
     detail ? ` ${JSON.stringify(detail)}` : ""
   }`;
-  // eslint-disable-next-line no-console
+
   console.log(line);
   const file = connectionLogFile();
   if (!file) return;

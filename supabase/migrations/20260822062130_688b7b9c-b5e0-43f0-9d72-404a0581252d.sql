@@ -1,3 +1,4 @@
+-- Historical migration checkpoint retained because deployed migration names are immutable.
 CREATE OR REPLACE FUNCTION public.app_users_require_store() RETURNS trigger
     LANGUAGE plpgsql
     SET search_path TO 'public', 'pg_temp'

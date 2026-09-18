@@ -17,6 +17,7 @@
 import { isTerminalApp } from "@/platform-config/platform";
 import { hydrateBackendUrl } from "./backend-config";
 import { initCloudConfigFromShell } from "./secure-cloud-config";
+import { hydrateTerminalConfig } from "@/core/activation/terminal-tokens";
 
 export type ProfileHydration = "idle" | "hydrating" | "hydrated";
 
@@ -51,7 +52,6 @@ export function hydrateConnectionProfile(): Promise<void> {
     // it after the vault pair would silently point the till at the previous
     // project. Restoring it first lets the device's own saved connection win.
     try {
-      const { hydrateTerminalConfig } = await import("@/core/activation/terminal-tokens");
       await hydrateTerminalConfig();
     } catch {
       /* no readable activation — the saved connection stands on its own */

@@ -48,7 +48,32 @@ export default tseslint.config(
           ],
         },
       ],
-      "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
+      // These exports are stable hooks, pure helpers, or immutable style
+      // descriptors colocated with their provider/component. Declaring them
+      // explicitly keeps Fast Refresh strict for every unreviewed export.
+      "react-refresh/only-export-components": [
+        "warn",
+        {
+          allowConstantExport: true,
+          allowExportNames: [
+            "badgeVariants", "buttonVariants", "toggleVariants",
+            "useFormField", "navigationMenuTriggerStyle", "useSidebar",
+            "useManagerGate", "fromDbRole", "hasPermission", "normalizePermissions",
+            "toDbRole", "APP_ROLES", "useAuth", "useAuthOptional", "useUserPermissions",
+            "platformName", "posRulesQueryKey", "usePosRules", "stockAt", "reservedAt",
+            "availableAt", "usePos", "usePosOptional", "money", "cartTotals",
+            "REGISTER_ACTIONS", "ACTION_CATEGORIES", "ACTION_BY_ID", "isActionId", "useRegisterActions",
+            "useTheme", "isDriverMissing", "usePanelWidth", "permissionLabel",
+            "permissionMessage", "denyPermission", "requirePermission", "useSidebarCollapsed",
+            "parseLines", "PAGE_SIZES", "usePagination", "readRecentBanks", "rememberBanks",
+            "statusStyle", "fulfilmentLabel", "when", "useTransferRecord", "CUSTOM_ICONS",
+            "useNodeOptions", "isoDay", "defaultRange", "inRange", "stamp", "downloadCsv",
+            "usePanelSave", "scopeForPath", "pathSection", "clusterList", "useSettingsCtx",
+            "readNavCollapsed", "writeNavCollapsed", "readOpenCategories",
+            "initialOpenCategories", "useEmbeddedSettings",
+          ],
+        },
+      ],
       "@typescript-eslint/no-unused-vars": "off",
       // Existing boundary adapters still need typed follow-up work. Keep this
       // visible as debt without making it indistinguishable from correctness
@@ -62,6 +87,23 @@ export default tseslint.config(
     files: ["src/lib/__tests__/**/*.test.ts"],
     rules: {
       "@typescript-eslint/no-require-imports": "off",
+    },
+  },
+  {
+    // These modules adapt schemaless SQL/Supabase rows and fluent query
+    // builders at the boundary. Their runtime validators/mappers narrow the
+    // values before application use; forcing a fabricated static row shape
+    // here would be less accurate than the SDK's intentionally dynamic type.
+    files: [
+      "src/core/activation/terminal-tokens.ts",
+      "src/core/api/pos-db.ts",
+      "src/core/types/feature-schema.ts",
+      "src/core/types/payment-types.ts",
+      "src/lib/{bookings-db,coupons,db-health,stock-transfers,suppliers}.ts",
+      "src/lib/__tests__/deep-drift.test.ts",
+    ],
+    rules: {
+      "@typescript-eslint/no-explicit-any": "off",
     },
   },
   {
@@ -86,6 +128,16 @@ export default tseslint.config(
           ],
         },
       ],
+    },
+  },
+  {
+    // TanStack Router route modules intentionally export both the generated
+    // `Route` descriptor and their screen components. The router's Vite
+    // plugin owns their reload boundary, so React Refresh's generic
+    // single-export heuristic is not applicable to this directory.
+    files: ["src/routes/**/*.{ts,tsx}"],
+    rules: {
+      "react-refresh/only-export-components": "off",
     },
   },
   // Formatting is checked by Prettier, not surfaced as thousands of ESLint

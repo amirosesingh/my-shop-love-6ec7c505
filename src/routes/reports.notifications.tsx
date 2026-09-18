@@ -47,7 +47,7 @@ const when = (iso: string) => {
 };
 
 function NotificationsReport() {
-  const { isSupervisor } = useAuth();
+  const { isSupervisor, user } = useAuth();
   const [rows, setRows] = useState<ActivityEvent[]>([]);
   const [type, setType] = useState("all");
   const [severity, setSeverity] = useState("all");
@@ -64,9 +64,12 @@ function NotificationsReport() {
     });
     setRows(list);
     setMissing(isActivityLogMissing());
-    markActivitySeen(list[0]?.createdAt ?? new Date().toISOString());
+    markActivitySeen(
+      list[0]?.createdAt ?? new Date().toISOString(),
+      user?.staffId ?? user?.name ?? "",
+    );
     setBusy(false);
-  }, [type, severity]);
+  }, [type, severity, user?.staffId, user?.name]);
 
   useEffect(() => {
     if (isSupervisor) void load();

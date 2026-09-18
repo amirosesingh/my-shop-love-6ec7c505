@@ -22,6 +22,7 @@ import {
 } from "./external-supabase-config";
 import { resetExternalClient, createTenantClient } from "@/integrations/supabase/external-client";
 import { setSyncState } from "./sync-status";
+import { runExclusive } from "./sync-engine";
 import {
   backendUrl,
   normaliseBackendUrl,
@@ -33,9 +34,7 @@ import {
 /** Fresh keys saved: unpark the sync engine and let it catch up at once. */
 function afterCredentialsSaved() {
   setSyncState({ credentialsInvalid: false, lastError: null, cloudConfigured: true });
-  void import("./sync-engine")
-    .then((m) => void m.runExclusive("credentials-saved"))
-    .catch(() => {});
+  void runExclusive("credentials-saved").catch(() => {});
 }
 
 export type CloudKeyStatus = {
@@ -577,4 +576,3 @@ export async function saveConnectionProfile(
     profile,
   };
 }
-

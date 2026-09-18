@@ -35,7 +35,7 @@ describe("platform access and initial loading", () => {
 
   it("does not render raw production errors in the root boundary", () => {
     const root = read("src/routes/__root.tsx");
-    expect(root).toContain("if (import.meta.env.DEV) console.error(error)");
-    expect(root).toContain("import.meta.env.DEV && error.stack");
+    expect(root).toContain("if (import.meta.env.DEV) console.error(normalizedError)");
+    expect(root).toContain("import.meta.env.DEV && normalizedError.stack");
   });
 });

@@ -60,7 +60,7 @@ export async function deleteCustomRole(role: RoleDef): Promise<void> {
   } catch (e) {
     const message = (e as { message?: string }).message ?? "";
     if (message.includes("ROLE_IN_USE")) {
-      throw new Error("Someone is still assigned this role — move them first");
+      throw new Error("Someone is still assigned this role — move them first", { cause: e });
     }
     throw e;
   }

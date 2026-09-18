@@ -1,3 +1,5 @@
+<!-- Historical Lovable plan snapshot retained under its original generated task name. -->
+
 # Persistent data, terminal kill switch, roles and manager PIN gates
 
 Five connected changes: stop the app re-creating deleted records, keep writes behind proven callers, give admins a remote terminal reset, add custom roles with smart permission presets, and a per-action "Require Manager PIN" list with an admin bypass.

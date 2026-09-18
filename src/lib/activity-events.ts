@@ -48,6 +48,8 @@ export type ActivityEvent = {
   amount: number | null;
   whatsappStatus: string;
   createdAt: string;
+  /** Staff identifiers that cleared this entry on another signed-in device. */
+  clearedBy: string[];
 };
 
 /** Every event the till can raise, grouped for the settings matrix. */
@@ -235,6 +237,9 @@ function map(row: Row): ActivityEvent {
     amount: row["amount"] === null || row["amount"] === undefined ? null : Number(row["amount"]),
     whatsappStatus: String(row["whatsapp_status"] ?? "skipped"),
     createdAt: String(row["created_at"] ?? ""),
+    clearedBy: Array.isArray(row["cleared_by"])
+      ? row["cleared_by"].filter((value): value is string => typeof value === "string")
+      : [],
   };
 }
 
@@ -290,19 +295,34 @@ export async function listActivityEvents(filter: ActivityFilter = {}): Promise<A
 
 const SEEN_KEY = "pos.activity.seen";
 
-export function lastSeenAt(): string {
-  if (!isBrowser()) return "";
-  return readBusinessValue(SEEN_KEY) ?? "";
+type SeenMap = Record<string, string>;
+
+function readSeenMap(): SeenMap {
+  if (!isBrowser()) return {};
+  try {
+    const parsed = JSON.parse(readBusinessValue(SEEN_KEY) ?? "{}") as unknown;
+    return parsed && typeof parsed === "object" ? (parsed as SeenMap) : {};
+  } catch {
+    return {};
+  }
 }
 
-export function markActivitySeen(stamp = new Date().toISOString()) {
+const who = (userId: string) => (userId || "anon").toLowerCase();
+
+export function lastSeenAt(userId = ""): string {
+  return readSeenMap()[who(userId)] ?? "";
+}
+
+export function markActivitySeen(stamp = new Date().toISOString(), userId = "") {
   if (!isBrowser()) return;
-  writeBusinessValue(SEEN_KEY, stamp);
+  const map = readSeenMap();
+  map[who(userId)] = stamp;
+  writeBusinessValue(SEEN_KEY, JSON.stringify(map));
 }
 
 /** Rows raised since the admin last opened the bell. */
-export const unseenEvents = (rows: ActivityEvent[]): ActivityEvent[] => {
-  const seen = lastSeenAt();
+export const unseenEvents = (rows: ActivityEvent[], userId = ""): ActivityEvent[] => {
+  const seen = lastSeenAt(userId);
   return seen ? rows.filter((r) => r.createdAt > seen) : rows;
 };
 
@@ -372,9 +392,29 @@ function writeClearedMap(map: ClearedMap) {
   window.dispatchEvent(new CustomEvent("pos:activity-cleared-changed"));
 }
 
-const who = (userId: string) => (userId || "anon").toLowerCase();
-
 export const clearedIds = (userId: string): string[] => readClearedMap()[who(userId)] ?? [];
+
+/**
+ * Merge server-side clear markers into the durable device cache. This makes a
+ * dismissal follow a person to their other tills while retaining offline use.
+ */
+export function mergeRemoteActivityPreferences(userId: string, rows: ActivityEvent[]) {
+  const key = who(userId);
+  const remote = rows
+    .filter((row) => row.clearedBy.some((id) => who(id) === key))
+    .map((row) => row.id);
+  if (!remote.length) return;
+  const map = readClearedMap();
+  map[key] = [...new Set([...(map[key] ?? []), ...remote])].slice(-500);
+  writeClearedMap(map);
+}
+
+function syncClearedEntry(id: string, cleared: boolean): void {
+  void supabase.rpc("set_activity_event_cleared", { p_event_id: id, p_cleared: cleared }).then(
+    () => undefined,
+    () => undefined,
+  );
+}
 
 export function clearActivityEntry(userId: string, id: string) {
   const map = readClearedMap();
@@ -382,6 +422,7 @@ export function clearActivityEntry(userId: string, id: string) {
   const list = map[key] ?? [];
   if (!list.includes(id)) map[key] = [...list, id].slice(-500);
   writeClearedMap(map);
+  syncClearedEntry(id, true);
 }
 
 export function reopenActivityEntry(userId: string, id: string) {
@@ -389,7 +430,7 @@ export function reopenActivityEntry(userId: string, id: string) {
   const key = who(userId);
   map[key] = (map[key] ?? []).filter((x) => x !== id);
   writeClearedMap(map);
+  syncClearedEntry(id, false);
 }
 
-export const isCleared = (userId: string, id: string): boolean =>
-  clearedIds(userId).includes(id);
+export const isCleared = (userId: string, id: string): boolean => clearedIds(userId).includes(id);

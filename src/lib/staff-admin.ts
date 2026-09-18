@@ -16,6 +16,7 @@ import {
 } from "@/lib/staff-admin.functions";
 import type { StaffRole } from "@/lib/permissions";
 import { isExternalEmail } from "@/lib/internal-domains";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 
 export type StaffAccountInput = {
   displayName: string;
@@ -170,7 +171,6 @@ export async function listTerminalStaff(storeId: string | null): Promise<Termina
     const { serverOrigin, serverUnreachableOnDevice, posFetch } = await import("./server-origin");
     if (serverUnreachableOnDevice()) return { staff: [], reason: "no-server" };
     if (serverOrigin()) {
-      const { readTerminalConfig } = await import("@/core/activation/terminal-tokens");
       const terminalToken = readTerminalConfig()?.tokenId ?? "";
       const res = await posFetch("/api/public/terminal-staff", {
         method: "POST",

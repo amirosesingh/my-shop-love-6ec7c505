@@ -90,7 +90,7 @@ function ReceivingWorkspace() {
   useEffect(() => {
     if (!transfer) return;
     setCounts(Object.fromEntries(transfer.items.map((i) => [i.productId, ""])));
-  }, [transfer?.id, transfer?.items.length]);
+  }, [transfer]);
 
   const lines = useMemo(() => {
     if (!transfer) return [];
