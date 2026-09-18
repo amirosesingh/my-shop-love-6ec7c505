@@ -4,9 +4,8 @@
   // Then deploy with Nitro's generated config:
   //   bunx wrangler deploy --config .output/server/wrangler.json
   "$schema": "node_modules/wrangler/config-schema.json",
-  // Cloudflare requires the deployment identifier to be lowercase. This is
-  // the Wrangler-safe form of the Retail-POS Worker/Pages project name.
   "name": "retail-pos",
+  "main": "dist/server/index.mjs",
   "compatibility_date": "2026-01-01",
   "compatibility_flags": ["nodejs_compat"],
   "observability": {
