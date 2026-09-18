@@ -34,6 +34,12 @@ describe("desktop release configuration", () => {
 
     expect(desktop).toContain("startsWith(github.ref, 'refs/tags/v')");
     expect(android).toContain("startsWith(github.ref, 'refs/tags/v')");
+    expect(desktop).not.toContain("branches: [main]");
+    expect(android).not.toContain("branches: [main]");
+    expect(desktop).not.toContain("head_commit.message");
+    expect(android).not.toContain("head_commit.message");
+    expect(desktop).toContain("if: ${{ startsWith(github.ref, 'refs/tags/v') }}");
+    expect(android).toContain("!inputs.app_url && startsWith(github.ref, 'refs/tags/v')");
     expect(desktop).not.toContain("GITHUB_RUN_NUMBER");
     expect(android).not.toContain("ANDROID_VERSION_CODE: ${{ github.run_number }}");
   });
