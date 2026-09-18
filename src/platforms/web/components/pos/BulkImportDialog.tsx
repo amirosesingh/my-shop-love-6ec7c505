@@ -104,15 +104,19 @@ export function BulkImportDialog({
     setProgress(4);
     setProgressLabel("Reading the file…");
 
-    let records: Record<string, unknown>[] = [];
-    try {
+    const records = await (async (): Promise<Record<string, unknown>[] | null> => {
+      try {
       const buf = await file.arrayBuffer();
       // Let the reading message paint before the parser takes the thread.
       await new Promise((r) => setTimeout(r, 0));
       const wb = XLSX.read(buf, { type: "array" });
       const sheet = wb.Sheets[wb.SheetNames[0]];
-      records = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
-    } catch {
+        return XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
+      } catch {
+        return null;
+      }
+    })();
+    if (!records) {
       setBusy("");
       toast.error("Could not read that file — use the .xlsx or .csv template");
       return;

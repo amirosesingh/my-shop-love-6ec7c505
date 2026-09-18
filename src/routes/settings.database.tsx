@@ -1,9 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { lazy, Suspense } from "react";
 import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsFrame";
 import { DatabaseConnectionSettings } from "@/platforms/web/components/pos/DatabaseConnectionSettings";
-import { SchemaHealthPanel } from "@/platforms/web/components/database/SchemaHealthPanel";
 import { BranchSettings } from "@/platforms/web/components/pos/BranchSettings";
 import { ConnectionSummary } from "@/platforms/web/components/pos/settings/ConnectionSummary";
+
+const SchemaHealthPanel = lazy(() =>
+  import("@/platforms/web/components/database/SchemaHealthPanel").then((module) => ({
+    default: module.SchemaHealthPanel,
+  })),
+);
 
 export const Route = createFileRoute("/settings/database")({
   head: () => ({
@@ -32,7 +38,9 @@ export const Route = createFileRoute("/settings/database")({
       <ConnectionSummary />
       <BranchSettings />
       <DatabaseConnectionSettings />
-      <SchemaHealthPanel />
+      <Suspense fallback={<p className="text-sm text-muted-foreground">Loading schema checks…</p>}>
+        <SchemaHealthPanel />
+      </Suspense>
     </SettingsFrame>
   ),
 });

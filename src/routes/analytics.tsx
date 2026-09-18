@@ -1,5 +1,5 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { RefreshCw } from "lucide-react";
 import {
@@ -96,18 +96,21 @@ function LiveBoard() {
     staleTime: 30_000,
   });
 
-  const nameOf = (id: string) => stores.find((s) => s.id === id)?.name ?? (id || "Unassigned");
-  const filter = picked.length ? new Set(picked) : undefined;
+  const nameOf = useCallback(
+    (id: string) => stores.find((s) => s.id === id)?.name ?? (id || "Unassigned"),
+    [stores],
+  );
+  const filter = useMemo(() => (picked.length ? new Set(picked) : undefined), [picked]);
   const data = query.data;
 
   const shops = useMemo(
     () => (data ? shopSlices(data, nameOf, filter) : []),
-    [data, picked, stores],
+    [data, nameOf, filter],
   );
 
   const itemRows: ItemDayRow[] = useMemo(
     () => (data ? data.itemDays.filter((r) => !filter || filter.has(r.store_id ?? "")) : []),
-    [data, picked],
+    [data, filter],
   );
 
   const combinedTop = useMemo(() => topItems(itemRows, topBy, 8), [itemRows, topBy]);
@@ -119,7 +122,7 @@ function LiveBoard() {
             grain,
           )
         : [],
-    [data, picked, grain],
+    [data, filter, grain],
   );
 
   const totals = useMemo(() => {
@@ -333,7 +336,7 @@ function LiveBoard() {
                       ))}
                     </Pie>
                     <Tooltip
-                      formatter={(v: number) => (topBy === "revenue" ? money(v) : `${v} units`)}
+                      formatter={(v) => (topBy === "revenue" ? money(Number(v ?? 0)) : `${Number(v ?? 0)} units`)}
                     />
                     <Legend />
                   </PieChart>
@@ -356,7 +359,7 @@ function LiveBoard() {
                         <Cell key={s.storeId} fill={PALETTE[i % PALETTE.length]} />
                       ))}
                     </Pie>
-                    <Tooltip formatter={(v: number) => money(v)} />
+                    <Tooltip formatter={(v) => money(Number(v ?? 0))} />
                     <Legend />
                   </PieChart>
                 </ResponsiveContainer>
@@ -393,8 +396,8 @@ function LiveBoard() {
                             ))}
                           </Pie>
                           <Tooltip
-                            formatter={(v: number) =>
-                              topBy === "revenue" ? money(v) : `${v} units`
+                            formatter={(v) =>
+                              topBy === "revenue" ? money(Number(v ?? 0)) : `${Number(v ?? 0)} units`
                             }
                           />
                         </PieChart>
@@ -421,8 +424,8 @@ function LiveBoard() {
                       domain={[0, 100]}
                     />
                     <Tooltip
-                      formatter={(v: number, key: string) =>
-                        key === "marginPct" ? `${v.toFixed(1)}%` : money(v)
+                      formatter={(v, key) =>
+                        key === "marginPct" ? `${Number(v ?? 0).toFixed(1)}%` : money(Number(v ?? 0))
                       }
                     />
                     <Legend />
@@ -449,7 +452,7 @@ function LiveBoard() {
                     <CartesianGrid strokeDasharray="3 3" />
                     <XAxis dataKey="name" fontSize={11} />
                     <YAxis fontSize={11} />
-                    <Tooltip formatter={(v: number) => money(v)} />
+                    <Tooltip formatter={(v) => money(Number(v ?? 0))} />
                     <Legend />
                     <Bar dataKey="profit" stackId="m" name="Kept as profit" fill="var(--success)" />
                     <Bar dataKey="itemDiscount" stackId="m" name="Item discounts" fill="var(--primary)" />
@@ -486,7 +489,7 @@ function LiveBoard() {
                   <CartesianGrid strokeDasharray="3 3" />
                   <XAxis dataKey="label" fontSize={11} />
                   <YAxis fontSize={11} />
-                  <Tooltip formatter={(v: number) => money(v)} />
+                  <Tooltip formatter={(v) => money(Number(v ?? 0))} />
                   <Legend />
                   <Line type="monotone" dataKey="revenue" name="Revenue" stroke="var(--primary)" strokeWidth={2} dot={false} />
                   <Line type="monotone" dataKey="profit" name="Profit" stroke="var(--success)" strokeWidth={2} dot={false} />

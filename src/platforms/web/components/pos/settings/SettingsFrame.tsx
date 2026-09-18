@@ -66,11 +66,9 @@ type Ctx = {
   setWhatsApp: (
     patch: Partial<NonNullable<ReturnType<typeof usePos>["state"]["settings"]["whatsapp"]>>,
   ) => void;
-  setPaymentQr: (patch: Partial<ReturnType<typeof defaultQr>>) => void;
-  paymentQr: ReturnType<typeof defaultQr>;
+  setPaymentQr: (patch: Partial<typeof defaultPaymentQr>) => void;
+  paymentQr: typeof defaultPaymentQr;
 };
-
-const defaultQr = () => defaultPaymentQr;
 
 const SettingsCtx = createContext<Ctx | null>(null);
 

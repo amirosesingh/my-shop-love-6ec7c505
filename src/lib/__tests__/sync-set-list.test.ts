@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-// eslint-disable-next-line @typescript-eslint/no-require-imports
+
 const { buildSetList } = require("../../../electron/db/repo.cjs") as {
   buildSetList: (
     columns: string[],

@@ -14,6 +14,7 @@
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { clearDeviceSecret, getDeviceSecret, setDeviceSecret } from "./device-secrets";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 
 const SECRET = "cashier-session";
 /** The raw session token minted at sign-in; only its hash reaches the database. */
@@ -125,7 +126,6 @@ export async function readCredentials(): Promise<PosCredentials> {
   }
   let terminalToken: string | undefined;
   try {
-    const { readTerminalConfig } = await import("@/core/activation/terminal-tokens");
     terminalToken = readTerminalConfig()?.tokenId ?? undefined;
   } catch {
     /* no till registered */

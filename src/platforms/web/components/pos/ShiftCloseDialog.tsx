@@ -96,14 +96,14 @@ export function ShiftCloseDialog({
     if (drawerOpenedForShift.current === activeShift.id) return;
     drawerOpenedForShift.current = activeShift.id;
     openCashDrawer("Shift closing cash count");
-  }, [open, step, activeShift?.id]);
+  }, [open, step, activeShift]);
 
   // Managers see the numbers; the database refuses everyone else.
   useEffect(() => {
     if (!open || !activeShift || !maySeeVariance) return;
     if (step !== "review" && step !== "done") return;
     void loadReconciliations(activeShift.id).then((rows) => setRecon(rows[0] ?? null));
-  }, [open, step, activeShift?.id, maySeeVariance]);
+  }, [open, step, activeShift, maySeeVariance]);
 
   if (!activeShift) return null;
 

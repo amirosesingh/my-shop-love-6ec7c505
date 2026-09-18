@@ -3,37 +3,14 @@
  * and fires an entry from the register action registry, so the underlying
  * feature is reached exactly as the built-in control would reach it.
  */
-import { icons, Zap } from "lucide-react";
 import { ActionButton } from "@/platforms/web/components/pos/ActionButton";
 import { ACTION_BY_ID, useRegisterActions } from "@/lib/register-actions";
 import type { CustomButtonSpec } from "@/lib/register-layout";
-
-export const CUSTOM_ICONS = [
-  "Zap",
-  "ShoppingCart",
-  "ScanLine",
-  "Banknote",
-  "Receipt",
-  "CalendarClock",
-  "PauseCircle",
-  "Ban",
-  "LogOut",
-  "Monitor",
-  "Users",
-  "UserPlus",
-  "Truck",
-  "Package",
-  "Boxes",
-  "ArrowLeftRight",
-  "Search",
-  "Printer",
-  "Clock",
-  "Wallet",
-];
+import { CUSTOM_ICON_MAP, fallbackCustomIcon } from "./custom-icons";
 
 export function CustomActionButton({ spec }: { spec: CustomButtonSpec }) {
   const { run, can } = useRegisterActions();
-  const Icon = (icons as Record<string, typeof Zap>)[spec.icon] ?? Zap;
+  const Icon = CUSTOM_ICON_MAP[spec.icon] ?? fallbackCustomIcon;
   const def = ACTION_BY_ID[spec.action];
   const available = can(spec.action);
   return (

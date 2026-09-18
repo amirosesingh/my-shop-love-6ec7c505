@@ -7,7 +7,7 @@
  * only turns that refusal into something an operator can act on. It wraps the
  * bridge once, so every existing screen gets the prompt without being changed.
  */
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -68,10 +68,10 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [ready, recovery, user?.staffId, isAdmin, isSupervisor]);
+  }, [ready, recovery, user, isAdmin, isSupervisor]);
 
   /* One prompt at a time, however many calls are refused at once. */
-  const requestUnlock = async (
+  const requestUnlock = useCallback(async (
     message: string,
     requiredLevel?: "admin" | "supervisor",
   ): Promise<boolean> => {
@@ -109,7 +109,7 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
       });
     }
     return asking.current;
-  };
+  }, [user, isAdmin, isSupervisor]);
 
   useEffect(() => {
     const win = window as unknown as Record<string, Record<string, unknown> | undefined>;
@@ -154,7 +154,7 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
       }
       off?.();
     };
-  }, [recovery, user?.staffId, isAdmin, isSupervisor]);
+  }, [recovery, requestUnlock]);
 
   const submit = async () => {
     setBusy(true);

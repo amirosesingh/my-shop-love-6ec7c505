@@ -1,16 +1,13 @@
 {
   // Cloudflare Workers deployment for the POS web app.
   // Build first with:  CLOUDFLARE_BUILD=1 bun run build
-  // Then deploy with:  bunx wrangler deploy
+  // Then deploy with Nitro's generated config:
+  //   bunx wrangler deploy --config .output/server/wrangler.json
   "$schema": "node_modules/wrangler/config-schema.json",
   "name": "retail-pos",
   "main": "dist/server/index.mjs",
   "compatibility_date": "2026-01-01",
   "compatibility_flags": ["nodejs_compat"],
-  "assets": {
-    "directory": "dist/client",
-    "binding": "ASSETS"
-  },
   "observability": {
     "enabled": true
   },

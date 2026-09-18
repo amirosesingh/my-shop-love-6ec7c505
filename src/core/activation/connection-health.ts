@@ -12,6 +12,7 @@ import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { localDb } from "@/core/local-db/local-db";
 import { hydrateTerminalConfig } from "@/core/activation/terminal-tokens";
 import { hasSupabaseConfig } from "@/lib/external-supabase-config";
+import { awaitProfileHydrated } from "@/lib/connection-profile";
 
 /**
  * Why the central database is or is not usable right now.
@@ -84,7 +85,6 @@ async function probeCloudVerdict(): Promise<CloudVerdict> {
   // pair carried by an older activation record — both of which come back as
   // "not configured" or "refused" on a perfectly good terminal.
   try {
-    const { awaitProfileHydrated } = await import("@/lib/connection-profile");
     await awaitProfileHydrated();
   } catch {
     /* the restore is best-effort; the checks below still hold */

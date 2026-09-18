@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useMemo, useState } from "react";
+import { useCallback, useMemo, useState } from "react";
 import {
   Bar,
   BarChart,
@@ -80,8 +80,10 @@ function AnalyticsBoard() {
   const lines = useMemo(() => soldLines(bills, state.products), [bills, state.products]);
   const totals = sumLines(lines);
   const savings = savingsOf(bills, lines);
-  const storeName = (id: string) =>
-    stores.find((s) => s.id === id)?.name ?? (id || "Unassigned");
+  const storeName = useCallback(
+    (id: string) => stores.find((s) => s.id === id)?.name ?? (id || "Unassigned"),
+    [stores],
+  );
 
   const topItems = useMemo(() => {
     const by = new Map<string, { name: string; revenue: number; units: number }>();
@@ -117,7 +119,7 @@ function AnalyticsBoard() {
       }))
       .map((s) => ({ ...s, sharePct: totals.revenue ? (s.revenue / totals.revenue) * 100 : 0 }))
       .sort((a, b) => b.revenue - a.revenue);
-  }, [lines, totals.revenue, stores]);
+  }, [lines, totals.revenue, storeName]);
 
   const series = useMemo(() => {
     const by = new Map<string, number>();
@@ -181,7 +183,7 @@ function AnalyticsBoard() {
                 <XAxis type="number" fontSize={11} />
                 <YAxis type="category" dataKey="name" width={130} fontSize={11} />
                 <Tooltip
-                  formatter={(v: number) => (topBy === "revenue" ? money(v) : `${v} units`)}
+                  formatter={(v) => (topBy === "revenue" ? money(Number(v ?? 0)) : `${Number(v ?? 0)} units`)}
                 />
                 <Bar dataKey={topBy} fill="var(--primary)" radius={[0, 4, 4, 0]} />
               </BarChart>
@@ -205,7 +207,7 @@ function AnalyticsBoard() {
                   ))}
                 </Pie>
                 <Legend />
-                <Tooltip formatter={(v: number) => money(v)} />
+                <Tooltip formatter={(v) => money(Number(v ?? 0))} />
               </PieChart>
             </ResponsiveContainer>
           </section>
@@ -239,7 +241,7 @@ function AnalyticsBoard() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="label" fontSize={11} />
                 <YAxis fontSize={11} />
-                <Tooltip formatter={(v: number) => money(v)} />
+                <Tooltip formatter={(v) => money(Number(v ?? 0))} />
                 <Bar dataKey="value" fill="var(--primary)" radius={[4, 4, 0, 0]} />
               </BarChart>
             ) : (
@@ -247,7 +249,7 @@ function AnalyticsBoard() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="label" fontSize={11} />
                 <YAxis fontSize={11} />
-                <Tooltip formatter={(v: number) => money(v)} />
+                <Tooltip formatter={(v) => money(Number(v ?? 0))} />
                 <Line
                   type="monotone"
                   dataKey="value"
@@ -281,7 +283,7 @@ function AnalyticsBoard() {
                 <CartesianGrid strokeDasharray="3 3" vertical={false} />
                 <XAxis dataKey="label" fontSize={11} />
                 <YAxis fontSize={11} />
-                <Tooltip formatter={(v: number) => money(v)} />
+                <Tooltip formatter={(v) => money(Number(v ?? 0))} />
                 <Bar dataKey="value" fill="var(--accent)" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>

@@ -173,7 +173,7 @@ export function ItemActivityDrawer({
     return () => {
       live = false;
     };
-  }, [product?.id]);
+  }, [product]);
 
   return (
     <Sheet open={!!product} onOpenChange={(o) => !o && onClose()}>

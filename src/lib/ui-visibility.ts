@@ -12,7 +12,7 @@
  * Admins are never hidden from anything, so a bad toggle cannot lock the owner
  * out of their own install.
  */
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { usePos } from "./pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import type { StaffRole } from "./permissions";
@@ -275,7 +275,10 @@ export function withVisibility(
 export function useVisibility() {
   const { state, updateSettings } = usePos();
   const { user, isAdmin } = useAuth();
-  const hidden = (state.settings.visibility?.hidden ?? {}) as VisibilityMap;
+  const hidden = useMemo(
+    () => (state.settings.visibility?.hidden ?? {}) as VisibilityMap,
+    [state.settings.visibility?.hidden],
+  );
   // Prefer the person's real level so a supervisor can be hidden from a page
   // even though the till treats them as elevated. Only true admins see all.
   const role = ((user?.metaRole ?? (isAdmin ? "admin" : user?.role) ?? "cashier") as string);

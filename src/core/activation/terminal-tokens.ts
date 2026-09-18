@@ -20,6 +20,8 @@ import {
 import { clearDeviceSecret, getDeviceSecret, setDeviceSecret } from "@/lib/device-secrets";
 import { recordActivationAttempt } from "@/core/activation/terminal-activation-log";
 import { APP_VERSION } from "@/version";
+import { resetHealthCache } from "@/core/activation/connection-health";
+import { canRelay, relayOp } from "@/core/api/sync-relay";
 
 import {
   clearTerminalSupabaseOverride,
@@ -120,7 +122,7 @@ function applyTenantOverride(config: TerminalConfig | null): void {
   resetExternalClient();
   // A probe made for the previous tenant must never make the newly activated
   // tenant look offline for the cache window.
-  void import("@/core/activation/connection-health").then(({ resetHealthCache }) => resetHealthCache());
+  resetHealthCache();
 }
 
 export type TokenLocation = {
@@ -145,7 +147,6 @@ export async function ensureLocations(locations: TokenLocation[]): Promise<void>
     address: l.address || null,
     phone: l.phone || null,
   }));
-  const { canRelay, relayOp } = await import("@/core/api/sync-relay");
   if (canRelay()) {
     const relayed = await relayOp({ kind: "upsert", table: "stores", rows, onConflict: "id" });
     if (!relayed.ok) throw new Error(relayed.error ?? "Could not save branch locations");

@@ -545,7 +545,7 @@ function Register() {
       if (rule && product) setLines((ls) => [...ls, focLine(rule, product, Number(qty))]);
     }
     if (!focId && hasFoc) setLines((ls) => ls.filter((l) => !l.foc));
-  }, [focId, hasFoc, state.promotions, state.products]);
+  }, [focId, hasFoc, state.promotions, state.products, setLines]);
   // Total rounding: display and tender validation use the same rounded figure
   // the checkout charges and stores.
   const rounding = applyRounding(totals.total, state.settings.integrations.rounding, method);

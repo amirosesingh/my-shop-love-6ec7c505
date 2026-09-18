@@ -84,16 +84,15 @@ export function CashierPinLogin({
     let live = true;
     const branch = activeBranchId(null);
     void (async () => {
-      let rows: TerminalStaff[] = [];
-      let why: RosterReason = "empty";
-      try {
+      const rosterResult: { rows: TerminalStaff[]; why: RosterReason } = await (async () => {
+        try {
         const roster = await listTerminalStaff(branch);
-        rows = roster.staff;
-        why = roster.reason;
-      } catch {
-        rows = [];
-        why = "unreachable";
-      }
+          return { rows: roster.staff, why: roster.reason };
+        } catch {
+          return { rows: [], why: "unreachable" };
+        }
+      })();
+      let { rows, why } = rosterResult;
       // No answer from the server: offer the roster mirrored into this till's
       // own database, so a cut-off branch still sees who can sign in.
       if (!rows.length) {

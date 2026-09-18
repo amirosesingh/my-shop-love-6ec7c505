@@ -43,7 +43,7 @@ const newAttemptId = () => `att_${Date.now().toString(36)}_${(++attemptSeq).toSt
 /** Console diagnostics — identity and timing only, never credentials. */
 function trace(run, event, extra) {
   const detail = extra ? ` ${JSON.stringify(extra)}` : "";
-  // eslint-disable-next-line no-console
+
   console.log(
     `[sqladmin] attempt=${run.attemptId} stage=${run.stage} event=${event} elapsed=${
       Date.now() - run.startedAt

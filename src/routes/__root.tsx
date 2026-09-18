@@ -7,7 +7,7 @@ import {
   HeadContent,
   Scripts,
 } from "@tanstack/react-router";
-import { useEffect, type ReactNode } from "react";
+import { useEffect, useMemo, type ReactNode } from "react";
 
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
@@ -61,17 +61,21 @@ function NotFoundComponent() {
   );
 }
 
-function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
-  if (import.meta.env.DEV) console.error(error);
+function ErrorComponent({ error, reset }: { error: unknown; reset: () => void }) {
+  const normalizedError = useMemo(
+    () => (error instanceof Error ? error : new Error(String(error))),
+    [error],
+  );
+  if (import.meta.env.DEV) console.error(normalizedError);
   const router = useRouter();
   useEffect(() => {
     // Something on screen beats a blank window: the desktop shell must know the
     // build started, or its 60-second watchdog tears the till down.
     reportAppReady();
-    reportLovableError(error, { boundary: "tanstack_root_error_component" });
-  }, [error]);
+    reportLovableError(normalizedError, { boundary: "tanstack_root_error_component" });
+  }, [normalizedError]);
 
-  const notConfigured = error.name === "SupabaseConfigError";
+  const notConfigured = normalizedError.name === "SupabaseConfigError";
 
   // Missing device configuration is step one of terminal setup, never a cue
   // to attempt activation. Reset the boundary after a successful save/probe
@@ -110,15 +114,15 @@ function ErrorComponent({ error, reset }: { error: Error; reset: () => void }) {
             : "Something went wrong on our end. You can try refreshing or head back home."}
         </p>
         {import.meta.env.DEV && (
-          <p className="mt-2 break-words text-xs text-muted-foreground/80">{error.message}</p>
+          <p className="mt-2 break-words text-xs text-muted-foreground/80">{normalizedError.message}</p>
         )}
-        {import.meta.env.DEV && error.stack && (
+        {import.meta.env.DEV && normalizedError.stack && (
           <details className="mt-3 text-left">
             <summary className="cursor-pointer text-xs text-muted-foreground">
               Technical details
             </summary>
             <pre className="mt-2 max-h-56 overflow-auto whitespace-pre-wrap break-words rounded-md bg-muted p-2 text-[10px] leading-snug text-muted-foreground">
-              {error.stack}
+              {normalizedError.stack}
             </pre>
           </details>
         )}

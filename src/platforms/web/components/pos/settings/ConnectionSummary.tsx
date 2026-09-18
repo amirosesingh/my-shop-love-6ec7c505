@@ -29,13 +29,14 @@ export function ConnectionSummary() {
   const local = useLocalDbHealth();
   const [busy, setBusy] = useState(false);
 
-  let server = "Not set";
-  try {
-    const cfg = supabaseConfig();
-    server = cfg?.url ? new URL(cfg.url).host : "Not set";
-  } catch {
-    server = "Not set";
-  }
+  const server = (() => {
+    try {
+      const cfg = supabaseConfig();
+      return cfg?.url ? new URL(cfg.url).host : "Not set";
+    } catch {
+      return "Not set";
+    }
+  })();
 
   const tone =
     status.tone === "ok"

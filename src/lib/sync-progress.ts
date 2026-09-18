@@ -1,3 +1,5 @@
+import { readBusinessValue, writeBusinessValue } from "./business-storage";
+
 /**
  * The ONE sync state object.
  *
@@ -39,10 +41,36 @@ const EMPTY: SyncRunState = {
   tables: [],
 };
 
-let state: SyncRunState = EMPTY;
+const STORAGE_KEY = "pos.sync.progress.v1";
+
+function restore(): SyncRunState {
+  try {
+    const saved = JSON.parse(readBusinessValue(STORAGE_KEY) ?? "null") as SyncRunState | null;
+    if (!saved || !Array.isArray(saved.tables)) return EMPTY;
+    // A renderer-owned operation cannot still be executing after a process
+    // restart. Keep its real last position, but never show an eternal spinner.
+    return saved.status === "syncing"
+      ? {
+          ...saved,
+          status: "error",
+          lastError:
+            "The previous sync was interrupted. Its queued work is safe and will resume automatically.",
+        }
+      : saved;
+  } catch {
+    return EMPTY;
+  }
+}
+
+let state: SyncRunState = restore();
 const listeners = new Set<() => void>();
 
 const emit = () => {
+  try {
+    writeBusinessValue(STORAGE_KEY, JSON.stringify(state));
+  } catch {
+    // Status persistence must never stop the underlying business operation.
+  }
   for (const l of listeners) l();
 };
 

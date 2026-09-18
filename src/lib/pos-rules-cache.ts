@@ -39,17 +39,19 @@ export async function readCachedRules(
   terminalId: string,
   branchId: string,
 ): Promise<CachedRules | null> {
-  let stored: Stored | null = null;
+  let stored: Stored | null;
   if (typeof window !== "undefined" && isWindowsShell()) {
     const bridge = (window as unknown as {
       pos?: { getSetting?: (key: string) => Promise<{ value?: string | null }> };
     }).pos;
     const value = await bridge?.getSetting?.(SLOT).catch(() => null);
-    try {
-      stored = value?.value ? (JSON.parse(value.value) as Stored) : null;
-    } catch {
-      stored = null;
-    }
+    stored = (() => {
+      try {
+        return value?.value ? (JSON.parse(value.value) as Stored) : null;
+      } catch {
+        return null;
+      }
+    })();
   } else {
     stored = await getDeviceSecret<Stored>(SLOT).catch(() => null);
   }

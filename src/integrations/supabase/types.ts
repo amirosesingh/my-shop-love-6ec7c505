@@ -4278,6 +4278,10 @@ export type Database = {
       }
     }
     Functions: {
+      set_activity_event_cleared: {
+        Args: { p_cleared: boolean; p_event_id: string }
+        Returns: undefined
+      }
       assert_supervisor_caller: { Args: never; Returns: undefined }
       authorization_verify_pin: {
         Args: {
