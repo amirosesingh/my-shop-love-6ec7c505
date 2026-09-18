@@ -29,7 +29,7 @@ describe("desktop release configuration", () => {
     expect(version).toContain("[release]");
     expect(version).toContain("actions: write");
 
-    expect(bump).toContain('git", ["tag", "--list", "v[0-9]*"]');
+    expect(bump).toContain("package.json is the authoritative application version");
     expect(bump).toContain("syncLockVersion(pkg.version)");
 
     expect(desktop).toContain("startsWith(github.ref, 'refs/tags/v')");
