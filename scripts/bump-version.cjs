@@ -2,18 +2,15 @@
  * Bumps the patch digit of package.json and mirrors the version into every
  * committed version source used by the build.
  *
- * The normal bump is monotonic against existing v* Git tags. This prevents a
- * repository/package version reset from producing an "upgrade" lower than an
- * already published release (for example v1.3.755 -> 1.3.188).
+ * package.json is the authoritative application version. Historical release
+ * tags may use a different numbering scheme and must not move the app version.
  *
- *   node scripts/bump-version.cjs          # bump past package + highest v* tag
+ *   node scripts/bump-version.cjs          # bump package patch version
  *   node scripts/bump-version.cjs --write  # only re-sync generated version files
  *   node scripts/bump-version.cjs --set 1.2.3
  */
 const fs = require("node:fs");
 const path = require("node:path");
-const { execFileSync } = require("node:child_process");
-
 const root = path.join(__dirname, "..");
 const pkgPath = path.join(root, "package.json");
 const lockPath = path.join(root, "package-lock.json");
@@ -27,31 +24,6 @@ const requested = setAt >= 0 ? process.argv[setAt + 1] : "";
 function parseVersion(value) {
   const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(value || ""));
   return match ? match.slice(1).map(Number) : null;
-}
-
-function compareVersions(a, b) {
-  for (let i = 0; i < 3; i += 1) {
-    if (a[i] !== b[i]) return a[i] - b[i];
-  }
-  return 0;
-}
-
-function highestTaggedVersion() {
-  try {
-    const output = execFileSync("git", ["tag", "--list", "v[0-9]*"], {
-      cwd: root,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"],
-    });
-    let highest = null;
-    for (const tag of output.split(/\r?\n/)) {
-      const parsed = parseVersion(tag.replace(/^v/, ""));
-      if (parsed && (!highest || compareVersions(parsed, highest) > 0)) highest = parsed;
-    }
-    return highest;
-  } catch {
-    return null;
-  }
 }
 
 function syncLockVersion(version) {
@@ -71,11 +43,8 @@ if (requested) {
   pkg.version = requested;
   fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 } else if (!writeOnly) {
-  const packageVersion = parseVersion(pkg.version) || [1, 0, 0];
-  const tagVersion = highestTaggedVersion();
-  const base =
-    tagVersion && compareVersions(tagVersion, packageVersion) > 0 ? tagVersion : packageVersion;
-  pkg.version = `${base[0]}.${base[1]}.${base[2] + 1}`;
+  const [major = 1, minor = 0, patch = 0] = parseVersion(pkg.version) || [1, 0, 0];
+  pkg.version = `${major}.${minor}.${patch + 1}`;
   fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 }
 
