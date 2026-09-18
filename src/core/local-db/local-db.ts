@@ -321,63 +321,7 @@ export type DirectConnectionParams = {
   timeout?: number;
 };
 
-/** Progress of an operator-triggered trading-history restore. */
-export type RestoreRun = {
-  running: boolean;
-  table: string | null;
-  index: number;
-  total: number;
-  restored: number;
-  skipped: number;
-  error?: string | null;
-  startedAt?: string | null;
-  finishedAt?: string | null;
-  tables?: Array<{ table: string; restored: number; skipped: number; error?: string | null }>;
-};
-
-/** The rebuild check: what the till holds against what head office holds. */
-export type RestoreCheck = {
-  ok: boolean;
-  at: string;
-  days: number;
-  since: string;
-  pending: number;
-  verdict: "complete" | "short";
-  short: string[];
-  tables: Array<{
-    table: string;
-    local: number;
-    central: number | null;
-    behind: number;
-    ahead: number;
-    error?: string | null;
-  }>;
-  error?: string;
-};
-
-/** A real wipe-and-restore drill, with the safety copy put back on failure. */
-export type RestoreDrill = {
-  running: boolean;
-  phase: string;
-  startedAt?: string | null;
-  finishedAt?: string | null;
-  days: number;
-  verdict: "pass" | "fail" | null;
-  rolledBack: boolean;
-  error?: string | null;
-  blockers?: string[];
-  tables: Array<{
-    table: string;
-    before: number;
-    after: number;
-    missing: number;
-    changed: boolean;
-    pass: boolean;
-  }>;
-};
-
 export type LocalSyncStatus = {
-
   connected: boolean;
   tradingReady?: boolean;
   durability?: { ok: boolean; code?: string | null; error?: string; rolledBack?: boolean };
@@ -404,16 +348,40 @@ export type LocalSyncStatus = {
   credentialsInvalid?: boolean;
   mutationPath?: "relay" | "authenticated-direct" | "pending-auth" | "authorization-refused";
   businessBatches?: {
-    pending: number; failed: number; parked: number; sales: number;
-    rows: Array<{ id: string; status: "pending" | "failed" | "dead_letter"; attempts: number;
-      client_transaction_id?: string | null; created_at: string; last_attempt_at?: string | null;
-      error_message?: string | null; error_detail?: string | null }>;
+    pending: number;
+    failed: number;
+    parked: number;
+    sales: number;
+    rows: Array<{
+      id: string;
+      status: "pending" | "failed" | "dead_letter";
+      attempts: number;
+      client_transaction_id?: string | null;
+      created_at: string;
+      last_attempt_at?: string | null;
+      error_message?: string | null;
+      error_detail?: string | null;
+    }>;
   };
-  lastBusinessPush?: { batchId: string; clientTransactionId?: string | null;
-    localCommittedAt: string; pushStartedAt: string; acknowledgedAt?: string | null;
-    durationMs?: number | null; result: "pushing" | "synced" | "pending" | "failed"; reason?: string } | null;
+  lastBusinessPush?: {
+    batchId: string;
+    clientTransactionId?: string | null;
+    localCommittedAt: string;
+    pushStartedAt: string;
+    acknowledgedAt?: string | null;
+    durationMs?: number | null;
+    result: "pushing" | "synced" | "pending" | "failed";
+    reason?: string;
+  } | null;
   lastFailure?: {
-    stage: "sqlite" | "sql-projection" | "cloud-push" | "cloud-pull" | "connectivity" | "staff-roster" | "worker";
+    stage:
+      | "sqlite"
+      | "sql-projection"
+      | "cloud-push"
+      | "cloud-pull"
+      | "connectivity"
+      | "staff-roster"
+      | "worker";
     message: string;
     reason: string;
     at: string;
@@ -487,7 +455,7 @@ export type PosBridge = {
     tables?: string[];
     error?: string;
   }>;
-  /** Apply database/schema.sql. Only ever called from an explicit user click. */
+  /** Retired local-schema hook retained only for compatibility with older typings. */
   applySchema?: () => Promise<{ ok: boolean; file?: string; error?: string }>;
   /**
    * Per-table schema manifest compared live against the connected database.
@@ -557,23 +525,15 @@ export type PosBridge = {
   push: () => Promise<{ ok: boolean; pushed: number; failed: number; error?: string }>;
   pull: () => Promise<{ ok: boolean; merged: number; error?: string }>;
   /** One mutex-protected main-process sync cycle on Electron. */
-  syncNow?: () => Promise<LocalSyncStatus & { ok: boolean; busy?: boolean; pushed?: number; failed?: number; merged?: number }>;
-  /** Operator-triggered restore of this branch's trading history. */
-  restore?: (options?: { days?: number }) => Promise<RestoreRun & { ok: boolean; error?: string }>;
-  restoreStatus?: () => Promise<RestoreRun | null>;
-  /** Rebuild check — counts only, safe at any time. */
-  restoreVerify?: (options?: { days?: number }) => Promise<RestoreCheck>;
-  /** The drill: wipe this branch's history and restore it, copy kept. */
-  restoreDrill?: (options?: { days?: number }) => Promise<
-    RestoreDrill & { ok: boolean; error?: string; blockers?: string[] }
+  syncNow?: () => Promise<
+    LocalSyncStatus & {
+      ok: boolean;
+      busy?: boolean;
+      pushed?: number;
+      failed?: number;
+      merged?: number;
+    }
   >;
-  restoreEvidence?: () => Promise<{
-    check: RestoreCheck | null;
-    drill: RestoreDrill | null;
-    blockers: string[];
-  }>;
-  /** Which tables this till pushes, pulls and can restore. */
-  syncContract?: () => Promise<{ push: string[]; pull: string[]; restore: string[] }>;
 
   setSyncEnabled: (on: boolean) => Promise<void>;
   setSyncConfig?: (config: {
@@ -582,29 +542,7 @@ export type PosBridge = {
     maxAttempts?: number;
     maxBackoffMs?: number;
   }) => Promise<unknown>;
-  /** Live per-table counts on this till, for the server/shop comparison. */
-  compareSummary?: (options?: { since?: string | null; tables?: string[] }) => Promise<{
-    ok: boolean;
-    error?: string;
-    tables?: Array<{
-      table: string;
-      count: number;
-      maxUpdatedAt: string | null;
-      pending?: number;
-      errored?: number;
-      missing?: boolean;
-      error?: string | null;
-    }>;
-  }>;
-  compareRows?: (
-    table: string,
-    options?: { since?: string | null; limit?: number },
-  ) => Promise<{
-    ok: boolean;
-    error?: string;
-    rows?: Array<{ id: string; updatedAt: string | null; status?: string | null }>;
-  }>;
-  backup: (path?: string) => Promise<{ ok: boolean; path?: string; error?: string }>;
+
   retryErrored: () => Promise<{ ok: boolean }>;
   retryRow?: (table: string, id: string) => Promise<{ ok: boolean; error?: string }>;
   /** Stop retrying a change that can never succeed (desktop shell only). */
@@ -660,9 +598,7 @@ export type PosBridge = {
 
   /* ---- address of the hosted backend this device talks to ---- */
   backendUrl?: () => Promise<{ ok: boolean; url?: string }>;
-  setBackendUrl?: (
-    value: string,
-  ) => Promise<{ ok: boolean; url?: string; error?: string }>;
+  setBackendUrl?: (value: string) => Promise<{ ok: boolean; url?: string; error?: string }>;
 
   /* ---- tenant cloud credentials sealed in the OS vault ---- */
 

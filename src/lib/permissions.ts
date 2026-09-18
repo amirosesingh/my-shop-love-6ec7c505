@@ -217,7 +217,7 @@ export const PERMISSION_LABELS: Record<PermissionKey, string> = {
   can_manage_staff: "Manage staff & permissions",
   can_manage_promotions: "Edit promotions & coupon rules",
   can_manage_terminals: "Manage terminal activation tokens",
-  can_manage_sync_backup: "Run sync, backup & restore",
+  can_manage_sync_backup: "Manage database connection",
 };
 
 export const PERMISSION_KEYS = Object.keys(PERMISSION_LABELS) as PermissionKey[];

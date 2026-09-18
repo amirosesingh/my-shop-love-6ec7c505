@@ -88,10 +88,11 @@ describe("what the indicator says", () => {
     );
   });
 
-  it("counts the queue while offline", () => {
+  it("does not advertise a device queue while offline", () => {
     const s = describeStatus({ ...base, connectivity: "offline", pending: 3 });
     expect(s.tone).toBe("offline");
-    expect(s.label).toContain("3");
+    expect(s.label).toBe("Offline");
+    expect(s.detail).toContain("cannot be saved");
   });
 
   it("puts rejected credentials above every other message", () => {
@@ -100,7 +101,7 @@ describe("what the indicator says", () => {
     expect(s.label.toLowerCase()).toContain("credential");
   });
 
-  it("says everything is synced when the queue is empty", () => {
+  it("reports the direct central connection when online", () => {
     expect(describeStatus(base).tone).toBe("ok");
   });
 });

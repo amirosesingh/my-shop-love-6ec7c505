@@ -6,7 +6,7 @@
  * administrator switches here is what the role gets, immediately.
  *
  * The only exception is a small set of owner-only screens (staff, terminals,
- * sync, security, billing identity). Those can never be handed to another role
+ * database, security, billing identity). Those can never be handed to another role
  * by accident, and are marked `ownerOnly`.
  *
  * Admins are never hidden from anything, so a bad toggle cannot lock the owner
@@ -163,19 +163,15 @@ export const SETTINGS_VISIBILITY_ELEMENTS: VisibilityElement[] = (
     ["/settings/accounts", "Payment accounts", "Card machines, banks and e-wallets.", "sensitive"],
     ["/settings/services", "Booking services", "Jobs and their default fee.", "none"],
     ["/settings/whatsapp", "WhatsApp bills", "Send receipts over WhatsApp.", "sensitive"],
-    ["/settings/sync", "Sync", "Run a sync, queue and backups.", "core"],
-    ["/settings/database", "Database connection", "Cloud and local connections, schema health.", "core"],
+    ["/settings/database", "Database connection", "Central Supabase credentials and status.", "core"],
     ["/settings/system", "System status & integrations", "Connection health and public domains.", "sensitive"],
     ["/settings/security-alerts", "Security alerts", "Scan findings and posture checks.", "sensitive"],
-    ["/settings/diagnostics", "Database health", "Per-table reading and saving status.", "sensitive"],
     ["/settings/logic-health", "Logic health", "Relational flow checks.", "sensitive"],
-    ["/settings/database-explorer", "Database explorer", "Browse the local SQL database.", "sensitive"],
     ["/settings/branch-telemetry", "Branch telemetry", "Heartbeats from every till.", "sensitive"],
     ["/settings/notifications", "Notifications", "Where alerts are delivered.", "sensitive"],
     ["/settings/shift-alerts", "Shift alerts", "How the day-end summary is delivered.", "none"],
     ["/settings/booking-rules", "Booking rules", "Deposits, timing and liability wording.", "none"],
     ["/settings/hardware", "Hardware", "Scanners, drawers and displays.", "none"],
-    ["/settings/data-sync", "Data sync & audit", "Server versus shop data comparison.", "sensitive"],
     ["/settings/inheritance", "Settings inheritance", "Global, cluster and branch tiers.", "sensitive"],
   ] as const
 ).map(([route, label, blurb, lock]) => ({

@@ -1,25 +1,24 @@
-# Database upgrade
+# Online database installation and reset
 
-## Existing production Supabase
+The repository intentionally contains only two SQL files.
 
-Run exactly one file in **Supabase Dashboard → SQL Editor → New Query**:
+## Install or upgrade the central Supabase database
 
-`supabase/sql/production_upgrade_current.sql`
+Run `supabase/schema.sql` in **Supabase Dashboard → SQL Editor → New Query**.
+It is the single canonical, re-runnable online schema. It creates and repairs
+all tables, constraints, indexes, functions, triggers, grants and row-level
+security policies used by Retail. Do not look for or run historical migrations;
+they have been consolidated into this file and removed.
 
-It is transactional, additive, idempotent, and consolidates the current approval-authority and attention-related database requirements. Do not also run the individual represented migrations or the full canonical schemas when using this manual path. Supabase CLI deployments should continue using timestamped migrations normally.
+Supabase selects the PostgreSQL database when you open a project, so neither
+file asks for or hard-codes a database name. Open the intended project first;
+do not add `CREATE DATABASE` or a local/desktop database name.
 
-## Existing Windows SQL Server till
+## Reset business data
 
-Use **POS → Settings → Database & Cloud Connection → Schema Manager → Local SQL Server**. No manual SQL is normally required.
-
-Technician fallback only: `db/offline/pos-offline-sqlserver.sql`.
-
-Do not run `database/schema.sql` separately.
-
-## Electron SQLite
-
-Automatic; no manual SQL is required. Electron applies the guarded local schema during startup/upgrade. Never use a reset script for an upgrade.
-
-## Fresh installation
-
-Use the repository's existing canonical/fresh-install process. `supabase/schema.sql` is not a production incremental upgrade file.
+Back up the database, then run `supabase/reset.sql` as the database owner.
+The reset keeps authentication, staff access, branches, terminals, payment
+methods and settings. It temporarily disables RLS inside one transaction,
+clears trading and catalogue data, restores RLS, and verifies the final state.
+If any step fails, PostgreSQL rolls back the entire transaction, including the
+RLS changes.

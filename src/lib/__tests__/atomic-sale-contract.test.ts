@@ -5,7 +5,7 @@ const read = (file: string) => readFileSync(file, "utf8");
 
 describe("atomic central sale contract", () => {
   it("commits the financial graph and stock deltas inside one database function", () => {
-    const migration = read("supabase/migrations/20260908090000_atomic_pos_sale_commit.sql");
+    const migration = read("supabase/schema.sql");
     expect(migration).toContain("FUNCTION public.pos_sale_commit");
     expect(migration).toContain("INSERT INTO public.sales");
     expect(migration).toContain("INSERT INTO public.sale_items");
@@ -15,18 +15,18 @@ describe("atomic central sale contract", () => {
     expect(migration).toContain("SECURITY INVOKER");
   });
 
-  it("routes online clients and Electron replay through the same RPC", () => {
+  it("routes every client through the central sale RPC", () => {
     const gateway = read("src/core/api/pos-db.ts");
-    const worker = read("electron/sync/worker.cjs");
     expect(gateway).toContain('fn: "pos_sale_commit"');
-    expect(worker).toContain('fn: "pos_sale_commit"');
     expect(gateway).toContain("_member: member ? memberToRow(member, tierId) : null");
   });
 
   it("allows the Electron atomic sale RPC through the HTTP relay contract", () => {
     const endpoint = read("src/lib/sync-endpoint.server.ts");
     const relay = read("src/core/api/pos-relay.server.ts");
-    expect(endpoint).toContain('z.enum(["pos_sale_commit", "sale_refund", "shift_cash_count_submit"])');
+    expect(endpoint).toContain(
+      'z.enum(["pos_sale_commit", "sale_refund", "shift_cash_count_submit"])',
+    );
     expect(relay).toContain('if (op.fn === "pos_sale_commit")');
     expect(relay).toContain("scope.permissions.can_process_sale");
   });

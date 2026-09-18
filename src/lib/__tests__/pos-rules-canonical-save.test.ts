@@ -17,12 +17,4 @@ describe("canonical POS rules contract", () => {
     expect(schema).toContain("'rules', public.pos_rules_get(r.store_id)");
     expect(schema).toContain("'row_version', COALESCE(m.row_version, 1)");
   });
-
-  it("keeps offline replay behind the same optimistic concurrency RPC", () => {
-    const worker = read("electron/sync/worker.cjs");
-    expect(worker).toContain('supabase.rpc("pos_rules_save"');
-    expect(worker).toContain("_expected_version: expectedVersion");
-    expect(worker).toContain('if (op.table === "pos_store_settings") await cloudSaveRules(rows)');
-    expect(worker).toContain('/STALE_RULES/i.test(message) ? 1 : workerConfig.maxAttempts');
-  });
 });

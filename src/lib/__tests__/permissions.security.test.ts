@@ -184,7 +184,7 @@ describe("route visibility", () => {
   });
 
   it("an admin-only settings page is never shown to a cashier", () => {
-    expect(isRouteVisibleFor({}, "/settings/sync", "cashier")).toBe(false);
+    expect(isRouteVisibleFor({}, "/settings/database", "cashier")).toBe(false);
     expect(isRouteVisibleFor({}, "/settings/display", "cashier")).toBe(true);
   });
 
@@ -206,4 +206,3 @@ describe("route visibility", () => {
     expect(isRouteVisibleFor(core, "/settings/access", "supervisor")).toBe(false);
   });
 });
-

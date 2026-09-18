@@ -1,22 +1,20 @@
 /**
- * Android runs live-only.
+ * Every supported client runs live-only.
  *
  * The phone build is a thin client of the cloud: it never keeps business data
  * on the device, never queues writes and never opens a local database. Web and
  * the Windows till keep their offline-first behaviour untouched — every caller
  * of `isLiveOnly()` falls through to the existing path when it returns false.
  */
-import { hasFeature, isMobileShell } from "@/platform-config/features";
+import { hasFeature } from "@/platform-config/features";
 
 export function isLiveOnly(): boolean {
-  return isMobileShell();
+  return true;
 }
 
 /**
- * True on every build without a local database engine behind it: the browser
- * and the phone. Both are live clients of the central system — they never
- * queue writes, never keep a snapshot and never offer the Local/Online
- * switch. Only the Windows desktop shell works offline.
+ * True on every build. Web, Android and Electron all write directly to the
+ * central database and never queue business data on the device.
  */
 export function isOnlineOnly(): boolean {
   return !hasFeature("offlineFirst");

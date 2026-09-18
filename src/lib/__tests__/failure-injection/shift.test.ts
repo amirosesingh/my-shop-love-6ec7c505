@@ -43,22 +43,14 @@ describe("failure injection — shift close", () => {
     localMirrorBatch.mockResolvedValue({ ok: true, written: 0 });
   });
 
-  it("parks the blind count when the line dies mid-close", async () => {
+  it("rejects the count when the connection dies", async () => {
     const before = listQueue().length;
     rpc.mockRejectedValue(new Error("Failed to fetch"));
-    const res = await submitCashCount("shift-1", counted, { clientKey: "shift-1:original" });
-    expect(res.ok).toBe(false);
-    expect(res.ok === false && res.queued).toBe(true);
+    await expect(
+      submitCashCount("shift-1", counted, { clientKey: "shift-1:original" }),
+    ).rejects.toThrow(/Central database unavailable/);
     expect(listQueue().slice(before)).toHaveLength(0);
-    expect(localMirrorBatch).toHaveBeenCalledTimes(1);
-    const [, operations] = localMirrorBatch.mock.calls[0]!;
-    const op = operations[0] as { fn: string; args: Record<string, unknown> };
-    expect(op.fn).toBe("shift_cash_count_submit");
-    // The same key travels with it, so a replay cannot count the drawer twice,
-    // and no variance is computed on the till.
-    expect(op.args["p_client_key"]).toBe("shift-1:original");
-    expect(op.args["p_cash"]).toBe(250.5);
-    expect(Object.keys(op.args)).not.toContain("p_variance");
+    expect(localMirrorBatch).not.toHaveBeenCalled();
   });
 
   it("does not park a count the server refused on principle", async () => {

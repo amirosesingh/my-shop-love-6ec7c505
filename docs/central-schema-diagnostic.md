@@ -4,18 +4,17 @@ Date: 2026-08-23 · App 1.3.38 · Central schema definition v1
 
 ## 1. Dependency map — every component that relies on central-schema knowledge
 
-| Component | File | What it knows about the central schema |
-| --- | --- | --- |
-| Authoritative definition (new) | `src/lib/central-schema.ts` | The full central contract: 27 tables, exact PostgreSQL types, required/optional classification, natural keys, idempotency indexes, `CENTRAL_SCHEMA_VERSION` |
-| Drift engine (rewritten) | `src/lib/central-drift.ts` | One-way compare: authoritative definition → actual central DB. Legacy extras are informational, never drift |
-| Introspection + probe | `src/lib/central-schema.functions.ts` | `fetchCentralSchema` (types + nullability), `probeCentralTables` (per-table read with exact error) |
-| Relay metadata | `src/lib/pos-relay.server.ts` | `cloudSchema` returns the PostgREST root document (type/format/nullable); `cloudProbe` reads one row per table |
-| Push contract | `electron/db/cloud-columns.json` | The exact per-table column allow-list the till's sync engine sends — 25 tables |
-| Local master schema | `database/schema.sql` | SQL Server DDL for the till; parsed at runtime by `electron/db/pool.cjs` — local validation only, never a central yardstick |
-| Local schema manager UI | `src/components/database/SchemaPanel.tsx` | Local repair (unchanged) + Authoritative central schema card + Sync compatibility + Fetch diagnostics |
-| Data comparison | `src/lib/data-compare.ts` | `COMPARE_TABLES` — report tables; every one is guaranteed present in the authoritative definition (tested) |
-| Sync worker | `electron/sync/worker.cjs` | Pushes queued rows per `cloud-columns.json`; parks rows on unrecoverable push errors |
-| Offline mirror | `electron/db/sqlite.cjs`, `electron/db/offline_sqlite_v2.sql` | SQLite mirror of central tables for offline reads |
+| Component                      | File                                                          | What it knows about the central schema                                                                                                                      |
+| ------------------------------ | ------------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Authoritative definition (new) | `src/lib/central-schema.ts`                                   | The full central contract: 27 tables, exact PostgreSQL types, required/optional classification, natural keys, idempotency indexes, `CENTRAL_SCHEMA_VERSION` |
+| Drift engine (rewritten)       | `src/lib/central-drift.ts`                                    | One-way compare: authoritative definition → actual central DB. Legacy extras are informational, never drift                                                 |
+| Introspection + probe          | `src/lib/central-schema.functions.ts`                         | `fetchCentralSchema` (types + nullability), `probeCentralTables` (per-table read with exact error)                                                          |
+| Relay metadata                 | `src/lib/pos-relay.server.ts`                                 | `cloudSchema` returns the PostgREST root document (type/format/nullable); `cloudProbe` reads one row per table                                              |
+| Push contract                  | `electron/db/cloud-columns.json`                              | The exact per-table column allow-list the till's sync engine sends — 25 tables                                                                              |
+| Local schema manager UI        | `src/components/database/SchemaPanel.tsx`                     | Local repair (unchanged) + Authoritative central schema card + Sync compatibility + Fetch diagnostics                                                       |
+| Data comparison                | `src/lib/data-compare.ts`                                     | `COMPARE_TABLES` — report tables; every one is guaranteed present in the authoritative definition (tested)                                                  |
+| Sync worker                    | `electron/sync/worker.cjs`                                    | Pushes queued rows per `cloud-columns.json`; parks rows on unrecoverable push errors                                                                        |
+| Offline mirror                 | `electron/db/sqlite.cjs`, `electron/db/offline_sqlite_v2.sql` | SQLite mirror of central tables for offline reads                                                                                                           |
 
 ## 2. Why the old drift check lied
 

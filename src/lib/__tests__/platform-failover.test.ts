@@ -18,15 +18,20 @@ describe("platform wording for a total failure", () => {
   beforeEach(() => vi.resetModules());
   afterEach(() => vi.resetModules());
 
-  it("names the required local SQL database on the Windows till", async () => {
-    vi.doMock("@/platform-config/platform", () => ({ isNative: () => false, isElectron: () => true }));
+  it("uses the central database message on the Windows till", async () => {
+    vi.doMock("@/platform-config/platform", () => ({
+      isNative: () => false,
+      isElectron: () => true,
+    }));
     const { unreachableMessage } = await import("@/core/local-db/db-mode");
-    expect(unreachableMessage()).toMatch(/Local transaction storage unavailable/);
-    expect(unreachableMessage()).not.toMatch(/online database/);
+    expect(unreachableMessage()).toMatch(/Central database unavailable/);
   });
 
   it("names the server relay on the phone and in a browser", async () => {
-    vi.doMock("@/platform-config/platform", () => ({ isNative: () => true, isElectron: () => false }));
+    vi.doMock("@/platform-config/platform", () => ({
+      isNative: () => true,
+      isElectron: () => false,
+    }));
     const { unreachableMessage } = await import("@/core/local-db/db-mode");
     expect(unreachableMessage()).toMatch(/Central database unavailable/);
   });

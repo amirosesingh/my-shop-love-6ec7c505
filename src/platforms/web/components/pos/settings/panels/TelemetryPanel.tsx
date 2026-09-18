@@ -4,7 +4,7 @@
  * settings slide-over.
  */
 import { useCallback, useEffect, useState } from "react";
-import { RefreshCw, Send } from "lucide-react";
+import { RefreshCw } from "lucide-react";
 import { toast } from "sonner";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -107,13 +107,12 @@ export function TelemetryPanel() {
     <>
       {missingColumns.length > 0 && (
         <div className="mb-4 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-700 dark:text-amber-400">
-          Some device details are unavailable — this database is missing recent telemetry
-          columns ({missingColumns.join(", ")}). Terminals still report their core status.
-          Apply the latest database update to restore the full view.
+          Some device details are unavailable — this database is missing recent telemetry columns (
+          {missingColumns.join(", ")}). Terminals still report their core status. Apply the latest
+          database update to restore the full view.
         </div>
       )}
       <section className="rounded-lg border border-border bg-card p-5">
-
         <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-3">
           <h2 className="truncate text-lg font-semibold">Terminals</h2>
           <Button variant="outline" size="sm" onClick={() => void load()}>
@@ -168,7 +167,9 @@ export function TelemetryPanel() {
                     <TableCell>
                       {r.staff_name ?? "—"}
                       {r.staff_role ? (
-                        <div className="text-[11px] capitalize text-muted-foreground">{r.staff_role}</div>
+                        <div className="text-[11px] capitalize text-muted-foreground">
+                          {r.staff_role}
+                        </div>
                       ) : null}
                     </TableCell>
                     <TableCell>
@@ -187,21 +188,15 @@ export function TelemetryPanel() {
                         {r.pending_count}
                       </span>
                       {r.conflict_count > 0 ? (
-                        <div className="text-[11px] text-destructive">{r.conflict_count} held back</div>
+                        <div className="text-[11px] text-destructive">
+                          {r.conflict_count} held back
+                        </div>
                       ) : null}
                     </TableCell>
                     <TableCell className="text-xs">{when(r.last_synced_at)}</TableCell>
                     <TableCell className="text-xs">{when(r.last_seen_at)}</TableCell>
                     <TableCell className="text-right">
                       <div className="flex justify-end gap-2">
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          disabled={busy !== null}
-                          onClick={() => void send(r, "sync_now")}
-                        >
-                          <Send className="mr-1 size-3.5" /> Sync now
-                        </Button>
                         <Button
                           size="sm"
                           variant="outline"
@@ -255,7 +250,9 @@ export function TelemetryPanel() {
                     <TableCell className="capitalize">
                       {c.status === "blocked" ? "waiting" : c.status}
                     </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">{c.result ?? "—"}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
+                      {c.result ?? "—"}
+                    </TableCell>
                   </TableRow>
                 ))
               )}

@@ -463,7 +463,6 @@ export const navItemKey = (i: NavItem) => `${i.to}#${i.hash ?? ""}?${i.section ?
 export const standaloneNavItems: NavItem[] = [];
 export { Store };
 
-
 /**
  * Route access comes from the same navigation registry that decides whether a
  * link is visible. Only non-navigation settings routes need explicit entries.
@@ -473,7 +472,6 @@ const ROUTE_PERMISSION_OVERRIDES: Record<string, PermissionFlag> = {
   "/settings/terminals": "can_manage_terminals",
   "/settings/mobile-terminals": "can_manage_terminals",
   "/settings/sessions": "can_manage_terminals",
-  "/settings/sync": "can_manage_sync_backup",
   "/settings/database": "can_manage_sync_backup",
   "/settings": "can_access_pos_settings",
 };

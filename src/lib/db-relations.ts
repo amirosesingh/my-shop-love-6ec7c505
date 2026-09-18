@@ -27,7 +27,10 @@ export const IDENTITY_TABLES = [
 ] as const;
 
 /** The links the POS is designed around — used to spot a missing relation. */
-export const EXPECTED_RELATIONS: Record<string, { column: string; parent: string; label: string }[]> = {
+export const EXPECTED_RELATIONS: Record<
+  string,
+  { column: string; parent: string; label: string }[]
+> = {
   sales: [{ column: "member_id", parent: "members", label: "Sale → member" }],
   sale_items: [
     { column: "sale_id", parent: "sales", label: "Sale line → sale" },
@@ -42,10 +45,14 @@ export const EXPECTED_RELATIONS: Record<string, { column: string; parent: string
   ],
   products: [],
   product_barcodes: [{ column: "product_id", parent: "products", label: "Barcode → product" }],
-  product_categories: [{ column: "parent_id", parent: "product_categories", label: "Category → parent" }],
+  product_categories: [
+    { column: "parent_id", parent: "product_categories", label: "Category → parent" },
+  ],
   members: [{ column: "tier_id", parent: "membership_tiers", label: "Member → tier" }],
   membership_tiers: [],
-  purchase_orders: [{ column: "supplier_id", parent: "suppliers", label: "Purchase order → supplier" }],
+  purchase_orders: [
+    { column: "supplier_id", parent: "suppliers", label: "Purchase order → supplier" },
+  ],
   purchase_order_items: [
     { column: "po_id", parent: "purchase_orders", label: "PO line → purchase order" },
     { column: "product_id", parent: "products", label: "PO line → product" },
@@ -62,7 +69,9 @@ export const EXPECTED_RELATIONS: Record<string, { column: string; parent: string
     { column: "member_id", parent: "members", label: "Voucher → member" },
   ],
   stock_adjustments: [{ column: "product_id", parent: "products", label: "Adjustment → product" }],
-  item_activity_logs: [{ column: "product_id", parent: "products", label: "Item history → product" }],
+  item_activity_logs: [
+    { column: "product_id", parent: "products", label: "Item history → product" },
+  ],
 };
 
 export const TABLE_LABELS: Record<string, string> = {
@@ -190,12 +199,15 @@ export async function runRelationalHealth(): Promise<RelationalReport> {
           data = local;
           error = null;
         } else {
-        throw new Error(
-          "The relationship check is not installed on this database. Run supabase/online_schema_fix_latest.sql in the SQL editor of the database this till points at (or 'npx supabase db push' for the matching file in supabase/migrations/) to install operational_relational_health().",
-        );
+          throw new Error(
+            "The relationship check is not installed on this database. Run supabase/schema.sql in the SQL editor of the database this device points at to install operational_relational_health().",
+          );
         }
       }
-      if (error && (code === "42501" || /permission denied/i.test(msg) || /jwt|unauthor/i.test(msg))) {
+      if (
+        error &&
+        (code === "42501" || /permission denied/i.test(msg) || /jwt|unauthor/i.test(msg))
+      ) {
         throw new Error(
           "Sign in with a staff account to run the relationship check — it is only available to signed-in staff.",
         );
