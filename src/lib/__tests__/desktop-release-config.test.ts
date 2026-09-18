@@ -14,17 +14,32 @@ describe("desktop release configuration", () => {
     );
   });
 
-  it("builds Windows and Android from the same committed release version", () => {
+  it("builds Windows and Android from the same immutable release tag", () => {
     const desktop = read(".github/workflows/desktop-release.yml");
     const android = read(".github/workflows/android-apk.yml");
     const version = read(".github/workflows/version-release.yml");
+    const bump = read("scripts/bump-version.cjs");
+
     expect(version).toContain("version=$(node scripts/bump-version.cjs)");
+    expect(version).toContain("git fetch --tags --force origin");
+    expect(version).toContain("git add package.json package-lock.json src/version.ts");
+    expect(version).toContain('git tag "$tag"');
+    expect(version).toContain('gh workflow run desktop-release.yml --ref "$tag"');
+    expect(version).toContain('gh workflow run android-apk.yml --ref "$tag"');
     expect(version).toContain("[release]");
     expect(version).toContain("actions: write");
-    expect(version).toContain("gh workflow run desktop-release.yml --ref main");
-    expect(version).toContain("gh workflow run android-apk.yml --ref main");
-    expect(desktop).toContain("contains(github.event.head_commit.message, '[release]')");
-    expect(android).toContain("contains(github.event.head_commit.message, '[release]')");
+
+    expect(bump).toContain("package.json is the authoritative application version");
+    expect(bump).toContain("syncLockVersion(pkg.version)");
+
+    expect(desktop).toContain("startsWith(github.ref, 'refs/tags/v')");
+    expect(android).toContain("startsWith(github.ref, 'refs/tags/v')");
+    expect(desktop).not.toContain("branches: [main]");
+    expect(android).not.toContain("branches: [main]");
+    expect(desktop).not.toContain("head_commit.message");
+    expect(android).not.toContain("head_commit.message");
+    expect(desktop).toContain("if: ${{ startsWith(github.ref, 'refs/tags/v') }}");
+    expect(android).toContain("!inputs.app_url && startsWith(github.ref, 'refs/tags/v')");
     expect(desktop).not.toContain("GITHUB_RUN_NUMBER");
     expect(android).not.toContain("ANDROID_VERSION_CODE: ${{ github.run_number }}");
   });

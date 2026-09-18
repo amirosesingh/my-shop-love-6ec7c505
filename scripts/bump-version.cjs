@@ -1,17 +1,19 @@
 /**
- * Bumps the patch digit of package.json (1.0.0 -> 1.0.1) and mirrors the new
- * value into src/version.ts so the app, the installer and the update feed all
- * report the same number. Prints the new version on stdout.
+ * Bumps the patch digit of package.json and mirrors the version into every
+ * committed version source used by the build.
  *
- *   node scripts/bump-version.cjs          # bump patch
- *   node scripts/bump-version.cjs --write  # only regenerate src/version.ts
+ * package.json is the authoritative application version. Historical release
+ * tags may use a different numbering scheme and must not move the app version.
+ *
+ *   node scripts/bump-version.cjs          # bump package patch version
+ *   node scripts/bump-version.cjs --write  # only re-sync generated version files
  *   node scripts/bump-version.cjs --set 1.2.3
  */
 const fs = require("node:fs");
 const path = require("node:path");
-
 const root = path.join(__dirname, "..");
 const pkgPath = path.join(root, "package.json");
+const lockPath = path.join(root, "package-lock.json");
 const versionPath = path.join(root, "src", "version.ts");
 
 const pkg = JSON.parse(fs.readFileSync(pkgPath, "utf8"));
@@ -19,19 +21,34 @@ const writeOnly = process.argv.includes("--write");
 const setAt = process.argv.indexOf("--set");
 const requested = setAt >= 0 ? process.argv[setAt + 1] : "";
 
+function parseVersion(value) {
+  const match = /^(\d+)\.(\d+)\.(\d+)$/.exec(String(value || ""));
+  return match ? match.slice(1).map(Number) : null;
+}
+
+function syncLockVersion(version) {
+  if (!fs.existsSync(lockPath)) return;
+  const lock = JSON.parse(fs.readFileSync(lockPath, "utf8"));
+  lock.version = version;
+  if (lock.packages && lock.packages[""]) {
+    lock.packages[""].version = version;
+  }
+  fs.writeFileSync(lockPath, `${JSON.stringify(lock, null, 2)}\n`);
+}
+
 if (requested) {
-  if (!/^\d+\.\d+\.\d+$/.test(requested)) {
+  if (!parseVersion(requested)) {
     throw new Error(`Invalid release version: ${requested}`);
   }
   pkg.version = requested;
   fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 } else if (!writeOnly) {
-  const [major = 1, minor = 0, patch = 0] = String(pkg.version || "1.0.0")
-    .split(".")
-    .map((n) => Number.parseInt(n, 10) || 0);
+  const [major = 1, minor = 0, patch = 0] = parseVersion(pkg.version) || [1, 0, 0];
   pkg.version = `${major}.${minor}.${patch + 1}`;
   fs.writeFileSync(pkgPath, `${JSON.stringify(pkg, null, 2)}\n`);
 }
+
+syncLockVersion(pkg.version);
 
 fs.writeFileSync(
   versionPath,
