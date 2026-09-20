@@ -18,7 +18,7 @@ Use the repository's single full canonical schema process with `../schema.sql`. 
 
 ## Windows and Electron
 
-Windows SQL Server uses POS Schema Manager; technician fallback is `../../db/offline/pos-offline-sqlserver.sql`. Electron SQLite upgrades automatically. These files must never be run in Supabase.
+Windows SQL Server uses the controlled schema manager in `electron/db/migrations.cjs` with generated files in `database/sqlserver/`. These files must never be run in Supabase.
 
 ## Destructive maintenance
 

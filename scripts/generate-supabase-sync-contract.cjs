@@ -1,0 +1,244 @@
+const fs = require("node:fs");
+const path = require("node:path");
+
+const root = path.resolve(__dirname, "..");
+const schemaPath = path.join(root, "supabase", "schema.sql");
+const registry = JSON.parse(fs.readFileSync(path.join(root, "database", "sqlserver", "schema-registry.json"), "utf8"));
+const begin = "-- SQLSERVER_SYNC_CONTRACT_BEGIN";
+const end = "-- SQLSERVER_SYNC_CONTRACT_END";
+const q = (value) => `"${value}"`;
+const primary = (table) => table.columns.filter((column) => column.primaryKey);
+const columnNames = (table) => new Set(table.columns.map((column) => column.cloudColumn));
+const keyJson = (table, alias) => `jsonb_build_object(${primary(table).map((column) => `'${column.cloudColumn}',${alias}.${q(column.cloudColumn)}`).join(",")})::text`;
+const keyMatch = (table, rowAlias, feedAlias = "f") => primary(table).map((column) => `${rowAlias}.${q(column.cloudColumn)}::text=(${feedAlias}.entity_id::jsonb)->>'${column.cloudColumn}'`).join(" AND ");
+
+function directBranchPredicate(table, alias, parameter = "p_branch_id") {
+  const names = columnNames(table);
+  if (names.has("store_id")) return `${alias}.store_id::text=${parameter}`;
+  if (names.has("branch_id")) return `${alias}.branch_id::text=${parameter}`;
+  if (names.has("from_store_id") && names.has("to_store_id")) return `${parameter} IN (${alias}.from_store_id::text,${alias}.to_store_id::text)`;
+  return null;
+}
+
+function branchPredicate(table, alias = "x", seen = new Set()) {
+  const direct = directBranchPredicate(table, alias);
+  if (direct) return direct;
+  if (seen.has(table.cloudTable)) return "false";
+  const nextSeen = new Set(seen).add(table.cloudTable);
+  for (const column of table.columns.filter((item) => item.foreignKey && item.foreignKeyTarget)) {
+    const parent = registry.tables.find((item) => item.cloudTable === column.foreignKeyTarget.table);
+    if (!parent) continue;
+    const parentFilter = branchPredicate(parent, "p", nextSeen);
+    if (parentFilter !== "true" && parentFilter !== "false")
+      return `EXISTS(SELECT 1 FROM public.${q(parent.cloudTable)} p WHERE p.${q(column.foreignKeyTarget.column)}::text=${alias}.${q(column.cloudColumn)}::text AND ${parentFilter})`;
+  }
+  return "true";
+}
+
+function incomingBranchGuard(table, rows = "p_rows") {
+  const names = columnNames(table);
+  if (names.has("store_id")) return `IF EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(${rows},'[]'::jsonb)) r WHERE r->>'store_id' IS NULL OR r->>'store_id'<>p_branch_id) THEN RAISE EXCEPTION 'SYNC_BRANCH_FORBIDDEN'; END IF;`;
+  if (names.has("branch_id")) return `IF EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(${rows},'[]'::jsonb)) r WHERE r->>'branch_id' IS NULL OR r->>'branch_id'<>p_branch_id) THEN RAISE EXCEPTION 'SYNC_BRANCH_FORBIDDEN'; END IF;`;
+  if (names.has("from_store_id") && names.has("to_store_id")) return `IF EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(${rows},'[]'::jsonb)) r WHERE p_branch_id<>COALESCE(r->>'from_store_id','') AND p_branch_id<>COALESCE(r->>'to_store_id','')) THEN RAISE EXCEPTION 'SYNC_BRANCH_FORBIDDEN'; END IF;`;
+  for (const column of table.columns.filter((item) => item.foreignKey && item.foreignKeyTarget)) {
+    const parent = registry.tables.find((item) => item.cloudTable === column.foreignKeyTarget.table);
+    if (!parent) continue;
+    const parentNames = columnNames(parent);
+    const link = `p.${q(column.foreignKeyTarget.column)}::text=r->>'${column.cloudColumn}'`;
+    if (parentNames.has("store_id")) return `IF EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(${rows},'[]'::jsonb)) r WHERE NOT EXISTS(SELECT 1 FROM public.${q(parent.cloudTable)} p WHERE ${link} AND p.store_id::text=p_branch_id)) THEN RAISE EXCEPTION 'SYNC_BRANCH_FORBIDDEN'; END IF;`;
+    if (parentNames.has("branch_id")) return `IF EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(${rows},'[]'::jsonb)) r WHERE NOT EXISTS(SELECT 1 FROM public.${q(parent.cloudTable)} p WHERE ${link} AND p.branch_id::text=p_branch_id)) THEN RAISE EXCEPTION 'SYNC_BRANCH_FORBIDDEN'; END IF;`;
+    if (parentNames.has("from_store_id") && parentNames.has("to_store_id")) return `IF EXISTS(SELECT 1 FROM jsonb_array_elements(COALESCE(${rows},'[]'::jsonb)) r WHERE NOT EXISTS(SELECT 1 FROM public.${q(parent.cloudTable)} p WHERE ${link} AND p_branch_id IN (p.from_store_id::text,p.to_store_id::text))) THEN RAISE EXCEPTION 'SYNC_BRANCH_FORBIDDEN'; END IF;`;
+  }
+  return "";
+}
+
+function dateColumn(table) {
+  const names = columnNames(table);
+  return ["created_at", "paid_at", "occurred_at", "updated_at"].find((name) => names.has(name)) ?? null;
+}
+
+function feedBranches(table) {
+  const names = columnNames(table);
+  if (names.has("store_id")) return "SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id";
+  if (names.has("branch_id")) return "SELECT COALESCE(NEW.branch_id,OLD.branch_id,'global')::text branch_id";
+  if (names.has("from_store_id") && names.has("to_store_id"))
+    return "SELECT DISTINCT branch_id FROM (VALUES(COALESCE(NEW.from_store_id,OLD.from_store_id)::text),(COALESCE(NEW.to_store_id,OLD.to_store_id)::text)) b(branch_id) WHERE branch_id IS NOT NULL";
+  for (const column of table.columns.filter((item) => item.foreignKey && item.foreignKeyTarget)) {
+    const parent = registry.tables.find((item) => item.cloudTable === column.foreignKeyTarget.table);
+    if (!parent) continue;
+    const parentNames = columnNames(parent);
+    const link = `p.${q(column.foreignKeyTarget.column)}::text=COALESCE(NEW.${q(column.cloudColumn)},OLD.${q(column.cloudColumn)})::text`;
+    if (parentNames.has("store_id")) return `SELECT p.store_id::text branch_id FROM public.${q(parent.cloudTable)} p WHERE ${link}`;
+    if (parentNames.has("branch_id")) return `SELECT p.branch_id::text branch_id FROM public.${q(parent.cloudTable)} p WHERE ${link}`;
+    if (parentNames.has("from_store_id") && parentNames.has("to_store_id"))
+      return `SELECT DISTINCT branch_id FROM public.${q(parent.cloudTable)} p CROSS JOIN LATERAL (VALUES(p.from_store_id::text),(p.to_store_id::text)) b(branch_id) WHERE ${link} AND branch_id IS NOT NULL`;
+  }
+  return "SELECT 'global'::text branch_id";
+}
+
+const tables = registry.tables.filter((table) => primary(table).length);
+const pushTables = tables.filter((table) => table.direction !== "pull");
+const out = [begin,
+  `CREATE TABLE IF NOT EXISTS public.sync_idempotency_receipts (
+ batch_id uuid PRIMARY KEY, organization_id text NOT NULL, branch_id text NOT NULL, table_name text NOT NULL,
+ payload_hash text NOT NULL DEFAULT '', applied_count integer NOT NULL DEFAULT 0, applied_at timestamptz NOT NULL DEFAULT now());`,
+  `ALTER TABLE public.sync_idempotency_receipts ADD COLUMN IF NOT EXISTS payload_hash text NOT NULL DEFAULT '';`,
+  `CREATE TABLE IF NOT EXISTS public.sync_change_feed (
+ cursor bigint GENERATED ALWAYS AS IDENTITY PRIMARY KEY, organization_id text NOT NULL, branch_id text NOT NULL,
+ table_name text NOT NULL, entity_id text NOT NULL, operation text NOT NULL CHECK(operation IN ('insert','update','delete')),
+ row_version bigint NOT NULL DEFAULT 1, tombstone boolean NOT NULL DEFAULT false, changed_at timestamptz NOT NULL DEFAULT now());`,
+  `CREATE INDEX IF NOT EXISTS sync_change_feed_branch_cursor_idx ON public.sync_change_feed(organization_id,branch_id,cursor);`,
+  `ALTER TABLE public.sync_idempotency_receipts ENABLE ROW LEVEL SECURITY; ALTER TABLE public.sync_change_feed ENABLE ROW LEVEL SECURITY;`,
+];
+
+for (const table of tables) {
+  const columns = table.columns.map((column) => q(column.cloudColumn));
+  const updates = table.columns.filter((column) => !column.primaryKey && !(table.cloudTable === "products" && ["stock_quantity", "stock_by_store"].includes(column.cloudColumn))).map((column) => `${q(column.cloudColumn)}=EXCLUDED.${q(column.cloudColumn)}`);
+  const versionWhere = columnNames(table).has("row_version") ? ` WHERE EXCLUDED."row_version">public.${q(table.cloudTable)}."row_version"` : "";
+  const immutable = table.conflictRule === "immutable_reversal" || table.conflictRule === "movement_delta";
+  const conflictAction = table.cloudTable === "sales"
+    ? `UPDATE SET "is_refunded"=(public."sales"."is_refunded" OR EXCLUDED."is_refunded"),"row_version"=GREATEST(public."sales"."row_version",EXCLUDED."row_version")`
+    : table.cloudTable === "sale_items"
+      ? `UPDATE SET "refunded_qty"=GREATEST(public."sale_items"."refunded_qty",EXCLUDED."refunded_qty"),"row_version"=GREATEST(public."sale_items"."row_version",EXCLUDED."row_version")`
+      : updates.length && !immutable ? `UPDATE SET ${updates.join(",")}${versionWhere}` : "NOTHING";
+  const refundOn = ["sales", "sale_items"].includes(table.cloudTable) ? "PERFORM set_config('pos.refunding','on',true);" : "";
+  const refundOff = ["sales", "sale_items"].includes(table.cloudTable) ? "PERFORM set_config('pos.refunding','off',true);" : "";
+  const applyStock = table.cloudTable === "item_activity_logs" ? `FOR v_row IN SELECT value FROM jsonb_array_elements(COALESCE(p_rows,'[]'::jsonb)) LOOP
+    IF NULLIF(v_row->>'id','') IS NOT NULL AND NULLIF(v_row->>'product_id','') IS NOT NULL AND NULLIF(v_row->>'store_id','') IS NOT NULL AND COALESCE((v_row->>'quantity_delta')::integer,0)<>0 THEN
+      PERFORM public.stock_apply_delta((v_row->>'id')::uuid,(v_row->>'product_id')::uuid,v_row->>'store_id',COALESCE((v_row->>'quantity_delta')::integer,0));
+    END IF;
+  END LOOP;` : "";
+  if (table.cloudTable === "stock_delta_applied") {
+    out.push(`CREATE OR REPLACE FUNCTION public.sync_apply_stock_delta_applied(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+DECLARE v_count integer:=0; v_row jsonb;
+BEGIN FOR v_row IN SELECT value FROM jsonb_array_elements(COALESCE(p_rows,'[]'::jsonb)) LOOP
+  PERFORM public.stock_apply_delta((v_row->>'movement_id')::uuid,(v_row->>'product_id')::uuid,v_row->>'store_id',COALESCE((v_row->>'delta')::integer,0)); v_count:=v_count+1;
+ END LOOP; RETURN v_count; END $fn$;`);
+  } else out.push(`CREATE OR REPLACE FUNCTION public.sync_apply_${table.cloudTable}(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+DECLARE v_count integer; v_row jsonb;
+BEGIN
+  ${refundOn}
+  INSERT INTO public.${q(table.cloudTable)} (${columns.join(",")})
+  SELECT ${columns.join(",")} FROM jsonb_populate_recordset(NULL::public.${q(table.cloudTable)}, COALESCE(p_rows,'[]'::jsonb))
+  ON CONFLICT (${primary(table).map((column) => q(column.cloudColumn)).join(",")}) DO ${conflictAction};
+  GET DIAGNOSTICS v_count=ROW_COUNT;
+  ${applyStock}
+  ${refundOff}
+  RETURN v_count;
+END $fn$;`);
+  const deleteWhere = primary(table).map((column) => `x.${q(column.cloudColumn)}::text=COALESCE(c->'key'->>'${column.cloudColumn}',(c->>'entityId')::jsonb->>'${column.cloudColumn}',(c->>'entity_id')::jsonb->>'${column.cloudColumn}')`).join(" AND ");
+  out.push(`CREATE OR REPLACE FUNCTION public.sync_delete_${table.cloudTable}(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+DECLARE v_count integer;
+BEGIN DELETE FROM public.${q(table.cloudTable)} x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
+ WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (${branchPredicate(table)}) AND ${deleteWhere};
+ GET DIAGNOSTICS v_count=ROW_COUNT; RETURN v_count; END $fn$;
+REVOKE ALL ON FUNCTION public.sync_apply_${table.cloudTable}(jsonb) FROM PUBLIC;
+REVOKE ALL ON FUNCTION public.sync_delete_${table.cloudTable}(jsonb,text) FROM PUBLIC;`);
+  const names = columnNames(table);
+  const organization = names.has("organization_id") ? "COALESCE(NEW.organization_id,OLD.organization_id,'default')" : "'default'";
+  const version = names.has("row_version") ? "COALESCE(NEW.row_version,OLD.row_version,1)" : "1";
+  const key = `CASE WHEN TG_OP='DELETE' THEN ${keyJson(table, "OLD")} ELSE ${keyJson(table, "NEW")} END`;
+  out.push(`CREATE OR REPLACE FUNCTION public.sync_feed_${table.cloudTable}() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
+ SELECT ${organization},branches.branch_id,'${table.cloudTable}',${key},lower(TG_OP),${version},TG_OP='DELETE' FROM (${feedBranches(table)}) branches; RETURN NULL; END $trg$;
+DROP TRIGGER IF EXISTS sync_feed_change ON public.${q(table.cloudTable)};
+CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public.${q(table.cloudTable)} FOR EACH ROW EXECUTE FUNCTION public.sync_feed_${table.cloudTable}();`);
+}
+
+const applyCases = (rowsExpression, changesExpression) => pushTables.map((table) => `WHEN '${table.cloudTable}' THEN ${incomingBranchGuard(table, rowsExpression)} v_count:=public.sync_apply_${table.cloudTable}(${rowsExpression})+public.sync_delete_${table.cloudTable}(${changesExpression},p_branch_id);`).join("\n    ");
+const rowCases = tables.map((table) => `WHEN '${table.cloudTable}' THEN (SELECT to_jsonb(x) FROM public.${q(table.cloudTable)} x WHERE ${keyMatch(table, "x")} LIMIT 1)`).join("\n    ");
+
+out.push(`CREATE OR REPLACE FUNCTION public.pos_sync_push_batch(p_batch_id uuid,p_organization_id text,p_branch_id text,p_table text,p_rows jsonb,p_changes jsonb DEFAULT '[]'::jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $fn$
+DECLARE v_me public.app_users%ROWTYPE; v_count integer:=0; v_hash text:=md5(p_table||COALESCE(p_rows,'[]'::jsonb)::text||COALESCE(p_changes,'[]'::jsonb)::text); v_prior text;
+BEGIN
+ IF auth.role()<>'service_role' THEN
+  SELECT * INTO v_me FROM public.app_users WHERE auth_user_id=auth.uid() AND is_active=true LIMIT 1;
+  IF v_me.id IS NULL OR NOT (v_me.role='admin' OR COALESCE((v_me.permissions->>'can_manage_sync_backup')::boolean,false)) THEN RAISE EXCEPTION 'SYNC_FORBIDDEN'; END IF;
+  IF NOT (v_me.role='admin' OR v_me.store_id IS NULL OR v_me.store_id=p_branch_id) THEN RAISE EXCEPTION 'SYNC_BRANCH_FORBIDDEN'; END IF;
+ END IF;
+ SELECT payload_hash INTO v_prior FROM public.sync_idempotency_receipts WHERE batch_id=p_batch_id;
+ IF FOUND THEN IF v_prior<>v_hash THEN RAISE EXCEPTION 'SYNC_IDEMPOTENCY_MISMATCH'; END IF; RETURN jsonb_build_object('ok',true,'replayed',true,'batch_id',p_batch_id); END IF;
+ CASE p_table ${applyCases("p_rows","p_changes")} ELSE RAISE EXCEPTION 'SYNC_TABLE_FORBIDDEN'; END CASE;
+ INSERT INTO public.sync_idempotency_receipts(batch_id,organization_id,branch_id,table_name,payload_hash,applied_count) VALUES(p_batch_id,p_organization_id,p_branch_id,p_table,v_hash,v_count);
+ RETURN jsonb_build_object('ok',true,'applied',v_count,'batch_id',p_batch_id);
+END $fn$;`);
+
+out.push(`CREATE OR REPLACE FUNCTION public.pos_sync_push_aggregate(p_batch_id uuid,p_organization_id text,p_branch_id text,p_operations jsonb)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $fn$
+DECLARE v_me public.app_users%ROWTYPE; v_op jsonb; v_table text; v_rows jsonb; v_count integer:=0; v_total integer:=0; v_hash text:=md5(COALESCE(p_operations,'[]'::jsonb)::text); v_prior text;
+BEGIN
+ IF jsonb_typeof(p_operations)<>'array' OR jsonb_array_length(p_operations)>200 THEN RAISE EXCEPTION 'SYNC_AGGREGATE_INVALID'; END IF;
+ IF auth.role()<>'service_role' THEN SELECT * INTO v_me FROM public.app_users WHERE auth_user_id=auth.uid() AND is_active=true LIMIT 1;
+  IF v_me.id IS NULL OR NOT (v_me.role='admin' OR COALESCE((v_me.permissions->>'can_manage_sync_backup')::boolean,false)) THEN RAISE EXCEPTION 'SYNC_FORBIDDEN'; END IF;
+  IF NOT (v_me.role='admin' OR v_me.store_id IS NULL OR v_me.store_id=p_branch_id) THEN RAISE EXCEPTION 'SYNC_BRANCH_FORBIDDEN'; END IF; END IF;
+ SELECT payload_hash INTO v_prior FROM public.sync_idempotency_receipts WHERE batch_id=p_batch_id;
+ IF FOUND THEN IF v_prior<>v_hash THEN RAISE EXCEPTION 'SYNC_IDEMPOTENCY_MISMATCH'; END IF; RETURN jsonb_build_object('ok',true,'replayed',true,'batch_id',p_batch_id); END IF;
+ FOR v_op IN SELECT value FROM jsonb_array_elements(p_operations) LOOP v_table:=v_op->>'table'; v_rows:=COALESCE(v_op->'rows','[]'::jsonb);
+  IF v_table='products' AND EXISTS(SELECT 1 FROM jsonb_array_elements(p_operations) related WHERE related->>'table' IN ('item_activity_logs','stock_delta_applied')) THEN
+   SELECT COALESCE(jsonb_agg((row_value-'stock_quantity'-'stock_by_store')||jsonb_build_object('stock_quantity',0,'stock_by_store','{}'::jsonb)),'[]'::jsonb) INTO v_rows FROM jsonb_array_elements(v_rows) AS product_rows(row_value);
+  END IF;
+  CASE v_table ${applyCases("v_rows","v_op->'changes'")} ELSE RAISE EXCEPTION 'SYNC_TABLE_FORBIDDEN'; END CASE; v_total:=v_total+v_count;
+ END LOOP;
+ INSERT INTO public.sync_idempotency_receipts(batch_id,organization_id,branch_id,table_name,payload_hash,applied_count) VALUES(p_batch_id,p_organization_id,p_branch_id,'__aggregate__',v_hash,v_total);
+ RETURN jsonb_build_object('ok',true,'applied',v_total,'batch_id',p_batch_id);
+END $fn$;`);
+
+out.push(`CREATE OR REPLACE FUNCTION public.pos_sync_pull(p_organization_id text,p_branch_id text,p_after_cursor bigint DEFAULT 0,p_limit integer DEFAULT 500)
+RETURNS TABLE(cursor bigint,table_name text,entity_id text,operation text,row_version bigint,tombstone boolean,row_data jsonb) LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $fn$
+DECLARE v_me public.app_users%ROWTYPE;
+BEGIN IF auth.role()<>'service_role' THEN SELECT * INTO v_me FROM public.app_users WHERE auth_user_id=auth.uid() AND is_active=true LIMIT 1;
+ IF v_me.id IS NULL OR NOT (v_me.role='admin' OR COALESCE((v_me.permissions->>'can_manage_sync_backup')::boolean,false)) THEN RAISE EXCEPTION 'SYNC_FORBIDDEN'; END IF;
+ IF NOT (v_me.role='admin' OR v_me.store_id IS NULL OR v_me.store_id=p_branch_id) THEN RAISE EXCEPTION 'SYNC_BRANCH_FORBIDDEN'; END IF; END IF;
+ RETURN QUERY SELECT f.cursor,f.table_name,f.entity_id,f.operation,f.row_version,f.tombstone,CASE f.table_name ${rowCases} ELSE NULL END
+ FROM public.sync_change_feed f WHERE f.organization_id=p_organization_id AND f.branch_id IN (p_branch_id,'global') AND f.cursor>p_after_cursor ORDER BY f.cursor LIMIT LEAST(GREATEST(p_limit,100),2000);
+END $fn$;`);
+
+const bootstrapCases = tables.map((table) => {
+  const key = keyJson(table, "x");
+  const history = table.retentionClass === "historical" && dateColumn(table) ? `AND (p_history_days>=7300 OR x.${q(dateColumn(table))}>=now()-make_interval(days=>GREATEST(p_history_days,30)))` : "";
+  return `WHEN '${table.cloudTable}' THEN SELECT COALESCE(jsonb_agg(to_jsonb(page.row_data) ORDER BY page.cursor),'[]'::jsonb),max(page.cursor) INTO v_rows,v_cursor FROM (SELECT ${key} cursor,x row_data FROM public.${q(table.cloudTable)} x WHERE (${branchPredicate(table)}) ${history} AND (p_after_cursor IS NULL OR ${key}>p_after_cursor) ORDER BY ${key} LIMIT LEAST(GREATEST(p_limit,100),2000)) page;`;
+}).join("\n    ");
+out.push(`CREATE OR REPLACE FUNCTION public.pos_sync_bootstrap(p_organization_id text,p_branch_id text,p_table text,p_after_cursor text DEFAULT NULL,p_history_days integer DEFAULT 90,p_limit integer DEFAULT 500)
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $fn$
+DECLARE v_rows jsonb:='[]'::jsonb; v_cursor text; v_me public.app_users%ROWTYPE;
+BEGIN IF auth.role()<>'service_role' THEN SELECT * INTO v_me FROM public.app_users WHERE auth_user_id=auth.uid() AND is_active=true LIMIT 1;
+ IF v_me.id IS NULL OR NOT (v_me.role='admin' OR COALESCE((v_me.permissions->>'can_manage_sync_backup')::boolean,false)) THEN RAISE EXCEPTION 'SYNC_FORBIDDEN'; END IF;
+ IF NOT (v_me.role='admin' OR v_me.store_id IS NULL OR v_me.store_id=p_branch_id) THEN RAISE EXCEPTION 'SYNC_BRANCH_FORBIDDEN'; END IF; END IF;
+ CASE p_table ${bootstrapCases} ELSE RAISE EXCEPTION 'SYNC_TABLE_FORBIDDEN'; END CASE;
+ RETURN jsonb_build_object('rows',v_rows,'cursor',CASE WHEN jsonb_array_length(v_rows)>=LEAST(GREATEST(p_limit,100),2000) THEN v_cursor ELSE NULL END);
+END $fn$;`);
+
+const countQueries = tables.map((table) => { const history=table.retentionClass==="historical"&&dateColumn(table)?` AND (p_history_days>=7300 OR x.${q(dateColumn(table))}>=now()-make_interval(days=>GREATEST(p_history_days,30)))`:"";return `SELECT '${table.cloudTable}'::text table_name,COUNT_BIG_PLACEHOLDER FROM public.${q(table.cloudTable)} x WHERE ${branchPredicate(table)}${history}`; }).join(" UNION ALL ").replaceAll("COUNT_BIG_PLACEHOLDER", "count(*)::bigint row_count");
+out.push(`CREATE OR REPLACE FUNCTION public.pos_sync_counts(p_organization_id text,p_branch_id text,p_history_days integer DEFAULT 90)
+RETURNS TABLE(table_name text,row_count bigint) LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $fn$
+DECLARE v_me public.app_users%ROWTYPE;
+BEGIN IF auth.role()<>'service_role' THEN SELECT * INTO v_me FROM public.app_users WHERE auth_user_id=auth.uid() AND is_active=true LIMIT 1;
+ IF v_me.id IS NULL OR NOT (v_me.role='admin' OR COALESCE((v_me.permissions->>'can_manage_sync_backup')::boolean,false)) THEN RAISE EXCEPTION 'SYNC_FORBIDDEN'; END IF;
+ IF NOT (v_me.role='admin' OR v_me.store_id IS NULL OR v_me.store_id=p_branch_id) THEN RAISE EXCEPTION 'SYNC_BRANCH_FORBIDDEN'; END IF; END IF;
+ RETURN QUERY ${countQueries};
+END $fn$;`);
+
+out.push(`CREATE OR REPLACE FUNCTION public.pos_old_receipt_lookup(p_lookup text,p_branch_id text) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $fn$
+DECLARE v_me public.app_users%ROWTYPE; v_sale public.sales%ROWTYPE;
+BEGIN IF auth.role()<>'service_role' THEN SELECT * INTO v_me FROM public.app_users WHERE auth_user_id=auth.uid() AND is_active=true LIMIT 1;
+ IF v_me.id IS NULL OR NOT (v_me.role='admin' OR COALESCE((v_me.permissions->>'can_process_refund')::boolean,false)) THEN RAISE EXCEPTION 'REFUND_FORBIDDEN'; END IF;
+ IF NOT (v_me.role='admin' OR v_me.store_id IS NULL OR v_me.store_id=p_branch_id) THEN RAISE EXCEPTION 'SYNC_BRANCH_FORBIDDEN'; END IF; END IF;
+ SELECT * INTO v_sale FROM public.sales WHERE store_id=p_branch_id AND (id::text=p_lookup OR bill_number=p_lookup OR client_transaction_id::text=p_lookup) LIMIT 1;
+ IF v_sale.id IS NULL THEN RETURN NULL; END IF;
+ RETURN jsonb_build_object('sale',to_jsonb(v_sale),'items',(SELECT COALESCE(jsonb_agg(to_jsonb(i)),'[]'::jsonb) FROM public.sale_items i WHERE i.sale_id=v_sale.id),'payments',(SELECT COALESCE(jsonb_agg(to_jsonb(p)),'[]'::jsonb) FROM public.payment_transactions p WHERE p.sale_id=v_sale.id));
+END $fn$;`);
+out.push(`GRANT EXECUTE ON FUNCTION public.pos_sync_push_batch(uuid,text,text,text,jsonb,jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.pos_sync_push_aggregate(uuid,text,text,jsonb) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.pos_sync_pull(text,text,bigint,integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.pos_sync_bootstrap(text,text,text,text,integer,integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.pos_sync_counts(text,text,integer) TO authenticated;
+GRANT EXECUTE ON FUNCTION public.pos_old_receipt_lookup(text,text) TO authenticated;`, end);
+
+let schema = fs.readFileSync(schemaPath, "utf8");
+const block = out.join("\n\n");
+const start = schema.indexOf(begin); const finish = schema.indexOf(end);
+if (start >= 0 && finish >= start) schema = schema.slice(0, start) + block + schema.slice(finish + end.length);
+else schema = `${schema.trimEnd()}\n\n${block}\n`;
+fs.writeFileSync(schemaPath, schema);
+console.log(`Supabase sync contract generated for ${tables.length} keyed tables`);

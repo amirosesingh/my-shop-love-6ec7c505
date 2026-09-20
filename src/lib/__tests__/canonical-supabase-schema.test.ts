@@ -11,14 +11,17 @@ function sqlFiles(directory = root): string[] {
     if ([".git", "node_modules", ".output", ".wrangler"].includes(entry)) continue;
     const absolute = resolve(directory, entry);
     if (statSync(absolute).isDirectory()) files.push(...sqlFiles(absolute));
-    else if (entry.endsWith(".sql")) files.push(relative(root, absolute).replaceAll("\\\\", "/"));
+    else if (entry.endsWith(".sql")) files.push(relative(root, absolute).replaceAll("\\", "/"));
   }
   return files.sort();
 }
 
 describe("canonical Supabase SQL", () => {
   it("keeps only the online installer and deliberate reset", () => {
-    expect(sqlFiles()).toEqual(["supabase/reset.sql", "supabase/schema.sql"]);
+    expect(sqlFiles().filter((file) => file.startsWith("supabase/"))).toEqual([
+      "supabase/reset.sql",
+      "supabase/schema.sql",
+    ]);
   });
 
   it("contains the complete schema and enforces RLS on every app table", () => {

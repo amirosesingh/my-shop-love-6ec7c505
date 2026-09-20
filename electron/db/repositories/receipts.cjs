@@ -1,0 +1,32 @@
+const { stableUuid }=require("./aggregates.cjs");
+class ReceiptRepository{
+ constructor(connectionManager,cloud){this.connectionManager=connectionManager;this.cloud=cloud;}
+ async aggregate(sale){const [items,payments]=await Promise.all([this.connectionManager.pool.request().input("sale",sale.id).query("SELECT * FROM dbo.sale_items WHERE sale_id=@sale ORDER BY created_at,id;"),this.connectionManager.pool.request().input("sale",sale.id).query("SELECT * FROM dbo.payment_transactions WHERE sale_id=@sale ORDER BY created_at,id;")]);return{sale,items:items.recordset??[],payments:payments.recordset??[]};}
+ async materialize(remote,branchId){if(!remote?.sale||String(remote.sale.store_id)!==String(branchId))throw Object.assign(new Error("The receipt does not belong to this branch."),{code:"ERECEIPT_BRANCH"});const registry=require("../schema-registry.cjs").loadRegistry();const byName=new Map(registry.tables.map(table=>[table.cloudTable,table]));const sql=this.connectionManager.sql();const tx=new sql.Transaction(this.connectionManager.pool);await tx.begin(sql.ISOLATION_LEVEL?.SERIALIZABLE);try{for(const [name,rows] of [["sales",[remote.sale]],["sale_items",remote.items??[]],["payment_transactions",remote.payments??[]]]){if(rows.length)await this.cloud.applyLocalBatch(tx,byName.get(name),{rows:rows.map(row=>({row_data:row})),tombstones:[]});}await tx.commit();}catch(error){await Promise.resolve(tx.rollback()).catch(()=>undefined);throw error;}}
+ async findExact(value,branchId,proof={}){const result=await this.connectionManager.pool.request().input("value",value).input("branch",branchId).query(`SELECT TOP(1)* FROM dbo.sales WHERE store_id=@branch AND (CONVERT(nvarchar(128),id)=@value OR bill_number=@value OR CONVERT(nvarchar(128),client_transaction_id)=@value);`);if(result.recordset?.[0])return{source:"local",...await this.aggregate(result.recordset[0])};let remote;try{remote=await this.cloud.oldReceipt(value,branchId,proof);}catch(error){const denied=["PERMISSION_DENIED","SESSION_INVALID","STORE_FORBIDDEN"].includes(error?.code);throw Object.assign(new Error(denied?String(error.message):"This receipt is outside local history. Connect to the internet to retrieve and refund it."),{code:denied?error.code:"EONLINE_REQUIRED",cause:error});}if(!remote)return null;await this.materialize(remote,branchId);return{source:"cloud",...remote};}
+ async refund({saleId,refundId,branchId,reason=null}){
+  if(!/^[0-9a-f-]{36}$/i.test(saleId)||!refundId||refundId.length>128)throw new Error("Stable sale and refund identifiers are required.");
+  const operationId=stableUuid({refundId});
+  const sql=this.connectionManager.sql();const tx=new sql.Transaction(this.connectionManager.pool);await tx.begin(sql.ISOLATION_LEVEL?.SERIALIZABLE);
+  try{
+   const prior=await new sql.Request(tx).input("refund",operationId).query("SELECT operation_id FROM dbo.local_operation_receipts WHERE operation_id=@refund;");
+   if(prior.recordset?.length){await tx.commit();return{ok:true,replayed:true,refundId};}
+   const saleResult=await new sql.Request(tx).input("sale",saleId).input("branch",branchId).query("SELECT TOP(1) id,is_refunded FROM dbo.sales WITH(UPDLOCK,HOLDLOCK) WHERE id=@sale AND store_id=@branch;");
+   if(!saleResult.recordset?.length)throw Object.assign(new Error("The receipt does not belong to this branch or is unavailable locally."),{code:"ERECEIPT"});
+   if(saleResult.recordset[0].is_refunded)throw Object.assign(new Error("This receipt has already been refunded."),{code:"EALREADY"});
+   const items=await new sql.Request(tx).input("sale",saleId).query("SELECT id,product_id,quantity,COALESCE(refunded_qty,0) refunded_qty FROM dbo.sale_items WITH(UPDLOCK,HOLDLOCK) WHERE sale_id=@sale ORDER BY id;");
+   const journal=async(table,key,operation="update")=>new sql.Request(tx).input("entity",table).input("entity_id",JSON.stringify(key)).input("operation",operation).input("branch",branchId).input("aggregate",operationId).query("INSERT dbo.sync_change_journal(entity_type,entity_id,operation,branch_id,entity_version,aggregate_id) VALUES(@entity,@entity_id,@operation,@branch,1,@aggregate);");
+   for(const item of items.recordset??[]){const qty=Math.max(0,Number(item.quantity)-Number(item.refunded_qty));if(!qty)continue;
+    await new sql.Request(tx).input("id",item.id).input("qty",qty).query("UPDATE dbo.sale_items SET refunded_qty=COALESCE(refunded_qty,0)+@qty,row_version=COALESCE(row_version,0)+1 WHERE id=@id;");
+    await journal("sale_items",{id:item.id});
+    const movement=stableUuid({refundId,itemId:item.id});const inserted=await new sql.Request(tx).input("movement",movement).input("product",item.product_id).input("branch",branchId).input("qty",qty).query("IF NOT EXISTS(SELECT 1 FROM dbo.stock_delta_applied WITH(UPDLOCK,HOLDLOCK) WHERE movement_id=@movement) BEGIN INSERT dbo.stock_delta_applied(movement_id,product_id,store_id,delta,applied_at) VALUES(@movement,@product,@branch,@qty,SYSDATETIMEOFFSET()); SELECT CAST(1 AS bit) inserted; END ELSE SELECT CAST(0 AS bit) inserted;");
+    if(inserted.recordset?.[0]?.inserted){const stockPath=`$.\"${String(branchId).replaceAll('"','\\\"')}\"`;await new sql.Request(tx).input("product",item.product_id).input("qty",qty).input("stock_path",stockPath).query("UPDATE dbo.products SET stock_quantity=COALESCE(stock_quantity,0)+@qty,stock_by_store=JSON_MODIFY(COALESCE(stock_by_store,N'{}'),@stock_path,COALESCE(TRY_CONVERT(int,JSON_VALUE(COALESCE(stock_by_store,N'{}'),@stock_path)),0)+@qty),row_version=COALESCE(row_version,0)+1 WHERE id=@product;");await journal("products",{id:item.product_id});await journal("stock_delta_applied",{movement_id:movement},"insert");}
+   }
+   await new sql.Request(tx).input("sale",saleId).query("UPDATE dbo.sales SET is_refunded=1,row_version=COALESCE(row_version,0)+1 WHERE id=@sale;");
+   await journal("sales",{id:saleId});
+   await new sql.Request(tx).input("refund",operationId).input("sale",saleId).input("reason",reason).query("INSERT dbo.local_operation_receipts(operation_id,operation_type,entity_id,note) VALUES(@refund,'refund',CONVERT(nvarchar(128),@sale),@reason);");
+   await tx.commit();return{ok:true,replayed:false,refundId};
+  }catch(error){await Promise.resolve(tx.rollback()).catch(()=>undefined);throw error;}
+ }
+}
+module.exports={ReceiptRepository};

@@ -11,36 +11,28 @@ import type { SyncOp } from "@/lib/sync-outbox";
 export type LocalDbConfig = {
   server: string;
   database: string;
-  /** "windows" uses integrated auth, "sql" uses the user/password pair */
+  /** "windows" uses integrated auth, "sql" uses the user/password pair. */
   auth: "windows" | "sql";
   user: string;
   password: string;
   port: number;
   encrypt: boolean;
-  /** Accept self-signed / internal certificates (default on). */
+  /** Accept self-signed / internal certificates. */
   trustServerCertificate?: boolean;
-  /** SET ARITHABORT ON for the session (default on). */
+  /** SET ARITHABORT ON for the session. */
   arithAbort?: boolean;
-  /**
-   * Connect straight to `server,port` and never ask SQL Server Browser to
-   * resolve a named instance. The reliable choice whenever the port is known.
-   */
-  directConnect?: boolean;
 };
 
 export const defaultLocalDbConfig: LocalDbConfig = {
-  server: "localhost\\SQLEXPRESS",
-  database: "POS_Branch_DB",
+  server: "127.0.0.1",
+  database: "",
   auth: "windows",
   user: "",
   password: "",
-  // 0 means automatic: default instances use 1433, named instances let the
-  // SQL driver/Browser resolve their dynamic port.
-  port: 0,
-  encrypt: false,
+  port: 1433,
+  encrypt: true,
   trustServerCertificate: true,
   arithAbort: true,
-  directConnect: false,
 };
 
 export type TableSyncStat = {
@@ -89,9 +81,7 @@ export type LocalWriteCheck = {
 /**
  * Migration guard for the saved connection plus isolated-driver health.
  *
- * A named instance without a pinned port cannot work once connections stop
- * asking the SQL Server Browser service for a dynamic port, so it is reported
- * up front instead of failing at the first sale.
+ * Audit of an explicit host and TCP port connection.
  */
 export type LocalConnectionAudit = {
   ok: boolean;
@@ -99,7 +89,6 @@ export type LocalConnectionAudit = {
   direct: boolean;
   needsPort: boolean;
   host: string | null;
-  instanceName: string | null;
   port: number | null;
   target: string | null;
   issues: Array<{ code: string; severity: "error" | "warning"; message: string; hint?: string }>;
@@ -180,12 +169,12 @@ export function deriveLocalDbState(input: {
   if (input.status?.durability && !input.status.durability.ok)
     return describeLocalDbState(
       "failed",
-      "Local SQLite store unavailable. Trading durability is not ready.",
+      "Local SQL Server transaction store unavailable. Trading durability is not ready.",
     );
   if (input.status?.sqlServer && !input.status.sqlServer.ok)
     return describeLocalDbState(
       "failed",
-      "Local SQL Server connection unavailable. SQLite offline durability remains available.",
+      "Local SQL Server connection unavailable. Trading remains in Central Online mode.",
     );
   // A repeated driver crash is deterministic: the banner says so and the till
   // stops pretending a retry is imminent.
@@ -198,7 +187,7 @@ export function deriveLocalDbState(input: {
 
 /**
  * The banner shows the driver's actual reason, not a generic line: a stopped
- * SQL Browser or a wrong port is a fixable misconfiguration and the operator
+ * A wrong host or TCP port is a fixable misconfiguration and the operator
  * should be told which one it is.
  */
 export function reconnectReason(status: {
@@ -284,29 +273,6 @@ export async function connectLocalDatabase(
   }
 }
 
-/** One SQL Server instance found on this machine or the local network. */
-export type DiscoveredDbServer = {
-  address: string;
-  serverName: string;
-  instance: string;
-  port: number | null;
-  version: string | null;
-  source?: "browser" | "local" | "registry";
-};
-
-export type ScanNetworkResult = {
-  ok: boolean;
-  servers?: DiscoveredDbServer[];
-  error?: string;
-  hint?: string;
-};
-
-/** Result of the local (registry + loopback) instance scan. */
-export type LocalInstanceScan = ScanNetworkResult & {
-  hostname?: string;
-  targets?: string[];
-};
-
 /** Parameters accepted by the direct (Browser-free) connection probe. */
 export type DirectConnectionParams = {
   host: string;
@@ -375,7 +341,7 @@ export type LocalSyncStatus = {
   } | null;
   lastFailure?: {
     stage:
-      | "sqlite"
+      | "sql-server"
       | "sql-projection"
       | "cloud-push"
       | "cloud-pull"
@@ -401,23 +367,23 @@ export type LocalSyncStatus = {
 };
 
 export type PosBridge = {
+  database?: {
+    getState: () => Promise<{ enabled: boolean; connected: boolean; state: string }>;
+  };
+  telemetry?: {
+    presence: (value: { sessionStatus: "signed_in" | "idle"; staffName: string | null; staffRole: string | null }) => Promise<{ ok: boolean }>;
+  };
   /** Persist one operation to local SQL Server. Resolves once committed. */
   write: (context: string, op: SyncOp) => Promise<{ ok: boolean; error?: string }>;
   /** Persist a related operation set in one SQL transaction. */
   writeBatch?: (context: string, ops: SyncOp[]) => Promise<{ ok: boolean; error?: string }>;
-  /** Atomic SQLite business rows plus their durable upload intent. */
-  localMirrorBatch?: (
-    entries: Array<{ entity: string; rows: Record<string, unknown>[] }>,
-    ops?: SyncOp[],
-  ) => Promise<{ ok: boolean; written?: number; error?: string }>;
-  /** Read stable-ID rows from the embedded SQLite recovery mirror. */
-  localList?: (
-    entity: string,
-    limit?: number,
-  ) => Promise<{ ok: boolean; rows?: Record<string, unknown>[]; error?: string }>;
-  /** Synchronous SQLite-backed operational state for established sync selectors. */
-  localBusinessGet?: (key: string) => string | null;
-  localBusinessSet?: (key: string, value: string | null) => boolean;
+  /** Commit a complete workflow and its metadata exactly once. */
+  commitAggregate?: (aggregate: {
+    kind: "sale" | "payment" | "refund" | "shift" | "receiving" | "stock" | "transfer" | "booking" | "held_order" | "general";
+    operationId?: string;
+    branchId?: string;
+    operations: SyncOp[];
+  }) => Promise<{ ok: boolean; replayed?: boolean; operationId?: string; error?: string }>;
   connect: (
     config: LocalDbConfig,
     cloud?: CloudBridgeConfig,
@@ -514,11 +480,6 @@ export type PosBridge = {
     text?: string;
     error?: string;
   }>;
-  /** Discover local/LAN SQL Server instances (desktop shell only). */
-  scanNetwork?: () => Promise<ScanNetworkResult>;
-  scanLocalDatabases?: () => Promise<ScanNetworkResult>;
-  /** Registry + loopback discovery of instances installed on this PC. */
-  scanLocalInstances?: () => Promise<LocalInstanceScan>;
   status: () => Promise<LocalSyncStatus>;
   /** Transactional write probe on the operational pool (always rolled back). */
   verifyWrite?: () => Promise<LocalWriteCheck>;
@@ -566,6 +527,8 @@ export type PosBridge = {
     tiers?: LocalSaleRow[];
     settings?: LocalSaleRow | null;
   }>;
+  findReceipt?: (value: string, branchId: string, proof?: { sessionToken?: string; cashierToken?: string; accessToken?: string }) => Promise<{ source: "local" | "cloud"; sale: LocalSaleRow; items?: LocalSaleRow[]; payments?: LocalSaleRow[] } | null>;
+  refundReceipt?: (value: { saleId: string; refundId: string; branchId: string; reason?: string | null }) => Promise<{ ok: boolean; replayed?: boolean; error?: string }>;
   /** Device settings stored in the branch SQL database. */
   getSetting?: (key: string) => Promise<{ ok: boolean; value?: string | null; error?: string }>;
   setSetting?: (key: string, value: string | null) => Promise<{ ok: boolean; error?: string }>;
@@ -698,7 +661,7 @@ export const hasLocalDb = (): boolean => typeof window !== "undefined" && !!wind
 
 /** True when a real local SQL engine is reachable through the desktop shell. */
 export const hasLocalSqlEngine = (): boolean =>
-  typeof window !== "undefined" && typeof window.pos?.setSetting === "function";
+  typeof window !== "undefined" && typeof (window.pos as { database?: { getState?: unknown } })?.database?.getState === "function";
 
 /** Read a device setting from the branch SQL database, if there is one. */
 export async function readLocalSetting(key: string): Promise<string | null> {
@@ -725,64 +688,6 @@ export async function writeLocalSetting(key: string, value: string | null): Prom
 
 export const localDb = (): PosBridge | null =>
   typeof window === "undefined" ? null : (window.pos ?? null);
-
-/**
- * Ask the desktop shell to look for SQL Server instances. In the browser there
- * is no network access to give, so the caller gets an empty, explained result.
- */
-export async function scanLocalDatabases(): Promise<ScanNetworkResult> {
-  const bridge = localDb();
-  const run = bridge?.scanNetwork ?? bridge?.scanLocalDatabases;
-  if (!run) {
-    return {
-      ok: false,
-      servers: [],
-      error: "Network discovery is only available in the Windows desktop app.",
-    };
-  }
-  try {
-    const res = await run();
-    return { ...res, servers: res.servers ?? [] };
-  } catch (err) {
-    return { ok: false, servers: [], error: err instanceof Error ? err.message : String(err) };
-  }
-}
-
-/**
- * Registry + loopback discovery of SQL Server instances installed on this PC.
- * Falls back to the LAN scan when the shell predates the dedicated channel.
- */
-export async function scanLocalInstances(): Promise<LocalInstanceScan> {
-  const bridge = localDb();
-  if (!bridge) {
-    return {
-      ok: false,
-      servers: [],
-      targets: [],
-      error: "Instance discovery is only available in the Windows desktop app.",
-    };
-  }
-  try {
-    if (bridge.scanLocalInstances) {
-      const res = await bridge.scanLocalInstances();
-      return { ...res, servers: res.servers ?? [], targets: res.targets ?? [] };
-    }
-    const res = await scanLocalDatabases();
-    return {
-      ...res,
-      targets: (res.servers ?? []).map((s) =>
-        s.instance ? `${s.serverName}\\${s.instance}` : s.serverName,
-      ),
-    };
-  } catch (err) {
-    return {
-      ok: false,
-      servers: [],
-      targets: [],
-      error: err instanceof Error ? err.message : String(err),
-    };
-  }
-}
 
 /**
  * Proves the till's own pool can write: one transaction that inserts, reads

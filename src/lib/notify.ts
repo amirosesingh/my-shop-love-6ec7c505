@@ -77,8 +77,8 @@ export function classifyError(error: unknown): ErrorCategory {
   if (status === 500) return "server";
   if (/failed to fetch|networkerror|load failed|offline|network request|econnrefused|enotfound/.test(lower)) return "network";
   if (/database.*not connected|enotconnected/.test(lower)) return "database-disconnected";
-  if (/database|sql|sqlite/.test(lower) && /write|insert|update|save|readonly|constraint/.test(lower)) return "database-write";
-  if (/database|sql|sqlite/.test(lower) && /read|select|query/.test(lower)) return "database-read";
+  if (/database|\bsql\b/.test(lower) && /write|insert|update|save|readonly|constraint/.test(lower)) return "database-write";
+  if (/database|\bsql\b/.test(lower) && /read|select|query/.test(lower)) return "database-read";
   if (/already.*(running|progress)|duplicate.*attempt|mutex|busy/.test(lower)) return "already-running";
   if (/configuration|not configured|missing.*(?:key|url)|invalid api key/.test(lower)) return "configuration";
   if (/enoent|path|file.*(?:missing|unavailable)|directory/.test(lower)) return "file-unavailable";

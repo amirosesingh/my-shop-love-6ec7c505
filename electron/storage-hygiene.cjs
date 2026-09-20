@@ -15,7 +15,7 @@
 const fs = require("node:fs");
 const path = require("node:path");
 
-/** Files and folders that carry identity, configuration or trading data. */
+/** Files and folders that carry identity or approved configuration. */
 const REQUIRED_ENTRIES = [
   "pos_config.json", // backend address, branch binding, general settings
   "terminal-config.json", // legacy plain activation (migrated, then removed)
@@ -25,9 +25,6 @@ const REQUIRED_ENTRIES = [
   "server-keys.bin",
   "emergency-pin.bin",
   "branding.json",
-  "pos-local.db", // the offline mirror the till trades from
-  "pos-local.db-wal",
-  "pos-local.db-shm",
   "health.json",
   "app-version.json", // written by this module
 ];

@@ -31,21 +31,21 @@ const stubShell = (connect: (...a: unknown[]) => Promise<unknown>) => {
 };
 
 describe("local database connection state", () => {
-  it("does not call SQL connectivity connected when SQLite durability failed", () => {
+  it("does not call SQL connectivity connected when transaction durability failed", () => {
     const view = deriveLocalDbState({
       available: true,
       configured: true,
       status: {
         connected: false,
-        durability: { ok: false, code: "ESQLITE_UNAVAILABLE" },
+        durability: { ok: false, code: "ESQLSERVER_UNAVAILABLE" },
         sqlServer: { ok: true },
       },
     });
     expect(view.state).toBe("failed");
-    expect(view.detail).toContain("SQLite");
+    expect(view.detail).toContain("SQL Server transaction store");
   });
 
-  it("reports SQL projection separately while SQLite remains trade-ready", () => {
+  it("reports a failed SQL Server connection as Central Online mode", () => {
     const view = deriveLocalDbState({
       available: true,
       configured: true,
@@ -57,7 +57,7 @@ describe("local database connection state", () => {
     });
     expect(view.state).toBe("failed");
     expect(view.detail).toContain("SQL Server");
-    expect(view.detail).toContain("SQLite offline durability remains available");
+    expect(view.detail).toContain("Central Online mode");
   });
   beforeEach(() => {
     store.clear();

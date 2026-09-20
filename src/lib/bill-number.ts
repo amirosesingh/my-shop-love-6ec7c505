@@ -93,7 +93,7 @@ export function billPrefix(
 
 type SeqStore = { prefix: string; next: number };
 
-/** Read the device counter (SQLite-backed in Electron). */
+/** Read the device counter from the approved platform settings store. */
 const readSeq = (): SeqStore | null => {
   try {
     const raw = readBusinessValue(SEQ_KEY);

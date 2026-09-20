@@ -9,6 +9,10 @@
 import { CloudConnectionPanel } from "@/platforms/web/components/pos/settings/panels/CloudConnectionPanel";
 import { ConnectionCheck } from "@/platforms/web/components/pos/ConnectionCheck";
 import { useSystemStatus } from "@/lib/system-status";
+import { isWindowsShell } from "@/platform-config/features";
+import { useAuth } from "@/lib/pos-auth";
+import { LocalDatabaseWizard } from "@/platforms/windows/components/LocalDatabaseWizard";
+import { LocalDatabaseOperations } from "@/platforms/windows/components/LocalDatabaseOperations";
 
 function Stat({ label, value }: { label: string; value: string }) {
   return (
@@ -21,6 +25,8 @@ function Stat({ label, value }: { label: string; value: string }) {
 
 export function DatabaseConnectionSettings() {
   const status = useSystemStatus();
+  const { isAdmin, can } = useAuth();
+  const mayManageLocal = isAdmin || can("can_manage_sync_backup");
 
   return (
     <div className="w-full space-y-3">
@@ -35,6 +41,8 @@ export function DatabaseConnectionSettings() {
       <CloudConnectionPanel />
 
       <ConnectionCheck />
+
+      {isWindowsShell() && mayManageLocal && <><LocalDatabaseWizard /><LocalDatabaseOperations /></>}
     </div>
   );
 }

@@ -37,7 +37,9 @@ describe("schema health", () => {
   beforeEach(() => (window as unknown as { localStorage: Storage }).localStorage.clear());
 
   it("names files per environment and version", () => {
-    const at = new Date("2026-08-29T00:00:00Z");
+    // This instant is already the next calendar day in UTC+14. Filenames are
+    // canonical UTC dates and must not depend on the machine timezone.
+    const at = new Date("2026-08-29T23:30:00Z");
     expect(migrationFilename("cloud", 7, at)).toBe("supabase_007_20260829.sql");
     expect(migrationFilename("local", 1, at)).toBe("local_001_20260829.sql");
   });

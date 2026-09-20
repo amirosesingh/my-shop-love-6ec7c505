@@ -45,8 +45,8 @@ export type TelemetryRow = {
 /** Which store keeps this terminal's offline copy of the data. */
 export function storageEngine(): string {
   if (typeof window === "undefined") return "cloud";
-  if (hasLocalSqlEngine()) return "sqlite";
-  return isOnlineOnly() ? "live" : "indexeddb";
+  if (hasLocalSqlEngine()) return "sqlserver";
+  return "live";
 }
 
 /** Plain-language connection state used by the monitoring centre. */
@@ -63,8 +63,7 @@ export const CONNECTION_LABEL: Record<string, string> = {
 };
 
 export const ENGINE_LABEL: Record<string, string> = {
-  sqlite: "Local SQLite",
-  indexeddb: "Browser storage",
+  sqlserver: "Local Microsoft SQL Server",
   live: "Live only (no local copy)",
   cloud: "Cloud only",
 };

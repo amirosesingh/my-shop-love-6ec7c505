@@ -14,7 +14,7 @@ Date: 2026-08-23 · App 1.3.38 · Central schema definition v1
 | Local schema manager UI        | `src/components/database/SchemaPanel.tsx`                     | Local repair (unchanged) + Authoritative central schema card + Sync compatibility + Fetch diagnostics                                                       |
 | Data comparison                | `src/lib/data-compare.ts`                                     | `COMPARE_TABLES` — report tables; every one is guaranteed present in the authoritative definition (tested)                                                  |
 | Sync worker                    | `electron/sync/worker.cjs`                                    | Pushes queued rows per `cloud-columns.json`; parks rows on unrecoverable push errors                                                                        |
-| Offline mirror                 | `electron/db/sqlite.cjs`, `electron/db/offline_sqlite_v2.sql` | SQLite mirror of central tables for offline reads                                                                                                           |
+| Windows operational database   | `electron/db/`                                                  | Direct SQL Server repositories, controlled migrations, and change tracking                                                                                |
 
 ## 2. Why the old drift check lied
 

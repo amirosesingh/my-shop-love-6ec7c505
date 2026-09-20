@@ -29,7 +29,7 @@ import {
   shiftReportPreview,
 } from "@/lib/pos-print";
 import type { PaymentMethod, Sale } from "@/core/types/pos-types";
-import { loadSalesPage } from "@/core/api/pos-db";
+import { findReceiptExact, loadSalesPage } from "@/core/api/pos-db";
 import type { Cursor } from "@/lib/keyset";
 
 export const Route = createFileRoute("/receipts")({
@@ -88,6 +88,8 @@ function ReceiptVault() {
   const [cursor, setCursor] = useState<Cursor>(null);
   const [exhausted, setExhausted] = useState(false);
   const [loadingOlder, setLoadingOlder] = useState(false);
+  const [findingExact, setFindingExact] = useState(false);
+  const [cloudHistory, setCloudHistory] = useState<Set<string>>(() => new Set());
 
   // Employees only ever see the log of the store they are on duty at.
   const sales = useMemo(() => {
@@ -114,6 +116,23 @@ function ReceiptVault() {
     } finally {
       setLoadingOlder(false);
     }
+  };
+
+  const searchExact = async () => {
+    if (!query.trim()) return;
+    setFindingExact(true);
+    try {
+      const found = await findReceiptExact(query, currentStore.id);
+      if (!found) { toast.error("No exact receipt was found for this branch"); return; }
+      setOlder((previous) => [found.sale, ...previous.filter((sale) => sale.id !== found.sale.id)]);
+      setSelectedId(found.sale.id);
+      setScope("all");
+      if (found.source === "cloud") {
+        setCloudHistory((previous) => new Set(previous).add(found.sale.id));
+        toast.success("Receipt retrieved from cloud history and verified locally");
+      }
+    } catch (error) { notifyError(error, "Finding receipt"); }
+    finally { setFindingExact(false); }
   };
 
   const scoped = sales.filter((s) => {
@@ -246,14 +265,12 @@ function ReceiptVault() {
               Viewing data for {currentStore.name} only · signed in as {user?.name}
             </p>
           </div>
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              value={query}
-              onChange={(e) => setQuery(e.target.value)}
-              placeholder="Search receipt no, cashier or item"
-              className="w-72 pl-9"
-            />
+          <div className="flex gap-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void searchExact(); }} placeholder="Receipt no, sale ID or transaction ID" className="w-72 pl-9" />
+            </div>
+            <Button variant="outline" disabled={findingExact || !query.trim()} onClick={() => void searchExact()}>{findingExact ? "Finding…" : "Find exact"}</Button>
           </div>
         </header>
 
@@ -350,6 +367,7 @@ function ReceiptVault() {
                       <Badge variant="outline" className="capitalize">
                         {s.method}
                       </Badge>
+                      {cloudHistory.has(s.id) && <Badge variant="secondary">Cloud history</Badge>}
                       <span className="numeric w-20 text-right text-sm font-semibold">
                         {money(s.total)}
                       </span>

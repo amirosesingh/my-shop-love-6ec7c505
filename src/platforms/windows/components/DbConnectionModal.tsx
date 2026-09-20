@@ -30,7 +30,7 @@ export function DbConnectionModal() {
 
   return (
     <Dialog open={message !== null} onOpenChange={(o) => !o && setMessage(null)}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-h-[calc(100vh-24px)] w-[calc(100vw-24px)] max-w-md overflow-y-auto">
         <DialogHeader>
           <DialogTitle className="flex items-center gap-2">
             <DatabaseZap className="size-4 text-destructive" /> Database connection required
@@ -40,9 +40,10 @@ export function DbConnectionModal() {
         <p className="text-xs text-muted-foreground">
           Nothing was saved, so you can safely try again once the connection is back.
         </p>
-        <Button className="w-full" onClick={() => setMessage(null)}>
-          Close
-        </Button>
+        <div className="sticky bottom-0 flex gap-2 bg-background pt-2">
+          <Button className="flex-1" variant="outline" onClick={() => setMessage(null)}>Close</Button>
+          <Button className="flex-1" onClick={() => { setMessage(null); window.location.assign("/settings/database"); }}>Database settings</Button>
+        </div>
       </DialogContent>
     </Dialog>
   );

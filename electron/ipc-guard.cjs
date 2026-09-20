@@ -125,6 +125,19 @@ function writeOps(value, { max = 500 } = {}) {
   return ops.map((op, i) => writeOp(op, { name: `write ${i + 1}` }));
 }
 
+function aggregate(value) {
+  const input = options(value, { name: "business aggregate", max: 4 });
+  const kind = text(input.kind, { name: "aggregate kind", max: 32 });
+  if (!["sale", "payment", "refund", "shift", "receiving", "stock", "transfer", "booking", "held_order", "general"].includes(kind))
+    throw new BadArg("Unsupported aggregate kind.");
+  return {
+    kind,
+    operationId: input.operationId === undefined ? undefined : uuid(input.operationId, { name: "operation id" }),
+    branchId: input.branchId === undefined ? undefined : text(input.branchId, { name: "branch", max: 128 }),
+    operations: writeOps(input.operations, { max: 200 }),
+  };
+}
+
 /**
  * Options for a maintenance action (restore, compare, housekeeping): a plain
  * object of scalars only, so nothing nested can be smuggled through.
@@ -153,6 +166,46 @@ function connectionConfig(value, { name = "connection details" } = {}) {
   return options(value, { name, max: 40 });
 }
 
+const HOST = /^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?|\[[0-9A-Fa-f:]+\])$/;
+const DB_NAME = /^[^;{}\\/\x00-\x1f]{1,128}$/;
+function integer(value, { name, min, max }) {
+  if (typeof value !== "number" || !Number.isInteger(value) || value < min || value > max) {
+    throw new BadArg(`The ${name} must be between ${min} and ${max}.`);
+  }
+  return value;
+}
+function boolean(value, { name }) {
+  if (typeof value !== "boolean") throw new BadArg(`The ${name} must be true or false.`);
+  return value;
+}
+function uuid(value, { name = "identifier" } = {}) {
+  const result = text(value, { name, max: 36 });
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(result)) throw new BadArg(`The ${name} must be a UUID.`);
+  return result;
+}
+function databaseProfile(value, { requireDatabase = false } = {}) {
+  const raw = plainObject(value, { name: "database connection" });
+  const authMode = text(raw.authMode, { name: "authentication mode", max: 16 });
+  if (authMode !== "windows" && authMode !== "sql") throw new BadArg("The authentication mode is not supported.");
+  const database = text(raw.database, { name: "database name", max: 128, allowEmpty: !requireDatabase });
+  if (database && !DB_NAME.test(database)) throw new BadArg("The database name contains characters that are not allowed.");
+  const username = text(raw.username, { name: "username", max: 128, allowEmpty: authMode === "windows" });
+  const password = text(raw.password, { name: "password", max: 512, allowEmpty: authMode === "windows" });
+  return {
+    host: text(raw.host, { name: "server hostname or IP", max: 253, pattern: HOST }),
+    port: integer(raw.port, { name: "TCP port", min: 1, max: 65535 }),
+    database,
+    authMode,
+    username: authMode === "sql" ? username : "",
+    password: authMode === "sql" ? password : "",
+    encrypt: boolean(raw.encrypt, { name: "encrypt setting" }),
+    trustServerCertificate: boolean(raw.trustServerCertificate, { name: "certificate trust setting" }),
+    connectionTimeoutMs: integer(raw.connectionTimeoutMs, { name: "connection timeout", min: 1000, max: 120000 }),
+    requestTimeoutMs: integer(raw.requestTimeoutMs, { name: "request timeout", min: 1000, max: 300000 }),
+    ...(raw.retentionDays === undefined ? {} : { retentionDays: integer(raw.retentionDays, { name: "retention period", min: 30, max: 7300 }) }),
+  };
+}
+
 /** The sealed activation record, or null to forget it. */
 function terminalConfig(value) {
   if (value === null || value === undefined) return null;
@@ -174,7 +227,10 @@ module.exports = {
   filePath,
   writeOp,
   writeOps,
+  aggregate,
   options,
   connectionConfig,
+  databaseProfile,
+  uuid,
   terminalConfig,
 };

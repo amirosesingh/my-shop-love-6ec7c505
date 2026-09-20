@@ -9,7 +9,7 @@ export const Route = createFileRoute("/settings/database")({
       { title: "Database Connection — Retail" },
       {
         name: "description",
-        content: "Central database credentials and a live connection check for this device.",
+        content: "Central status and Windows local Microsoft SQL Server setup.",
       },
       { property: "og:title", content: "Database Connection — Retail" },
       {
@@ -24,7 +24,7 @@ export const Route = createFileRoute("/settings/database")({
     <SettingsFrame
       wide
       title="Database connection"
-      description="Connect this device to the central database. Electron, Android and web all read and write online only."
+      description="Manage central connectivity and, on authorized Windows tills, the local Microsoft SQL Server database."
     >
       <BranchSettings />
       <DatabaseConnectionSettings />

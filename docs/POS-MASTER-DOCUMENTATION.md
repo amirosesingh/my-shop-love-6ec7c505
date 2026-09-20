@@ -10,7 +10,7 @@
 | Routes              | 83 page routes + 11 API routes under `src/routes/api/`                                                              |
 | POS components      | 71 files in `src/components/pos/`                                                                                   |
 | Backend             | Lovable Cloud (Postgres) — 54 tables, 3 views, 133 policies, 91 functions, 101 triggers, 182 indexes, 98 migrations |
-| Desktop             | Electron shell (`electron/`) with local Microsoft SQL Server + SQLite mirror                                        |
+| Desktop             | Electron shell (`electron/`) with direct local Microsoft SQL Server                                                   |
 | Mobile              | Capacitor Android shell (live-only, no local business data)                                                         |
 | Tests               | 24 suites in `src/lib/__tests__/` (177 assertions passing at last run)                                              |
 
@@ -39,7 +39,7 @@ file changes were in `docs/`.
 9. [The server write relay and its authorisation rules](#9-the-server-write-relay)
 10. [Electron desktop shell](#10-electron-desktop-shell)
 11. [SQL Server connection and authentication handshake](#11-sql-server-connection-and-authentication-handshake)
-12. [SQLite local mirror](#12-sqlite-local-mirror)
+12. [Windows SQL Server data path](#12-windows-sql-server-data-path)
 13. [Authentication model](#13-authentication-model)
 14. [Roles, permissions and manager overrides](#14-roles-permissions-and-manager-overrides)
 15. [Terminal activation, tokens and kill switch](#15-terminal-activation-tokens-and-kill-switch)
@@ -135,7 +135,7 @@ The same React bundle runs everywhere; behaviour forks on two predicates:
 | Local SQL engine                   | none                                       | MS SQL Server (source of truth on that machine) | none                            |
 | Write on connection loss           | **fails loudly** for operational tables    | committed to local SQL, pushed later            | **fails loudly**                |
 | Outbox queue in `localStorage`     | only non-operational tables                | yes (`window.pos` present)                      | never                           |
-| Reads when offline                 | local snapshot (`pos.offline.snapshot.v1`) | local SQL / SQLite mirror                       | blocked by `OfflineGate`        |
+| Reads when offline                 | local snapshot (`pos.offline.snapshot.v1`) | direct SQL Server                               | blocked by `OfflineGate`        |
 | Raw ESC/POS printing + drawer kick | via network/OS printer where available     | native IPC `print:raw`                          | not supported                   |
 | Customer display second screen     | `/display` route in a browser window       | second `BrowserWindow` auto-detected            | no                              |
 | SSMS-style SQL explorer            | no                                         | yes (`sqladmin:*` IPC)                          | no                              |
@@ -156,7 +156,7 @@ CONFIRMED in `src/lib/native.ts`, `src/lib/live-mode.ts`, `src/lib/local-db.ts`,
 | Data fetching | TanStack Query + bespoke `db-query.ts` dedupe layer                   |                                                                      |
 | Backend       | Lovable Cloud Postgres, PostgREST, RLS                                | `src/integrations/supabase/*` (generated — never edit)               |
 | Server logic  | `createServerFn` (`*.functions.ts` / `*.server.ts`) + API file routes | 11 API routes, `/api/public/*` bypasses site auth                    |
-| Desktop       | Electron + `mssql` / `msnodesqlv8` + `better-sqlite3`-style mirror    | `electron/`                                                          |
+| Desktop       | Electron + `mssql` / `msnodesqlv8`                                    | `electron/`                                                          |
 | Mobile        | Capacitor (`capacitor.config.ts`, `capacitor-shell/`)                 |                                                                      |
 | Tests         | Vitest (`vitest.config.ts`), 24 suites                                |                                                                      |
 | Lint/format   | ESLint flat config, Prettier                                          | plus `scripts/logic-scan.cjs` (custom logic health scan)             |
@@ -198,7 +198,7 @@ electron/
   db/pool.cjs             MS SQL pool + attempt ladder
   db/admin-pool.cjs       SSMS-style admin connection state machine
   db/repo.cjs             SyncOp -> parameterised T-SQL
-  db/sqlite.cjs           local mirror + offline_sqlite_v2.sql schema
+  db/                     controlled SQL Server repositories and migrations
   sync/worker.cjs         background push/pull
   updater.cjs recovery.cjs health.cjs net.cjs …
 supabase/schema.sql       canonical online schema
@@ -225,7 +225,7 @@ docs/POS-MASTER-DOCUMENTATION.md   <- this file (the only doc)
                     │ window.pos (IPC, desktop only)
         ┌───────────┴──────────────────────────────────────────────┐
         │ Electron main process                                     │
-        │   MS SQL Server pool  ──  SQLite mirror  ──  sync worker   │
+        │   MS SQL Server pool  ──  change-tracking sync worker      │
         │   printer / drawer / second display / updater              │
         └───────────────────────────────────────────────────────────┘
 ```
@@ -382,11 +382,10 @@ grouped:
 
 | Group          | Channels                                                                                                                                                                                      | Purpose                      |
 | -------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------------- |
-| Connection     | `pos:connect` `pos:test` `pos:status` `pos:reset-connection` `pos:database-config` `pos:configure-cloud` `pos:verify-write` `pos:scan-network` `db:scan-local-instances`                      | local SQL lifecycle          |
-| Data           | `pos:write` `pos:read-schema` `pos:apply-schema` `pos:snapshot` `pos:backup` `pos:housekeep` `db:create-sale` `db:get-products` `db:get-branch` `db:set-branch`                               | operations against local SQL |
-| Sync           | `pos:push` `pos:pull` `pos:set-sync-enabled` `pos:retry-row` `pos:retry-errored` `pos:discard-row` `db:get-pending-sync-count`                                                                | background worker control    |
-| Mirror         | `local:enqueue` `local:list` `local:mark` `local:mirror` `local:pending` `local:rollback` `local:info` `local:relational-health` `local:audit-*`                                              | SQLite mirror                |
-| Admin explorer | `sqladmin:connect` `sqladmin:cancel` `sqladmin:probe-port` `sqladmin:lock` `sqladmin:databases` `sqladmin:tables` `sqladmin:columns` `sqladmin:query` `sqladmin:status` `sqladmin:disconnect` | SSMS-style browser           |
+| Connection     | `database:get-state` `database:test` `database:validate` `database:migrate` `database:save-connect` `database:disconnect` | direct SQL Server lifecycle |
+| Data           | `business:write-batch` `business:snapshot` `receipts:find-exact` `receipts:refund` | controlled business operations |
+| Sync           | `sync:status` `sync:pause` `sync:resume` `sync:reconcile` | background worker control |
+| Administration | `admin:unlock` `admin:lock` `admin:adopt-session` `admin:status` | time-limited administrator capability |
 | Hardware       | `print:list` `print:raw` `print:silent`                                                                                                                                                       | ESC/POS + drawer kick        |
 | Shell          | `window:*` `app:ready` `app:version` `update:check/install/status` `health:state` `health:rollback` `config:*` `settings:*` `branding:*` `terminal:*` `net:*`                                 |                              |
 
@@ -417,12 +416,12 @@ across the available drivers (`tedious` and, for Windows Integrated
 Authentication, `msnodesqlv8` with the installed ODBC drivers enumerated by
 `installedOdbcDrivers()`). A driver that fails with a driver-class error is added
 to `deadDrivers` and skipped; once one driver works, the others are skipped.
-Named instances resolve through `parseServerField` / `resolveTarget`, falling back
-to a fixed TCP port when the SQL Browser service is unavailable.
+Every configuration supplies an explicit TCP host and port; the application
+does not resolve server instances or discover network services.
 
 **Error vocabulary** (`describeSqlError`, plain-language by design):
-`ELOGIN`, `ETIMEOUT` ("firewall, wrong port, or a stopped SQL Server Browser"),
-`ETIMEOUT_INSTANCE_LOOKUP`, `EDRIVER`, and `EBUDGET` — the last explicitly tells
+`ELOGIN`, `ETIMEOUT` ("firewall, wrong port, or unavailable server"),
+`EDRIVER`, and `EBUDGET` — the last explicitly tells
 the operator the deadline ended while walking combinations, _not_ that a port
 probe failed. Every attempted combination is returned to the UI.
 
@@ -471,13 +470,10 @@ Rules enforced by the design:
 - **Session cleanup** — a kill skips TDS logout, so the SPID is recorded and
   closed through a side-channel `KILL_SESSION`; unresolved orphans past
   `ORPHAN_WARN_AT` raise a warning in Local database settings.
-- **Direct-mode determinism** — `normalizeDirectTarget` turns `PCNAME\SQLEXPRESS`
-  plus a pinned port into `PCNAME,port` once, and every path (admin handshake,
-  lock flow, operational pool) uses that same string. SQL Browser is never
-  consulted in direct mode.
-- **Migration guard** — `auditConnectionConfig`, exposed as `pos:connection-audit`,
-  flags any saved named instance with no pinned port (`EMISSINGPORT`) before it
-  fails at the first sale.
+- **Direct-mode determinism** — every path uses the exact host and pinned TCP
+  port saved by the wizard. Server-instance resolution is not supported.
+- **Migration guard** — configuration validation refuses a missing or invalid
+  host and port before any connection or business write can run.
 
 The main process also installs `uncaughtException` / `unhandledRejection`
 handlers that write to `connection.log` and keep the window alive, and the saved
@@ -519,15 +515,13 @@ is logged to `connection.log` via `logConnection`. IPC: `driver:list`,
 
 ---
 
-## 12. SQLite local mirror
+## 12. Windows SQL Server data path
 
-`electron/db/sqlite.cjs` with schema `electron/db/offline_sqlite_v2.sql` and
-metadata embedded in the canonical generated SQL Server installer. It is a **mirror**, not a
-second source of truth: rows already safe centrally are copied in via
-`mirrorToLocal`; pending local writes live in the mirror's own queue and are
-reported by `local:pending`. `local:relational-health` cross-checks parent/child
-integrity, feeding the Logic Health screen. `local:rollback` undoes a discarded
-outbox entry so the till never displays a change that will never be sent.
+`electron/db/` contains the direct SQL Server connection manager, controlled
+repositories, schema validator, migration runner, backup service, and
+change-tracking workers. The renderer can request only allowlisted business
+operations through the IPC bridge; it cannot submit SQL or access credentials.
+SQL Server is the durable acceptance boundary for the Windows application.
 
 ---
 
