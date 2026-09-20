@@ -103,6 +103,10 @@ const CHANNEL_LEVELS = {
   "window:is-maximized": OPEN,
   "branding:read": OPEN,
   "database:get-state": OPEN,
+  // Discovery only inspects the local default-instance service and returns
+  // aliases to the wizard. It does not connect, persist credentials, or alter
+  // the terminal/database configuration.
+  "database:list-servers": OPEN,
   "database:health": OPEN,
   "database:schema-status": OPEN,
   "jobs:get-active": OPEN,

@@ -7,8 +7,11 @@ const ENABLED_KEY = "localDatabaseEnabled";
 function createSecureConfig({ app, safeStorage, configStore }) {
   const secretPath = () => path.join(app.getPath("userData"), "local-db-config.bin");
   const canSeal = () => {
-    try { return process.platform === "win32" && safeStorage.isEncryptionAvailable(); }
-    catch { return false; }
+    try {
+      return process.platform === "win32" && safeStorage.isEncryptionAvailable();
+    } catch {
+      return false;
+    }
   };
 
   const profile = () => {
@@ -22,7 +25,9 @@ function createSecureConfig({ app, safeStorage, configStore }) {
     try {
       if (!canSeal()) return null;
       return JSON.parse(safeStorage.decryptString(fs.readFileSync(secretPath())));
-    } catch { return null; }
+    } catch {
+      return null;
+    }
   }
 
   function save(value) {
@@ -34,15 +39,23 @@ function createSecureConfig({ app, safeStorage, configStore }) {
       throw error;
     }
     if (next.authMode === "sql") {
-      fs.writeFileSync(secretPath(), safeStorage.encryptString(JSON.stringify({ password })), { mode: 0o600 });
+      fs.writeFileSync(secretPath(), safeStorage.encryptString(JSON.stringify({ password })), {
+        mode: 0o600,
+      });
     } else {
       fs.rmSync(secretPath(), { force: true });
     }
     const redacted = {
-      host: next.host, port: next.port, database: next.database,
-      authMode: next.authMode, username: next.authMode === "sql" ? next.username : "",
-      encrypt: next.encrypt, trustServerCertificate: next.trustServerCertificate,
-      connectionTimeoutMs: next.connectionTimeoutMs, requestTimeoutMs: next.requestTimeoutMs,
+      host: next.host,
+      instanceName: next.instanceName ?? "",
+      port: next.port,
+      database: next.database,
+      authMode: next.authMode,
+      username: next.authMode === "sql" ? next.username : "",
+      encrypt: next.encrypt,
+      trustServerCertificate: next.trustServerCertificate,
+      connectionTimeoutMs: next.connectionTimeoutMs,
+      requestTimeoutMs: next.requestTimeoutMs,
       retentionDays: next.retentionDays ?? 90,
     };
     const result = configStore.set(PROFILE_KEY, redacted);

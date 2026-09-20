@@ -21,7 +21,7 @@ import {
 import { wrapBridge } from "@/platforms/windows/privilege-bridge";
 import { onRecoveryScreen } from "@/lib/recovery-route";
 import { useAuth } from "@/lib/pos-auth";
-import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
+import { readCredentials } from "@/lib/pos-credentials";
 import { toast } from "sonner";
 
 type Ask = {
@@ -34,7 +34,8 @@ type Ask = {
 const BRIDGES = ["pos", "electronAPI", "sqlAdmin"] as const;
 
 export function PrivilegeGate({ children }: { children: React.ReactNode }) {
-  const { ready, user, isAdmin, isSupervisor } = useAuth();
+  const { ready, user, isAdmin, isSupervisor, can } = useAuth();
+  const mayManageDatabaseAndSync = isAdmin || isSupervisor || can("can_manage_sync_backup");
   const [ask, setAsk] = useState<Ask | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
   const [username, setUsername] = useState("");
@@ -55,65 +56,64 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
     if (!bridge?.adoptSession || !bridge.lockAdmin) return;
     let active = true;
     const sync = async () => {
-      if (!user || (!isAdmin && !isSupervisor)) {
+      if (!user || !mayManageDatabaseAndSync) {
         await bridge.lockAdmin?.();
         return;
       }
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      if (!active || !token) return;
-      await bridge.adoptSession?.(token);
+      const proof = await readCredentials();
+      if (!active) return;
+      await bridge.adoptSession?.(proof);
     };
     void sync();
     return () => {
       active = false;
     };
-  }, [ready, recovery, user, isAdmin, isSupervisor]);
+  }, [ready, recovery, user, mayManageDatabaseAndSync]);
 
   /* One prompt at a time, however many calls are refused at once. */
-  const requestUnlock = useCallback(async (
-    message: string,
-    requiredLevel?: "admin" | "supervisor",
-  ): Promise<boolean> => {
-    // A live online account gets one immediate server-verified refresh before
-    // any local override is requested. This also closes the small launch race
-    // between auth hydration and the first protected click.
-    if (user && (isAdmin || isSupervisor)) {
-      const { data } = await supabase.auth.getSession();
-      const token = data.session?.access_token;
-      const adopted = token ? await window.sqlAdmin?.adoptSession?.(token) : null;
-      if (adopted?.ok) {
-        if (requiredLevel === "admin" && adopted.level !== "admin") {
-          toast.error("Administrator access required", {
-            description: "Your Supervisor account can use read-only database tools, but cannot make this change.",
-          });
-          return false;
+  const requestUnlock = useCallback(
+    async (message: string, requiredLevel?: "admin" | "supervisor"): Promise<boolean> => {
+      // A live online account gets one immediate server-verified refresh before
+      // any local override is requested. This also closes the small launch race
+      // between auth hydration and the first protected click.
+      if (user && mayManageDatabaseAndSync) {
+        const adopted = await window.sqlAdmin?.adoptSession?.(await readCredentials());
+        if (adopted?.ok) {
+          if (requiredLevel === "admin" && adopted.level !== "admin") {
+            toast.error("Administrator access required", {
+              description:
+                "Your Supervisor account can use read-only database tools, but cannot make this change.",
+            });
+            return false;
+          }
+          return true;
         }
-        return true;
       }
-    }
-    if (!asking.current) {
-      asking.current = new Promise<boolean>((resolve) => {
-        setAsk({
-          message,
-          requiredLevel,
-          resolve: (ok) => {
-            asking.current = null;
-            setAsk(null);
-            setUsername("");
-            setPin("");
-            setError("");
-            resolve(ok);
-          },
+      if (!asking.current) {
+        asking.current = new Promise<boolean>((resolve) => {
+          setAsk({
+            message,
+            requiredLevel,
+            resolve: (ok) => {
+              asking.current = null;
+              setAsk(null);
+              setUsername("");
+              setPin("");
+              setError("");
+              resolve(ok);
+            },
+          });
         });
-      });
-    }
-    return asking.current;
-  }, [user, isAdmin, isSupervisor]);
+      }
+      return asking.current;
+    },
+    [user, mayManageDatabaseAndSync],
+  );
 
   useEffect(() => {
     const win = window as unknown as Record<string, Record<string, unknown> | undefined>;
-    const pos = win["pos"] as { onFatal?: (cb: (p: { message: string }) => void) => () => void } | undefined;
+    const pos = win["pos"] as
+      { onFatal?: (cb: (p: { message: string }) => void) => () => void } | undefined;
     if (!pos || recovery) return; // web and Android have no desktop bridge
 
     const undo: Array<() => void> = [];
@@ -159,14 +159,16 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
   const submit = async () => {
     setBusy(true);
     setError("");
-    const bridge = (window as unknown as {
-      sqlAdmin?: {
-        unlock?: (
-          u: string,
-          p: string,
-        ) => Promise<{ ok: boolean; level?: "admin" | "supervisor"; error?: string }>;
-      };
-    }).sqlAdmin;
+    const bridge = (
+      window as unknown as {
+        sqlAdmin?: {
+          unlock?: (
+            u: string,
+            p: string,
+          ) => Promise<{ ok: boolean; level?: "admin" | "supervisor"; error?: string }>;
+        };
+      }
+    ).sqlAdmin;
     const result = (await bridge?.unlock?.(username, pin)) ?? {
       ok: false,
       error: "This terminal cannot be unlocked from here.",
