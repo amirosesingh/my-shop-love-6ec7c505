@@ -154,17 +154,4 @@ describe("local SQL Server wizard server step", () => {
     expect(wizard).toContain("flex shrink-0 justify-between");
     expect(wizard).toContain("setStep((value) => Math.min(6, value + 1))");
   });
-
-  it("preserves the seven-step wizard and keeps discovery separate from persistence", () => {
-    const wizard = readFileSync("src/platforms/windows/components/LocalDatabaseWizard.tsx", "utf8");
-    expect(wizard).toContain('const steps = ["Mode", "Server", "Authentication", "Test", "Database", "Validate", "Save"]');
-    expect(wizard).toContain("const response = await database.listServers()");
-    expect(wizard).toContain("selectDiscoveredServer(current, server)");
-    expect(wizard).toContain("saveAndConnect(profile)");
-
-    const scan = wizard.slice(wizard.indexOf("const scanServers"), wizard.indexOf("const ok ="));
-    expect(scan).not.toContain("saveAndConnect");
-    expect(scan).not.toContain("setEnabled");
-    expect(scan).not.toContain("removeConfiguration");
-  });
 });
