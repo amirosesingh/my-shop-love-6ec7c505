@@ -24,43 +24,58 @@ export const isRefusal = (value: unknown): value is Refusal =>
   (value as Refusal).code === "EPRIVILEGE";
 
 /** Calls that must never trigger the prompt: event subscriptions and unlock. */
-const passthrough = (key: string) => key.startsWith("on") || key === "unlock";
+const passthrough = (key: string) =>
+  key.startsWith("on") || key === "subscribe" || key === "unlock";
 
 export function wrapBridge<T extends object>(
   bridge: T,
   requestUnlock: (message: string, requiredLevel?: "admin" | "supervisor") => Promise<boolean>,
 ): T {
-  const copy: Record<string, unknown> = {};
+  const seen = new WeakMap<object, object>();
 
-  const keys = new Set<string>();
-  for (const key of Object.getOwnPropertyNames(bridge)) keys.add(key);
-  const proto = Object.getPrototypeOf(bridge) as object | null;
-  if (proto && proto !== Object.prototype) {
-    for (const key of Object.getOwnPropertyNames(proto)) {
-      if (key !== "constructor") keys.add(key);
-    }
-  }
+  const wrapObject = (source: object): object => {
+    const existing = seen.get(source);
+    if (existing) return existing;
 
-  for (const key of keys) {
-    let value: unknown;
-    try {
-      value = (bridge as Record<string, unknown>)[key];
-    } catch {
-      continue;
-    }
-    if (typeof value !== "function" || passthrough(key)) {
-      copy[key] = value;
-      continue;
-    }
-    const original = (value as (...args: unknown[]) => unknown).bind(bridge);
-    copy[key] = async (...args: unknown[]) => {
-      const first = await original(...args);
-      if (!isRefusal(first)) return first;
-      const unlocked = await requestUnlock(first.error ?? "", first.requiredLevel);
-      if (!unlocked) return first;
-      return original(...args);
-    };
-  }
+    const copy: Record<string, unknown> = {};
+    seen.set(source, copy);
 
-  return copy as T;
+    const keys = new Set<string>();
+    for (const key of Object.getOwnPropertyNames(source)) keys.add(key);
+    const proto = Object.getPrototypeOf(source) as object | null;
+    if (proto && proto !== Object.prototype) {
+      for (const key of Object.getOwnPropertyNames(proto)) {
+        if (key !== "constructor") keys.add(key);
+      }
+    }
+
+    for (const key of keys) {
+      let value: unknown;
+      try {
+        value = (source as Record<string, unknown>)[key];
+      } catch {
+        continue;
+      }
+      if (value && typeof value === "object") {
+        copy[key] = wrapObject(value);
+        continue;
+      }
+      if (typeof value !== "function" || passthrough(key)) {
+        copy[key] = value;
+        continue;
+      }
+      const original = (value as (...args: unknown[]) => unknown).bind(source);
+      copy[key] = async (...args: unknown[]) => {
+        const first = await original(...args);
+        if (!isRefusal(first)) return first;
+        const unlocked = await requestUnlock(first.error ?? "", first.requiredLevel);
+        if (!unlocked) return first;
+        return original(...args);
+      };
+    }
+
+    return copy;
+  };
+
+  return wrapObject(bridge) as T;
 }

@@ -39,7 +39,9 @@ describe("wrapBridge", () => {
     const bridge = readOnlyBridge({
       write: async () => {
         calls += 1;
-        return calls === 1 ? { ok: false, code: "EPRIVILEGE", error: "Needs an admin" } : { ok: true };
+        return calls === 1
+          ? { ok: false, code: "EPRIVILEGE", error: "Needs an admin" }
+          : { ok: true };
       },
     });
     const unlock = vi.fn(async () => true);
@@ -47,6 +49,39 @@ describe("wrapBridge", () => {
     await expect(wrapped.write()).resolves.toEqual({ ok: true });
     expect(unlock).toHaveBeenCalledWith("Needs an admin", undefined);
     expect(calls).toBe(2);
+  });
+
+  it("adopts and retries privileged calls on nested database and sync bridges", async () => {
+    let databaseCalls = 0;
+    let syncCalls = 0;
+    const subscribe = () => () => {};
+    const bridge = readOnlyBridge({
+      database: readOnlyBridge({
+        testServer: async () =>
+          ++databaseCalls === 1
+            ? { ok: false, code: "EPRIVILEGE", requiredLevel: "admin", error: "Needs admin" }
+            : { ok: true, version: "16" },
+        subscribe,
+      }),
+      sync: readOnlyBridge({
+        runNow: async () =>
+          ++syncCalls === 1
+            ? { ok: false, code: "EPRIVILEGE", requiredLevel: "admin", error: "Needs admin" }
+            : { ok: true },
+      }),
+    });
+    const adopt = vi.fn(async () => true);
+    const wrapped = wrapBridge(bridge, adopt) as {
+      database: { testServer: () => Promise<unknown>; subscribe: typeof subscribe };
+      sync: { runNow: () => Promise<unknown> };
+    };
+
+    await expect(wrapped.database.testServer()).resolves.toMatchObject({ ok: true, version: "16" });
+    await expect(wrapped.sync.runNow()).resolves.toEqual({ ok: true });
+    expect(adopt).toHaveBeenCalledTimes(2);
+    expect(databaseCalls).toBe(2);
+    expect(syncCalls).toBe(2);
+    expect(wrapped.database.subscribe).toBe(subscribe);
   });
 
   it("returns the refusal when the operator cancels", async () => {
