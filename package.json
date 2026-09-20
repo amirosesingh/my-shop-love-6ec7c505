@@ -4,6 +4,10 @@
   "author": "My Shop Love",
   "private": true,
   "packageManager": "npm@11.4.2",
+  "engines": {
+    "node": "22.x",
+    "npm": "11.4.2"
+  },
   "allowScripts": {
     "electron-winstaller@5.4.0": true,
     "esbuild@0.28.1": true,
