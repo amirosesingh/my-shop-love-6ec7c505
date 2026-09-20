@@ -38,6 +38,7 @@ const { OperationsRepository } = require("./db/repositories/operations.cjs");
 const { AggregateRepository } = require("./db/repositories/aggregates.cjs");
 const { ReceiptRepository } = require("./db/repositories/receipts.cjs");
 const { applyMigrations } = require("./db/migrations.cjs");
+const { discoverLocalSqlServers } = require("./db/local-server-discovery.cjs");
 const ipcPrivilege = require("./ipc-privilege.cjs");
 const adminSession = require("./admin-session.cjs");
 
@@ -684,6 +685,7 @@ function registerIpc() {
   }));
   ipcMain.handle("database:get-state", () => databaseService.snapshot());
   ipcMain.handle("database:set-enabled", (_e, value) => guard.guarded(async()=>{const state=await databaseService.setEnabled(value===true);if(value===true&&databaseManager.pool)await prepareLocalData();return databaseService.snapshot();}));
+  ipcMain.handle("database:list-servers", () => discoverLocalSqlServers());
   ipcMain.handle("database:test-server", (_e, value) => guard.guarded(() => databaseService.testServer(guard.databaseProfile(value))));
   ipcMain.handle("database:list-databases", (_e, value) => guard.guarded(() => databaseService.databases(guard.databaseProfile(value))));
   ipcMain.handle("database:validate", (_e, value) => guard.guarded(() => databaseService.validate(guard.databaseProfile(value, { requireDatabase: true }))));

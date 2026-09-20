@@ -23,6 +23,7 @@ contextBridge.exposeInMainWorld("pos", {
   database: {
     getState: () => invoke("database:get-state"),
     setEnabled: (enabled) => invoke("database:set-enabled", enabled),
+    listServers: () => invoke("database:list-servers"),
     testServer: (profile) => invoke("database:test-server", profile),
     listDatabases: (profile) => invoke("database:list-databases", profile),
     validateDatabase: (profile) => invoke("database:validate", profile),

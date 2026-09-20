@@ -4,6 +4,12 @@
   "author": "My Shop Love",
   "private": true,
   "packageManager": "npm@11.4.2",
+  "allowScripts": {
+    "electron-winstaller@5.4.0": true,
+    "esbuild@0.28.1": true,
+    "msnodesqlv8@5.5.0": true,
+    "workerd@1.20260917.1": true
+  },
   "sideEffects": false,
   "type": "module",
   "main": "electron/main.cjs",
