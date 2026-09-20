@@ -2,9 +2,8 @@
  * Where this till reads and writes: the online database, or the local one.
  *
  * Web and Android are online-only and send every change straight to the central
- * database. Windows first commits every business change to its embedded SQLite
- * durability store. The Electron worker then synchronizes it centrally, while
- * SQL Server is maintained as a compatibility projection.
+ * database. Windows remains online-only until the SQL Server release gate is
+ * complete; afterward Electron's canonical connection state selects local mode.
  */
 import { isOnlineOnly } from "@/lib/live-mode";
 import { hasFeature } from "@/platform-config/features";
@@ -66,7 +65,7 @@ export function unreachableMessage(): string {
   return isOnlineOnly()
     ? "Central database unavailable. Please check the network connection or contact an administrator."
     : "Local transaction storage unavailable. The payment was not accepted. " +
-        "Open Settings → Database & Cloud Connection and check Trading Ready / SQLite durability.";
+        "Open Settings → Database & Cloud Connection and check the local SQL Server connection.";
 }
 
 function localFailureMessage(cause?: unknown): string {
@@ -77,17 +76,11 @@ function localFailureMessage(cause?: unknown): string {
   if (code === "EBRIDGE_UNAVAILABLE" || /Electron database bridge unavailable/i.test(detail)) {
     return "Electron database bridge unavailable. Restart the Retail desktop app.";
   }
-  if (/cannot commit an atomic SQLite batch|update the app/i.test(detail)) {
-    return "This Retail desktop build cannot use the required local transaction store. Update the app before taking payments.";
+  if (code.includes("SQLSERVER_SCHEMA") || /SQL Server.*schema|schema.*SQL Server|no such table|no such column/i.test(detail)) {
+    return "Local SQL Server schema is not ready. Repair the selected database from Settings before taking payments.";
   }
-  if (code.includes("SQLITE_SCHEMA") || /SQLite.*schema|schema.*SQLite|no such table|no such column/i.test(detail)) {
-    return "Local SQLite schema is not ready. Repair the local database from Settings before taking payments.";
-  }
-  if (code.includes("SQLITE_WRITE") || /SQLite.*write|write.*SQLite|readonly database|database is locked|disk.*full/i.test(detail)) {
-    return "Local SQLite write failed. The payment was not accepted. Check local storage and database health, then retry.";
-  }
-  if (code.includes("SQLITE") || /SQLite|embedded SQLite|localMirrorBatch|local transaction store/i.test(detail)) {
-    return "Local SQLite store unavailable. The payment was not accepted. Check Trading Ready / SQLite durability in Settings.";
+  if (code.includes("SQLSERVER_WRITE") || /SQL Server.*write|write.*SQL Server|readonly database|disk.*full/i.test(detail)) {
+    return "Local SQL Server write failed. The payment was not accepted. Check database health, then retry.";
   }
   return unreachableMessage();
 }

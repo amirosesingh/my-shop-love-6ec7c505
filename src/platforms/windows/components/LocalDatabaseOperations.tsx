@@ -1,0 +1,16 @@
+import { useEffect, useState } from "react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { DatabaseHealthCard } from "./DatabaseHealthCard";
+import { DatabaseJobProgress } from "./DatabaseJobProgress";
+
+type State={state?:string;connected?:boolean;profile?:{database?:string}|null};
+const shell=()=>window.pos as unknown as {database?:{getState():Promise<State>;health():Promise<Record<string,unknown>>;backup(file:string):Promise<Record<string,unknown>>;restore(file:string):Promise<Record<string,unknown>>};jobs?:{getActive():Promise<Record<string,unknown>|null>};sync?:{getStatus():Promise<Record<string,unknown>>;runNow(options:Record<string,unknown>):Promise<Record<string,unknown>>;pause():Promise<Record<string,unknown>>;resume():Promise<Record<string,unknown>>;reconcile(options:Record<string,unknown>):Promise<Record<string,unknown>>}};
+export function LocalDatabaseOperations(){
+ const [state,setState]=useState<State>({});const[job,setJob]=useState<Record<string,unknown>|null>(null);const[sync,setSync]=useState<Record<string,unknown>>({});const[file,setFile]=useState("");const[result,setResult]=useState<Record<string,unknown>|null>(null);const[busy,setBusy]=useState(false);
+ const refresh=async()=>{const api=shell();const[nextState,nextJob,nextSync]=await Promise.all([api.database?.getState(),api.jobs?.getActive(),api.sync?.getStatus()]);setState(nextState??{});setJob(nextJob??null);setSync(nextSync??{});};
+ useEffect(()=>{void refresh();},[]);
+ const run=async(work:()=>Promise<Record<string,unknown>>)=>{if(busy)return;setBusy(true);try{setResult(await work());await refresh();}finally{setBusy(false);}};
+ return <div className="space-y-3"><DatabaseHealthCard state={state}/><Card><CardHeader><CardTitle className="text-base">Database jobs and synchronization</CardTitle></CardHeader><CardContent className="space-y-3"><DatabaseJobProgress job={job as never}/><pre className="max-h-32 overflow-auto rounded bg-muted p-2 text-xs">{JSON.stringify(sync,null,2)}</pre><div className="flex flex-wrap gap-2"><Button disabled={busy||!state.connected} onClick={()=>run(()=>shell().sync!.runNow({batchSize:500}))}>Sync now</Button><Button variant="outline" disabled={busy} onClick={()=>run(()=>shell().sync!.pause())}>Pause</Button><Button variant="outline" disabled={busy} onClick={()=>run(()=>shell().sync!.resume())}>Resume</Button><Button variant="outline" disabled={busy||!state.connected} onClick={()=>run(()=>shell().sync!.reconcile({}))}>Reconcile</Button></div></CardContent></Card><Card><CardHeader><CardTitle className="text-base">Backup and recovery</CardTitle></CardHeader><CardContent className="space-y-3"><Input aria-label="SQL Server backup file" placeholder="C:\Backups\POS_LOCAL.bak" value={file} onChange={(e)=>setFile(e.target.value)}/><div className="flex gap-2"><Button disabled={busy||!file||!state.connected} onClick={()=>run(()=>shell().database!.backup(file))}>Create backup</Button><Button variant="destructive" disabled={busy||!file} onClick={()=>run(()=>shell().database!.restore(file))}>Restore backup</Button></div>{result&&<pre className="max-h-40 overflow-auto rounded bg-muted p-2 text-xs">{JSON.stringify(result,null,2)}</pre>}</CardContent></Card></div>;
+}

@@ -17,7 +17,7 @@ export type DiagnosticKind =
   | "stock_delta_failed"
   | "stock_reconcile_drift"
   | "local_mirror_failed"
-  /** SQLite accepted the mutation but the optional SQL Server projection did not. */
+  /** A compatibility projection failed after the authoritative write. */
   | "compatibility_projection_failed"
   | "sale_idempotency_unavailable"
   | "shift_lookup_unavailable"

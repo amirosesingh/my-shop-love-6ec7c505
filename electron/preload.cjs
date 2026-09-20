@@ -2,11 +2,58 @@ const { contextBridge, ipcRenderer } = require("electron");
 
 const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
 
+contextBridge.exposeInMainWorld("sqlAdmin", {
+  unlock: (username, pin) => invoke("admin:unlock", username, pin),
+  lockAdmin: () => invoke("admin:lock"),
+  adoptSession: (accessToken) => invoke("admin:adopt-session", accessToken),
+  status: () => invoke("admin:status"),
+});
+
 /**
  * Online-only Electron bridge. Business data is handled by the renderer's
  * central Supabase client; this surface contains only OS integrations.
  */
 contextBridge.exposeInMainWorld("pos", {
+  write: (context, op) => invoke("business:write-batch", context, [op]),
+  writeBatch: (context, ops) => invoke("business:write-batch", context, ops),
+  commitAggregate: (aggregate) => invoke("business:commit-aggregate", aggregate),
+  snapshot: () => invoke("business:snapshot"),
+  findReceipt: (value, branchId) => invoke("receipts:find-exact", value, branchId),
+  refundReceipt: (value) => invoke("receipts:refund", value),
+  database: {
+    getState: () => invoke("database:get-state"),
+    setEnabled: (enabled) => invoke("database:set-enabled", enabled),
+    testServer: (profile) => invoke("database:test-server", profile),
+    listDatabases: (profile) => invoke("database:list-databases", profile),
+    validateDatabase: (profile) => invoke("database:validate", profile),
+    migrateDatabase: (profile) => invoke("database:migrate", profile),
+    saveAndConnect: (profile) => invoke("database:save-connect", profile),
+    disconnect: () => invoke("database:disconnect"),
+    removeConfiguration: () => invoke("database:remove-configuration"),
+    health: () => invoke("database:health"),
+    schemaStatus: () => invoke("database:schema-status"),
+    backup: (file) => invoke("database:backup", file),
+    restore: (file) => invoke("database:restore", file),
+    subscribe: (cb) => {
+      const handler = (_event, payload) => cb(payload);
+      ipcRenderer.on("database:state", handler);
+      return () => ipcRenderer.removeListener("database:state", handler);
+    },
+  },
+  jobs: {
+    getActive: () => invoke("jobs:get-active"),
+    getHistory: (limit) => invoke("jobs:get-history", limit),
+    subscribe: (cb) => { const handler=(_event,payload)=>cb(payload); ipcRenderer.on("jobs:state",handler); return()=>ipcRenderer.removeListener("jobs:state",handler); },
+  },
+  sync: {
+    getStatus: () => invoke("sync:get-status"),
+    runNow: (options) => invoke("sync:run-now", options),
+    pause: () => invoke("sync:pause"),
+    resume: () => invoke("sync:resume"),
+    getFailures: () => invoke("sync:get-failures"),
+    reconcile: (options) => invoke("sync:reconcile", options),
+    subscribe: (cb) => { const handler=(_event,payload)=>cb(payload); ipcRenderer.on("sync:state",handler); return()=>ipcRenderer.removeListener("sync:state",handler); },
+  },
   print: (html, options) => invoke("print:silent", html, options),
   printRaw: (bytes, options) => invoke("print:raw", bytes, options),
   listPrinters: () => invoke("print:list"),

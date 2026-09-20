@@ -12,9 +12,13 @@
  * checked instead of followed blindly, and machines on the local network are
  * out of reach.
  */
-const { net } = require("electron");
 const fs = require("node:fs");
 const path = require("node:path");
+
+// Resolve Electron only when a request is actually made. URL validation is a
+// pure security boundary and its tests must not require an installed Electron
+// binary or accidentally initiate its downloader.
+const electronNet = () => require("electron").net;
 
 /** Update host used when a build carries no configuration of its own. */
 const DEFAULT_UPDATE_HOST = "updatecms.luckycharmsdnbhd.com";
@@ -142,7 +146,7 @@ function request(url, { method = "GET", headers = {}, timeoutMs = 300000 } = {})
     try {
       // "manual" so a redirect off the allowed hosts ends the request instead
       // of quietly delivering somewhere else.
-      req = net.request({ method, url: allowed.url, redirect: "manual" });
+      req = electronNet().request({ method, url: allowed.url, redirect: "manual" });
     } catch (error) {
       done(reject, error instanceof Error ? error : new Error(String(error)));
       return;
@@ -287,7 +291,7 @@ function downloadTo(url, destination, { onProgress, timeoutMs = 900000, resume =
     }, timeoutMs);
 
     try {
-      req = net.request({ method: "GET", url: allowed.url, redirect: "manual" });
+      req = electronNet().request({ method: "GET", url: allowed.url, redirect: "manual" });
     } catch (error) {
       done(reject, error instanceof Error ? error : new Error(String(error)));
       return;

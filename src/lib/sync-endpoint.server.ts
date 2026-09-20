@@ -48,6 +48,33 @@ const bodySchema = z.object({
   terminalToken: z.string().max(200).optional(),
   accessToken: z.string().max(4000).optional(),
   ops: z.array(opSchema).max(50).optional(),
+  sqlServerBatch: z.object({
+    batchId: z.string().uuid(),
+    organizationId: z.string().min(1).max(128),
+    branchId: z.string().min(1).max(128),
+    table: z.string().regex(/^[a-z_][a-z0-9_]*$/).max(64),
+    rows: z.array(z.record(z.string(), z.unknown())).max(2000),
+    changes: z.array(z.record(z.string(), z.unknown())).max(2000),
+  }).optional(),
+  sqlServerAggregate: z.object({
+    batchId: z.string().uuid(), organizationId: z.string().min(1).max(128), branchId: z.string().min(1).max(128),
+    operations: z.array(z.object({
+      table: z.string().regex(/^[a-z_][a-z0-9_]*$/).max(64),
+      rows: z.array(z.record(z.string(), z.unknown())).max(2000),
+      changes: z.array(z.record(z.string(), z.unknown())).max(2000),
+    })).min(1).max(200),
+  }).optional(),
+  sqlServerPull: z.object({
+    organizationId: z.string().min(1).max(128), branchId: z.string().min(1).max(128),
+    cursor: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER), limit: z.number().int().min(100).max(2000),
+  }).optional(),
+  sqlServerBootstrap: z.object({
+    organizationId: z.string().min(1).max(128), branchId: z.string().min(1).max(128),
+    table: z.string().regex(/^[a-z_][a-z0-9_]*$/).max(64), cursor: z.string().max(512).nullable(),
+    historyDays: z.number().int().min(30).max(7300), limit: z.number().int().min(100).max(2000),
+  }).optional(),
+  sqlServerCounts: z.object({ organizationId: z.string().min(1).max(128), branchId: z.string().min(1).max(128), historyDays: z.number().int().min(30).max(7300) }).optional(),
+  oldReceipt: z.object({ lookup: z.string().min(1).max(128), branchId: z.string().min(1).max(128) }).optional(),
   read: z
     .discriminatedUnion("kind", [
       z.object({ kind: z.literal("activeShift"), storeId: z.string().min(1).max(64) }),
@@ -59,7 +86,10 @@ const bodySchema = z.object({
 export async function handleSyncRequest(request: Request): Promise<Response> {
   let body: z.infer<typeof bodySchema>;
   try {
-    body = bodySchema.parse(await request.json());
+    const raw = await request.text();
+    if (new TextEncoder().encode(raw).byteLength > 8 * 1024 * 1024)
+      return Response.json({ ok: false, code: "PAYLOAD_TOO_LARGE", error: "The sync batch exceeds 8 MiB." }, { status: 413 });
+    body = bodySchema.parse(JSON.parse(raw));
   } catch {
     return Response.json({ ok: false, error: "Malformed request" }, { status: 400 });
   }
@@ -73,7 +103,7 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
     body = { ...body, accessToken: bearer.slice(0, 4000) };
   }
 
-  if (!body.ops?.length && !body.read)
+  if (!body.ops?.length && !body.read && !body.sqlServerBatch && !body.sqlServerAggregate && !body.sqlServerPull && !body.sqlServerBootstrap && !body.sqlServerCounts && !body.oldReceipt)
     return Response.json({ ok: false, error: "Nothing to do" }, { status: 400 });
 
   const { verifyRelayCaller, runRelayOp, runRelayRead, hasServiceKey } = await import(
@@ -134,6 +164,27 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
     } catch (e) {
       return Response.json({ ok: false, error: (e as Error).message }, { status: 503 });
     }
+  }
+
+  if (body.sqlServerBatch || body.sqlServerAggregate || body.sqlServerPull || body.sqlServerBootstrap || body.sqlServerCounts || body.oldReceipt) {
+    const branchId = body.sqlServerBatch?.branchId ?? body.sqlServerAggregate?.branchId ?? body.sqlServerPull?.branchId ?? body.sqlServerBootstrap?.branchId ?? body.sqlServerCounts?.branchId ?? body.oldReceipt?.branchId ?? "";
+    const mayManageOtherBranches = scope.role === "admin" || scope.roleSlug === "admin" || scope.permissions.can_manage_sync_backup === true;
+    if (branchId !== scope.storeId && !mayManageOtherBranches) return Response.json({ ok:false,code:"STORE_FORBIDDEN",error:"You can only synchronize your own branch." },{status:403});
+    const { serviceRest } = await import("@/core/api/pos-relay.server");
+    const rpc = body.sqlServerBatch ? ["pos_sync_push_batch", {
+      p_batch_id:body.sqlServerBatch.batchId,p_organization_id:body.sqlServerBatch.organizationId,p_branch_id:branchId,
+      p_table:body.sqlServerBatch.table,p_rows:body.sqlServerBatch.rows,p_changes:body.sqlServerBatch.changes,
+    }] as const : body.sqlServerAggregate ? ["pos_sync_push_aggregate", {
+      p_batch_id:body.sqlServerAggregate.batchId,p_organization_id:body.sqlServerAggregate.organizationId,p_branch_id:branchId,p_operations:body.sqlServerAggregate.operations,
+    }] as const : body.sqlServerPull ? ["pos_sync_pull", {
+      p_organization_id:body.sqlServerPull.organizationId,p_branch_id:branchId,p_after_cursor:body.sqlServerPull.cursor,p_limit:body.sqlServerPull.limit,
+    }] as const : body.sqlServerBootstrap ? ["pos_sync_bootstrap", {
+      p_organization_id:body.sqlServerBootstrap.organizationId,p_branch_id:branchId,p_table:body.sqlServerBootstrap.table,p_after_cursor:body.sqlServerBootstrap.cursor,p_history_days:body.sqlServerBootstrap.historyDays,p_limit:body.sqlServerBootstrap.limit,
+    }] as const : body.sqlServerCounts ? ["pos_sync_counts", {
+      p_organization_id:body.sqlServerCounts.organizationId,p_branch_id:branchId,p_history_days:body.sqlServerCounts.historyDays,
+    }] as const : ["pos_old_receipt_lookup",{p_lookup:body.oldReceipt!.lookup,p_branch_id:branchId}] as const;
+    const response=await serviceRest(`rpc/${rpc[0]}`,{method:"POST",body:JSON.stringify(rpc[1])});
+    return new Response(await response.text(),{status:response.status,headers:{"content-type":"application/json"}});
   }
 
   const results: {

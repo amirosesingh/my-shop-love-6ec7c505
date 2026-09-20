@@ -2,7 +2,7 @@
 
 ## Method and scope
 
-Repository-wide searches covered permission calls, legacy PIN rules, the central authorization action catalogue, transfer and shift state machines, Supabase migrations, Electron SQLite/outbox tables, approval UI, authentication, realtime polling and notification events. This report records existing business rules; it does not turn ordinary permission checks into approvals.
+Repository-wide searches covered permission calls, legacy PIN rules, the central authorization action catalogue, transfer and shift state machines, Supabase migrations, Electron change-journal tables, approval UI, authentication, realtime polling and notification events. This report records existing business rules; it does not turn ordinary permission checks into approvals.
 
 ## Approval matrix
 
@@ -38,7 +38,7 @@ Repository-wide searches covered permission calls, legacy PIN rules, the central
 2. Request permission and decision permission were conflated: any authenticated cashier could submit any action key, while queue visibility only checked approver role/user. Requester roles/users are now independently configured and server-enforced.
 3. A valid approver PIN/session had no value ceiling. Configurable `role:<role>` and `user:<id>` limits are now checked both for terminal PIN authorization and remote decisions. A personal limit overrides a role limit.
 4. Above-limit discount requests omitted requested amount, allowed limit, type, scope and transaction reference. The automatic dialog now presents a human explanation and sends this context to the queue/audit path.
-5. The existing offline implementation deliberately refuses unverifiable PINs rather than trusting any cached PIN. Requests/actions remain parked and enter the SQLite sync queue; online-only policy produces a clear message. This security posture is retained.
+5. The application deliberately refuses unverifiable PINs rather than trusting any cached PIN. Requests/actions remain parked until the central service can verify them; online-only policy produces a clear message. This security posture is retained.
 6. Transfer approval remains its existing quantity/state-machine workflow rather than being duplicated in the generic queue. Ordinary settings, staff and role permission failures remain prohibited unless the existing authorization action catalogue explicitly supports escalation.
 
 ## Required invariants

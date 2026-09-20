@@ -3,7 +3,7 @@ const fs = require("node:fs");
 const os = require("node:os");
 const net = require("node:net");
 const { spawn } = require("node:child_process");
-const { app, BrowserWindow, ipcMain, screen, dialog, session, shell } = require("electron");
+const { app, BrowserWindow, ipcMain, screen, dialog, session, shell, safeStorage } = require("electron");
 
 const updater = require("./updater.cjs");
 const terminalStore = require("./terminal-store.cjs");
@@ -18,6 +18,63 @@ const diagnostics = require("./diagnostics.cjs");
 const serverKeys = require("./server-keys.cjs");
 const cloudCredentials = require("./cloud-credentials.cjs");
 const storageHygiene = require("./storage-hygiene.cjs");
+const { createSecureConfig } = require("./db/secure-config.cjs");
+const { ConnectionManager } = require("./db/connection-manager.cjs");
+const { DatabaseService } = require("./db/service.cjs");
+const { BackupService } = require("./db/backup.cjs");
+const { JobRepository } = require("./jobs/repository.cjs");
+const { JobManager } = require("./jobs/manager.cjs");
+const { LocalDataLifecycle } = require("./jobs/lifecycle.cjs");
+const { loadRegistry } = require("./db/schema-registry.cjs");
+const { CheckpointRepository } = require("./sync/checkpoints.cjs");
+const { ChangeReader } = require("./sync/change-reader.cjs");
+const { PushWorker } = require("./sync/push-worker.cjs");
+const { PullWorker } = require("./sync/pull-worker.cjs");
+const { ConflictRepository } = require("./sync/conflicts.cjs");
+const { SyncCoordinator } = require("./sync/coordinator.cjs");
+const { CloudClient } = require("./sync/cloud-client.cjs");
+const { createTelemetry } = require("./telemetry.cjs");
+const { OperationsRepository } = require("./db/repositories/operations.cjs");
+const { AggregateRepository } = require("./db/repositories/aggregates.cjs");
+const { ReceiptRepository } = require("./db/repositories/receipts.cjs");
+const { applyMigrations } = require("./db/migrations.cjs");
+const ipcPrivilege = require("./ipc-privilege.cjs");
+const adminSession = require("./admin-session.cjs");
+
+const databaseConfig = createSecureConfig({ app, safeStorage, configStore });
+const databaseManager = new ConnectionManager();
+const databaseService = new DatabaseService({
+  secureConfig: databaseConfig,
+  manager: databaseManager,
+  publish: (state) => {
+    for (const win of BrowserWindow.getAllWindows()) win.webContents.send("database:state", state);
+  },
+});
+const backupService = new BackupService(databaseManager,databaseConfig);
+const jobRepository = new JobRepository(databaseManager);
+const jobManager = new JobManager(jobRepository, { publish: (job) => { for (const win of BrowserWindow.getAllWindows()) win.webContents.send("jobs:state", job); } });
+const syncRegistry = loadRegistry();
+const syncCheckpoints = new CheckpointRepository(databaseManager);
+const syncCloud = new CloudClient({ configStore, terminalStore, connectionManager: databaseManager });
+const changeReader = new ChangeReader(databaseManager, syncRegistry);
+const conflictRepository = new ConflictRepository(databaseManager);
+const syncCoordinator = new SyncCoordinator({
+  pushWorker: new PushWorker({ reader:changeReader,cloud:syncCloud,checkpoints:syncCheckpoints,registry:syncRegistry }),
+  pullWorker: new PullWorker({ connectionManager:databaseManager,cloud:syncCloud,checkpoints:syncCheckpoints,registry:syncRegistry,reader:changeReader,conflicts:conflictRepository }),
+  publish: (state) => { for (const win of BrowserWindow.getAllWindows()) win.webContents.send("sync:state",state); },
+});
+const localDataLifecycle = new LocalDataLifecycle({ connectionManager:databaseManager,databaseService,jobManager,jobRepository,registry:syncRegistry,cloud:syncCloud,syncCoordinator,checkpoints:syncCheckpoints });
+const mainTelemetry = createTelemetry({ databaseService,syncCoordinator,jobRepository,configStore,terminalStore,app });
+const operationsRepository = new OperationsRepository(databaseManager, syncRegistry);
+const aggregateRepository = new AggregateRepository(databaseManager, operationsRepository);
+const receiptRepository = new ReceiptRepository(databaseManager, syncCloud);
+
+function localBranchId(){const terminal=terminalStore.read()??{};return terminal.locationId??terminal.storeId??terminal.branchId??null;}
+async function prepareLocalData({force=false}={}){
+  const profile=databaseConfig.profile()??{};
+  try{return await localDataLifecycle.ensure({branchId:localBranchId(),historyDays:Number(profile.retentionDays)||90,force});}
+  catch(error){databaseService.markDegraded({code:error?.code??"EBOOTSTRAP",error:String(error?.message??error),differences:error?.differences});throw error;}
+}
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const DEBUG = process.env.POS_DEBUG === "1";
@@ -598,6 +655,59 @@ async function printRaw(bytes, options = {}) {
 
 
 function registerIpc() {
+  ipcPrivilege.install(ipcMain, {
+    isFirstRun: () => !terminalStore.read() && !cloudCredentials.status().configured,
+  });
+  ipcMain.handle("admin:status", () => adminSession.status());
+  ipcMain.handle("admin:lock", () => { adminSession.clear(); return adminSession.status(); });
+  ipcMain.handle("admin:adopt-session", async (_e, accessToken) => guard.guarded(async () => {
+    const token=guard.text(accessToken,{name:"access token",max:4000});
+    if(!baseUrl)return{ok:false,error:"The authorization service is still starting."};
+    const response=await fetch(`${baseUrl}/api/v1/pos/ipc-adopt`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({accessToken:token})});
+    const result=await response.json().catch(()=>({ok:false,error:"Authorization failed."}));
+    if(!response.ok||!result.ok)return{ok:false,error:result.error??"Authorization failed."};
+    adminSession.grant("admin",result.subject);return{ok:true,level:"admin"};
+  }));
+  ipcMain.handle("admin:unlock", async (_e, username, pin) => guard.guarded(async () => {
+    const user = guard.text(username, { name: "username", max: 160 });
+    const secret = guard.text(pin, { name: "PIN", max: 32 });
+    if (!baseUrl) return { ok: false, error: "The authorization service is still starting." };
+    const response = await fetch(`${baseUrl}/api/v1/pos/ipc-authorize`, {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ username: user, pin: secret, terminalId: terminalStore.read()?.terminalId ?? null }),
+    });
+    const result = await response.json().catch(() => ({ ok: false, error: "Authorization failed." }));
+    if (!response.ok || !result.ok) return { ok: false, error: result.error ?? "Authorization failed." };
+    adminSession.grant("admin", result.subject);
+    return { ok: true, level: "admin" };
+  }));
+  ipcMain.handle("database:get-state", () => databaseService.snapshot());
+  ipcMain.handle("database:set-enabled", (_e, value) => guard.guarded(async()=>{const state=await databaseService.setEnabled(value===true);if(value===true&&databaseManager.pool)await prepareLocalData();return databaseService.snapshot();}));
+  ipcMain.handle("database:test-server", (_e, value) => guard.guarded(() => databaseService.testServer(guard.databaseProfile(value))));
+  ipcMain.handle("database:list-databases", (_e, value) => guard.guarded(() => databaseService.databases(guard.databaseProfile(value))));
+  ipcMain.handle("database:validate", (_e, value) => guard.guarded(() => databaseService.validate(guard.databaseProfile(value, { requireDatabase: true }))));
+  ipcMain.handle("database:migrate", (_e, value) => guard.guarded(() => applyMigrations(databaseManager,guard.databaseProfile(value,{requireDatabase:true}))));
+  ipcMain.handle("database:save-connect", (_e, value) => guard.guarded(async()=>{const result=await databaseService.saveAndConnect(guard.databaseProfile(value,{requireDatabase:true}));if(!result.ok)return result;await prepareLocalData();return{...result,state:databaseService.snapshot()};}));
+  ipcMain.handle("database:disconnect", () => databaseService.disconnect());
+  ipcMain.handle("database:remove-configuration", () => databaseService.remove());
+  ipcMain.handle("database:health", () => databaseService.health());
+  ipcMain.handle("database:schema-status", () => databaseService.schemaStatus());
+  ipcMain.handle("database:backup", (_e, file) => guard.guarded(() => backupService.backup(guard.filePath(file,{name:"backup file",extension:"bak"}))));
+  ipcMain.handle("database:restore", (_e, file) => guard.guarded(async () => { const result=await backupService.restore(guard.filePath(file,{name:"backup file",extension:"bak"})); if(result.ok)await databaseService.restore(); return result; }));
+  ipcMain.handle("business:write-batch", (_e, context, ops) => guard.guarded(() => operationsRepository.apply(guard.text(context,{name:"operation context",max:160}), guard.writeOps(ops,{max:200}))));
+  ipcMain.handle("business:commit-aggregate", (_e, value) => guard.guarded(() => { const aggregate=guard.aggregate(value); return aggregateRepository.commit(aggregate.kind,aggregate); }));
+  ipcMain.handle("business:snapshot", () => guard.guarded(() => operationsRepository.snapshot()));
+  ipcMain.handle("receipts:find-exact", (_e, value, branchId) => guard.guarded(() => receiptRepository.findExact(guard.text(value,{name:"receipt lookup",max:128}),guard.text(branchId,{name:"branch",max:128}))));
+  ipcMain.handle("receipts:refund", (_e, value) => guard.guarded(() => { const input=guard.options(value,{name:"refund",max:5}); const terminal=terminalStore.read()??{}; const branch=input.branchId??terminal.locationId??terminal.storeId; return receiptRepository.refund({saleId:guard.uuid(input.saleId,{name:"sale id"}),refundId:guard.text(input.refundId,{name:"refund id",max:128}),branchId:guard.text(branch,{name:"branch",max:128}),reason:input.reason?guard.text(input.reason,{name:"reason",max:400}):null}); }));
+  ipcMain.handle("jobs:get-active", async () => databaseManager.pool ? jobRepository.active() : null);
+  ipcMain.handle("jobs:get-history", async (_e, limit) => databaseManager.pool ? jobRepository.history(Number(limit)||50) : []);
+  ipcMain.handle("sync:get-status", () => syncCoordinator.snapshot());
+  ipcMain.handle("sync:run-now", (_e, options) => guard.guarded(async()=>{const input=guard.options(options,{name:"sync options"});const result=await syncCoordinator.runNow({...input,branchId:input.branchId??localBranchId()});return result.code==="ECHANGEGAP"?prepareLocalData({force:true}):result;}));
+  ipcMain.handle("sync:pause", () => syncCoordinator.pause());
+  ipcMain.handle("sync:resume", () => syncCoordinator.resume());
+  ipcMain.handle("sync:get-failures", async () => ({ failures:databaseManager.pool?await jobRepository.failures():[], conflictRows:databaseManager.pool?await conflictRepository.unresolved():[], conflicts:databaseManager.pool?await conflictRepository.count():0 }));
+  ipcMain.handle("sync:reconcile", () => guard.guarded(async()=>{const branchId=localBranchId();if(!branchId)throw Object.assign(new Error("A branch is required for reconciliation."),{code:"EBRANCH"});const differences=await localDataLifecycle.reconcile(branchId,Number(databaseConfig.profile()?.retentionDays)||90);return{ok:differences.length===0,differences};}));
   ipcMain.handle("app:ready", () => {
     markStartupSettled();
     const state = health.markHealthy();
@@ -705,17 +815,20 @@ app.whenReady().then(async () => {
   app.on("second-instance", () => { const win = mainWindow ?? BrowserWindow.getAllWindows()[0]; if (!win || win.isDestroyed()) return; if (win.isMinimized()) win.restore(); win.show(); win.focus(); });
   try { storageHygiene.runOnLaunch(app.getPath("userData"), app.getVersion()); } catch (error) { if (DEBUG) console.warn("[pos] storage hygiene skipped:", fail(error).error); }
   registerIpc();
+  const restoredDatabase=await databaseService.restore();
+  mainTelemetry.start();
   const boot = health.beginBoot();
   if (health.shouldEnterSafeMode(boot)) { safeMode = true; health.beginRecovery(boot.reason ?? "Repeated failed launches"); updater.pause(); recovery.open(); return; }
   try { if (!baseUrl) baseUrl = await startAppServer(); }
   catch (err) { enterSafeMode(err instanceof Error ? err.message : String(err)); return; }
   createWindows();
+  if(restoredDatabase.state==="enabled_bootstrapping")void prepareLocalData().catch(error=>recordFault("local-data.prepare",error));
   updater.start();
   readyWatchdog = setTimeout(() => enterSafeMode("Startup timed out"), 60_000);
   app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindows(); });
 });
 
-app.on("before-quit", () => { quitting = true; closeCustomerDisplay(); });
+app.on("before-quit", () => { quitting = true; mainTelemetry.stop(); closeCustomerDisplay(); void databaseManager.close(); });
 app.on("window-all-closed", () => {
   if (recovery.isOpen()) return;
   markStartupSettled(); updater.stop(); stopAppServer();

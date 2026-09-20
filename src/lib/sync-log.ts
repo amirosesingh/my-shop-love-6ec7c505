@@ -1,7 +1,7 @@
 /**
  * Persistent sync & backup activity log.
  *
- * Entries survive reloads (SQLite in Electron) so a manager can see what failed
+ * Entries are transient in the renderer; durable Windows failures live in SQL Server
  * overnight, even after the terminal was restarted.
  */
 import { readBusinessValue, writeBusinessValue } from "./business-storage";

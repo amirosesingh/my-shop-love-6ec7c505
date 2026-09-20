@@ -4,7 +4,6 @@ import { defaultSettings, sampleState } from "@/lib/pos-seed";
 import { runOpLive } from "@/lib/sync-engine";
 import { localDb } from "@/core/local-db/local-db";
 import { routedQuery } from "@/core/api/db-query";
-import { readSnapshot } from "@/lib/offline-snapshot";
 import type { SyncOp } from "@/lib/sync-outbox";
 import { isOnlineOnly } from "@/lib/live-mode";
 import {
@@ -1012,43 +1011,9 @@ export async function loadCloudState(storeId?: string | null): Promise<CloudSlic
 
 async function loadLocalState(cause: unknown): Promise<CloudSlice> {
   const bridge = localDb();
-  if (!bridge) {
-    // No local SQL engine on this device: the last good copy this terminal
-    // kept on disk is still better than an empty register.
-    const snap = readSnapshot();
-    if (!snap) throw cause;
-    const { savedAt: _savedAt, ...slice } = snap;
-    return slice as CloudSlice;
-  }
+  if (!bridge) throw cause;
   const result = await bridge.snapshot();
   if (!result.ok) throw cause;
-  // The operational SQL snapshot intentionally excludes sales. Recover the
-  // durable transaction graph from SQLite so a desktop reopened without a
-  // network still shows the bills it accepted before shutdown.
-  let localSales: Row[] = [];
-  if (bridge.localList) {
-    try {
-      const [headers, items] = await Promise.all([
-        bridge.localList("sales", 5000),
-        bridge.localList("sale_items", 20000),
-      ]);
-      if (headers.ok) {
-        const linesBySale = new Map<string, Row[]>();
-        for (const item of items.ok ? (items.rows ?? []) : []) {
-          const saleId = String(item.sale_id ?? "");
-          if (!saleId) continue;
-          linesBySale.set(saleId, [...(linesBySale.get(saleId) ?? []), item]);
-        }
-        localSales = (headers.rows ?? []).map((sale) => ({
-          ...sale,
-          sale_items: linesBySale.get(String(sale.id ?? "")) ?? [],
-        }));
-      }
-    } catch {
-      // The SQL snapshot still supplies catalogue/settings. A corrupt recovery
-      // mirror must not stop the register opening for an operator to repair it.
-    }
-  }
   tierIdByName = {};
   tierNameById = {};
   for (const tier of result.tiers ?? []) {
@@ -1059,7 +1024,7 @@ async function loadLocalState(cause: unknown): Promise<CloudSlice> {
   return {
     products: (result.products ?? []).map(rowToProduct),
     members: (result.members ?? []).map((row) => rowToMember(row, tierName)),
-    sales: localSales.map(rowToSale),
+    sales: [],
     promotions: (result.promotions ?? []).map(rowToPromotion),
     settings: rowToSettings((result.settings as Row | null) ?? null),
     stores: (result.stores ?? []).map(rowToStore),
@@ -1080,11 +1045,8 @@ async function loadLocalState(cause: unknown): Promise<CloudSlice> {
  * terminal has no copy to answer with, which is different from "no shift".
  */
 function localOpenShift(storeId: string): Shift | null | undefined {
-  const snap = readSnapshot();
-  if (!snap) return undefined;
-  const open = (snap.shifts ?? []).filter((s) => s.storeId === storeId && s.status === "OPEN");
-  if (!open.length) return null;
-  return [...open].sort((a, b) => (a.openedAt < b.openedAt ? 1 : -1))[0];
+  void storeId;
+  return undefined;
 }
 
 export async function loadActiveShift(storeId: string): Promise<Shift | null> {
@@ -1171,25 +1133,6 @@ export async function openShiftOnServer(s: Shift): Promise<Shift | null> {
  * bills in memory, and history screens walk further back a page at a time
  * without ever paying for an OFFSET.
  */
-/** The same page of bills served from this terminal's copy. */
-function localSalesPage(storeId: string, cursor: Cursor, limit: number): Page<Sale> | null {
-  const snap = readSnapshot();
-  if (!snap) return null;
-  const all = (snap.sales ?? [])
-    .filter((s) => !storeId || s.storeId === storeId)
-    .sort((a, b) => (a.createdAt < b.createdAt ? 1 : a.createdAt > b.createdAt ? -1 : 0));
-  const after = cursor
-    ? all.filter((s) => s.createdAt < cursor.ts || (s.createdAt === cursor.ts && s.id < cursor.id))
-    : all;
-  const rows = after.slice(0, limit);
-  const last = rows[rows.length - 1];
-  return {
-    rows,
-    cursor: last ? { ts: last.createdAt, id: last.id } : null,
-    hasMore: after.length > limit,
-  };
-}
-
 export async function loadSalesPage(
   storeId: string,
   cursor: Cursor = null,
@@ -1208,8 +1151,6 @@ export async function loadSalesPage(
     err = (res as { error?: { message: string } }).error;
   }
   if (err) {
-    const cached = localSalesPage(storeId, cursor, limit);
-    if (cached && isConnectionError(new Error(err.message))) return cached;
     throw new Error(err.message);
   }
   const rows = ((res as { data?: Row[] | null }).data ?? []) as Row[];
@@ -1389,25 +1330,16 @@ export async function invoiceNumberTaken(invoiceNo: string, exceptId?: string): 
 /** Latest catalogue rows for a set of products, straight from the database. */
 export async function loadProductsByIds(ids: string[]): Promise<Product[]> {
   if (!ids.length) return [];
-  try {
-    const res = await supabase.from("products").select("*").in("id", ids);
-    if (res.error) throw new Error(res.error.message);
-    return ((res.data as Row[] | null) ?? []).map(rowToProduct);
-  } catch (e) {
-    // Offline with a terminal copy on disk: those rows are already in the
-    // shape the app uses, so they are handed back as they are.
-    const snap = readSnapshot();
-    if (snap && isConnectionError(e)) return snap.products.filter((p) => ids.includes(p.id));
-    throw e;
-  }
+  const res = await supabase.from("products").select("*").in("id", ids);
+  if (res.error) throw new Error(res.error.message);
+  return ((res.data as Row[] | null) ?? []).map(rowToProduct);
 }
 
 /**
  * Writes never hit the network directly.
  *
- * On Windows every helper enters the same SQLite durability boundary and the
- * background worker pushes it centrally. Web and Android write centrally and
- * surface failure instead of pretending browser storage is a business DB.
+ * Until the final Windows SQL Server release gate, every platform writes
+ * centrally and surfaces failure without persisting business payloads in the renderer.
  */
 const queue = (context: string, op: SyncOp) => {
   // Legacy-shaped model helpers return the authoritative acknowledgement.
@@ -1441,7 +1373,7 @@ export function isDuplicateBillNumber(error: unknown): boolean {
 /* ---------------------------- durable commits --------------------------- */
 
 /** Where a committed change actually landed. */
-export type CommitTarget = "cloud" | "local" | "outbox";
+export type CommitTarget = "cloud" | "local";
 
 /**
  * Copy rows that are already safe centrally onto this terminal, in the
@@ -1449,24 +1381,8 @@ export type CommitTarget = "cloud" | "local" | "outbox";
  * finished and the operator must never be interrupted for it.
  */
 export async function mirrorToLocal(context: string, ops: SyncOp[]) {
-  const bridge = localDb();
-  if (!bridge) return;
-  for (const op of ops) {
-    try {
-      const res = await bridge.write(context, op);
-      if (!res.ok) {
-        logSync("push", op.table, false, res.error ?? `${context}: local copy failed`);
-        recordDiagnostic({
-          kind: "local_mirror_failed",
-          entity: op.table,
-          code: reasonCode(res.error ?? "local copy failed"),
-        });
-      }
-    } catch (e) {
-      logSync("push", op.table, false, `${context}: ${(e as Error)?.message ?? String(e)}`);
-      recordDiagnostic({ kind: "local_mirror_failed", entity: op.table, code: reasonCode(e) });
-    }
-  }
+  void context;
+  void ops;
 }
 
 /** One relative stock change, keyed on the movement row that caused it. */
@@ -1524,8 +1440,8 @@ async function runBatchLive(context: string, ops: SyncOp[]) {
 }
 
 /**
- * Store a group of writes and only resolve once they are safe somewhere:
- * the cloud database, the local desktop database, or the on-disk outbox.
+ * Store a group of writes and only resolve once they are committed to the
+ * cloud database or the local desktop database.
  *
  * Callers await this before printing, clearing the cart or starting the next
  * action — nothing moves on while the data is still only in memory.
@@ -1542,115 +1458,48 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   // still receives the full row, so the till shows the new count at once.
   const { ops: cloudOps, deltas } = withRelativeStock(ops);
 
-  // Web and Android are live-only: the backend is the single source of truth.
-  if (isOnlineOnly()) {
-    try {
-      await runBatchLive(context, cloudOps);
-      await applyStockDeltas(deltas);
-    } catch (e) {
-      if (isConnectionError(e)) throw new AllTargetsFailed(context, e);
-      throw e;
-    }
-    return noteCommitTarget("cloud");
-  }
-
-  // Windows desktop commits to local SQL first. The IPC batch is one SQL
-  // transaction and marks every changed row pending before it resolves. The
-  // Electron worker then pushes those rows to the central database immediately
-  // when it can, or keeps retrying after connectivity returns. Keeping this as
-  // one path avoids the worst cloud-first failure window: the cloud accepting a
-  // payment while the till loses the response before its local copy is written.
-  const bridge = localDb();
-  if (bridge) {
-    try {
-      const mirrorEntries = ops.flatMap((op) =>
-        op.kind === "insert" || op.kind === "upsert"
-          ? [{ entity: op.table, rows: op.rows as Record<string, unknown>[] }]
-          : [],
-      );
-      // SQLite is the mandatory durable boundary for desktop business rows.
-      // Write it before the compatibility SQL Server projection: there must
-      // never again be a committed till transaction that has no on-device
-      // SQLite recovery copy.
-      if (ops.length) {
-        if (!bridge.localMirrorBatch) {
-          throw new Error(
-            "This desktop build cannot commit an atomic SQLite batch. Update the app.",
-          );
-        }
-        const shadow = await bridge.localMirrorBatch(mirrorEntries, ops);
-        const expected = mirrorEntries.reduce((total, entry) => total + entry.rows.length, 0);
-        if (!shadow.ok || Number(shadow.written ?? 0) !== expected) {
-          throw new Error(shadow.error ?? "The embedded SQLite transaction copy was incomplete");
-        }
-      }
-      // SQLite is the acceptance boundary. SQL Server is retained as a
-      // compatibility projection, but failure there must not tell the cashier
-      // that an already durable transaction was lost (and invite a duplicate
-      // retry). The SQLite outbox owns retrying the central mutation.
-      if (!bridge.writeBatch) {
-        recordDiagnostic({
-          kind: "compatibility_projection_failed",
-          entity: ops[0]?.table ?? "business_batch",
-          code: "unavailable",
-        });
-      } else {
-        try {
-          const result = await bridge.writeBatch(context, ops);
-          if (!result.ok) {
-            recordDiagnostic({
-              kind: "compatibility_projection_failed",
-              entity: ops[0]?.table ?? "business_batch",
-              code: reasonCode(result.error),
-            });
-          }
-        } catch (projectionError) {
-          recordDiagnostic({
-            kind: "compatibility_projection_failed",
-            entity: ops[0]?.table ?? "business_batch",
-            code: reasonCode(projectionError),
-          });
-        }
-      }
-      setCloudDirect(false);
-      // `pos:write[-batch]` already wakes the Electron worker. This second
-      // signal also covers alternate/test bridges and is deliberately detached:
-      // central latency must never hold up a locally durable till transaction.
-      if (bridge.push) void bridge.push();
+  const local = localDb();
+  if (local?.writeBatch) {
+    const state = await local.database?.getState?.().catch(() => null);
+    if (state?.enabled && state?.connected) {
+      const refund = ops.length === 1 && ops[0].kind === "rpc" && ops[0].fn === "sale_refund" ? ops[0] : null;
+      const aggregateKind = /sale/i.test(context) ? "sale"
+        : /payment|tender/i.test(context) ? "payment"
+        : /refund/i.test(context) ? "refund"
+        : /shift/i.test(context) ? "shift"
+        : /receiv|purchase|invoice/i.test(context) ? "receiving"
+        : /stock/i.test(context) ? "stock"
+        : /transfer/i.test(context) ? "transfer"
+        : /booking/i.test(context) ? "booking"
+        : /hold|ticket/i.test(context) ? "held_order" : "general";
+      const branchRow = ops.flatMap((op): Row[] => {
+        if (op.kind === "insert" || op.kind === "upsert") return op.rows as Row[];
+        if (op.kind === "update") return [{ ...op.match, ...op.values } as Row];
+        if (op.kind === "delete") return [op.match as Row];
+        return [op.args as Row];
+      }).find((row) => row && ("store_id" in row || "branch_id" in row || "from_store_id" in row || "to_store_id" in row));
+      const branchId = String(branchRow?.store_id ?? branchRow?.branch_id ?? branchRow?.from_store_id ?? branchRow?.to_store_id ?? "");
+      const stored = refund && local.refundReceipt
+        ? await local.refundReceipt({ saleId: String(refund.args._sale_id), refundId: String(refund.args._client_refund_id), branchId: String((refund.args as Record<string, unknown>)._branch_id ?? ""), reason: refund.args._reason == null ? null : String(refund.args._reason) })
+        : local.commitAggregate
+          ? await local.commitAggregate({ kind: aggregateKind, branchId: branchId || undefined, operations: ops })
+          : await local.writeBatch(context, ops);
+      if (!stored.ok) throw new Error(stored.error ?? `${context} was not committed locally.`);
       return noteCommitTarget("local");
-    } catch (localError) {
-      // A desktop transaction is successful only after SQLite commits. Do not
-      // bypass a broken SQLite database with a cloud-only write: doing so would
-      // make the terminal's offline ledger incomplete and unrecoverable.
-      throw new AllTargetsFailed(context, localError);
     }
   }
 
-  // A Windows renderer without its preload bridge is not a browser. Failing
-  // closed here prevents a startup/IPC fault from turning into a cloud-only
-  // sale with no recoverable local ledger.
-  if (!isOnlineOnly()) {
-    const error = new Error("Electron database bridge unavailable");
-    (error as Error & { code?: string }).code = "EBRIDGE_UNAVAILABLE";
-    throw new AllTargetsFailed(context, error);
-  }
-
-  // Browser build: there is no local SQL engine on this device, so every
-  // write goes to the central database or the action stops. Nothing about the
-  // business is parked in browser storage.
   const operational = ops.every((op) => isOperationalTable(op.table));
-  {
-    try {
-      await runBatchLive(context, cloudOps);
-      await applyStockDeltas(deltas);
-      noteConnectionRestored();
-      setCloudDirect(operational);
-      return noteCommitTarget("cloud");
-    } catch (cloud) {
-      if (!isConnectionError(cloud)) throw cloud;
-      noteConnectionLost();
-      throw new AllTargetsFailed(context, cloud);
-    }
+  try {
+    await runBatchLive(context, cloudOps);
+    await applyStockDeltas(deltas);
+    noteConnectionRestored();
+    setCloudDirect(operational);
+    return noteCommitTarget("cloud");
+  } catch (cloud) {
+    if (!isConnectionError(cloud)) throw cloud;
+    noteConnectionLost();
+    throw new AllTargetsFailed(context, cloud);
   }
 }
 
@@ -1846,7 +1695,7 @@ export const db = {
    * much stock back, and marks the bill. Replaying the same refund id (retry,
    * double tap, queued replay) changes nothing a second time.
    */
-  refundSale(saleId: string, refundId: string, reason?: string) {
+  refundSale(saleId: string, refundId: string, reason?: string, branchId?: string) {
     return queue("Refunding sale", {
       kind: "rpc",
       table: "sales",
@@ -1856,6 +1705,7 @@ export const db = {
         _lines: null,
         _client_refund_id: refundId,
         _reason: reason ?? null,
+        _branch_id: branchId ?? null,
       },
     });
   },
@@ -1935,8 +1785,8 @@ export const db = {
   },
 
   /**
-   * Store a receiving invoice and its lines, and wait until they are safe
-   * (cloud, local database or the durable outbox). Nothing on screen is
+   * Store a receiving invoice and its lines, and wait until they are committed
+   * to the cloud or local database. Nothing on screen is
    * cleared until this resolves, so an invoice can no longer vanish.
    *
    * `movementStoreId` is the branch the stock actually lands in. Passing it

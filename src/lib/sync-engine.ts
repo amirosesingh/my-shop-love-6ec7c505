@@ -20,7 +20,6 @@ import {
   setSyncState,
   syncState,
 } from "./sync-status";
-import { writeSnapshot } from "./offline-snapshot";
 import { recordSync } from "./sync-audit";
 import {
   beginSyncRun,
@@ -336,54 +335,9 @@ export async function runOpLive(context: string, op: SyncOp): Promise<void> {
   logSync("push", op.table, true, context);
 }
 
-let draining = false;
-
-/**
- * Push queued writes in the order they happened. Entries are replayed
- * oldest-first per terminal, and a failure blocks only that terminal's queue,
- * so one stuck branch never holds up another. Dependent operations (sale then
- * sale_items) therefore always land in sequence.
- */
+/** Renderer payload queues are retired; Electron main owns Windows sync. */
 export async function drainOutbox(): Promise<{ pushed: number; failed: number }> {
-  // The renderer outbox is now migration-only on Electron. Any entry left by
-  // an older build is copied into SQLite's durable business outbox and then
-  // removed here; only the main-process worker is allowed to send it centrally.
-  const bridge = localDb();
-  if (!bridge?.localMirrorBatch || draining) return { pushed: 0, failed: 0 };
-
-  draining = true;
-  let moved = 0;
-  let failed = 0;
-  try {
-    for (const entry of replayOrder(listQueue())) {
-      const op = versionedOp(entry);
-      const entries =
-        op.kind === "insert" || op.kind === "upsert"
-          ? [{ entity: op.table, rows: op.rows as Record<string, unknown>[] }]
-          : [];
-      try {
-        const result = await bridge.localMirrorBatch(entries, [op]);
-        if (!result.ok) throw new Error(result.error ?? "SQLite outbox migration failed");
-        resolveOp(entry.id);
-        moved += 1;
-      } catch (error) {
-        failOp(entry.id, error instanceof Error ? error.message : String(error));
-        failed += 1;
-        // Preserve the original queue order; a later operation must not pass a
-        // predecessor that could not be made durable in SQLite.
-        break;
-      }
-    }
-
-    if (moved) {
-      markSynced();
-      if (bridge.syncNow) void bridge.syncNow();
-      else if (bridge.push) void bridge.push();
-    }
-  } finally {
-    draining = false;
-  }
-  return { pushed: moved, failed };
+  return { pushed: 0, failed: 0 };
 }
 
 /* ---------------------------- downward sync ---------------------------- */
@@ -477,7 +431,6 @@ export async function pullDelta(): Promise<{ merged: number }> {
     // Something moved centrally: refresh the local copy in one consistent read.
     if (changed) {
       const state = await loadCloudState();
-      writeSnapshot(state);
       // Server-wins mirror into the embedded database, so the till can open
       // its catalogue with no network at all.
       await mirrorCloudState(state);

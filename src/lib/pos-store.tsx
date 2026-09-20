@@ -55,7 +55,6 @@ import {
 } from "@/core/api/pos-db";
 import { recordActivity } from "./activity-events";
 import type { CloudSlice, CommitTarget } from "@/core/api/pos-db";
-import { clearSnapshot, hydrateSnapshot, readSnapshot, writeSnapshot } from "./offline-snapshot";
 import { isOnlineOnly } from "./live-mode";
 import { platformName } from "@/platform-config/platform";
 import { useAuth } from "@/lib/pos-auth";
@@ -489,34 +488,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (!cancelled) setLoadPhase((p) => (p === "loading" ? "stalled" : p));
     }, 15000);
     void (async () => {
-      if (!isOnlineOnly()) {
-        await hydrateSnapshot();
-        try {
-          const stored = await localDb()?.getSetting?.(KEY);
-          if (stored?.value) {
-            const saved = JSON.parse(stored.value) as PosState;
-            const transfers = (saved.transfers ?? []).map((t) => {
-              const legacy = t as Transfer & { productId?: string; qty?: number };
-              return t.items
-                ? t
-                : { ...t, items: [{ productId: legacy.productId ?? "", qty: legacy.qty ?? 0 }] };
-            });
-            setState((s) => ({
-              ...s,
-              stores: saved.stores?.length ? saved.stores : s.stores,
-              currentStoreId: saved.currentStoreId ?? s.currentStoreId,
-              shifts: saved.shifts ?? [],
-              transfers,
-              bookings: saved.bookings ?? [],
-              counter: saved.counter ?? 0,
-              transferCounter: saved.transferCounter ?? 0,
-              bookingCounter: saved.bookingCounter ?? 0,
-            }));
-          }
-        } catch {
-          /* corrupt local UI projection does not affect the durable ledger */
-        }
-      }
       // Anonymous visitors get nothing: no products, members or sales.
       if (!signedIn) {
         if (authReady && !cancelled) {
@@ -524,21 +495,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
           setLoadPhase("ready");
         }
         return;
-      }
-      // Offline-first boot: paint the last known good snapshot immediately so
-      // the till is usable with no connection, then refresh in the background.
-      const snap = readSnapshot();
-      if (snap && !cancelled) {
-        try {
-          setState((s) => applyCloud(s, snap));
-        } catch {
-          // A snapshot written by an older build must never brick the till.
-          clearSnapshot();
-        }
-        setReady(true);
-        // The snapshot carries the locations this terminal last saw, so the
-        // launch screen has a real answer while the fresh read is in flight.
-        setStoresLoaded(true);
       }
       if (typeof navigator !== "undefined" && !navigator.onLine) {
         if (!cancelled) {
@@ -553,7 +509,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
         await Promise.all([loadCashierToken(), loadSessionToken()]);
         const cloud = await loadCloudState();
         if (cancelled) return;
-        writeSnapshot(cloud);
         setState((s) => applyCloud(s, cloud));
         // The locations question now has a real answer, empty or not.
         setStoresLoaded(true);
@@ -812,7 +767,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       void loadCloudState(active ?? undefined)
         .then((cloud) => setState((current) => applyCloud(current, cloud)))
         .catch(() => {
-          /* SQLite remains authoritative while the central service is absent. */
+          /* The Electron coordinator owns recovery while the central service is absent. */
         });
     };
     window.addEventListener("focus", focus);
@@ -834,7 +789,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
         timer = undefined;
         void loadCloudState(active ?? undefined)
           .then((cloud) => {
-            writeSnapshot(cloud);
             setState((current) => applyCloud(current, cloud));
           })
           .catch(() => {
@@ -861,7 +815,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
         timer = undefined;
         void loadCloudState()
           .then((cloud) => {
-            writeSnapshot(cloud);
             setState((current) => applyCloud(current, cloud));
           })
           .catch(() => {
@@ -888,7 +841,6 @@ export function PosProvider({ children }: { children: ReactNode }) {
       void loadCloudState()
         .then((cloud) => {
           if (cancelled) return;
-          writeSnapshot(cloud);
           // Only master data is replaced; anything created on this till that
           // has not synced yet stays untouched by applyCloud's merge.
           setState((s) => applyCloud(s, cloud));

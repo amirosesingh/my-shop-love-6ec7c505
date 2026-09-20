@@ -33,7 +33,7 @@ This continuation audit is based on the current `audit/database-activity-readine
 | ---------------------- | -------------------------------------------- | -------------------------------------------------------------------- | ----------------------------------------------------------------------- |
 | Sale/exchange          | Existing checkout validation                 | Existing atomic `commitSale`                                         | Stable sale/payment/movement IDs; worker wakes                          |
 | Refund/void            | Permission + sale state                      | Stable `refund:<saleId>` RPC now awaited                             | RPC idempotency prevents duplicate reversal                             |
-| Product/member         | Existing form validation                     | Confirmed commit awaited                                             | Electron SQLite acceptance, asynchronous worker                         |
+| Product/member         | Existing form validation                     | Confirmed commit awaited                                             | Direct SQL Server acceptance, asynchronous worker                       |
 | Stock adjustment/count | Quantity/reason checks                       | One batch for product, audit rows and count post                     | Stable supplied IDs/batch hash; relative cloud reconciliation preserved |
 | Receiving              | Invoice/supplier/branch checks               | Existing invoice/lines/movements commit awaited; projections awaited | Stable invoice/line/movement IDs                                        |
 | Transfer               | State/quantity/reason checks                 | Create is locally durable; central transition RPCs awaited           | RPCs lock/check state and are retry-safe                                |
@@ -48,8 +48,8 @@ This continuation audit is based on the current `audit/database-activity-readine
 
 ## Migration assessment
 
-No SQL Server, SQLite, or Supabase schema change was required. No manual SQL is required. No database was reset and no pending operation was deleted.
+No Supabase schema change was required for this audit. No database was reset and no pending operation was deleted.
 
 ## Real-device boundary
 
-Automated tests can prove promise ordering, batch composition, fail-closed SQLite behavior, and stable identifiers. Windows Electron + SQL Server pool replacement, driver failures, and authorized Supabase acknowledgement still require a non-production Windows staging till and tenant.
+Automated tests can prove promise ordering, batch composition, fail-closed direct-database behavior, and stable identifiers. Windows Electron + SQL Server pool replacement, driver failures, and authorized Supabase acknowledgement still require a non-production Windows staging till and tenant.

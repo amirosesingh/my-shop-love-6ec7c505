@@ -1,0 +1,7012 @@
+{
+  "source": "supabase/schema.sql",
+  "generatedAt": "2026-09-19T12:35:48.151Z",
+  "tableCount": 67,
+  "columnCount": 1023,
+  "tables": [
+    {
+      "name": "coupon_campaigns",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "slug",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "discount_type",
+          "declaration": "text DEFAULT 'PERCENTAGE'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "discount_value",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "scope",
+          "declaration": "text DEFAULT 'BILL'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "scope_value",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "max_claims",
+          "declaration": "integer",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "max_per_member",
+          "declaration": "integer DEFAULT 1",
+          "nullable": true,
+          "hasDefault": true
+        },
+        {
+          "name": "claims_count",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "starts_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "expires_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "is_active",
+          "declaration": "boolean DEFAULT true NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "is_welcome",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [
+        [
+          "slug"
+        ]
+      ],
+      "foreignKeys": []
+    },
+    {
+      "name": "shifts",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "store_id",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "opened_by_name",
+          "declaration": "text DEFAULT 'Cashier'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "opened_by_staff_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "opened_by_role",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "closed_by_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "closed_by_staff_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "closed_by_role",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "opened_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "closed_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "opening_float",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "counted_cash",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "expected_cash",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "note",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "overdue",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "status",
+          "declaration": "text DEFAULT 'OPEN'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "closing_float",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "user_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "counted_card",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "counted_digital",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "expected_card",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "expected_digital",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "variance_cash",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "variance_card",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "variance_digital",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "variance_total",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "state",
+          "declaration": "text NOT NULL DEFAULT 'ACTIVE', ADD COLUMN IF NOT EXISTS close_reason text, ADD COLUMN IF NOT EXISTS closing_started_at timestamptz, ADD COLUMN IF NOT EXISTS closing_started_by text, ADD COLUMN IF NOT EXISTS final_counted_cash numeric, ADD COLUMN IF NOT EXISTS variance_status text",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "issued_vouchers",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "token_slug",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "campaign_id",
+          "declaration": "uuid NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "member_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "status",
+          "declaration": "text DEFAULT 'ISSUED'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "issued_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "expires_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "issued_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "issued_source",
+          "declaration": "text DEFAULT 'PUBLIC'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "redeemed_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "redeemed_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "redeemed_sale_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "disabled_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "disabled_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "disable_reason",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [
+        [
+          "token_slug"
+        ]
+      ],
+      "foreignKeys": [
+        {
+          "column": "campaign_id",
+          "table": "coupon_campaigns",
+          "targetColumn": "id"
+        },
+        {
+          "column": "member_id",
+          "table": "members",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "activity_events",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "event_type",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "severity",
+          "declaration": "text DEFAULT 'info'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "title",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "message",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "actor_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "actor_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "actor_role",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "entity_type",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "entity_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "amount",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "meta",
+          "declaration": "jsonb DEFAULT '{}'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "whatsapp_status",
+          "declaration": "text DEFAULT 'skipped'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "whatsapp_error",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "client_event_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "cleared_by",
+          "declaration": "text[] NOT NULL DEFAULT '{}'::text[]",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "app_users",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "user_id",
+          "declaration": "character varying(64) NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "full_name",
+          "declaration": "character varying(160) NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "email",
+          "declaration": "character varying(255) NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "role",
+          "declaration": "public.app_role DEFAULT 'staff'::public.app_role NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "store_id",
+          "declaration": "character varying(64)",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "is_active",
+          "declaration": "boolean DEFAULT true NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "permissions",
+          "declaration": "jsonb DEFAULT jsonb_build_object('can_open_drawer', true, 'can_close_drawer', true, 'can_view_drawer_balance', false, 'can_process_sale', true, 'can_give_discount', false, 'can_void_item', false, 'can_hold_cart', true, 'can_process_refund', false, 'can_process_exchange', false, 'can_view_inventory', true, 'can_edit_product_price', false, 'can_add_new_product', false, 'can_receive_purchase_order', false, 'can_add_member', true, 'can_edit_member_points', false, 'can_apply_member_discount', true, 'can_view_sales_reports', false, 'can_access_pos_settings', false, 'can_manage_staff', false) NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "pin_hash",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "auth_user_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "last_login_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "role_slug",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "pin_length",
+          "declaration": "smallint DEFAULT 6 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "pin_set_at",
+          "declaration": "timestamptz",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "pin_updated_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [
+        [
+          "user_id"
+        ]
+      ],
+      "foreignKeys": []
+    },
+    {
+      "name": "audit_logs",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "user_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "action_category",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "action_name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "target_module",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "details",
+          "declaration": "jsonb",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "user_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "action",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "entity",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "before_state",
+          "declaration": "jsonb",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "after_state",
+          "declaration": "jsonb",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "booking_payments",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "booking_id",
+          "declaration": "uuid NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "amount",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "method",
+          "declaration": "text DEFAULT 'cash'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "cashier",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "paid_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "status",
+          "declaration": "text NOT NULL DEFAULT 'settled', ADD COLUMN IF NOT EXISTS client_payment_id text, ADD COLUMN IF NOT EXISTS reference text, ADD COLUMN IF NOT EXISTS reversed_at timestamptz, ADD COLUMN IF NOT EXISTS reversed_by text",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "kind",
+          "declaration": "text NOT NULL DEFAULT 'payment', ADD COLUMN IF NOT EXISTS refund_reason text, ADD COLUMN IF NOT EXISTS refunds_payment_id uuid, ADD COLUMN IF NOT EXISTS change_given numeric NOT NULL DEFAULT 0",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "column": "booking_id",
+          "table": "bookings",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "bookings",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "ref",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "shift_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "customer_name",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "customer_phone",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "member_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "service_type_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "service_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "service_fee",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "payment_timing",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "lines",
+          "declaration": "jsonb DEFAULT '[]'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "subtotal",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "discount",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "tax",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "total",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "paid",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "due_date",
+          "declaration": "date",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "note",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "cashier",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "status",
+          "declaration": "text DEFAULT 'active'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "sale_receipt_no",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "closed_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "racket_model",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "string_type",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "tension_main",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "tension_cross",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "tension_unit",
+          "declaration": "text DEFAULT 'lb'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "grommet_notes",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "job_notes",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "dropped_off_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "promised_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "job_status",
+          "declaration": "text DEFAULT 'received'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "job_status_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "job_status_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "notify_whatsapp",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "tag_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "intake_note",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "string_origin",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "string_source_product_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "grip_product_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "charges",
+          "declaration": "jsonb DEFAULT '{}'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "technician",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "liability_accepted",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "incident_note",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "cancel_reason",
+          "declaration": "text, ADD COLUMN IF NOT EXISTS cancelled_by text, ADD COLUMN IF NOT EXISTS cancelled_at timestamptz, ADD COLUMN IF NOT EXISTS cancelled_terminal text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "cancel_money_action",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "column": "member_id",
+          "table": "members",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "branch_telemetry",
+      "columns": [
+        {
+          "name": "terminal_id",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "staff_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "staff_role",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "db_mode",
+          "declaration": "text DEFAULT 'online'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "connection_status",
+          "declaration": "text DEFAULT 'online'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "storage_engine",
+          "declaration": "text DEFAULT 'cloud'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "pending_count",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "conflict_count",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "last_synced_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "app_version",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "platform",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "last_seen_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "branch_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "pending_queue_count",
+          "declaration": "integer",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "last_ping",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "status",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        }
+      ],
+      "primaryKey": [
+        "terminal_id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "cashiers",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "username",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "full_name",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "pin_hash",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "permissions",
+          "declaration": "jsonb DEFAULT '{}'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "is_active",
+          "declaration": "boolean DEFAULT true NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "last_login_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "role_slug",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "coupon_events",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "event_type",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "campaign_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "campaign_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "voucher_token",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "member_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "member_phone",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "staff_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "staff_role",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "sale_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "note",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "column": "campaign_id",
+          "table": "coupon_campaigns",
+          "targetColumn": "id"
+        },
+        {
+          "column": "member_id",
+          "table": "members",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "drawer_events",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "shift_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "staff_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "staff_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "role",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "reason",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "note",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "approved_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "held_orders",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "text DEFAULT (gen_random_uuid())::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "label",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "shift_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "held_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "total",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "lines",
+          "declaration": "jsonb DEFAULT '[]'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "cart_discount",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "cart_discount_type",
+          "declaration": "text DEFAULT 'amount'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "exchange_ref",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "member_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "member_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "coupon",
+          "declaration": "jsonb",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "note",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "cancelled_from",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "held_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "status",
+          "declaration": "text NOT NULL DEFAULT 'held', ADD COLUMN IF NOT EXISTS pending_request_id uuid",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "integration_settings",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "provider_name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "api_keys_encrypted",
+          "declaration": "jsonb DEFAULT '{}'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "verification_channel",
+          "declaration": "text DEFAULT 'whatsapp'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "strict_verification",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "is_active",
+          "declaration": "boolean DEFAULT true NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "item_activity_logs",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "product_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "product_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "sku",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "barcode",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "activity_type",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "reference",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "quantity_delta",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "stock_before",
+          "declaration": "integer",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "stock_after",
+          "declaration": "integer",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "unit_cost",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "staff_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "staff_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "role",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "note",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "column": "product_id",
+          "table": "products",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "member_verifications",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "member_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "phone",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "email",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "channel",
+          "declaration": "text DEFAULT 'whatsapp'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "otp_code",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "attempts",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "status",
+          "declaration": "text DEFAULT 'pending'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "sent_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "expires_at",
+          "declaration": "timestamp with time zone DEFAULT (now() + '00:10:00'::interval) NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "verified_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "column": "member_id",
+          "table": "members",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "members",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "member_code",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "full_name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "phone",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "email",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "address",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "date_of_birth",
+          "declaration": "date",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "tier_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "loyalty_points",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "total_spent",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "is_verified",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "verified_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "verified_channel",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [
+        [
+          "member_code"
+        ],
+        [
+          "phone"
+        ]
+      ],
+      "foreignKeys": [
+        {
+          "column": "tier_id",
+          "table": "membership_tiers",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "membership_tiers",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "discount_percentage",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "points_multiplier",
+          "declaration": "numeric DEFAULT 1.0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [
+        [
+          "name"
+        ]
+      ],
+      "foreignKeys": []
+    },
+    {
+      "name": "offline_sync_audit_log",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "direction",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "table_name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "record_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "records",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "status",
+          "declaration": "text DEFAULT 'ok'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "error_message",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "started_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "finished_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "payment_transactions",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "source_type",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "sale_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "booking_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "member_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "shift_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "amount",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "method",
+          "declaration": "text DEFAULT 'cash'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "kind",
+          "declaration": "text DEFAULT 'payment'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "reference",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "cashier_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "cashier_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "note",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "paid_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "status",
+          "declaration": "text DEFAULT 'completed'::text",
+          "nullable": true,
+          "hasDefault": true
+        },
+        {
+          "name": "metadata",
+          "declaration": "jsonb DEFAULT '{}'::jsonb",
+          "nullable": true,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "column": "booking_id",
+          "table": "bookings",
+          "targetColumn": "id"
+        },
+        {
+          "column": "member_id",
+          "table": "members",
+          "targetColumn": "id"
+        },
+        {
+          "column": "sale_id",
+          "table": "sales",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "payment_types",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "type_code",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "requires_reference",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "is_active",
+          "declaration": "boolean DEFAULT true NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "icon",
+          "declaration": "text DEFAULT 'Wallet'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "sort_order",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "is_system",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [
+        [
+          "type_code"
+        ]
+      ],
+      "foreignKeys": []
+    },
+    {
+      "name": "pin_attempts",
+      "columns": [
+        {
+          "name": "key",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "attempts",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "window_started_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "locked_until",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "key"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "pos_settings",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "tax_percentage",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "enable_tax",
+          "declaration": "boolean DEFAULT true NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "tax_mode",
+          "declaration": "text DEFAULT 'exclusive'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "paper_size",
+          "declaration": "text DEFAULT '80mm'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "header_text",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "footer_text",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "show_logo",
+          "declaration": "boolean DEFAULT true NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "show_points",
+          "declaration": "boolean DEFAULT true NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "show_barcode",
+          "declaration": "boolean DEFAULT true NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "show_tax_details",
+          "declaration": "boolean DEFAULT true NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "company_name",
+          "declaration": "text DEFAULT 'RETAIL'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "tax_number",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "reg_number",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "phone",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "website",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "fonts",
+          "declaration": "jsonb DEFAULT '{}'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "custom_lines",
+          "declaration": "jsonb DEFAULT '[]'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "qr",
+          "declaration": "jsonb DEFAULT '{}'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "review_max_voids",
+          "declaration": "integer DEFAULT 5 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "review_max_refunds",
+          "declaration": "integer DEFAULT 3 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "review_max_refund_value",
+          "declaration": "numeric DEFAULT 200 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "review_max_nosale",
+          "declaration": "integer DEFAULT 5 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "review_max_discount_pct",
+          "declaration": "numeric DEFAULT 15 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "day_start_time",
+          "declaration": "text DEFAULT '09:00'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "day_end_time",
+          "declaration": "text DEFAULT '22:00'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "max_shift_hours",
+          "declaration": "numeric DEFAULT 12 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "shift_reminder_minutes",
+          "declaration": "integer DEFAULT 30 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "ui_visibility",
+          "declaration": "jsonb DEFAULT '{\"hidden\": {}}'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "integration_settings",
+          "declaration": "jsonb DEFAULT '{}'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "region_country",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "time_zone",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "date_format",
+          "declaration": "text DEFAULT 'dd/MM/yyyy'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "time_format",
+          "declaration": "text DEFAULT '24h'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "booking_slip",
+          "declaration": "jsonb DEFAULT '{}'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "notification_settings",
+          "declaration": "jsonb DEFAULT '{}'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "logo_data_url",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "receipt_design",
+          "declaration": "jsonb DEFAULT '{}'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "product_barcodes",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "product_id",
+          "declaration": "uuid NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "barcode",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "label",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "pack_size",
+          "declaration": "numeric DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "is_primary",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [
+        [
+          "barcode"
+        ]
+      ],
+      "foreignKeys": [
+        {
+          "column": "product_id",
+          "table": "products",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "product_categories",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "parent_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "sort",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "kind",
+          "declaration": "text DEFAULT 'category'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "is_active",
+          "declaration": "boolean NOT NULL DEFAULT true",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "column": "parent_id",
+          "table": "product_categories",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "products",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "barcode",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "category",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "cost_price",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "selling_price",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "ecom_price",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "stock_quantity",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "custom_points",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "point_multiplier",
+          "declaration": "numeric DEFAULT 1.0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "sku",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "reorder_level",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "tax_rate",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "ecom_visible",
+          "declaration": "boolean DEFAULT true NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "stock_by_store",
+          "declaration": "jsonb DEFAULT '{}'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "landing_pct",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "sub_category",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "unit",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "packs",
+          "declaration": "jsonb DEFAULT '[]'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "barcode_aliases",
+          "declaration": "text[] DEFAULT '{}'::text[] NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "is_archived",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "archived_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "brand",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "product_group",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "barcode_variants",
+          "declaration": "jsonb DEFAULT '[]'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "owner_store_id",
+          "declaration": "text REFERENCES public.stores(id) ON DELETE SET NULL",
+          "nullable": true,
+          "hasDefault": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [
+        [
+          "barcode"
+        ]
+      ],
+      "foreignKeys": []
+    },
+    {
+      "name": "promotions",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "title",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "promo_type",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "min_spend",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "discount_percent",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "discount_amount",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "foc_product_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "points_per_dollar",
+          "declaration": "numeric DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "tier_rates",
+          "declaration": "jsonb",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "is_active",
+          "declaration": "boolean DEFAULT true NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "start_date",
+          "declaration": "date",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "end_date",
+          "declaration": "date",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "column": "foc_product_id",
+          "table": "products",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "public_flags",
+      "columns": [
+        {
+          "name": "key",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "enabled",
+          "declaration": "boolean DEFAULT true NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "key"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "purchase_order_items",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "po_id",
+          "declaration": "uuid NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "product_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "barcode",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "product_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "cost_price",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "selling_price",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "quantity_received",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "subtotal_cost",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "sku",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "column": "po_id",
+          "table": "purchase_orders",
+          "targetColumn": "id"
+        },
+        {
+          "column": "product_id",
+          "table": "products",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "purchase_orders",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "po_number",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "supplier_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "operator_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "total_cost",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "total_items_count",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "supplier_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_code",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "invoice_date",
+          "declaration": "date",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "invoice_entry_date",
+          "declaration": "timestamp with time zone DEFAULT now()",
+          "nullable": true,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "pending_edit_request_id",
+          "declaration": "uuid, ADD COLUMN IF NOT EXISTS pending_edit_by text, ADD COLUMN IF NOT EXISTS pending_edit_at timestamptz",
+          "nullable": true,
+          "hasDefault": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [
+        [
+          "po_number"
+        ]
+      ],
+      "foreignKeys": [
+        {
+          "column": "supplier_id",
+          "table": "suppliers",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "sale_items",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "sale_id",
+          "declaration": "uuid NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "product_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "product_name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "unit_price",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "quantity",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "discount_percent",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "discount_amount",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "is_return",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "tax_rate",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "is_foc",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "promo_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "coupon_code",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "coupon_discount",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "unit_cost",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "refunded_qty",
+          "declaration": "integer NOT NULL DEFAULT 0",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "column": "product_id",
+          "table": "products",
+          "targetColumn": "id"
+        },
+        {
+          "column": "sale_id",
+          "table": "sales",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "sales",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "bill_number",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "member_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "cashier_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "subtotal_amount",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "total_amount",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "discount_amount",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "tax_amount",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "payment_type",
+          "declaration": "text DEFAULT 'cash'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "points_earned",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "points_redeemed",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "is_exchange",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "original_bill_number",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "is_refunded",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "shift_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "paid_amount",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "change_amount",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "exchange_credit",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "exchanged_to_bill_number",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "coupon_code",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "coupon_promo_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "coupon_scope",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "coupon_discount",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "payments",
+          "declaration": "jsonb DEFAULT '[]'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "client_transaction_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "cashier_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "updated_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "store_name_snapshot",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_address_snapshot",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "authorization_request_id",
+          "declaration": "uuid, ADD COLUMN IF NOT EXISTS authorized_by text, ADD COLUMN IF NOT EXISTS authorized_at timestamptz",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "rounding_adjustment",
+          "declaration": "numeric(18,4) NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS rounding_label text",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [
+        [
+          "bill_number"
+        ]
+      ],
+      "foreignKeys": [
+        {
+          "column": "member_id",
+          "table": "members",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "secure_settings",
+      "columns": [
+        {
+          "name": "key",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "ciphertext",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "hint",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "updated_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "key"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "security_findings",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "fingerprint",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "source",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "severity",
+          "declaration": "text DEFAULT 'medium'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "title",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "detail",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "deployment_ref",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "status",
+          "declaration": "text DEFAULT 'open'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "first_seen_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "last_seen_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "acknowledged_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "acknowledged_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "resolved_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [
+        [
+          "fingerprint"
+        ]
+      ],
+      "foreignKeys": []
+    },
+    {
+      "name": "settings_locks",
+      "columns": [
+        {
+          "name": "section",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "locked",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "section"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "settings_overrides",
+      "columns": [
+        {
+          "name": "scope",
+          "declaration": "text DEFAULT 'BRANCH'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "scope_id",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "section",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "patch",
+          "declaration": "jsonb DEFAULT '{}'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "scope",
+        "scope_id",
+        "section"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "shift_sessions",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "shift_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "staff_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "staff_name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "role",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "signed_in_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "signed_out_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "sku_audit",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "sku",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "product_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "product_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "source",
+          "declaration": "text DEFAULT 'auto'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "previous_sku",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "staff_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "staff_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "role",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "staff_roles",
+      "columns": [
+        {
+          "name": "slug",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "base_level",
+          "declaration": "text DEFAULT 'cashier'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "permissions",
+          "declaration": "jsonb DEFAULT '{}'::jsonb NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "is_core",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "slug"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "stock_adjustments",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "product_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "product_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "sku",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "barcode",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "reason",
+          "declaration": "text DEFAULT 'manual'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "note",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "previous_stock",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_stock",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "delta",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "cost_impact",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "staff_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "staff_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "role",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "draft_id",
+          "declaration": "UUID",
+          "nullable": true,
+          "hasDefault": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "column": "product_id",
+          "table": "products",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "stock_delta_applied",
+      "columns": [
+        {
+          "name": "movement_id",
+          "declaration": "uuid NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "product_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "delta",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "applied_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "movement_id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "stock_transfer_items",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "transfer_id",
+          "declaration": "uuid NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "product_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "barcode",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "sku",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "product_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "quantity",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "quantity_received",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "unit_cost",
+          "declaration": "numeric DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "quantity_approved",
+          "declaration": "integer",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "quantity_dispatched",
+          "declaration": "integer",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "quantity_verified",
+          "declaration": "integer",
+          "nullable": true,
+          "hasDefault": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "column": "product_id",
+          "table": "products",
+          "targetColumn": "id"
+        },
+        {
+          "column": "transfer_id",
+          "table": "stock_transfers",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "stock_transfers",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "ref",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "kind",
+          "declaration": "text DEFAULT 'transfer'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "transfer_scope",
+          "declaration": "text DEFAULT 'INTRA_GROUP'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "from_store_id",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "from_store_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "from_group_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "to_store_id",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "to_store_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "to_group_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "status",
+          "declaration": "text DEFAULT 'pending'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "note",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "approved_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "approved_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "received_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "received_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "rejected_reason",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "verified_by",
+          "declaration": "text, ADD COLUMN IF NOT EXISTS verified_at timestamptz, ADD COLUMN IF NOT EXISTS posted_at timestamptz, ADD COLUMN IF NOT EXISTS discrepancy_reason text",
+          "nullable": true,
+          "hasDefault": false
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [
+        [
+          "ref"
+        ]
+      ],
+      "foreignKeys": []
+    },
+    {
+      "name": "stores",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "code",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "address",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "phone",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "group_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "location_type",
+          "declaration": "text DEFAULT 'store'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "parent_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "is_central",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "building_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "floor_label",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "is_active",
+          "declaration": "boolean DEFAULT true NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "archived_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "is_primary_sub",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "private_catalogue",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "column": "parent_id",
+          "table": "stores",
+          "targetColumn": "id"
+        },
+        {
+          "column": "group_id",
+          "table": "store_groups",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "suppliers",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "contact_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "phone",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "email",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "address",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "tax_number",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "notes",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "is_active",
+          "declaration": "boolean DEFAULT true NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "sync_metadata",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "table_name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "last_synced_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "last_pushed_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "rows_pushed",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "last_error",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [
+        [
+          "store_id",
+          "terminal_id",
+          "table_name"
+        ]
+      ],
+      "foreignKeys": []
+    },
+    {
+      "name": "system_audit_logs",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "actor_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "actor_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "actor_role",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "action_type",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "entity_affected",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "entity_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "old_value",
+          "declaration": "jsonb",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "new_value",
+          "declaration": "jsonb",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "ip_address",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "note",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "terminal_commands",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "command",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "status",
+          "declaration": "text DEFAULT 'pending'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "note",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "result",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "issued_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "issued_role",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "picked_up_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "finished_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "terminal_tokens",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "location_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "location_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "device_name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "status",
+          "declaration": "text DEFAULT 'active'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "activated_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "revoked_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "last_seen_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "reissued_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "replaced_by",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "claimed_by_device",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "claimed_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "platform",
+          "declaration": "text DEFAULT 'unknown'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": [
+        {
+          "column": "location_id",
+          "table": "stores",
+          "targetColumn": "id"
+        }
+      ]
+    },
+    {
+      "name": "uom_units",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "code",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "allow_decimal",
+          "declaration": "boolean DEFAULT false NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "sort",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer DEFAULT 1 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "is_active",
+          "declaration": "boolean NOT NULL DEFAULT true",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [
+        [
+          "code"
+        ]
+      ],
+      "foreignKeys": []
+    },
+    {
+      "name": "user_roles",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "user_id",
+          "declaration": "uuid NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "role",
+          "declaration": "public.app_role NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [
+        [
+          "user_id",
+          "role"
+        ]
+      ],
+      "foreignKeys": []
+    },
+    {
+      "name": "whatsapp_queue",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid DEFAULT gen_random_uuid() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "phone_number_id",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "recipient",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "body",
+          "declaration": "text DEFAULT ''::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "reference",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "status",
+          "declaration": "text DEFAULT 'QUEUED'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "error",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "queued_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "sent_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "id"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "terminal_recovery_secrets",
+      "columns": [
+        {
+          "name": "terminal_token_id",
+          "declaration": "uuid PRIMARY KEY",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "sealed_secret",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "fingerprint",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "platform",
+          "declaration": "text DEFAULT 'unknown'::text NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "device_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "utc_offset_minutes",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "pos_store_settings",
+      "columns": [
+        {
+          "name": "store_id",
+          "declaration": "text PRIMARY KEY",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "block_shift_close_on_hold",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_daily_sales_for_shift_close",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_counted_cash_on_close",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_opening_float_count",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "enable_blind_cash_count",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "max_drawer_cash_limit",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_reason_for_payout",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "allow_multiple_shifts_per_terminal",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "enable_cashier_x_report",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "show_opening_float_at_close",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "show_expected_totals_at_close",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "show_live_variance_at_close",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "show_itemized_tender_breakdown",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_manager_pin_on_variance",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "variance_pin_threshold",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "max_cashier_discount_percent",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "max_cart_discount_amount",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "allow_discount_stacking",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_reason_for_price_override",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "prevent_below_cost_sale",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "allow_tax_exemption",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "prevent_negative_stock_sale",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_receipt_for_refund",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_manager_pin_for_refund",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "max_refund_days_limit",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "track_item_voids",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "auto_lock_timeout_seconds",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_manager_pin_for_cash_drawer_open",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "enable_manager_pin_audit_log",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_pin_void_cart",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_pin_void_line",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_pin_reduce_qty",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_pin_manual_discount",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_pin_price_override",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_pin_stock_adjustment",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_pin_shift_close",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_pin_edit_tenders",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "require_pin_terminal_reset",
+          "declaration": "boolean",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "row_version",
+          "declaration": "integer NOT NULL DEFAULT 1",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "allow_offline_approvals",
+          "declaration": "boolean NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS offline_approval_requires_pin boolean NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS online_only_void_cart boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_void_line boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_reduce_qty boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_manual_discount boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_price_override boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_stock_adjustment boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_shift_close boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_edit_tenders boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_terminal_reset boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_refund boolean NOT NULL DEFAULT false",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "settings_scoped",
+      "columns": [
+        {
+          "name": "scope",
+          "declaration": "text NOT NULL DEFAULT 'GLOBAL'",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "scope_id",
+          "declaration": "text NOT NULL DEFAULT ''",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "key",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "value",
+          "declaration": "jsonb",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "is_overridden",
+          "declaration": "boolean NOT NULL DEFAULT true",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [
+        "scope",
+        "scope_id",
+        "key"
+      ],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "stock_count_drafts",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "UUID NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "store_id",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "staff_id",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "staff_name",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "status",
+          "declaration": "TEXT NOT NULL DEFAULT 'draft'",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "reason",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "note",
+          "declaration": "TEXT NOT NULL DEFAULT ''",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "lines",
+          "declaration": "JSONB NOT NULL DEFAULT '[]'::jsonb",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "line_count",
+          "declaration": "INTEGER NOT NULL DEFAULT 0",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "total_impact",
+          "declaration": "NUMERIC(18,4) NOT NULL DEFAULT 0",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "posted_at",
+          "declaration": "TIMESTAMPTZ",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "posted_by",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "TIMESTAMPTZ NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "TIMESTAMPTZ NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "reference",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_code",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "pending_edit_request_id",
+          "declaration": "uuid, ADD COLUMN IF NOT EXISTS pending_edit_by text, ADD COLUMN IF NOT EXISTS pending_edit_at timestamptz",
+          "nullable": true,
+          "hasDefault": false
+        }
+      ],
+      "primaryKey": [],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "authorization_actions",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "action_key",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "scope_type",
+          "declaration": "text NOT NULL DEFAULT 'global'",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "scope_id",
+          "declaration": "text NOT NULL DEFAULT ''",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "mode",
+          "declaration": "text NOT NULL DEFAULT 'none'",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "allowed_roles",
+          "declaration": "text[] NOT NULL DEFAULT ARRAY['admin','manager']::text[]",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "allowed_user_ids",
+          "declaration": "text[] NOT NULL DEFAULT ARRAY[]::text[]",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "requester_roles",
+          "declaration": "text[] NOT NULL DEFAULT ARRAY['cashier','staff','manager','admin']::text[]",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "requester_user_ids",
+          "declaration": "text[] NOT NULL DEFAULT ARRAY[]::text[]",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "authority_limits",
+          "declaration": "jsonb NOT NULL DEFAULT '{}'::jsonb",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "extra_authority",
+          "declaration": "jsonb NOT NULL DEFAULT '{}'::jsonb",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "absolute_ceilings",
+          "declaration": "jsonb NOT NULL DEFAULT '{}'::jsonb",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "require_reason",
+          "declaration": "boolean NOT NULL DEFAULT false",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "threshold",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "is_enabled",
+          "declaration": "boolean NOT NULL DEFAULT true",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "authorization_requests",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "action_key",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "requested_by",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "requested_by_name",
+          "declaration": "text NOT NULL DEFAULT ''",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "store_id",
+          "declaration": "text NOT NULL DEFAULT ''",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text NOT NULL DEFAULT ''",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "reason",
+          "declaration": "text NOT NULL DEFAULT ''",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "payload",
+          "declaration": "jsonb NOT NULL DEFAULT '{}'::jsonb",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "status",
+          "declaration": "text NOT NULL DEFAULT 'pending'",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "decided_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "decided_by_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "decided_at",
+          "declaration": "timestamptz",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "decision_note",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "expires_at",
+          "declaration": "timestamptz NOT NULL DEFAULT (now() + interval '24 hours')",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "consumed_at",
+          "declaration": "timestamptz",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "requester_direct_limit",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "value_unit",
+          "declaration": "text NOT NULL DEFAULT 'number'",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "requested_amount",
+          "declaration": "numeric, ADD COLUMN IF NOT EXISTS approved_amount numeric, ADD COLUMN IF NOT EXISTS approved_payload jsonb NOT NULL DEFAULT '{}'::jsonb, ADD COLUMN IF NOT EXISTS bill_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb, ADD COLUMN IF NOT EXISTS snapshot_hash text NOT NULL DEFAULT '', ADD COLUMN IF NOT EXISTS held_order_id text, ADD COLUMN IF NOT EXISTS notified_at timestamptz",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "authorization_log",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "action_key",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "mode_used",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "request_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "requested_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "authorized_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "authorizer_role",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text NOT NULL DEFAULT ''",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text NOT NULL DEFAULT ''",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "outcome",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "detail",
+          "declaration": "jsonb NOT NULL DEFAULT '{}'::jsonb",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "record_edits",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid PRIMARY KEY DEFAULT gen_random_uuid()",
+          "nullable": true,
+          "hasDefault": true
+        },
+        {
+          "name": "record_type",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "record_id",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "reference",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "action_key",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "request_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "edited_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "edited_by_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "authorized_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "authorized_by_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "mode_used",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "before_value",
+          "declaration": "jsonb NOT NULL DEFAULT '{}'::jsonb",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "after_value",
+          "declaration": "jsonb NOT NULL DEFAULT '{}'::jsonb",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "stock_deltas",
+          "declaration": "jsonb NOT NULL DEFAULT '{}'::jsonb",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "note",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "shift_cash_counts",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid PRIMARY KEY DEFAULT gen_random_uuid()",
+          "nullable": true,
+          "hasDefault": true
+        },
+        {
+          "name": "shift_id",
+          "declaration": "uuid NOT NULL REFERENCES public.shifts(id) ON DELETE CASCADE",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "kind",
+          "declaration": "text NOT NULL DEFAULT 'ORIGINAL'",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "counted_cash",
+          "declaration": "numeric NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "counted_card",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "counted_digital",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "reason",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "counted_by_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "counted_by_staff_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "counted_by_user_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "client_key",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "shift_close_events",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid PRIMARY KEY DEFAULT gen_random_uuid()",
+          "nullable": true,
+          "hasDefault": true
+        },
+        {
+          "name": "shift_id",
+          "declaration": "uuid NOT NULL REFERENCES public.shifts(id) ON DELETE CASCADE",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "event",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "from_state",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "to_state",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "detail",
+          "declaration": "jsonb NOT NULL DEFAULT '{}'::jsonb",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "actor_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "actor_staff_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "actor_user_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "shift_reconciliations",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid PRIMARY KEY DEFAULT gen_random_uuid()",
+          "nullable": true,
+          "hasDefault": true
+        },
+        {
+          "name": "shift_id",
+          "declaration": "uuid NOT NULL REFERENCES public.shifts(id) ON DELETE CASCADE",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "count_id",
+          "declaration": "uuid REFERENCES public.shift_cash_counts(id) ON DELETE SET NULL",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "expected_cash",
+          "declaration": "numeric NOT NULL DEFAULT 0",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "expected_card",
+          "declaration": "numeric NOT NULL DEFAULT 0",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "expected_digital",
+          "declaration": "numeric NOT NULL DEFAULT 0",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "counted_cash",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "counted_card",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "counted_digital",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "variance_cash",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "variance_card",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "variance_digital",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "variance_total",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "variance_status",
+          "declaration": "text NOT NULL DEFAULT 'NO_VARIANCE'",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "shift_variance_alerts",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid PRIMARY KEY DEFAULT gen_random_uuid()",
+          "nullable": true,
+          "hasDefault": true
+        },
+        {
+          "name": "shift_id",
+          "declaration": "uuid NOT NULL REFERENCES public.shifts(id) ON DELETE CASCADE",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "reconciliation_id",
+          "declaration": "uuid REFERENCES public.shift_reconciliations(id) ON DELETE SET NULL",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "variance_total",
+          "declaration": "numeric NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "variance_status",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "severity",
+          "declaration": "text NOT NULL DEFAULT 'warning'",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "message",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "delivery_status",
+          "declaration": "text NOT NULL DEFAULT 'pending'",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "attempts",
+          "declaration": "integer NOT NULL DEFAULT 0",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "last_error",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "last_attempt_at",
+          "declaration": "timestamptz",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "acknowledged_at",
+          "declaration": "timestamptz",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "acknowledged_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "entity_status_history",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "UUID PRIMARY KEY DEFAULT gen_random_uuid()",
+          "nullable": true,
+          "hasDefault": true
+        },
+        {
+          "name": "entity_type",
+          "declaration": "TEXT NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "entity_id",
+          "declaration": "TEXT NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "status_kind",
+          "declaration": "TEXT NOT NULL DEFAULT 'status'",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "previous_status",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "new_status",
+          "declaration": "TEXT NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "reason",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "actor_id",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "actor_name",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "actor_role",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "store_id",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "branch_id",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "terminal_id",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "related_entity_type",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "related_entity_id",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "metadata",
+          "declaration": "JSONB NOT NULL DEFAULT '{}'::jsonb",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "client_event_id",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "occurred_at",
+          "declaration": "TIMESTAMPTZ NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "TIMESTAMPTZ NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "TIMESTAMPTZ NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "row_version",
+          "declaration": "BIGINT NOT NULL DEFAULT 1",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "nav_pins",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "uuid NOT NULL DEFAULT gen_random_uuid() PRIMARY KEY",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "owner_id",
+          "declaration": "uuid NULL",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "item_kind",
+          "declaration": "text NOT NULL CHECK (item_kind IN ('nav', 'settings'))",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "item_key",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "sort_order",
+          "declaration": "integer NOT NULL DEFAULT 0",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamp with time zone NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    },
+    {
+      "name": "store_groups",
+      "columns": [
+        {
+          "name": "id",
+          "declaration": "text NOT NULL PRIMARY KEY",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "code",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "name",
+          "declaration": "text NOT NULL",
+          "nullable": false,
+          "hasDefault": false
+        },
+        {
+          "name": "is_active",
+          "declaration": "boolean NOT NULL DEFAULT true",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "archived_at",
+          "declaration": "timestamptz",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "updated_at",
+          "declaration": "timestamptz NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        }
+      ],
+      "primaryKey": [],
+      "uniqueKeys": [],
+      "foreignKeys": []
+    }
+  ]
+}

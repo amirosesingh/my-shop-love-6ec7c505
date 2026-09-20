@@ -11,7 +11,7 @@ All canonical affected `SECURITY DEFINER` routines set a fixed `public, pg_temp`
 
 ## Offline controls
 
-SQLite and SQL Server do not claim RLS. Access is enforced by the Electron IPC allow-list and application permission checks; cloud/database credentials are sealed in the OS vault; local paths inherit OS user ACLs; SQL Server should use its dedicated least-privilege login. Business schemas contain no service-role key, cloud secret, password, or plaintext PIN. Authentication tables are not treated as cloud auth mirrors; any legitimate offline verifier retains only the existing protected hash material.
+SQL Server does not claim RLS. Access is enforced by the Electron IPC allow-list and application permission checks; cloud/database credentials are sealed in the OS vault; SQL Server should use its dedicated least-privilege login. Business schemas contain no service-role key, cloud secret, password, or plaintext PIN. Authentication tables are not treated as cloud auth mirrors; any legitimate offline verifier retains only the existing protected hash material.
 
 ## Production application
 

@@ -16,10 +16,15 @@ describe("Windows till storage hygiene", () => {
       "terminal-config.bin",
       "local-db-config.bin",
       "cloud-credentials.bin",
-      "pos-local.db",
     ]) {
       expect(hygiene.isRequiredEntry(name)).toBe(true);
       expect(hygiene.isDisposableCacheDir(name)).toBe(false);
+    }
+  });
+
+  it("does not preserve retired local database files", () => {
+    for (const name of ["pos-local.db", "pos-local.db-wal", "pos-local.db-shm"]) {
+      expect(hygiene.isRequiredEntry(name)).toBe(false);
     }
   });
 

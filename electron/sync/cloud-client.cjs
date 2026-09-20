@@ -1,0 +1,72 @@
+const { policy } = require("./conflicts.cjs");
+
+class CloudClient {
+  constructor({ configStore, terminalStore, connectionManager = null }) { this.configStore = configStore; this.terminalStore = terminalStore; this.connectionManager = connectionManager; }
+  async request(payload) {
+    const base = String(this.configStore.get("backendUrl") ?? "").replace(/\/+$/, "");
+    const terminalToken = this.terminalStore.read()?.tokenId;
+    if (!base || !terminalToken) throw new Error("The hosted backend and terminal activation are required for synchronization.");
+    const response = await fetch(`${base}/api/v1/pos/sync`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ terminalToken, ...payload }) });
+    const data = await response.json().catch(() => ({ ok: false, error: `HTTP ${response.status}` }));
+    if (!response.ok || data?.ok === false) throw Object.assign(new Error(data?.error ?? `HTTP ${response.status}`), { code: data?.code ?? `HTTP_${response.status}` });
+    return data;
+  }
+  pushBatch(batch) { return this.request({ sqlServerBatch: { batchId: batch.batchId, organizationId: batch.organizationId ?? "default", branchId: batch.branchId, table: batch.table, rows: batch.rows, changes: batch.changes } }); }
+  pushAggregate(batch) { return this.request({ sqlServerAggregate: { batchId: batch.batchId, organizationId: batch.organizationId ?? "default", branchId: batch.branchId, operations: batch.operations } }); }
+  pullBatch({ organizationId = "default", branchId, cursor, limit }) {
+    return this.request({ sqlServerPull: { organizationId, branchId, cursor: Number(cursor ?? 0), limit } }).then((rows) => {
+      const list = Array.isArray(rows) ? rows : [];
+      return { rows: list.filter((row) => !row.tombstone), tombstones: list.filter((row) => row.tombstone), cursor: list.length ? list.at(-1).cursor : cursor, count: list.length };
+    });
+  }
+  bootstrapPage({ organizationId = "default", table, branchId, historyDays, cursor, limit }) {
+    return this.request({ sqlServerBootstrap: { organizationId, table, branchId, historyDays, cursor: cursor ?? null, limit } });
+  }
+  counts({ organizationId = "default", branchId, historyDays = 90 }) { return this.request({ sqlServerCounts: { organizationId, branchId, historyDays } }); }
+  oldReceipt(lookup, branchId) { return this.request({ oldReceipt: { lookup, branchId } }); }
+  parseKey(table, change) {
+    if (change.row_data) return change.row_data;
+    try { return JSON.parse(change.entity_id); }
+    catch { return { id: change.entity_id }; }
+  }
+  async applyLocalBatch(transaction, table, batch) {
+    const sql = this.connectionManager?.sql?.() ?? require("mssql/msnodesqlv8");
+    const allowed = new Map((table.columns ?? []).map((column) => [column.cloudColumn, column.sqlServerColumn]));
+    const primary = table.columns.filter((column) => column.primaryKey).map((column) => column.sqlServerColumn);
+    if (!primary.length) throw new Error(`No primary key is registered for ${table.sqlServerTable}.`);
+    for (const change of [...(batch.rows ?? []), ...(batch.tombstones ?? [])]) {
+      const row = change.row_data ?? {};
+      const key = this.parseKey(table, change);
+      if (change.tombstone) {
+        const request = new sql.Request(transaction);
+        const where = primary.map((name, index) => { request.input(`k${index}`, key[name]); return `[${name}]=@k${index}`; }).join(" AND ");
+        await request.query(`WITH CHANGE_TRACKING_CONTEXT (0x434C4F5544) DELETE FROM dbo.[${table.sqlServerTable}] WHERE ${where};`);
+        continue;
+      }
+      const entries = Object.entries(row).filter(([name]) => allowed.has(name)).map(([name, value]) => [allowed.get(name), value]);
+      if (!entries.length || primary.some((name) => !entries.some(([column]) => column === name))) continue;
+      const request = new sql.Request(transaction); const names = [];
+      entries.forEach(([name, value], index) => { const parameter = `v${index}`; request.input(parameter, value); names.push([name, parameter]); });
+      const on = primary.map((name) => `target.[${name}]=source.[${name}]`).join(" AND ");
+      const updates = names.filter(([name]) => !primary.includes(name)).map(([name]) => `target.[${name}]=source.[${name}]`);
+      const versioned = names.some(([name]) => name === "row_version");
+      const conflictPolicy = table.conflictRule ?? policy(table.cloudTable);
+      const correction = table.cloudTable === "sales" && names.some(([name]) => name === "is_refunded")
+        ? "target.[is_refunded]=CASE WHEN target.[is_refunded]=1 OR source.[is_refunded]=1 THEN 1 ELSE 0 END,target.[row_version]=CASE WHEN source.[row_version]>target.[row_version] THEN source.[row_version] ELSE target.[row_version] END"
+        : table.cloudTable === "sale_items" && names.some(([name]) => name === "refunded_qty")
+          ? "target.[refunded_qty]=CASE WHEN source.[refunded_qty]>target.[refunded_qty] THEN source.[refunded_qty] ELSE target.[refunded_qty] END,target.[row_version]=CASE WHEN source.[row_version]>target.[row_version] THEN source.[row_version] ELSE target.[row_version] END"
+          : null;
+      const mayUpdate = conflictPolicy !== "immutable_reversal" && updates.length;
+      const matched = correction ? `WHEN MATCHED THEN UPDATE SET ${correction}` : mayUpdate ? `WHEN MATCHED${versioned ? " AND source.[row_version]>target.[row_version]" : ""} THEN UPDATE SET ${updates.join(",")}` : "";
+      const source = names.map(([name, parameter]) => `@${parameter} AS [${name}]`).join(",");
+      await request.query(`WITH CHANGE_TRACKING_CONTEXT (0x434C4F5544) MERGE dbo.[${table.sqlServerTable}] WITH(HOLDLOCK) AS target USING(SELECT ${source}) AS source ON ${on} ${matched} WHEN NOT MATCHED THEN INSERT(${names.map(([name]) => `[${name}]`).join(",")}) VALUES(${names.map(([name]) => `source.[${name}]`).join(",")});`);
+    }
+  }
+  async applyLocalBatchToPool(connectionManager, table, rows) {
+    this.connectionManager = connectionManager;
+    const sql = connectionManager.sql(); const transaction = new sql.Transaction(connectionManager.pool); await transaction.begin(sql.ISOLATION_LEVEL?.SERIALIZABLE);
+    try { await this.applyLocalBatch(transaction, table, { rows, tombstones: [] }); await transaction.commit(); }
+    catch (error) { await Promise.resolve(transaction.rollback()).catch(() => undefined); throw error; }
+  }
+}
+module.exports = { CloudClient };

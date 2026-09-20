@@ -8,7 +8,6 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const rpc = vi.fn();
-const localMirrorBatch = vi.fn();
 
 vi.mock("@/integrations/supabase/external-client", () => ({
   supabaseExternal: { rpc: (...a: unknown[]) => rpc(...a) },
@@ -26,11 +25,6 @@ const store = new Map<string, string>();
   addEventListener: () => {},
   removeEventListener: () => {},
 };
-// A desktop till: the only platform allowed to hold work on the device.
-(globalThis as unknown as { window: Record<string, unknown> }).window["pos"] = {
-  localMirrorBatch: (...args: unknown[]) => localMirrorBatch(...args),
-};
-
 import { submitCashCount } from "@/lib/shift-closing";
 import { listQueue } from "@/lib/sync-outbox";
 
@@ -39,8 +33,6 @@ const counted = { cash: 250.5, card: null, digital: null };
 describe("failure injection — shift close", () => {
   beforeEach(() => {
     rpc.mockReset();
-    localMirrorBatch.mockReset();
-    localMirrorBatch.mockResolvedValue({ ok: true, written: 0 });
   });
 
   it("rejects the count when the connection dies", async () => {
@@ -50,7 +42,6 @@ describe("failure injection — shift close", () => {
       submitCashCount("shift-1", counted, { clientKey: "shift-1:original" }),
     ).rejects.toThrow(/Central database unavailable/);
     expect(listQueue().slice(before)).toHaveLength(0);
-    expect(localMirrorBatch).not.toHaveBeenCalled();
   });
 
   it("does not park a count the server refused on principle", async () => {
