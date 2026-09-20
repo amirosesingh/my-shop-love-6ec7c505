@@ -1,12 +1,18 @@
 const { performance } = require("node:perf_hooks");
 const { safeError } = require("./errors.cjs");
 
-function escapeOdbc(value) { return `{${String(value ?? "").replaceAll("}", "}}")}}`; }
+function escapeOdbc(value) {
+  return `{${String(value ?? "").replaceAll("}", "}}")}}`;
+}
 
 function connectionString(profile, database = profile.database || "master") {
+  const directPort = Number.isInteger(profile.port) && profile.port > 0;
+  const server = directPort
+    ? `tcp:${profile.host},${profile.port}`
+    : `tcp:${profile.host}\\${profile.instanceName}`;
   const parts = [
     "Driver={ODBC Driver 18 for SQL Server}",
-    `Server=tcp:${profile.host},${profile.port}`,
+    `Server=${server}`,
     `Database=${escapeOdbc(database)}`,
     `Encrypt=${profile.encrypt ? "Yes" : "No"}`,
     `TrustServerCertificate=${profile.trustServerCertificate ? "Yes" : "No"}`,
@@ -17,11 +23,19 @@ function connectionString(profile, database = profile.database || "master") {
   return `${parts.join(";")};`;
 }
 
-function defaultDriver() { return require("mssql/msnodesqlv8"); }
+function defaultDriver() {
+  return require("mssql/msnodesqlv8");
+}
 
 class ConnectionManager {
-  constructor({ driver = null } = {}) { this.driver = driver; this.pool = null; this.profile = null; }
-  sql() { return this.driver ?? defaultDriver(); }
+  constructor({ driver = null } = {}) {
+    this.driver = driver;
+    this.pool = null;
+    this.profile = null;
+  }
+  sql() {
+    return this.driver ?? defaultDriver();
+  }
   async open(profile) {
     await this.close();
     const sql = this.sql();
@@ -36,7 +50,9 @@ class ConnectionManager {
     return pool;
   }
   async close() {
-    const pool = this.pool; this.pool = null; this.profile = null;
+    const pool = this.pool;
+    this.pool = null;
+    this.profile = null;
     if (pool) await pool.close();
   }
   async temporary(profile, database, work) {
@@ -46,8 +62,12 @@ class ConnectionManager {
       pool: { min: 0, max: 1, idleTimeoutMillis: 1000 },
       requestTimeout: profile.requestTimeoutMs,
     });
-    try { await pool.connect(); return await work(pool); }
-    finally { await pool.close().catch(() => undefined); }
+    try {
+      await pool.connect();
+      return await work(pool);
+    } finally {
+      await pool.close().catch(() => undefined);
+    }
   }
   async testServer(profile) {
     const start = performance.now();
@@ -59,10 +79,18 @@ class ConnectionManager {
           ORIGINAL_LOGIN() AS login_name,
           HAS_PERMS_BY_NAME(NULL, NULL, 'VIEW ANY DATABASE') AS can_list_databases`);
         const row = result.recordset?.[0] ?? {};
-        return { ok: true, version: row.version, edition: row.edition, loginName: row.login_name,
-          canListDatabases: Boolean(row.can_list_databases), latencyMs: Math.round(performance.now() - start) };
+        return {
+          ok: true,
+          version: row.version,
+          edition: row.edition,
+          loginName: row.login_name,
+          canListDatabases: Boolean(row.can_list_databases),
+          latencyMs: Math.round(performance.now() - start),
+        };
       });
-    } catch (error) { return { ...safeError(error), latencyMs: Math.round(performance.now() - start) }; }
+    } catch (error) {
+      return { ...safeError(error), latencyMs: Math.round(performance.now() - start) };
+    }
   }
 }
 
