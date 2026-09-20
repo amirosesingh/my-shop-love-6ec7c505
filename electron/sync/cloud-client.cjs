@@ -23,7 +23,7 @@ class CloudClient {
     return this.request({ sqlServerBootstrap: { organizationId, table, branchId, historyDays, cursor: cursor ?? null, limit } });
   }
   counts({ organizationId = "default", branchId, historyDays = 90 }) { return this.request({ sqlServerCounts: { organizationId, branchId, historyDays } }); }
-  oldReceipt(lookup, branchId) { return this.request({ oldReceipt: { lookup, branchId } }); }
+  oldReceipt(lookup, branchId, proof = {}) { return this.request({ ...proof, oldReceipt: { lookup, branchId } }); }
   parseKey(table, change) {
     if (change.row_data) return change.row_data;
     try { return JSON.parse(change.entity_id); }

@@ -698,7 +698,19 @@ function registerIpc() {
   ipcMain.handle("business:write-batch", (_e, context, ops) => guard.guarded(() => operationsRepository.apply(guard.text(context,{name:"operation context",max:160}), guard.writeOps(ops,{max:200}))));
   ipcMain.handle("business:commit-aggregate", (_e, value) => guard.guarded(() => { const aggregate=guard.aggregate(value); return aggregateRepository.commit(aggregate.kind,aggregate); }));
   ipcMain.handle("business:snapshot", () => guard.guarded(() => operationsRepository.snapshot()));
-  ipcMain.handle("receipts:find-exact", (_e, value, branchId) => guard.guarded(() => receiptRepository.findExact(guard.text(value,{name:"receipt lookup",max:128}),guard.text(branchId,{name:"branch",max:128}))));
+  ipcMain.handle("receipts:find-exact", (_e, value, branchId, proof) => guard.guarded(() => {
+    const input = guard.options(proof, { name: "receipt authorization", max: 3 });
+    const authorization = {
+      ...(input.sessionToken ? { sessionToken: guard.text(input.sessionToken, { name: "session token", max: 400 }) } : {}),
+      ...(input.cashierToken ? { cashierToken: guard.text(input.cashierToken, { name: "cashier token", max: 2000 }) } : {}),
+      ...(input.accessToken ? { accessToken: guard.text(input.accessToken, { name: "access token", max: 4000 }) } : {}),
+    };
+    return receiptRepository.findExact(
+      guard.text(value, { name: "receipt lookup", max: 128 }),
+      guard.text(branchId, { name: "branch", max: 128 }),
+      authorization,
+    );
+  }));
   ipcMain.handle("receipts:refund", (_e, value) => guard.guarded(() => { const input=guard.options(value,{name:"refund",max:5}); const terminal=terminalStore.read()??{}; const branch=input.branchId??terminal.locationId??terminal.storeId; return receiptRepository.refund({saleId:guard.uuid(input.saleId,{name:"sale id"}),refundId:guard.text(input.refundId,{name:"refund id",max:128}),branchId:guard.text(branch,{name:"branch",max:128}),reason:input.reason?guard.text(input.reason,{name:"reason",max:400}):null}); }));
   ipcMain.handle("jobs:get-active", async () => databaseManager.pool ? jobRepository.active() : null);
   ipcMain.handle("jobs:get-history", async (_e, limit) => databaseManager.pool ? jobRepository.history(Number(limit)||50) : []);
@@ -708,6 +720,14 @@ function registerIpc() {
   ipcMain.handle("sync:resume", () => syncCoordinator.resume());
   ipcMain.handle("sync:get-failures", async () => ({ failures:databaseManager.pool?await jobRepository.failures():[], conflictRows:databaseManager.pool?await conflictRepository.unresolved():[], conflicts:databaseManager.pool?await conflictRepository.count():0 }));
   ipcMain.handle("sync:reconcile", () => guard.guarded(async()=>{const branchId=localBranchId();if(!branchId)throw Object.assign(new Error("A branch is required for reconciliation."),{code:"EBRANCH"});const differences=await localDataLifecycle.reconcile(branchId,Number(databaseConfig.profile()?.retentionDays)||90);return{ok:differences.length===0,differences};}));
+  ipcMain.handle("telemetry:presence", (_e, value) => guard.guarded(() => {
+    const input = guard.options(value, { name: "telemetry presence", max: 3 });
+    return mainTelemetry.setPresence({
+      sessionStatus: input.sessionStatus === "signed_in" ? "signed_in" : "idle",
+      staffName: input.staffName ? guard.text(input.staffName, { name: "staff name", max: 160 }) : null,
+      staffRole: input.staffRole ? guard.text(input.staffRole, { name: "staff role", max: 64 }) : null,
+    });
+  }));
   ipcMain.handle("app:ready", () => {
     markStartupSettled();
     const state = health.markHealthy();

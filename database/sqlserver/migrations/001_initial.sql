@@ -649,6 +649,16 @@ IF OBJECT_ID(N'dbo.branch_telemetry', N'U') IS NULL BEGIN CREATE TABLE dbo.[bran
   [pending_queue_count] int NULL,
   [last_ping] datetimeoffset(7) NULL,
   [status] nvarchar(max) NULL,
+  [branch_code] nvarchar(max) NULL,
+  [session_status] nvarchar(max) NULL,
+  [sql_server_state] nvarchar(max) NULL,
+  [database_name] nvarchar(max) NULL,
+  [schema_version] int NULL,
+  [failed_count] int NOT NULL CONSTRAINT [DF_branch_telemetry_failed_count] DEFAULT (0),
+  [sync_phase] nvarchar(max) NULL,
+  [current_table] nvarchar(max) NULL,
+  [last_push_at] datetimeoffset(7) NULL,
+  [last_pull_at] datetimeoffset(7) NULL,
   CONSTRAINT [PK_branch_telemetry] PRIMARY KEY ([terminal_id])
 
 ); END;
@@ -694,6 +704,26 @@ IF COL_LENGTH(N'dbo.branch_telemetry', N'pending_queue_count') IS NULL ALTER TAB
 IF COL_LENGTH(N'dbo.branch_telemetry', N'last_ping') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [last_ping] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.branch_telemetry', N'status') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [status] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'branch_code') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [branch_code] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'session_status') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [session_status] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'sql_server_state') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [sql_server_state] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'database_name') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [database_name] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'schema_version') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [schema_version] int NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'failed_count') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [failed_count] int NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'sync_phase') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [sync_phase] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'current_table') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [current_table] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'last_push_at') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [last_push_at] datetimeoffset(7) NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'last_pull_at') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [last_pull_at] datetimeoffset(7) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.branch_telemetry') AND name=N'IX_branch_telemetry_store_id') CREATE INDEX [IX_branch_telemetry_store_id] ON dbo.[branch_telemetry]([store_id]);
 

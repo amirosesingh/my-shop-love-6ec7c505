@@ -18,7 +18,7 @@ contextBridge.exposeInMainWorld("pos", {
   writeBatch: (context, ops) => invoke("business:write-batch", context, ops),
   commitAggregate: (aggregate) => invoke("business:commit-aggregate", aggregate),
   snapshot: () => invoke("business:snapshot"),
-  findReceipt: (value, branchId) => invoke("receipts:find-exact", value, branchId),
+  findReceipt: (value, branchId, proof) => invoke("receipts:find-exact", value, branchId, proof),
   refundReceipt: (value) => invoke("receipts:refund", value),
   database: {
     getState: () => invoke("database:get-state"),
@@ -53,6 +53,9 @@ contextBridge.exposeInMainWorld("pos", {
     getFailures: () => invoke("sync:get-failures"),
     reconcile: (options) => invoke("sync:reconcile", options),
     subscribe: (cb) => { const handler=(_event,payload)=>cb(payload); ipcRenderer.on("sync:state",handler); return()=>ipcRenderer.removeListener("sync:state",handler); },
+  },
+  telemetry: {
+    presence: (value) => invoke("telemetry:presence", value),
   },
   print: (html, options) => invoke("print:silent", html, options),
   printRaw: (bytes, options) => invoke("print:raw", bytes, options),

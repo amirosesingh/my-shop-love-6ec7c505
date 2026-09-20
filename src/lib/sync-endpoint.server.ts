@@ -74,6 +74,13 @@ const bodySchema = z.object({
     historyDays: z.number().int().min(30).max(7300), limit: z.number().int().min(100).max(2000),
   }).optional(),
   sqlServerCounts: z.object({ organizationId: z.string().min(1).max(128), branchId: z.string().min(1).max(128), historyDays: z.number().int().min(30).max(7300) }).optional(),
+  sqlServerTelemetry: z.object({
+    terminal_id:z.string().min(1).max(128),store_id:z.string().min(1).max(128),terminal_name:z.string().max(160).nullable(),
+    branch_code:z.string().max(64).nullable(),session_status:z.enum(["signed_in","idle"]).nullable(),staff_name:z.string().max(160).nullable(),staff_role:z.string().max(64).nullable(),db_mode:z.string().max(32),connection_status:z.string().max(32),
+    storage_engine:z.literal("sqlserver"),pending_count:z.number().int().nonnegative(),conflict_count:z.number().int().nonnegative(),failed_count:z.number().int().nonnegative(),
+    last_synced_at:z.string().datetime().nullable(),last_push_at:z.string().datetime().nullable(),last_pull_at:z.string().datetime().nullable(),app_version:z.string().max(64),platform:z.string().max(64).nullable(),
+    sql_server_state:z.string().max(64),database_name:z.string().max(128).nullable(),schema_version:z.number().int().nonnegative().nullable(),sync_phase:z.string().max(64).nullable(),current_table:z.string().max(128).nullable(),last_seen_at:z.string().datetime(),
+  }).optional(),
   oldReceipt: z.object({ lookup: z.string().min(1).max(128), branchId: z.string().min(1).max(128) }).optional(),
   read: z
     .discriminatedUnion("kind", [
@@ -103,7 +110,7 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
     body = { ...body, accessToken: bearer.slice(0, 4000) };
   }
 
-  if (!body.ops?.length && !body.read && !body.sqlServerBatch && !body.sqlServerAggregate && !body.sqlServerPull && !body.sqlServerBootstrap && !body.sqlServerCounts && !body.oldReceipt)
+  if (!body.ops?.length && !body.read && !body.sqlServerBatch && !body.sqlServerAggregate && !body.sqlServerPull && !body.sqlServerBootstrap && !body.sqlServerCounts && !body.sqlServerTelemetry && !body.oldReceipt)
     return Response.json({ ok: false, error: "Nothing to do" }, { status: 400 });
 
   const { verifyRelayCaller, runRelayOp, runRelayRead, hasServiceKey } = await import(
@@ -166,10 +173,19 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
     }
   }
 
+  if (body.sqlServerTelemetry) {
+    if (body.sqlServerTelemetry.store_id !== scope.storeId) return Response.json({ok:false,code:"STORE_FORBIDDEN",error:"Telemetry must belong to this terminal's branch."},{status:403});
+    const { serviceRest } = await import("@/core/api/pos-relay.server");
+    const response=await serviceRest("branch_telemetry?on_conflict=terminal_id",{method:"POST",prefer:"resolution=merge-duplicates,return=minimal",body:JSON.stringify([body.sqlServerTelemetry])});
+    return response.ok?Response.json({ok:true}):Response.json({ok:false,error:(await response.text()).slice(0,400)},{status:response.status});
+  }
+
   if (body.sqlServerBatch || body.sqlServerAggregate || body.sqlServerPull || body.sqlServerBootstrap || body.sqlServerCounts || body.oldReceipt) {
     const branchId = body.sqlServerBatch?.branchId ?? body.sqlServerAggregate?.branchId ?? body.sqlServerPull?.branchId ?? body.sqlServerBootstrap?.branchId ?? body.sqlServerCounts?.branchId ?? body.oldReceipt?.branchId ?? "";
     const mayManageOtherBranches = scope.role === "admin" || scope.roleSlug === "admin" || scope.permissions.can_manage_sync_backup === true;
     if (branchId !== scope.storeId && !mayManageOtherBranches) return Response.json({ ok:false,code:"STORE_FORBIDDEN",error:"You can only synchronize your own branch." },{status:403});
+    if (body.oldReceipt && !(scope.role === "admin" || scope.roleSlug === "admin" || scope.permissions.can_process_refund === true))
+      return Response.json({ok:false,code:"PERMISSION_DENIED",error:"Refund permission is required to retrieve historical receipts."},{status:403});
     const { serviceRest } = await import("@/core/api/pos-relay.server");
     const rpc = body.sqlServerBatch ? ["pos_sync_push_batch", {
       p_batch_id:body.sqlServerBatch.batchId,p_organization_id:body.sqlServerBatch.organizationId,p_branch_id:branchId,

@@ -109,6 +109,7 @@ const CHANNEL_LEVELS = {
   "jobs:get-history": OPEN,
   "sync:get-status": OPEN,
   "sync:get-failures": OPEN,
+  "telemetry:presence": OPEN,
   "driver:list": OPEN,
   "pos:test": OPEN,
   "sqladmin:status": OPEN,

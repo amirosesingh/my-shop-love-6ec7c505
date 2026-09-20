@@ -131,6 +131,7 @@
   "build": {
     "appId": "app.lovable.pos",
     "productName": "Retail",
+    "npmRebuild": false,
     "files": [
       "electron/**",
       "dist-desktop/**",

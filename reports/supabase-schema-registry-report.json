@@ -1,8 +1,8 @@
 {
   "source": "supabase/schema.sql",
-  "generatedAt": "2026-09-19T12:35:48.151Z",
+  "generatedAt": "2026-09-20T01:17:08.854Z",
   "tableCount": 67,
-  "columnCount": 1023,
+  "columnCount": 1033,
   "tables": [
     {
       "name": "coupon_campaigns",
@@ -1301,6 +1301,66 @@
         {
           "name": "status",
           "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "branch_code",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "session_status",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "sql_server_state",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "database_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "schema_version",
+          "declaration": "integer",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "failed_count",
+          "declaration": "integer DEFAULT 0 NOT NULL",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "sync_phase",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "current_table",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "last_push_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "last_pull_at",
+          "declaration": "timestamp with time zone",
           "nullable": true,
           "hasDefault": false
         }

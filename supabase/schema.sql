@@ -1428,6 +1428,16 @@ ALTER TABLE public.branch_telemetry ADD COLUMN IF NOT EXISTS pending_queue_count
 ALTER TABLE public.branch_telemetry ADD COLUMN IF NOT EXISTS last_ping timestamp with time zone;
 
 ALTER TABLE public.branch_telemetry ADD COLUMN IF NOT EXISTS status text;
+ALTER TABLE public.branch_telemetry ADD COLUMN IF NOT EXISTS branch_code text;
+ALTER TABLE public.branch_telemetry ADD COLUMN IF NOT EXISTS session_status text;
+ALTER TABLE public.branch_telemetry ADD COLUMN IF NOT EXISTS sql_server_state text;
+ALTER TABLE public.branch_telemetry ADD COLUMN IF NOT EXISTS database_name text;
+ALTER TABLE public.branch_telemetry ADD COLUMN IF NOT EXISTS schema_version integer;
+ALTER TABLE public.branch_telemetry ADD COLUMN IF NOT EXISTS failed_count integer DEFAULT 0 NOT NULL;
+ALTER TABLE public.branch_telemetry ADD COLUMN IF NOT EXISTS sync_phase text;
+ALTER TABLE public.branch_telemetry ADD COLUMN IF NOT EXISTS current_table text;
+ALTER TABLE public.branch_telemetry ADD COLUMN IF NOT EXISTS last_push_at timestamp with time zone;
+ALTER TABLE public.branch_telemetry ADD COLUMN IF NOT EXISTS last_pull_at timestamp with time zone;
 
 ALTER TABLE public.cashiers ADD COLUMN IF NOT EXISTS id uuid DEFAULT gen_random_uuid() NOT NULL;
 
@@ -12154,9 +12164,9 @@ CREATE OR REPLACE FUNCTION public.sync_apply_branch_telemetry(p_rows jsonb) RETU
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
-  INSERT INTO public."branch_telemetry" ("terminal_id","store_id","terminal_name","staff_name","staff_role","db_mode","connection_status","storage_engine","pending_count","conflict_count","last_synced_at","app_version","platform","last_seen_at","created_at","updated_at","branch_id","pending_queue_count","last_ping","status")
-  SELECT "terminal_id","store_id","terminal_name","staff_name","staff_role","db_mode","connection_status","storage_engine","pending_count","conflict_count","last_synced_at","app_version","platform","last_seen_at","created_at","updated_at","branch_id","pending_queue_count","last_ping","status" FROM jsonb_populate_recordset(NULL::public."branch_telemetry", COALESCE(p_rows,'[]'::jsonb))
-  ON CONFLICT ("terminal_id") DO UPDATE SET "store_id"=EXCLUDED."store_id","terminal_name"=EXCLUDED."terminal_name","staff_name"=EXCLUDED."staff_name","staff_role"=EXCLUDED."staff_role","db_mode"=EXCLUDED."db_mode","connection_status"=EXCLUDED."connection_status","storage_engine"=EXCLUDED."storage_engine","pending_count"=EXCLUDED."pending_count","conflict_count"=EXCLUDED."conflict_count","last_synced_at"=EXCLUDED."last_synced_at","app_version"=EXCLUDED."app_version","platform"=EXCLUDED."platform","last_seen_at"=EXCLUDED."last_seen_at","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","branch_id"=EXCLUDED."branch_id","pending_queue_count"=EXCLUDED."pending_queue_count","last_ping"=EXCLUDED."last_ping","status"=EXCLUDED."status";
+  INSERT INTO public."branch_telemetry" ("terminal_id","store_id","terminal_name","staff_name","staff_role","db_mode","connection_status","storage_engine","pending_count","conflict_count","last_synced_at","app_version","platform","last_seen_at","created_at","updated_at","branch_id","pending_queue_count","last_ping","status","branch_code","session_status","sql_server_state","database_name","schema_version","failed_count","sync_phase","current_table","last_push_at","last_pull_at")
+  SELECT "terminal_id","store_id","terminal_name","staff_name","staff_role","db_mode","connection_status","storage_engine","pending_count","conflict_count","last_synced_at","app_version","platform","last_seen_at","created_at","updated_at","branch_id","pending_queue_count","last_ping","status","branch_code","session_status","sql_server_state","database_name","schema_version","failed_count","sync_phase","current_table","last_push_at","last_pull_at" FROM jsonb_populate_recordset(NULL::public."branch_telemetry", COALESCE(p_rows,'[]'::jsonb))
+  ON CONFLICT ("terminal_id") DO UPDATE SET "store_id"=EXCLUDED."store_id","terminal_name"=EXCLUDED."terminal_name","staff_name"=EXCLUDED."staff_name","staff_role"=EXCLUDED."staff_role","db_mode"=EXCLUDED."db_mode","connection_status"=EXCLUDED."connection_status","storage_engine"=EXCLUDED."storage_engine","pending_count"=EXCLUDED."pending_count","conflict_count"=EXCLUDED."conflict_count","last_synced_at"=EXCLUDED."last_synced_at","app_version"=EXCLUDED."app_version","platform"=EXCLUDED."platform","last_seen_at"=EXCLUDED."last_seen_at","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","branch_id"=EXCLUDED."branch_id","pending_queue_count"=EXCLUDED."pending_queue_count","last_ping"=EXCLUDED."last_ping","status"=EXCLUDED."status","branch_code"=EXCLUDED."branch_code","session_status"=EXCLUDED."session_status","sql_server_state"=EXCLUDED."sql_server_state","database_name"=EXCLUDED."database_name","schema_version"=EXCLUDED."schema_version","failed_count"=EXCLUDED."failed_count","sync_phase"=EXCLUDED."sync_phase","current_table"=EXCLUDED."current_table","last_push_at"=EXCLUDED."last_push_at","last_pull_at"=EXCLUDED."last_pull_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
   
   

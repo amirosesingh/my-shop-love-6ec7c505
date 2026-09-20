@@ -11,6 +11,7 @@ import { publishTelemetry } from "@/lib/telemetry";
 import { runPendingCommands } from "@/lib/terminal-commands";
 import { hasSignedInIdentity } from "@/lib/session-presence";
 import { isWindowsShell } from "@/platform-config/features";
+import { localDb } from "@/core/local-db/local-db";
 
 export function TelemetryAgent() {
   const { user, terminalUser } = useAuth();
@@ -19,7 +20,14 @@ export function TelemetryAgent() {
 
   useEffect(() => {
     if (typeof window === "undefined") return;
-    if (isWindowsShell()) return;
+    if (isWindowsShell()) {
+      void localDb()?.telemetry?.presence({
+        sessionStatus: name ? "signed_in" : "idle",
+        staffName: name,
+        staffRole: role,
+      });
+      return;
+    }
     let stopped = false;
 
     const refreshCatalogue = async () => {

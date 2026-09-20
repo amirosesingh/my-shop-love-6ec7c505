@@ -19,6 +19,7 @@ type DatabaseApi = {
   migrateDatabase(profile: Profile): Promise<Record<string, unknown>>;
   saveAndConnect(profile: Profile): Promise<Record<string, unknown>>;
   removeConfiguration(): Promise<DbState>;
+  subscribe(cb: (state: DbState) => void): () => void;
 };
 const api = () => (window.pos as unknown as { database?: DatabaseApi })?.database;
 const initial: Profile = { host: "127.0.0.1", port: 1433, database: "", authMode: "windows", username: "", password: "", encrypt: true, trustServerCertificate: true, connectionTimeoutMs: 15000, requestTimeoutMs: 30000, retentionDays: 90 };
@@ -32,15 +33,25 @@ export function LocalDatabaseWizard() {
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
   const [databases, setDatabases] = useState<Array<{ name: string; state_desc: string; compatibility_level: number }>>([]);
   const [search, setSearch] = useState("");
-  useEffect(() => { void api()?.getState().then((next) => { setState(next); if (next.profile) setProfile((old) => ({ ...old, ...next.profile, password: "" })); }); }, []);
+  useEffect(() => {
+    const database = api();
+    void database?.getState().then((next) => { setState(next); if (next.profile) setProfile((old) => ({ ...old, ...next.profile, password: "" })); });
+    return database?.subscribe?.(setState);
+  }, []);
   const shown = useMemo(() => databases.filter((item) => item.name.toLowerCase().includes(search.toLowerCase())), [databases, search]);
-  const run = async (work: () => Promise<Record<string, unknown>>) => { if (busy) return; setBusy(true); setResult(null); try { setResult(await work()); } finally { setBusy(false); } };
+  const run = async (work: () => Promise<Record<string, unknown>>) => {
+    if (busy) return;
+    setBusy(true); setResult(null);
+    try { setResult(await work()); }
+    catch (error) { setResult({ ok: false, error: error instanceof Error ? error.message : String(error) }); }
+    finally { setBusy(false); }
+  };
   const ok = result?.ok === true;
 
   return <Card className="w-full">
     <CardHeader><CardTitle className="text-base">Local Microsoft SQL Server</CardTitle><CardDescription>Windows Electron only. Connections use the entered hostname and TCP port.</CardDescription></CardHeader>
     <CardContent className="space-y-4">
-      <ol className="grid grid-cols-7 gap-1 text-center text-[11px]" aria-label="Database setup steps">{steps.map((name, index) => <li key={name} className={index === step ? "font-semibold text-primary" : "text-muted-foreground"}>{index + 1}. {name}</li>)}</ol>
+      <ol className="grid grid-cols-2 gap-1 text-center text-[11px] sm:grid-cols-4 xl:grid-cols-7" aria-label="Database setup steps">{steps.map((name, index) => <li key={name} className={index === step ? "font-semibold text-primary" : "text-muted-foreground"} aria-current={index === step ? "step" : undefined}>{index + 1}. {name}</li>)}</ol>
       <div className="max-h-[calc(100vh-240px)] min-h-48 overflow-y-auto rounded-md border p-4">
         {step === 0 && <div className="flex items-center justify-between gap-4"><div><Label htmlFor="local-db-enabled">Use local Microsoft SQL Server</Label><p className="text-sm text-muted-foreground">{state.enabled ? state.connected ? "Connected" : "Setup or connection check required" : "Central Online mode"}</p></div><Switch id="local-db-enabled" checked={state.enabled} onCheckedChange={(enabled) => void api()?.setEnabled(enabled).then((next) => { setState(next); if (enabled) setStep(1); })} /></div>}
         {step === 1 && <div className="grid gap-3 sm:grid-cols-2"><Field label="Server hostname or IP"><Input value={profile.host} onChange={(e) => setProfile({ ...profile, host: e.target.value })} /></Field><Field label="TCP port"><Input type="number" min={1} max={65535} value={profile.port} onChange={(e) => setProfile({ ...profile, port: Number(e.target.value) })} /></Field><Toggle label="Encrypt connection" value={profile.encrypt} change={(encrypt) => setProfile({ ...profile, encrypt })} /><Toggle label="Trust server certificate" value={profile.trustServerCertificate} change={(trustServerCertificate) => setProfile({ ...profile, trustServerCertificate })} /><Field label="Connection timeout (ms)"><Input type="number" value={profile.connectionTimeoutMs} onChange={(e) => setProfile({ ...profile, connectionTimeoutMs: Number(e.target.value) })} /></Field><Field label="Request timeout (ms)"><Input type="number" value={profile.requestTimeoutMs} onChange={(e) => setProfile({ ...profile, requestTimeoutMs: Number(e.target.value) })} /></Field></div>}
@@ -57,4 +68,11 @@ export function LocalDatabaseWizard() {
 
 function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="space-y-1 text-sm"><span className="font-medium">{label}</span>{children}</label>; }
 function Toggle({ label, value, change }: { label: string; value: boolean; change(value: boolean): void }) { return <div className="flex items-center justify-between rounded-md border px-3"><Label>{label}</Label><Switch checked={value} onCheckedChange={change} /></div>; }
-function Action({ title, text, busy, onClick, result }: { title: string; text: string; busy: boolean; onClick(): void; result: Record<string, unknown> | null }) { return <div className="space-y-3"><div><p className="font-medium">{title}</p><p className="text-sm text-muted-foreground">{text}</p></div><Button disabled={busy} onClick={onClick}>{busy ? "Working…" : title}</Button>{result && <pre className="max-h-60 overflow-auto whitespace-pre-wrap rounded bg-muted p-3 text-xs">{JSON.stringify(result, null, 2)}</pre>}</div>; }
+function Action({ title, text, busy, onClick, result }: { title: string; text: string; busy: boolean; onClick(): void; result: Record<string, unknown> | null }) { return <div className="space-y-3"><div><p className="font-medium">{title}</p><p className="text-sm text-muted-foreground">{text}</p></div><Button disabled={busy} onClick={onClick}>{busy ? "Working…" : title}</Button>{result && <ResultSummary result={result} />}</div>; }
+
+function ResultSummary({ result }: { result: Record<string, unknown> }) {
+  if (result.ok === false) return <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive" role="alert"><p className="font-medium">{String(result.error ?? "The check failed.")}</p>{result.hint ? <p className="mt-1">{String(result.hint)}</p> : null}{result.code ? <p className="mt-1 text-xs">Code: {String(result.code)}</p> : null}</div>;
+  if (typeof result.requiredTables === "number") return <div className="grid gap-2 rounded-md bg-muted p-3 text-sm sm:grid-cols-2" role="status"><span>Required tables: {String(result.requiredTables)}</span><span>Present: {String(result.presentTables ?? 0)}</span><span>Missing: {Array.isArray(result.missingTables) ? result.missingTables.length : 0}</span><span>Columns compatible: {result.columnsCompatible ? "Yes" : "No"}</span><span>Write test: {result.writeTest ? "Passed and rolled back" : "Failed"}</span><span>Status: {result.ready ? "Ready" : String(result.status ?? "Migration required")}</span></div>;
+  if (result.version || result.edition) return <div className="grid gap-2 rounded-md bg-muted p-3 text-sm sm:grid-cols-2" role="status"><span>SQL Server: {String(result.version ?? "Detected")}</span><span>Edition: {String(result.edition ?? "Unknown")}</span><span>Login: {String(result.loginName ?? "Verified")}</span><span>Latency: {String(result.latencyMs ?? "—")} ms</span><span>List databases: {result.canListDatabases ? "Allowed" : "Not allowed"}</span></div>;
+  return <p className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400" role="status">{Array.isArray(result.databases) ? `${result.databases.length} accessible database${result.databases.length === 1 ? "" : "s"} loaded.` : Array.isArray(result.applied) ? `${result.applied.length} migration${result.applied.length === 1 ? "" : "s"} applied.` : "Completed successfully."}</p>;
+}

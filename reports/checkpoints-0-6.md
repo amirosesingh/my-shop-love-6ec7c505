@@ -12,7 +12,7 @@ checkpoint 6. Checkpoints 7 onward are intentionally not marked complete.
 | 2 — direct backend dependencies | Complete in source | Exact `mssql@12.7.2`, `msnodesqlv8@5.5.0`, and `@electron/rebuild@4.2.0` are pinned. The production build unpacks the native ODBC module. |
 | 3 — permissions and restart state | Complete in source | IPC classifications, guarded handlers, a time-limited administrator capability, explicit lock/adopt/unlock paths, and connection state reporting are present and tested. |
 | 4 — connection wizard | Complete in source | The Windows-only seven-step wizard collects a pinned direct host/port, TLS/timeouts and credentials; tests, validation, database selection, migration, encrypted save/connect, and retention are represented in the UI. |
-| 5 — schema, mapping, and migrations | Complete | Supabase registry generation creates 67 SQL Server domain tables and 1,023 columns, including columns introduced by later `ALTER TABLE` statements, constraints, and generated DDL. Controlled migration and catalog validation code are present. |
+| 5 — schema, mapping, and migrations | Complete | Supabase registry generation creates 67 SQL Server domain tables and 1,033 columns, including columns introduced by later `ALTER TABLE` statements, constraints, and generated DDL. Controlled migration and catalog validation code are present. |
 | 6 — controlled repositories and IPC | Complete | Renderer access is limited to guarded, allowlisted business operations and bounded snapshots. Writes use parameterized repository operations and transactions; no renderer-supplied SQL channel exists. |
 
 ## Validation completed

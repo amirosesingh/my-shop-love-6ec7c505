@@ -17,7 +17,7 @@ disabled pending live acceptance and the later rollout checkpoints.
 
 ## Schema and safety properties
 
-- The generated registry contains 67 domain tables and 1,023 columns.
+- The generated registry contains 67 domain tables and 1,033 columns.
 - Foreign-key dependency order is generated from the actual relationships.
 - The local journal stores metadata only; outbound payloads are read from the
   domain tables at delivery time.
@@ -50,5 +50,4 @@ recovery, million-row timed transfer, reconciliation, packaged Electron native
 driver loading, and uninstall/reinstall recovery. These are environment
 acceptance steps rather than missing fallback code; SQLite is not used.
 
-Checkpoint 13 and later rollout, release, and operational work is outside this
-requested checkpoint-12 boundary.
+Checkpoint 13 onward is recorded in `reports/checkpoints-13-16.md`.

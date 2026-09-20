@@ -22,7 +22,7 @@ import { hydrateTerminalConfig } from "@/core/activation/terminal-tokens";
 import { isOperationalTable } from "@/lib/pos-auth-route";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "@/lib/keyset";
 import { readAllPages } from "@/lib/paged-read";
-import { loadCashierToken } from "@/lib/pos-credentials";
+import { loadCashierToken, readCredentials } from "@/lib/pos-credentials";
 
 import { isLinkedRecordError, usageBlock, type ProductUsage } from "@/lib/product-delete";
 import type {
@@ -657,6 +657,22 @@ const rowToSale = (r: Row): Sale => ({
   roundingAdjustment: num(r.rounding_adjustment) || undefined,
   roundingLabel: r.rounding_label ?? undefined,
 });
+
+export async function findReceiptExact(value: string, branchId: string): Promise<{ sale: Sale; source: "local" | "cloud" } | null> {
+  const lookup = value.trim();
+  if (!lookup || !branchId) return null;
+  const local = localDb();
+  if (!local?.findReceipt) return null;
+  const state = await local.database?.getState?.().catch(() => null);
+  if (!state?.connected) return null;
+  const { sessionToken, cashierToken, accessToken } = await readCredentials();
+  const result = await local.findReceipt(lookup, branchId, { sessionToken, cashierToken, accessToken });
+  if (!result?.sale) return null;
+  const payments = Array.isArray(result.sale.payments) && result.sale.payments.length
+    ? result.sale.payments
+    : (result.payments ?? []).map((payment) => ({ method: payment.method ?? "cash", amount: num(payment.amount), reference: payment.reference ?? undefined }));
+  return { source: result.source, sale: rowToSale({ ...result.sale, sale_items: result.items ?? [], payments }) };
+}
 
 const saleToRow = (s: Sale): Row => ({
   id: s.id,
