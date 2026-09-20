@@ -23,13 +23,7 @@ export type SqlAdminCredentials = {
 export type SqlAttemptStatus = "success" | "failed" | "cancelled" | "timed_out";
 
 export type SqlAttemptStage =
-  | "port"
-  | "instance_lookup"
-  | "driver"
-  | "tls"
-  | "login"
-  | "database"
-  | "write";
+  "port" | "instance_lookup" | "driver" | "tls" | "login" | "database" | "write";
 
 export type SqlAdminFailure = {
   ok: false;
@@ -132,8 +126,7 @@ export type SqlPortProbe =
     });
 
 export type SqlLockResult =
-  | { ok: true; activeDb: string; usedTrustFallback: boolean }
-  | SqlAdminFailure;
+  { ok: true; activeDb: string; usedTrustFallback: boolean } | SqlAdminFailure;
 
 export type SqlAdminBridge = {
   connectInstance: (credentials: SqlAdminCredentials) => Promise<SqlAdminConnectResult>;
@@ -180,9 +173,12 @@ export type SqlAdminBridge = {
     error?: string;
   }>;
   /** Ask the desktop process to validate and adopt the current online session. */
-  adoptSession?: (
-    accessToken: string,
-  ) => Promise<{ ok: boolean; level?: "admin" | "supervisor"; error?: string }>;
+  adoptSession?: (proof: {
+    accessToken?: string;
+    sessionToken?: string;
+    cashierToken?: string;
+    terminalToken?: string;
+  }) => Promise<{ ok: boolean; level?: "admin" | "supervisor"; error?: string }>;
   lockAdmin?: () => Promise<{ ok: boolean }>;
   adminStatus?: () => Promise<{
     unlocked: boolean;

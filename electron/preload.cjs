@@ -5,7 +5,7 @@ const invoke = (channel, ...args) => ipcRenderer.invoke(channel, ...args);
 contextBridge.exposeInMainWorld("sqlAdmin", {
   unlock: (username, pin) => invoke("admin:unlock", username, pin),
   lockAdmin: () => invoke("admin:lock"),
-  adoptSession: (accessToken) => invoke("admin:adopt-session", accessToken),
+  adoptSession: (proof) => invoke("admin:adopt-session", proof),
   status: () => invoke("admin:status"),
 });
 
