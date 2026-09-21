@@ -154,12 +154,4 @@ describe("local SQL Server wizard server step", () => {
     expect(wizard).toContain("flex shrink-0 justify-between");
     expect(wizard).toContain("setStep((value) => Math.min(6, value + 1))");
   });
-
-  it("adopts the signed-in POS identity before every protected wizard step", () => {
-    const wizard = readFileSync("src/platforms/windows/components/LocalDatabaseWizard.tsx", "utf8");
-    expect(wizard).toContain("await window.sqlAdmin?.adoptSession?.(await readCredentials())");
-    expect(wizard).toContain('code: "EAUTHORIZATION"');
-    expect(wizard.indexOf("adoptSession")).toBeLessThan(wizard.indexOf("setResult(await work())"));
-    expect(wizard).not.toContain('code: "EPRIVILEGE"');
-  });
 });

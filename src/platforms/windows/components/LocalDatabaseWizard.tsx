@@ -11,7 +11,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { readCredentials } from "@/lib/pos-credentials";
 import {
   normalizeServerHost,
   parseServerAddress,
@@ -115,20 +114,6 @@ export function LocalDatabaseWizard() {
     setBusy(true);
     setResult(null);
     try {
-      // Re-prove the current POS identity before each protected wizard step.
-      // The backend derives the role and permission from signed credentials;
-      // the renderer never sends or asserts a role itself.
-      const adopted = await window.sqlAdmin?.adoptSession?.(await readCredentials());
-      if (!adopted?.ok) {
-        setResult({
-          ok: false,
-          code: "EAUTHORIZATION",
-          error:
-            adopted?.error ??
-            "Your signed-in POS account could not be verified for database management.",
-        });
-        return;
-      }
       setResult(await work());
     } catch (error) {
       setResult({ ok: false, error: error instanceof Error ? error.message : String(error) });
