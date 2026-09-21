@@ -1,22 +1,57 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { normalizeServerHost, selectDiscoveredServer, type DiscoveredSqlServer, validateServerEndpoint } from "./local-database-server";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import { readCredentials } from "@/lib/pos-credentials";
+import {
+  normalizeServerHost,
+  parseServerAddress,
+  selectDiscoveredServer,
+  type DiscoveredSqlServer,
+  validateServerEndpoint,
+} from "./local-database-server";
 
 type Profile = {
-  host: string; port: number; database: string; authMode: "windows" | "sql";
-  username: string; password: string; encrypt: boolean; trustServerCertificate: boolean;
-  connectionTimeoutMs: number; requestTimeoutMs: number; retentionDays: number;
+  host: string;
+  instanceName: string;
+  port: number;
+  database: string;
+  authMode: "windows" | "sql";
+  username: string;
+  password: string;
+  encrypt: boolean;
+  trustServerCertificate: boolean;
+  connectionTimeoutMs: number;
+  requestTimeoutMs: number;
+  retentionDays: number;
 };
-type DbState = { state: string; enabled: boolean; configured: boolean; connected: boolean; profile?: Partial<Profile> | null; detail?: { error?: string } | null };
+type DbState = {
+  state: string;
+  enabled: boolean;
+  configured: boolean;
+  connected: boolean;
+  profile?: Partial<Profile> | null;
+  detail?: { error?: string } | null;
+};
 type DatabaseApi = {
-  getState(): Promise<DbState>; setEnabled(value: boolean): Promise<DbState>;
+  getState(): Promise<DbState>;
+  setEnabled(value: boolean): Promise<DbState>;
   listServers(): Promise<{ ok: boolean; servers?: DiscoveredSqlServer[]; error?: string }>;
   testServer(profile: Profile): Promise<Record<string, unknown>>;
-  listDatabases(profile: Profile): Promise<{ ok: boolean; databases?: Array<{ name: string; state_desc: string; compatibility_level: number }> ; error?: string }>;
+  listDatabases(profile: Profile): Promise<{
+    ok: boolean;
+    databases?: Array<{ name: string; state_desc: string; compatibility_level: number }>;
+    error?: string;
+  }>;
   validateDatabase(profile: Profile): Promise<Record<string, unknown>>;
   migrateDatabase(profile: Profile): Promise<Record<string, unknown>>;
   saveAndConnect(profile: Profile): Promise<Record<string, unknown>>;
@@ -24,79 +59,649 @@ type DatabaseApi = {
   subscribe(cb: (state: DbState) => void): () => void;
 };
 const api = () => (window.pos as unknown as { database?: DatabaseApi })?.database;
-const initial: Profile = { host: "127.0.0.1", port: 1433, database: "", authMode: "windows", username: "", password: "", encrypt: true, trustServerCertificate: true, connectionTimeoutMs: 15000, requestTimeoutMs: 30000, retentionDays: 90 };
+const initial: Profile = {
+  host: "127.0.0.1",
+  instanceName: "",
+  port: 1433,
+  database: "",
+  authMode: "windows",
+  username: "",
+  password: "",
+  encrypt: true,
+  trustServerCertificate: true,
+  connectionTimeoutMs: 15000,
+  requestTimeoutMs: 30000,
+  retentionDays: 90,
+};
 const steps = ["Mode", "Server", "Authentication", "Test", "Database", "Validate", "Save"];
 
 export function LocalDatabaseWizard() {
-  const [state, setState] = useState<DbState>({ state: "disabled", enabled: false, configured: false, connected: false });
+  const [state, setState] = useState<DbState>({
+    state: "disabled",
+    enabled: false,
+    configured: false,
+    connected: false,
+  });
   const [profile, setProfile] = useState<Profile>(initial);
   const [step, setStep] = useState(0);
+  const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<Record<string, unknown> | null>(null);
-  const [databases, setDatabases] = useState<Array<{ name: string; state_desc: string; compatibility_level: number }>>([]);
+  const [databases, setDatabases] = useState<
+    Array<{ name: string; state_desc: string; compatibility_level: number }>
+  >([]);
   const [search, setSearch] = useState("");
-  const [setupEnabled, setSetupEnabled] = useState(false);
+  const [selectedServer, setSelectedServer] = useState("");
   const [servers, setServers] = useState<DiscoveredSqlServer[]>([]);
   const [scanning, setScanning] = useState(false);
   const [discoveryError, setDiscoveryError] = useState<string | null>(null);
-  const stateRequest = useRef(0);
   useEffect(() => {
     const database = api();
-    const request = stateRequest.current;
     void database?.getState().then((next) => {
-      if (request !== stateRequest.current) return;
-      setState(next); setSetupEnabled(next.enabled);
+      setState(next);
       if (next.profile) setProfile((old) => ({ ...old, ...next.profile, password: "" }));
     });
-    return database?.subscribe?.((next) => { setState(next); setSetupEnabled(next.enabled); });
+    return database?.subscribe?.((next) => {
+      setState(next);
+    });
   }, []);
-  const shown = useMemo(() => databases.filter((item) => item.name.toLowerCase().includes(search.toLowerCase())), [databases, search]);
-  const serverValidation = validateServerEndpoint(profile.host, profile.port);
+  const shown = useMemo(
+    () => databases.filter((item) => item.name.toLowerCase().includes(search.toLowerCase())),
+    [databases, search],
+  );
+  const serverValidation = validateServerEndpoint(profile.host, profile.port, profile.instanceName);
   const run = async (work: () => Promise<Record<string, unknown>>) => {
     if (busy) return;
-    setBusy(true); setResult(null);
-    try { setResult(await work()); }
-    catch (error) { setResult({ ok: false, error: error instanceof Error ? error.message : String(error) }); }
-    finally { setBusy(false); }
+    setBusy(true);
+    setResult(null);
+    try {
+      // Re-prove the current POS identity before each protected wizard step.
+      // The backend derives the role and permission from signed credentials;
+      // the renderer never sends or asserts a role itself.
+      const adopted = await window.sqlAdmin?.adoptSession?.(await readCredentials());
+      if (!adopted?.ok) {
+        setResult({
+          ok: false,
+          code: "EAUTHORIZATION",
+          error:
+            adopted?.error ??
+            "Your signed-in POS account could not be verified for database management.",
+        });
+        return;
+      }
+      setResult(await work());
+    } catch (error) {
+      setResult({ ok: false, error: error instanceof Error ? error.message : String(error) });
+    } finally {
+      setBusy(false);
+    }
   };
   const scanServers = async () => {
     const database = api();
-    if (!database) { setDiscoveryError("Server discovery is available only in the Windows desktop app."); return; }
-    setScanning(true); setDiscoveryError(null);
+    if (!database) {
+      setDiscoveryError("Server discovery is available only in the Windows desktop app.");
+      return;
+    }
+    setScanning(true);
+    setDiscoveryError(null);
     try {
       const response = await database.listServers();
       setServers(response.servers ?? []);
       if (!response.ok) setDiscoveryError(response.error ?? "Server discovery did not complete.");
-    } catch (error) { setServers([]); setDiscoveryError(error instanceof Error ? error.message : String(error)); }
-    finally { setScanning(false); }
+    } catch (error) {
+      setServers([]);
+      setDiscoveryError(error instanceof Error ? error.message : String(error));
+    } finally {
+      setScanning(false);
+    }
   };
   const ok = result?.ok === true;
 
-  return <Card className="w-full">
-    <CardHeader><CardTitle className="text-base">Local Microsoft SQL Server</CardTitle><CardDescription>Windows Electron only. Connections use the entered hostname and TCP port.</CardDescription></CardHeader>
-    <CardContent className="space-y-4">
-      <ol className="grid grid-cols-2 gap-1 text-center text-[11px] sm:grid-cols-4 xl:grid-cols-7" aria-label="Database setup steps">{steps.map((name, index) => <li key={name} className={index === step ? "font-semibold text-primary" : "text-muted-foreground"} aria-current={index === step ? "step" : undefined}>{index + 1}. {name}</li>)}</ol>
-      <div className="max-h-[calc(100vh-240px)] min-h-48 overflow-y-auto rounded-md border p-4">
-        {step === 0 && <div className="flex items-center justify-between gap-4"><div><Label htmlFor="local-db-enabled">Use local Microsoft SQL Server</Label><p className="text-sm text-muted-foreground">{setupEnabled ? state.connected ? "Connected" : "Setup or connection check required" : "Central Online mode"}</p></div><Switch id="local-db-enabled" checked={setupEnabled} onCheckedChange={(enabled) => { stateRequest.current += 1; setSetupEnabled(enabled); setState((current) => ({ ...current, enabled })); void api()?.setEnabled(enabled).then((next) => { setState(next); setSetupEnabled(next.enabled); if (enabled) setStep(1); }).catch((error) => { setSetupEnabled(!enabled); setResult({ ok: false, error: error instanceof Error ? error.message : String(error) }); }); }} /></div>}
-        {step === 1 && <div className="space-y-3"><div className="grid gap-3 sm:grid-cols-2"><Field label="Server hostname or IP"><Input aria-invalid={Boolean(serverValidation)} value={profile.host} onBlur={() => setProfile((current) => ({ ...current, host: normalizeServerHost(current.host) }))} onChange={(e) => setProfile({ ...profile, host: e.target.value })} /></Field><Field label="TCP port"><Input type="number" min={1} max={65535} value={profile.port} onChange={(e) => setProfile({ ...profile, port: Number(e.target.value) })} /></Field><Toggle label="Encrypt connection" value={profile.encrypt} change={(encrypt) => setProfile({ ...profile, encrypt })} /><Toggle label="Trust server certificate" value={profile.trustServerCertificate} change={(trustServerCertificate) => setProfile({ ...profile, trustServerCertificate })} /><Field label="Connection timeout (ms)"><Input type="number" value={profile.connectionTimeoutMs} onChange={(e) => setProfile({ ...profile, connectionTimeoutMs: Number(e.target.value) })} /></Field><Field label="Request timeout (ms)"><Input type="number" value={profile.requestTimeoutMs} onChange={(e) => setProfile({ ...profile, requestTimeoutMs: Number(e.target.value) })} /></Field></div>{serverValidation ? <p className="text-sm text-destructive" role="alert">{serverValidation}</p> : <p className="text-sm text-muted-foreground">A valid server name enables Next. The connection is tested in the Test step.</p>}<div className="rounded-md border p-3 space-y-2"><div className="flex flex-wrap items-center justify-between gap-2"><div><p className="font-medium text-sm">Find local SQL Server</p><p className="text-sm text-muted-foreground">Checks this computer’s default SQL Server service only. It does not probe the LAN or named instances.</p></div><Button type="button" variant="outline" disabled={scanning} onClick={() => void scanServers()}>{scanning ? "Scanning…" : "Scan / Discover Servers"}</Button></div>{discoveryError ? <p className="text-sm text-destructive" role="alert">{discoveryError}</p> : null}{!scanning && servers.length === 0 && !discoveryError ? <p className="text-sm text-muted-foreground">Scan to show local default-instance server aliases. You can always enter a hostname manually.</p> : null}{servers.length > 0 ? <div className="grid gap-2">{servers.map((server) => <button type="button" key={server.host} onClick={() => setProfile((current) => selectDiscoveredServer(current, server))} className={`flex items-center justify-between rounded border px-3 py-2 text-left text-sm ${normalizeServerHost(profile.host) === server.host ? "border-primary bg-primary/10" : "hover:bg-muted"}`}><span>{server.label}</span><span className="text-muted-foreground">{server.status === "running" ? "Running" : "Installed"}</span></button>)}</div> : null}</div></div>}
-        {step === 2 && <div className="space-y-3"><div className="flex gap-2"><Button variant={profile.authMode === "windows" ? "default" : "outline"} onClick={() => setProfile({ ...profile, authMode: "windows", username: "", password: "" })}>Windows Integrated</Button><Button variant={profile.authMode === "sql" ? "default" : "outline"} onClick={() => setProfile({ ...profile, authMode: "sql" })}>SQL Server Authentication</Button></div>{profile.authMode === "sql" && <div className="grid gap-3 sm:grid-cols-2"><Field label="Username"><Input autoComplete="username" value={profile.username} onChange={(e) => setProfile({ ...profile, username: e.target.value })} /></Field><Field label="Password"><Input type="password" autoComplete="new-password" value={profile.password} onChange={(e) => setProfile({ ...profile, password: e.target.value })} /></Field></div>}</div>}
-        {step === 3 && <Action title="Test direct server connection" text="Tests ODBC Driver 18, TCP, TLS and authentication against master." busy={busy} onClick={() => run(() => api()!.testServer(profile))} result={result} />}
-        {step === 4 && <div className="space-y-3"><Action title="Choose an accessible database" text="System databases are excluded." busy={busy} onClick={() => run(async () => { const response = await api()!.listDatabases(profile); setDatabases(response.databases ?? []); return response as unknown as Record<string, unknown>; })} result={result} /><Input aria-label="Search databases" placeholder="Search databases" value={search} onChange={(e) => setSearch(e.target.value)} /><div className="max-h-52 overflow-y-auto">{shown.map((db) => <button type="button" key={db.name} onClick={() => setProfile({ ...profile, database: db.name })} className={`flex w-full justify-between rounded px-3 py-2 text-left text-sm ${profile.database === db.name ? "bg-primary text-primary-foreground" : "hover:bg-muted"}`}><span>{db.name}</span><span>{db.state_desc}</span></button>)}</div></div>}
-        {step === 5 && <div className="space-y-3"><Action title={`Validate ${profile.database || "selected database"}`} text="Checks schema, columns, change tracking, permissions and a rolled-back write." busy={busy} onClick={() => run(() => api()!.validateDatabase(profile))} result={result} />{result?.status === "migration_required" && <Button variant="outline" disabled={busy} onClick={() => run(async()=>{const migrated=await api()!.migrateDatabase(profile);if(!migrated.ok)return migrated;return api()!.validateDatabase(profile);})}>Apply approved migration and validate again</Button>}</div>}
-        {step === 6 && <div className="space-y-4"><Field label="Local history retention"><select className="h-10 w-full rounded-md border bg-background px-3" value={profile.retentionDays} onChange={(e) => setProfile({ ...profile, retentionDays: Number(e.target.value) })}><option value={30}>30 days</option><option value={90}>90 days</option><option value={180}>6 months</option><option value={365}>12 months</option><option value={730}>24 months</option><option value={7300}>All history</option></select></Field><Action title="Save and connect" text="The password is sealed with Windows DPAPI and is never returned to this screen." busy={busy} onClick={() => run(async () => { const response = await api()!.saveAndConnect(profile); if (response.ok) { setProfile((old) => ({ ...old, password: "" })); setState(await api()!.getState()); } return response; })} result={result} /></div>}
-      </div>
-      <div className="sticky bottom-0 flex justify-between gap-2 bg-card pt-2"><Button variant="outline" disabled={step === 0 || busy} onClick={() => { setResult(null); setStep((value) => value - 1); }}>Back</Button><div className="flex gap-2">{state.configured && <Button variant="destructive" onClick={() => void api()?.removeConfiguration().then(setState)}>Remove configuration</Button>}<Button disabled={!setupEnabled || step === 6 || busy || (step === 1 && Boolean(serverValidation)) || (step === 3 && !ok) || (step === 4 && !profile.database) || (step === 5 && result?.ready !== true)} onClick={() => { setResult(null); setStep((value) => Math.min(6, value + 1)); }}>Next</Button></div></div>
-    </CardContent>
-  </Card>;
+  const toggleLocalMode = (enabled: boolean) => {
+    if (enabled) {
+      setStep(0);
+      setResult(null);
+      setOpen(true);
+      return;
+    }
+    void api()
+      ?.setEnabled(false)
+      .then((next) => {
+        setState(next);
+      })
+      .catch((error) =>
+        setResult({ ok: false, error: error instanceof Error ? error.message : String(error) }),
+      );
+  };
+  const chooseServer = (host: string) => {
+    setSelectedServer(host);
+    const server = servers.find(
+      (item) => `${item.host}|${item.instanceName ?? ""}|${item.port ?? ""}` === host,
+    );
+    if (server) setProfile((current) => selectDiscoveredServer(current, server));
+  };
+
+  return (
+    <>
+      <Card className="w-full">
+        <CardHeader>
+          <CardTitle className="text-base">Local Microsoft SQL Server</CardTitle>
+          <CardDescription>
+            Direct TCP connection from this Windows terminal. SQL Browser, SQLite, and network-wide
+            probing are not used.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="flex items-center justify-between gap-4">
+          <div>
+            <Label htmlFor="local-db-enabled">Use local Microsoft SQL Server</Label>
+            <p className="text-sm text-muted-foreground">
+              {state.enabled
+                ? state.connected
+                  ? "Connected"
+                  : "Enabled — connection requires attention"
+                : "Central Online mode"}
+            </p>
+          </div>
+          <div className="flex items-center gap-2">
+            {state.configured && (
+              <Button
+                type="button"
+                variant="outline"
+                onClick={() => {
+                  setStep(0);
+                  setOpen(true);
+                }}
+              >
+                Configure
+              </Button>
+            )}
+            <Switch
+              id="local-db-enabled"
+              checked={state.enabled || open}
+              onCheckedChange={toggleLocalMode}
+            />
+          </div>
+        </CardContent>
+      </Card>
+      <Dialog open={open} onOpenChange={setOpen}>
+        <DialogContent className="flex max-h-[92dvh] flex-col overflow-hidden sm:max-w-3xl">
+          <DialogHeader>
+            <DialogTitle>Connect directly to Microsoft SQL Server</DialogTitle>
+            <DialogDescription>
+              Nothing is enabled or saved until the final Save and connect step succeeds.
+            </DialogDescription>
+          </DialogHeader>
+          <div className="flex min-h-0 flex-1 flex-col gap-4 overflow-hidden">
+            <ol
+              className="grid grid-cols-2 gap-1 text-center text-[11px] sm:grid-cols-4 xl:grid-cols-7"
+              aria-label="Database setup steps"
+            >
+              {steps.map((name, index) => (
+                <li
+                  key={name}
+                  className={
+                    index === step ? "font-semibold text-primary" : "text-muted-foreground"
+                  }
+                  aria-current={index === step ? "step" : undefined}
+                >
+                  {index + 1}. {name}
+                </li>
+              ))}
+            </ol>
+            <div className="min-h-0 flex-1 overflow-y-auto rounded-md border p-4">
+              {step === 0 && (
+                <div className="space-y-2">
+                  <p className="font-medium">Direct SQL Server mode</p>
+                  <p className="text-sm text-muted-foreground">
+                    This wizard accepts a hostname, IP address, or named instance. A detected or
+                    explicit TCP port is preferred for a direct connection; a named instance can
+                    also resolve its port when TCP port is set to 0. It never uses SQLite.
+                  </p>
+                </div>
+              )}
+              {step === 1 && (
+                <div className="space-y-4">
+                  <div className="rounded-md border p-3 space-y-3">
+                    <div className="flex flex-wrap items-center justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-sm">Detect installed server instances</p>
+                        <p className="text-sm text-muted-foreground">
+                          Reads this computer’s SQL Server names, services, and TCP registry
+                          settings.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="outline"
+                        disabled={scanning}
+                        onClick={() => void scanServers()}
+                      >
+                        {scanning ? "Scanning…" : "Scan / Detect"}
+                      </Button>
+                    </div>
+                    {discoveryError ? (
+                      <p className="text-sm text-destructive" role="alert">
+                        {discoveryError}
+                      </p>
+                    ) : null}
+                    <Field label="Detected SQL Server instance">
+                      <select
+                        aria-label="Detected SQL Server instance"
+                        className="h-10 w-full rounded-md border bg-background px-3"
+                        value={selectedServer}
+                        onChange={(event) => chooseServer(event.target.value)}
+                      >
+                        <option value="">Select a detected instance…</option>
+                        {servers.map((server) => {
+                          const key = `${server.host}|${server.instanceName ?? ""}|${server.port ?? ""}`;
+                          return (
+                            <option key={key} value={key}>
+                              {server.label} · {server.status}
+                              {server.port ? ` · TCP ${server.port}` : " · enter TCP port"}
+                            </option>
+                          );
+                        })}
+                      </select>
+                    </Field>
+                    {!scanning && servers.length === 0 && !discoveryError ? (
+                      <p className="text-sm text-muted-foreground">
+                        No scan results yet. Manual hostname or IP entry is always available.
+                      </p>
+                    ) : null}
+                    {selectedServer && (
+                      <div className="grid gap-2 rounded bg-muted p-3 text-xs sm:grid-cols-2">
+                        <span>
+                          Server:{" "}
+                          {
+                            servers.find(
+                              (item) =>
+                                `${item.host}|${item.instanceName ?? ""}|${item.port ?? ""}` ===
+                                selectedServer,
+                            )?.serverName
+                          }
+                        </span>
+                        <span>
+                          Instance:{" "}
+                          {
+                            servers.find(
+                              (item) =>
+                                `${item.host}|${item.instanceName ?? ""}|${item.port ?? ""}` ===
+                                selectedServer,
+                            )?.instanceName
+                          }
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Server hostname or IP">
+                      <Input
+                        aria-invalid={Boolean(serverValidation)}
+                        value={profile.host}
+                        onBlur={() =>
+                          setProfile((current) => ({
+                            ...current,
+                            host: normalizeServerHost(current.host),
+                          }))
+                        }
+                        onChange={(e) => {
+                          setSelectedServer("");
+                          const parsed = parseServerAddress(e.target.value);
+                          setProfile({
+                            ...profile,
+                            host: parsed.host,
+                            instanceName: parsed.instanceName || profile.instanceName,
+                            port: parsed.instanceName ? 0 : profile.port,
+                          });
+                        }}
+                      />
+                    </Field>
+                    <Field label="Named instance (optional)">
+                      <Input
+                        placeholder="SQLEXPRESS"
+                        value={profile.instanceName}
+                        onChange={(e) => setProfile({ ...profile, instanceName: e.target.value })}
+                      />
+                    </Field>
+                    <Field label="TCP port">
+                      <Input
+                        type="number"
+                        min={0}
+                        max={65535}
+                        value={profile.port}
+                        onChange={(e) => setProfile({ ...profile, port: Number(e.target.value) })}
+                      />
+                    </Field>
+                    <Toggle
+                      label="Encrypt connection"
+                      value={profile.encrypt}
+                      change={(encrypt) => setProfile({ ...profile, encrypt })}
+                    />
+                    <Toggle
+                      label="Trust server certificate"
+                      value={profile.trustServerCertificate}
+                      change={(trustServerCertificate) =>
+                        setProfile({ ...profile, trustServerCertificate })
+                      }
+                    />
+                    <Field label="Connection timeout (ms)">
+                      <Input
+                        type="number"
+                        value={profile.connectionTimeoutMs}
+                        onChange={(e) =>
+                          setProfile({ ...profile, connectionTimeoutMs: Number(e.target.value) })
+                        }
+                      />
+                    </Field>
+                    <Field label="Request timeout (ms)">
+                      <Input
+                        type="number"
+                        value={profile.requestTimeoutMs}
+                        onChange={(e) =>
+                          setProfile({ ...profile, requestTimeoutMs: Number(e.target.value) })
+                        }
+                      />
+                    </Field>
+                  </div>
+                  {serverValidation ? (
+                    <p className="text-sm text-destructive" role="alert">
+                      {serverValidation}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">
+                      Use the detected/known TCP port for a direct connection. Use port 0 only when
+                      Windows must resolve a named instance such as SERVER\\SQLEXPRESS.
+                    </p>
+                  )}
+                </div>
+              )}
+              {step === 2 && (
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    <Button
+                      variant={profile.authMode === "windows" ? "default" : "outline"}
+                      onClick={() =>
+                        setProfile({ ...profile, authMode: "windows", username: "", password: "" })
+                      }
+                    >
+                      Windows Integrated
+                    </Button>
+                    <Button
+                      variant={profile.authMode === "sql" ? "default" : "outline"}
+                      onClick={() => setProfile({ ...profile, authMode: "sql" })}
+                    >
+                      SQL Server Authentication
+                    </Button>
+                  </div>
+                  {profile.authMode === "sql" && (
+                    <div className="grid gap-3 sm:grid-cols-2">
+                      <Field label="Username">
+                        <Input
+                          autoComplete="username"
+                          value={profile.username}
+                          onChange={(e) => setProfile({ ...profile, username: e.target.value })}
+                        />
+                      </Field>
+                      <Field label="Password">
+                        <Input
+                          type="password"
+                          autoComplete="new-password"
+                          value={profile.password}
+                          onChange={(e) => setProfile({ ...profile, password: e.target.value })}
+                        />
+                      </Field>
+                    </div>
+                  )}
+                </div>
+              )}
+              {step === 3 && (
+                <Action
+                  title="Test direct server connection"
+                  text="Tests ODBC Driver 18, TCP, TLS and authentication against master."
+                  busy={busy}
+                  onClick={() => run(() => api()!.testServer(profile))}
+                  result={result}
+                />
+              )}
+              {step === 4 && (
+                <div className="space-y-3">
+                  <Action
+                    title="Load accessible databases"
+                    text="Loads databases directly from the authenticated server. System databases are excluded."
+                    busy={busy}
+                    onClick={() =>
+                      run(async () => {
+                        const response = await api()!.listDatabases(profile);
+                        setDatabases(response.databases ?? []);
+                        return response as unknown as Record<string, unknown>;
+                      })
+                    }
+                    result={result}
+                  />
+                  <Field label="Available database">
+                    <select
+                      aria-label="Available database"
+                      className="h-10 w-full rounded-md border bg-background px-3"
+                      value={profile.database}
+                      onChange={(e) => setProfile({ ...profile, database: e.target.value })}
+                    >
+                      <option value="">Select a database…</option>
+                      {shown.map((db) => (
+                        <option key={db.name} value={db.name}>
+                          {db.name} · {db.state_desc}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                  <Input
+                    aria-label="Search databases"
+                    placeholder="Filter databases"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                  />
+                </div>
+              )}
+              {step === 5 && (
+                <div className="space-y-3">
+                  <Action
+                    title={`Validate ${profile.database || "selected database"}`}
+                    text="Checks schema, tables, columns, change tracking, permissions and a rolled-back write."
+                    busy={busy}
+                    onClick={() => run(() => api()!.validateDatabase(profile))}
+                    result={result}
+                  />
+                  {result?.status === "migration_required" && (
+                    <Button
+                      variant="outline"
+                      disabled={busy}
+                      onClick={() =>
+                        run(async () => {
+                          const migrated = await api()!.migrateDatabase(profile);
+                          if (!migrated.ok) return migrated;
+                          return api()!.validateDatabase(profile);
+                        })
+                      }
+                    >
+                      Apply approved migration and validate again
+                    </Button>
+                  )}
+                </div>
+              )}
+              {step === 6 && (
+                <div className="space-y-4">
+                  <Field label="Local history retention">
+                    <select
+                      className="h-10 w-full rounded-md border bg-background px-3"
+                      value={profile.retentionDays}
+                      onChange={(e) =>
+                        setProfile({ ...profile, retentionDays: Number(e.target.value) })
+                      }
+                    >
+                      <option value={30}>30 days</option>
+                      <option value={90}>90 days</option>
+                      <option value={180}>6 months</option>
+                      <option value={365}>12 months</option>
+                      <option value={730}>24 months</option>
+                      <option value={7300}>All history</option>
+                    </select>
+                  </Field>
+                  <Action
+                    title="Save and connect"
+                    text="The password is sealed with Windows DPAPI and is never returned to this screen."
+                    busy={busy}
+                    onClick={() =>
+                      run(async () => {
+                        const response = await api()!.saveAndConnect(profile);
+                        if (response.ok) {
+                          setProfile((old) => ({ ...old, password: "" }));
+                          const next = await api()!.getState();
+                          setState(next);
+                          setOpen(false);
+                        }
+                        return response;
+                      })
+                    }
+                    result={result}
+                  />
+                </div>
+              )}
+            </div>
+            <div className="flex shrink-0 justify-between gap-2 border-t bg-background pt-3">
+              <Button
+                variant="outline"
+                disabled={step === 0 || busy}
+                onClick={() => {
+                  setResult(null);
+                  setStep((value) => value - 1);
+                }}
+              >
+                Back
+              </Button>
+              <div className="flex gap-2">
+                <Button variant="ghost" onClick={() => setOpen(false)}>
+                  Cancel
+                </Button>
+                <Button
+                  disabled={
+                    step === 6 ||
+                    busy ||
+                    (step === 1 && Boolean(serverValidation)) ||
+                    (step === 3 && !ok) ||
+                    (step === 4 && !profile.database) ||
+                    (step === 5 && result?.ready !== true)
+                  }
+                  onClick={() => {
+                    setResult(null);
+                    setStep((value) => Math.min(6, value + 1));
+                  }}
+                >
+                  Next
+                </Button>
+              </div>
+            </div>
+          </div>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
 }
 
-function Field({ label, children }: { label: string; children: React.ReactNode }) { return <label className="space-y-1 text-sm"><span className="font-medium">{label}</span>{children}</label>; }
-function Toggle({ label, value, change }: { label: string; value: boolean; change(value: boolean): void }) { return <div className="flex items-center justify-between rounded-md border px-3"><Label>{label}</Label><Switch checked={value} onCheckedChange={change} /></div>; }
-function Action({ title, text, busy, onClick, result }: { title: string; text: string; busy: boolean; onClick(): void; result: Record<string, unknown> | null }) { return <div className="space-y-3"><div><p className="font-medium">{title}</p><p className="text-sm text-muted-foreground">{text}</p></div><Button disabled={busy} onClick={onClick}>{busy ? "Working…" : title}</Button>{result && <ResultSummary result={result} />}</div>; }
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <label className="space-y-1 text-sm">
+      <span className="font-medium">{label}</span>
+      {children}
+    </label>
+  );
+}
+function Toggle({
+  label,
+  value,
+  change,
+}: {
+  label: string;
+  value: boolean;
+  change(value: boolean): void;
+}) {
+  return (
+    <div className="flex items-center justify-between rounded-md border px-3">
+      <Label>{label}</Label>
+      <Switch checked={value} onCheckedChange={change} />
+    </div>
+  );
+}
+function Action({
+  title,
+  text,
+  busy,
+  onClick,
+  result,
+}: {
+  title: string;
+  text: string;
+  busy: boolean;
+  onClick(): void;
+  result: Record<string, unknown> | null;
+}) {
+  return (
+    <div className="space-y-3">
+      <div>
+        <p className="font-medium">{title}</p>
+        <p className="text-sm text-muted-foreground">{text}</p>
+      </div>
+      <Button disabled={busy} onClick={onClick}>
+        {busy ? "Working…" : title}
+      </Button>
+      {result && <ResultSummary result={result} />}
+    </div>
+  );
+}
 
 function ResultSummary({ result }: { result: Record<string, unknown> }) {
-  if (result.ok === false) return <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive" role="alert"><p className="font-medium">{String(result.error ?? "The check failed.")}</p>{result.hint ? <p className="mt-1">{String(result.hint)}</p> : null}{result.code ? <p className="mt-1 text-xs">Code: {String(result.code)}</p> : null}</div>;
-  if (typeof result.requiredTables === "number") return <div className="grid gap-2 rounded-md bg-muted p-3 text-sm sm:grid-cols-2" role="status"><span>Required tables: {String(result.requiredTables)}</span><span>Present: {String(result.presentTables ?? 0)}</span><span>Missing: {Array.isArray(result.missingTables) ? result.missingTables.length : 0}</span><span>Columns compatible: {result.columnsCompatible ? "Yes" : "No"}</span><span>Write test: {result.writeTest ? "Passed and rolled back" : "Failed"}</span><span>Status: {result.ready ? "Ready" : String(result.status ?? "Migration required")}</span></div>;
-  if (result.version || result.edition) return <div className="grid gap-2 rounded-md bg-muted p-3 text-sm sm:grid-cols-2" role="status"><span>SQL Server: {String(result.version ?? "Detected")}</span><span>Edition: {String(result.edition ?? "Unknown")}</span><span>Login: {String(result.loginName ?? "Verified")}</span><span>Latency: {String(result.latencyMs ?? "—")} ms</span><span>List databases: {result.canListDatabases ? "Allowed" : "Not allowed"}</span></div>;
-  return <p className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400" role="status">{Array.isArray(result.databases) ? `${result.databases.length} accessible database${result.databases.length === 1 ? "" : "s"} loaded.` : Array.isArray(result.applied) ? `${result.applied.length} migration${result.applied.length === 1 ? "" : "s"} applied.` : "Completed successfully."}</p>;
+  if (result.ok === false)
+    return (
+      <div className="rounded-md bg-destructive/10 p-3 text-sm text-destructive" role="alert">
+        <p className="font-medium">{String(result.error ?? "The check failed.")}</p>
+        {result.hint ? <p className="mt-1">{String(result.hint)}</p> : null}
+        {result.code ? <p className="mt-1 text-xs">Code: {String(result.code)}</p> : null}
+      </div>
+    );
+  if (typeof result.requiredTables === "number")
+    return (
+      <div className="grid gap-2 rounded-md bg-muted p-3 text-sm sm:grid-cols-2" role="status">
+        <span>Required tables: {String(result.requiredTables)}</span>
+        <span>Present: {String(result.presentTables ?? 0)}</span>
+        <span>
+          Missing: {Array.isArray(result.missingTables) ? result.missingTables.length : 0}
+        </span>
+        <span>Columns compatible: {result.columnsCompatible ? "Yes" : "No"}</span>
+        <span>Write test: {result.writeTest ? "Passed and rolled back" : "Failed"}</span>
+        <span>
+          Status: {result.ready ? "Ready" : String(result.status ?? "Migration required")}
+        </span>
+      </div>
+    );
+  if (result.version || result.edition)
+    return (
+      <div className="grid gap-2 rounded-md bg-muted p-3 text-sm sm:grid-cols-2" role="status">
+        <span>SQL Server: {String(result.version ?? "Detected")}</span>
+        <span>Edition: {String(result.edition ?? "Unknown")}</span>
+        <span>Login: {String(result.loginName ?? "Verified")}</span>
+        <span>Latency: {String(result.latencyMs ?? "—")} ms</span>
+        <span>List databases: {result.canListDatabases ? "Allowed" : "Not allowed"}</span>
+      </div>
+    );
+  return (
+    <p
+      className="rounded-md bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-400"
+      role="status"
+    >
+      {Array.isArray(result.databases)
+        ? `${result.databases.length} accessible database${result.databases.length === 1 ? "" : "s"} loaded.`
+        : Array.isArray(result.applied)
+          ? `${result.applied.length} migration${result.applied.length === 1 ? "" : "s"} applied.`
+          : "Completed successfully."}
+    </p>
+  );
 }

@@ -2,6 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import {
   normalizeServerHost,
+  parseServerAddress,
   selectDiscoveredServer,
   validateServerEndpoint,
 } from "../components/local-database-server";
@@ -21,45 +22,144 @@ describe("local SQL Server wizard server step", () => {
     expect(validateServerEndpoint(normalizeServerHost("  127.0.0.1  "), 1433)).toBeNull();
   });
 
-  it("keeps empty, malformed, named-instance, and invalid-port entries from advancing", () => {
+  it("accepts named instances while rejecting malformed endpoints and invalid ports", () => {
     expect(validateServerEndpoint("", 1433)).toContain("Enter a SQL Server hostname");
     expect(validateServerEndpoint("not a host", 1433)).toContain("valid hostname");
-    expect(validateServerEndpoint("localhost\\SQLEXPRESS", 1433)).toContain("Named instances");
+    expect(parseServerAddress("localhost\\SQLEXPRESS")).toEqual({
+      host: "localhost",
+      instanceName: "SQLEXPRESS",
+    });
+    expect(validateServerEndpoint("localhost\\SQLEXPRESS", 0)).toBeNull();
+    expect(validateServerEndpoint("localhost", 0, "SQLEXPRESS")).toBeNull();
+    expect(validateServerEndpoint("localhost", 0, "bad instance!")).toContain(
+      "valid SQL Server instance",
+    );
     expect(validateServerEndpoint("localhost", 0)).toContain("TCP port");
   });
 
   it("populates the manual field when a discovered server is selected", () => {
-    expect(selectDiscoveredServer({ host: "manual-host", port: 1433 }, {
-      host: "  localhost ", label: "Localhost", status: "running",
-    })).toEqual({ host: "localhost", port: 1433 });
+    expect(
+      selectDiscoveredServer(
+        { host: "manual-host", port: 1433 },
+        {
+          host: "  POS-01 ",
+          label: "POS-01 — SALES",
+          instanceName: "SALES",
+          port: 51433,
+          status: "running",
+        },
+      ),
+    ).toEqual({ host: "POS-01", instanceName: "SALES", port: 51433 });
   });
 
-  it("returns safe local aliases only when the local default service is running", async () => {
+  it("returns installed local instances with their direct TCP ports", async () => {
     const result = await discoverLocalSqlServers({
-      platform: "win32", hostname: "POS-01",
-      run: (_file: string, _args: string[], _options: unknown, done: (error: Error | null, stdout?: string) => void) => done(null, "STATE              : 4  RUNNING"),
+      platform: "win32",
+      hostname: "POS-01",
+      run: (
+        _file: string,
+        _args: string[],
+        _options: unknown,
+        done: (error: Error | null, stdout?: string) => void,
+      ) =>
+        done(
+          null,
+          JSON.stringify([
+            {
+              instanceName: "MSSQLSERVER",
+              serviceName: "MSSQLSERVER",
+              status: "running",
+              port: 1433,
+            },
+            { instanceName: "SALES", serviceName: "MSSQL$SALES", status: "installed", port: 51433 },
+          ]),
+        ),
     });
-    expect(result).toEqual({ ok: true, servers: [
-      { host: "localhost", label: "localhost", status: "running" },
-      { host: "127.0.0.1", label: "127.0.0.1", status: "running" },
-      { host: "POS-01", label: "POS-01 (this computer)", status: "running" },
-    ] });
+    expect(result).toEqual({
+      ok: true,
+      servers: [
+        {
+          host: "POS-01",
+          serverName: "POS-01",
+          instanceName: "MSSQLSERVER",
+          serviceName: "MSSQLSERVER",
+          label: "POS-01 — default instance",
+          status: "running",
+          port: 1433,
+        },
+        {
+          host: "POS-01",
+          serverName: "POS-01",
+          instanceName: "SALES",
+          serviceName: "MSSQL$SALES",
+          label: "POS-01 — SALES",
+          status: "installed",
+          port: 51433,
+        },
+      ],
+    });
   });
 
   it("reports supported error and empty-result scan states without probing a network", async () => {
     const empty = await discoverLocalSqlServers({
-      platform: "win32", hostname: "POS-01",
-      run: (_file: string, _args: string[], _options: unknown, done: (error: Error | null, stdout?: string) => void) => done(new Error("not installed"), ""),
+      platform: "win32",
+      hostname: "POS-01",
+      run: (
+        _file: string,
+        _args: string[],
+        _options: unknown,
+        done: (error: Error | null, stdout?: string) => void,
+      ) => done(new Error("not installed"), ""),
     });
-    expect(empty).toEqual({ ok: true, servers: [] });
-    await expect(discoverLocalSqlServers({ platform: "linux" })).resolves.toMatchObject({ ok: false, servers: [] });
+    expect(empty).toMatchObject({
+      ok: false,
+      servers: [],
+      error: expect.stringContaining("inspect"),
+    });
+    await expect(discoverLocalSqlServers({ platform: "linux" })).resolves.toMatchObject({
+      ok: false,
+      servers: [],
+    });
   });
 
   it("keeps manual entry available and presents scan loading, error, and empty states", () => {
     const wizard = readFileSync("src/platforms/windows/components/LocalDatabaseWizard.tsx", "utf8");
-    expect(wizard).toContain('const [scanning, setScanning]');
-    expect(wizard).toContain('scanning ? "Scanning…" : "Scan / Discover Servers"');
+    expect(wizard).toContain("const [scanning, setScanning]");
+    expect(wizard).toContain('scanning ? "Scanning…" : "Scan / Detect"');
     expect(wizard).toContain("discoveryError");
-    expect(wizard).toContain("You can always enter a hostname manually.");
+    expect(wizard).toContain("Manual hostname or IP entry is always available.");
+    expect(wizard).toContain('aria-label="Detected SQL Server instance"');
+    expect(wizard).toContain('aria-label="Available database"');
+  });
+
+  it("preserves the seven-step wizard and keeps discovery separate from persistence", () => {
+    const wizard = readFileSync("src/platforms/windows/components/LocalDatabaseWizard.tsx", "utf8");
+    expect(wizard).toContain(
+      'const steps = ["Mode", "Server", "Authentication", "Test", "Database", "Validate", "Save"]',
+    );
+    expect(wizard).toContain("const response = await database.listServers()");
+    expect(wizard).toContain("selectDiscoveredServer(current, server)");
+    expect(wizard).toContain("saveAndConnect(profile)");
+
+    const scan = wizard.slice(wizard.indexOf("const scanServers"), wizard.indexOf("const ok ="));
+    expect(scan).not.toContain("saveAndConnect");
+    expect(scan).not.toContain("setEnabled");
+    expect(scan).not.toContain("removeConfiguration");
+  });
+
+  it("keeps the wizard navigation footer visible while the step body scrolls", () => {
+    const wizard = readFileSync("src/platforms/windows/components/LocalDatabaseWizard.tsx", "utf8");
+    expect(wizard).toContain("flex max-h-[92dvh] flex-col overflow-hidden");
+    expect(wizard).toContain("min-h-0 flex-1 overflow-y-auto");
+    expect(wizard).toContain("flex shrink-0 justify-between");
+    expect(wizard).toContain("setStep((value) => Math.min(6, value + 1))");
+  });
+
+  it("adopts the signed-in POS identity before every protected wizard step", () => {
+    const wizard = readFileSync("src/platforms/windows/components/LocalDatabaseWizard.tsx", "utf8");
+    expect(wizard).toContain("await window.sqlAdmin?.adoptSession?.(await readCredentials())");
+    expect(wizard).toContain('code: "EAUTHORIZATION"');
+    expect(wizard.indexOf("adoptSession")).toBeLessThan(wizard.indexOf("setResult(await work())"));
+    expect(wizard).not.toContain('code: "EPRIVILEGE"');
   });
 });
