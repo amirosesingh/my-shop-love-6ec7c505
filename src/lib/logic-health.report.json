@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-09-19T12:22:30.702Z",
-  "filesScanned": 615,
+  "generatedAt": "2026-09-21T10:32:14.397Z",
+  "filesScanned": 619,
   "counts": {
     "critical": 5,
     "warning": 2,
-    "info": 272
+    "info": 273
   },
   "findings": [
     {
@@ -215,126 +215,126 @@
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/core/api/pos-db.ts:851:No failure handling",
+      "id": "src/core/api/pos-db.ts:867:No failure handling",
       "file": "src/core/api/pos-db.ts",
-      "line": 851,
+      "line": 867,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "tierId() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/core/api/pos-db.ts:852:No failure handling",
+      "id": "src/core/api/pos-db.ts:868:No failure handling",
       "file": "src/core/api/pos-db.ts",
-      "line": 852,
+      "line": 868,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "tierName() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/core/api/pos-db.ts:861:No failure handling",
+      "id": "src/core/api/pos-db.ts:877:No failure handling",
       "file": "src/core/api/pos-db.ts",
-      "line": 861,
+      "line": 877,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "importSampleData() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/core/api/pos-db.ts:1012:No failure handling",
+      "id": "src/core/api/pos-db.ts:1028:No failure handling",
       "file": "src/core/api/pos-db.ts",
-      "line": 1012,
+      "line": 1028,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "loadLocalState() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/core/api/pos-db.ts:1052:No failure handling",
+      "id": "src/core/api/pos-db.ts:1068:No failure handling",
       "file": "src/core/api/pos-db.ts",
-      "line": 1052,
+      "line": 1068,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "loadActiveShift() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/core/api/pos-db.ts:1136:No failure handling",
+      "id": "src/core/api/pos-db.ts:1152:No failure handling",
       "file": "src/core/api/pos-db.ts",
-      "line": 1136,
+      "line": 1152,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "loadSalesPage() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/core/api/pos-db.ts:1165:No failure handling",
+      "id": "src/core/api/pos-db.ts:1181:No failure handling",
       "file": "src/core/api/pos-db.ts",
-      "line": 1165,
+      "line": 1181,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "loadShiftSessions() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/core/api/pos-db.ts:1282:No failure handling",
+      "id": "src/core/api/pos-db.ts:1298:No failure handling",
       "file": "src/core/api/pos-db.ts",
-      "line": 1282,
+      "line": 1298,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "loadReceivingInvoices() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/core/api/pos-db.ts:1311:No failure handling",
+      "id": "src/core/api/pos-db.ts:1327:No failure handling",
       "file": "src/core/api/pos-db.ts",
-      "line": 1311,
+      "line": 1327,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "loadReceivingDrafts() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/core/api/pos-db.ts:1318:No failure handling",
+      "id": "src/core/api/pos-db.ts:1334:No failure handling",
       "file": "src/core/api/pos-db.ts",
-      "line": 1318,
+      "line": 1334,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "invoiceNumberTaken() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/core/api/pos-db.ts:1331:No failure handling",
+      "id": "src/core/api/pos-db.ts:1347:No failure handling",
       "file": "src/core/api/pos-db.ts",
-      "line": 1331,
+      "line": 1347,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "loadProductsByIds() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/core/api/pos-db.ts:1344:No failure handling",
+      "id": "src/core/api/pos-db.ts:1360:No failure handling",
       "file": "src/core/api/pos-db.ts",
-      "line": 1344,
+      "line": 1360,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "queue() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/core/api/pos-db.ts:1433:No failure handling",
+      "id": "src/core/api/pos-db.ts:1449:No failure handling",
       "file": "src/core/api/pos-db.ts",
-      "line": 1433,
+      "line": 1449,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "applyStockDeltas() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/core/api/pos-db.ts:1438:No failure handling",
+      "id": "src/core/api/pos-db.ts:1454:No failure handling",
       "file": "src/core/api/pos-db.ts",
-      "line": 1438,
+      "line": 1454,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "runBatchLive() awaits work without a try/catch.",
@@ -386,9 +386,9 @@
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/core/local-db/local-db.ts:744:No failure handling",
+      "id": "src/core/local-db/local-db.ts:747:No failure handling",
       "file": "src/core/local-db/local-db.ts",
-      "line": 744,
+      "line": 747,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "loadLocalDbConfig() awaits work without a try/catch.",
@@ -2141,36 +2141,45 @@
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/platforms/windows/components/LocalDatabaseOperations.tsx:12:No failure handling",
-      "file": "src/platforms/windows/components/LocalDatabaseOperations.tsx",
-      "line": 12,
-      "rule": "No failure handling",
-      "severity": "info",
-      "detail": "refresh() awaits work without a try/catch.",
-      "hint": "Consider reporting the failure to the user."
-    },
-    {
-      "id": "src/platforms/windows/components/LocalDatabaseWizard.tsx:46:Unvalidated number input",
+      "id": "src/platforms/windows/components/LocalDatabaseWizard.tsx:358:Unvalidated number input",
       "file": "src/platforms/windows/components/LocalDatabaseWizard.tsx",
-      "line": 46,
+      "line": 358,
       "rule": "Unvalidated number input",
       "severity": "info",
-      "detail": "{step === 1 && <div className=\"grid gap-3 sm:grid-cols-2\"><Field label=\"Server hostname or IP\"><Input value={profile.host} onChange={(e) => ",
+      "detail": "onChange={(e) => setProfile({ ...profile, port: Number(e.target.value) })}",
       "hint": "An empty or bad entry becomes NaN."
     },
     {
-      "id": "src/platforms/windows/components/LocalDatabaseWizard.tsx:51:Unvalidated number input",
+      "id": "src/platforms/windows/components/LocalDatabaseWizard.tsx:378:Unvalidated number input",
       "file": "src/platforms/windows/components/LocalDatabaseWizard.tsx",
-      "line": 51,
+      "line": 378,
       "rule": "Unvalidated number input",
       "severity": "info",
-      "detail": "{step === 6 && <div className=\"space-y-4\"><Field label=\"Local history retention\"><select className=\"h-10 w-full rounded-md border bg-backgro",
+      "detail": "setProfile({ ...profile, connectionTimeoutMs: Number(e.target.value) })",
       "hint": "An empty or bad entry becomes NaN."
     },
     {
-      "id": "src/platforms/windows/components/PrivilegeGate.tsx:57:No failure handling",
+      "id": "src/platforms/windows/components/LocalDatabaseWizard.tsx:387:Unvalidated number input",
+      "file": "src/platforms/windows/components/LocalDatabaseWizard.tsx",
+      "line": 387,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "setProfile({ ...profile, requestTimeoutMs: Number(e.target.value) })",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/platforms/windows/components/LocalDatabaseWizard.tsx:523:Unvalidated number input",
+      "file": "src/platforms/windows/components/LocalDatabaseWizard.tsx",
+      "line": 523,
+      "rule": "Unvalidated number input",
+      "severity": "info",
+      "detail": "setProfile({ ...profile, retentionDays: Number(e.target.value) })",
+      "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/platforms/windows/components/PrivilegeGate.tsx:58:No failure handling",
       "file": "src/platforms/windows/components/PrivilegeGate.tsx",
-      "line": 57,
+      "line": 58,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "sync() awaits work without a try/catch.",
@@ -2204,9 +2213,9 @@
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/platforms/windows/privilege-bridge.ts:55:No failure handling",
+      "id": "src/platforms/windows/privilege-bridge.ts:67:No failure handling",
       "file": "src/platforms/windows/privilege-bridge.ts",
-      "line": 55,
+      "line": 67,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "original() awaits work without a try/catch.",
@@ -2339,18 +2348,18 @@
       "hint": "An empty or bad entry becomes NaN."
     },
     {
-      "id": "src/routes/receipts.tsx:175:No failure handling",
+      "id": "src/routes/receipts.tsx:194:No failure handling",
       "file": "src/routes/receipts.tsx",
-      "line": 175,
+      "line": 194,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "openCancel() awaits work without a try/catch.",
       "hint": "Consider reporting the failure to the user."
     },
     {
-      "id": "src/routes/receipts.tsx:216:No failure handling",
+      "id": "src/routes/receipts.tsx:235:No failure handling",
       "file": "src/routes/receipts.tsx",
-      "line": 216,
+      "line": 235,
       "rule": "No failure handling",
       "severity": "info",
       "detail": "openPaymentFix() awaits work without a try/catch.",
