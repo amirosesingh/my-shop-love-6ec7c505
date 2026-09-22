@@ -33,11 +33,11 @@ export const Route = createFileRoute("/api/v1/pos/ipc-adopt")({
         const { resolveRelayScope } = await import("@/core/api/relay-policy.server");
         try {
           const scope = await resolveRelayScope(await verifyRelayCaller(proof));
-          if (!(
-            scope.role === "admin" ||
-            scope.roleSlug === "admin" ||
-            scope.permissions.can_manage_sync_backup === true
-          )) {
+          // The app_users role is the authority for the desktop's admin IPC
+          // session. Do not promote a browser-provided permission matrix to
+          // administrator: that would allow a non-admin to alter the terminal
+          // connection and its sealed credentials.
+          if (!(scope.role === "admin" || scope.roleSlug === "admin")) {
             return Response.json(
               { ok: false, error: "This account cannot manage database and sync." },
               { status: 403 },

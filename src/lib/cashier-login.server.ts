@@ -21,6 +21,10 @@ export type CashierLoginResult =
         username: string;
         full_name: string;
         store_id: string | null;
+        /** Authoritative public.app_users role; never infer this from the PIN client. */
+        role: "admin" | "manager" | "staff";
+        /** Optional custom role label, used for display and policy resolution. */
+        role_slug: string | null;
         permissions: Record<string, boolean>;
       };
     }
@@ -95,7 +99,7 @@ export async function cashierLoginServer(input: {
   }
 
   const profileResponse = await serviceRest(
-    `app_users?user_id=eq.${encodeURIComponent(row.user_id)}&select=id,user_id,full_name,store_id,permissions,is_active&limit=1`,
+    `app_users?user_id=eq.${encodeURIComponent(row.user_id)}&select=id,user_id,full_name,store_id,role,role_slug,permissions,is_active&limit=1`,
   );
   if (!profileResponse.ok) return { ok: false, error: "Could not load this staff account" };
   const profiles = (await profileResponse.json()) as {
@@ -103,6 +107,8 @@ export async function cashierLoginServer(input: {
     user_id: string;
     full_name: string;
     store_id: string | null;
+    role: "admin" | "manager" | "staff";
+    role_slug: string | null;
     permissions: Record<string, boolean> | null;
     is_active: boolean;
   }[];
@@ -129,6 +135,8 @@ export async function cashierLoginServer(input: {
     username: profile.user_id,
     full_name: profile.full_name || profile.user_id,
     store_id: ownBranch ?? tillBranch,
+    role: profile.role,
+    role_slug: profile.role_slug ?? null,
     permissions: profile.permissions ?? {},
   };
 
@@ -145,7 +153,7 @@ export async function cashierLoginServer(input: {
   await writeSystemAudit({
     actorId: cashier.username,
     actorName: cashier.full_name,
-    actorRole: "cashier",
+    actorRole: cashier.role_slug ?? cashier.role,
     actionType: "auth.sign_in",
     entityAffected: "app_users",
     entityId: cashier.username,

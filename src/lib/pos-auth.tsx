@@ -133,6 +133,8 @@ export type TerminalUser = {
   userCode: string;
   name: string;
   role: AppRole;
+  /** The optional custom role held by the central staff record. */
+  roleSlug?: string | null;
   storeId: string | null;
   email: string;
   /** row id in public.cashiers when this is a cashier terminal session */
@@ -596,6 +598,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         username: string;
         full_name: string;
         store_id: string | null;
+        role: AppRole;
+        role_slug: string | null;
         permissions: Record<string, boolean>;
       };
     };
@@ -684,7 +688,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       next = {
         userCode: account.username,
         name: account.full_name || account.username,
-        role: "staff",
+        // The protected PIN endpoint reads this from public.app_users. This
+        // preserves an administrator's existing session for the desktop gate;
+        // the desktop process independently verifies it before granting IPC.
+        role: account.role,
+        roleSlug: account.role_slug,
         storeId: activeBranchId(account.store_id ?? null),
         email: "",
         cashierId: account.id,
@@ -866,8 +874,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     if (!account) {
       if (!terminalUser) return null;
       // Local bootstrap / offline terminal session.
-      const isLocalAdmin = terminalUser.role === "admin";
-      const isLocalSupervisor = terminalUser.role === "manager";
+      // `role` is the stable database level; roleSlug also covers older
+      // centrally-managed admin/supervisor role definitions during migration.
+      const isLocalAdmin = terminalUser.role === "admin" || terminalUser.roleSlug === "admin";
+      const isLocalSupervisor =
+        isLocalAdmin || terminalUser.role === "manager" || terminalUser.roleSlug === "supervisor";
       return {
         staffId: terminalUser.userCode,
         name: terminalUser.name,
@@ -878,9 +889,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             ? "admin"
             : terminalUser.role === "manager"
               ? "supervisor"
-              : "cashier",
+              : (terminalUser.roleSlug as MetaRole | null | undefined) ?? "cashier",
         roles: [terminalUser.role],
-        storeId: terminalUser.role === "admin" ? null : terminalUser.storeId,
+        storeId: isLocalAdmin ? null : terminalUser.storeId,
         permissions: isLocalAdmin
           ? FULL_PERMISSIONS
           : isLocalSupervisor
@@ -894,14 +905,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const isTrueAdmin =
       roles.includes("admin") ||
       appUser?.role === "admin" ||
-      terminalUser?.role === "admin";
+      terminalUser?.role === "admin" ||
+      terminalUser?.roleSlug === "admin";
     // Supervisors reach the same management screens as admins, but their
     // store scope is their own assignment (null = all stores).
     const isElevated =
       isTrueAdmin ||
       roles.includes("manager") ||
       appUser?.role === "manager" ||
-      terminalUser?.role === "manager";
+      terminalUser?.role === "manager" ||
+      terminalUser?.roleSlug === "supervisor";
     const found = email ? staff.find((s) => s.email && norm(s.email) === norm(email)) : undefined;
     const fallbackName =
       (meta["full_name"] as string | undefined) || email.split("@")[0] || "User";

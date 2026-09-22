@@ -34,8 +34,7 @@ type Ask = {
 const BRIDGES = ["pos", "electronAPI", "sqlAdmin"] as const;
 
 export function PrivilegeGate({ children }: { children: React.ReactNode }) {
-  const { ready, user, isAdmin, isSupervisor, can } = useAuth();
-  const mayManageDatabaseAndSync = isAdmin || isSupervisor || can("can_manage_sync_backup");
+  const { ready, user } = useAuth();
   const [ask, setAsk] = useState<Ask | null>(null);
   const [fatal, setFatal] = useState<string | null>(null);
   const [username, setUsername] = useState("");
@@ -56,7 +55,7 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
     if (!bridge?.adoptSession || !bridge.lockAdmin) return;
     let active = true;
     const sync = async () => {
-      if (!user || !mayManageDatabaseAndSync) {
+      if (!user) {
         await bridge.lockAdmin?.();
         return;
       }
@@ -68,7 +67,7 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
     return () => {
       active = false;
     };
-  }, [ready, recovery, user, mayManageDatabaseAndSync]);
+  }, [ready, recovery, user]);
 
   /* One prompt at a time, however many calls are refused at once. */
   const requestUnlock = useCallback(
@@ -76,7 +75,11 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
       // A live online account gets one immediate server-verified refresh before
       // any local override is requested. This also closes the small launch race
       // between auth hydration and the first protected click.
-      if (user && mayManageDatabaseAndSync) {
+      // Always ask the backend to adopt a live signed-in session. The client
+      // may be carrying an older cached role after an upgrade; the server
+      // resolves public.app_users again and is the only authority that can
+      // grant the desktop administrator session.
+      if (user) {
         const adopted = await window.sqlAdmin?.adoptSession?.(await readCredentials());
         if (adopted?.ok) {
           if (requiredLevel === "admin" && adopted.level !== "admin") {
@@ -107,7 +110,7 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
       }
       return asking.current;
     },
-    [user, mayManageDatabaseAndSync],
+    [user],
   );
 
   useEffect(() => {

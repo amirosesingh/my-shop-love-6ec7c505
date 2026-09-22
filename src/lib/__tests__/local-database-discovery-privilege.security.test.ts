@@ -101,12 +101,23 @@ describe("local SQL Server discovery privilege", () => {
     const adoptRoute = readFileSync("src/routes/api/v1/pos/ipc-adopt.ts", "utf8");
 
     expect(gate).toContain("await window.sqlAdmin?.adoptSession?.(await readCredentials())");
-    expect(gate).toContain('can("can_manage_sync_backup")');
     expect(gate).toContain('requiredLevel === "admin" && adopted.level !== "admin"');
     expect(main).toContain('ipcMain.handle("admin:adopt-session"');
     expect(adoptRoute).toContain("verifyRelayCaller(proof)");
     expect(adoptRoute).toContain("sessionToken:");
     expect(adoptRoute).toContain("cashierToken:");
     expect(adoptRoute).not.toMatch(/role\s*:\s*input/);
+    expect(adoptRoute).not.toContain("can_manage_sync_backup === true");
+  });
+
+  it("keeps the central staff role through PIN sign-in so an existing admin is adopted", () => {
+    const login = readFileSync("src/lib/cashier-login.server.ts", "utf8");
+    const auth = readFileSync("src/lib/pos-auth.tsx", "utf8");
+
+    expect(login).toContain("role,role_slug,permissions,is_active");
+    expect(login).toContain("role: profile.role");
+    expect(login).toContain("role_slug: profile.role_slug ?? null");
+    expect(auth).toContain("role: account.role");
+    expect(auth).toContain("roleSlug: account.role_slug");
   });
 });
