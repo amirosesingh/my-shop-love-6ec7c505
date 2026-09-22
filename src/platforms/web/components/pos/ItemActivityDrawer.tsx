@@ -58,7 +58,7 @@ export function ItemActivityDrawer({
         try {
           return await dbRouter.queryWithSource(table, options);
         } catch {
-          return { rows: [] as LooseRow[], source: "local" as ReadSource };
+          return { rows: [] as LooseRow[], source: "cloud" as ReadSource };
         }
       };
       const [adjustments, transfers, meta, merges, movements] = await Promise.all([
@@ -93,11 +93,7 @@ export function ItemActivityDrawer({
       ]);
 
       if (!live) return;
-      setSource(
-        [adjustments, transfers, meta, merges, movements].some((r) => r.source === "local")
-          ? "local"
-          : "cloud",
-      );
+      setSource("cloud");
       const list: Movement[] = [
         ...(movements.rows as LooseRow[]).map((r) => ({
           id: `mov-${r.id}`,

@@ -76,9 +76,8 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
       // any local override is requested. This also closes the small launch race
       // between auth hydration and the first protected click.
       // Always ask the backend to adopt a live signed-in session. The client
-      // may be carrying an older cached role after an upgrade; the server
-      // resolves public.app_users again and is the only authority that can
-      // grant the desktop administrator session.
+      // may be carrying older cached permissions; the server re-reads
+      // public.app_users before granting desktop database access.
       if (user) {
         const adopted = await window.sqlAdmin?.adoptSession?.(await readCredentials());
         if (adopted?.ok) {
@@ -168,7 +167,7 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
           unlock?: (
             u: string,
             p: string,
-          ) => Promise<{ ok: boolean; level?: "admin" | "supervisor"; error?: string }>;
+          ) => Promise<{ ok: boolean; level?: "admin" | "supervisor" | "staff"; error?: string }>;
         };
       }
     ).sqlAdmin;

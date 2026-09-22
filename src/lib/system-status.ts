@@ -7,7 +7,7 @@ import {
   type Connectivity,
 } from "@/core/activation/connection-health";
 
-export type StatusTone = "connecting" | "ok" | "offline" | "error";
+export type StatusTone = "connecting" | "ok" | "busy" | "offline" | "error";
 
 export type SystemStatus = {
   connectivity: Connectivity;

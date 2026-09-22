@@ -1,0 +1,90 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { z } from "zod";
+
+const bodySchema = z.object({
+  action: z.enum(["list", "clear"]),
+  sessionToken: z.string().max(400).optional(),
+  cashierToken: z.string().max(2000).optional(),
+  terminalToken: z.string().max(200).optional(),
+  accessToken: z.string().max(4000).optional(),
+  eventId: z.string().uuid().optional(),
+  cleared: z.boolean().optional(),
+  limit: z.number().int().min(1).max(500).optional(),
+  types: z.array(z.string().regex(/^[a-z_]{1,60}$/)).max(30).optional(),
+  severities: z.array(z.enum(["info", "warning", "critical"])).max(3).optional(),
+  storeId: z.string().max(64).optional(),
+  actor: z.string().max(160).optional(),
+  from: z.string().datetime().optional(),
+  to: z.string().datetime().optional(),
+});
+
+export const Route = createFileRoute("/api/v1/pos/activity-preferences")({
+  server: {
+    handlers: {
+      POST: async ({ request }) => {
+        const raw = await request.text();
+        if (raw.length > 12_000) return Response.json({ ok: false, error: "Request too large" }, { status: 413 });
+        let body: unknown;
+        try { body = JSON.parse(raw); }
+        catch { return Response.json({ ok: false, error: "Invalid JSON" }, { status: 400 }); }
+        const parsed = bodySchema.safeParse(body);
+        if (!parsed.success) return Response.json({ ok: false, error: "Invalid request" }, { status: 400 });
+        const input = parsed.data;
+        const { verifyRelayCaller, serviceRest } = await import("@/core/api/pos-relay.server");
+        let caller: Awaited<ReturnType<typeof verifyRelayCaller>>;
+        try {
+          caller = await verifyRelayCaller(input);
+        } catch {
+          return Response.json({ ok: false, error: "Sign in is required" }, { status: 401 });
+        }
+        // Resolve from the live account row. A terminal token or cached role
+        // claim alone must never read this feed or clear another user's row.
+        const identities = [
+          caller.authUserId && `auth_user_id=eq.${encodeURIComponent(caller.authUserId)}`,
+          caller.staffUserId && `user_id=eq.${encodeURIComponent(caller.staffUserId)}`,
+          caller.email && `email=eq.${encodeURIComponent(caller.email)}`,
+        ].filter((value): value is string => Boolean(value));
+        type Account = { user_id: string; role: string; role_slug: string | null; permissions: Record<string, boolean> | null; store_id: string | null; is_active: boolean };
+        let account: Account | undefined;
+        for (const identity of identities) {
+          const response = await serviceRest(`app_users?${identity}&select=user_id,role,role_slug,permissions,store_id,is_active&limit=1`);
+          if (!response.ok) return Response.json({ ok: false, error: "Account lookup failed" }, { status: 503 });
+          account = ((await response.json()) as Account[])[0];
+          if (account) break;
+        }
+        if (!account?.is_active || !(
+          account.role === "admin" || account.role === "manager" ||
+          account.role_slug === "admin" || account.role_slug === "supervisor" ||
+          account.permissions?.can_view_audit_trail === true
+        )) return Response.json({ ok: false, error: "Activity access denied" }, { status: 403 });
+
+        if (input.action === "clear") {
+          if (!input.eventId || input.cleared === undefined)
+            return Response.json({ ok: false, error: "Event and clear state are required" }, { status: 400 });
+          const response = await serviceRest("rpc/pos_set_activity_event_cleared", {
+            method: "POST",
+            body: JSON.stringify({ p_event_id: input.eventId, p_user_id: account.user_id, p_cleared: input.cleared }),
+          });
+          if (!response.ok) return Response.json({ ok: false, error: "Could not save notification state" }, { status: 503 });
+          return Response.json({ ok: true });
+        }
+
+        const params = new URLSearchParams({ select: "*", order: "created_at.desc", limit: String(input.limit ?? 200) });
+        if (input.types?.length) params.set("event_type", `in.(${input.types.join(",")})`);
+        if (input.severities?.length) params.set("severity", `in.(${input.severities.join(",")})`);
+        const branch = account.store_id ?? caller.storeId ?? null;
+        if (branch && account.role !== "admin" && account.role_slug !== "admin") {
+          if (input.storeId && input.storeId !== branch)
+            return Response.json({ ok: false, error: "Branch access denied" }, { status: 403 });
+          params.set("store_id", `eq.${branch}`);
+        } else if (input.storeId) params.set("store_id", `eq.${input.storeId}`);
+        if (input.actor) params.set("actor_name", `ilike.*${input.actor.replace(/[,*()]/g, "")}*`);
+        if (input.from) params.set("created_at", `gte.${input.from}`);
+        if (input.to) params.append("created_at", `lte.${input.to}`);
+        const response = await serviceRest(`activity_events?${params}`);
+        if (!response.ok) return Response.json({ ok: false, error: "Could not load activity" }, { status: 503 });
+        return Response.json({ ok: true, rows: await response.json() });
+      },
+    },
+  },
+});

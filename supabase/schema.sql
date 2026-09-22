@@ -2779,7 +2779,7 @@ $guard$;
 
 CREATE OR REPLACE FUNCTION public.activity_events_immutable() RETURNS trigger
     LANGUAGE plpgsql
-    SET search_path TO 'public'
+    SET search_path TO 'public', 'pg_temp'
     AS $$
 BEGIN
   IF TG_OP = 'UPDATE'
@@ -2817,6 +2817,31 @@ BEGIN
    WHERE id = p_event_id;
 END;
 $$;
+
+-- The hosted POS backend uses this only after it has verified the staff proof
+-- and re-read app_users. Clients cannot call it with another person's id.
+CREATE OR REPLACE FUNCTION public.pos_set_activity_event_cleared(
+  p_event_id uuid,
+  p_user_id text,
+  p_cleared boolean
+) RETURNS void
+LANGUAGE plpgsql SECURITY INVOKER
+SET search_path TO 'public', 'pg_temp'
+AS $$
+BEGIN
+  IF NOT EXISTS (SELECT 1 FROM public.app_users WHERE user_id = p_user_id AND is_active) THEN
+    RAISE EXCEPTION 'Active staff account required';
+  END IF;
+  UPDATE public.activity_events
+     SET cleared_by = CASE
+       WHEN p_cleared THEN array(SELECT DISTINCT x FROM unnest(cleared_by || p_user_id) x)
+       ELSE array_remove(cleared_by, p_user_id)
+     END
+   WHERE id = p_event_id;
+END;
+$$;
+REVOKE ALL ON FUNCTION public.pos_set_activity_event_cleared(uuid,text,boolean) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.pos_set_activity_event_cleared(uuid,text,boolean) TO service_role;
 
 CREATE OR REPLACE FUNCTION public.app_users_require_store() RETURNS trigger
     LANGUAGE plpgsql
@@ -11944,7 +11969,7 @@ CREATE INDEX IF NOT EXISTS sync_change_feed_branch_cursor_idx ON public.sync_cha
 
 ALTER TABLE public.sync_idempotency_receipts ENABLE ROW LEVEL SECURITY; ALTER TABLE public.sync_change_feed ENABLE ROW LEVEL SECURITY;
 
-CREATE OR REPLACE FUNCTION public.sync_apply_coupon_campaigns(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_apply_coupon_campaigns(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -11957,7 +11982,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_coupon_campaigns(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_coupon_campaigns(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."coupon_campaigns" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -11965,13 +11990,15 @@ BEGIN DELETE FROM public."coupon_campaigns" x USING jsonb_array_elements(COALESC
 REVOKE ALL ON FUNCTION public.sync_apply_coupon_campaigns(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_coupon_campaigns(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_coupon_campaigns() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_coupon_campaigns() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'coupon_campaigns',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."coupon_campaigns";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."coupon_campaigns" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_coupon_campaigns();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_shifts(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_coupon_campaigns() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_shifts(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -11984,7 +12011,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_shifts(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_shifts(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."shifts" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -11992,13 +12019,15 @@ BEGIN DELETE FROM public."shifts" x USING jsonb_array_elements(COALESCE(p_change
 REVOKE ALL ON FUNCTION public.sync_apply_shifts(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_shifts(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_shifts() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_shifts() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'shifts',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."shifts";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."shifts" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_shifts();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_issued_vouchers(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_shifts() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_issued_vouchers(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12011,7 +12040,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_issued_vouchers(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_issued_vouchers(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."issued_vouchers" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12019,26 +12048,28 @@ BEGIN DELETE FROM public."issued_vouchers" x USING jsonb_array_elements(COALESCE
 REVOKE ALL ON FUNCTION public.sync_apply_issued_vouchers(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_issued_vouchers(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_issued_vouchers() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_issued_vouchers() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'issued_vouchers',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."issued_vouchers";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."issued_vouchers" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_issued_vouchers();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_activity_events(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_issued_vouchers() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_activity_events(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
   INSERT INTO public."activity_events" ("id","event_type","severity","title","message","actor_id","actor_name","actor_role","terminal_id","terminal_name","store_id","entity_type","entity_id","amount","meta","whatsapp_status","whatsapp_error","client_event_id","created_at","cleared_by")
   SELECT "id","event_type","severity","title","message","actor_id","actor_name","actor_role","terminal_id","terminal_name","store_id","entity_type","entity_id","amount","meta","whatsapp_status","whatsapp_error","client_event_id","created_at","cleared_by" FROM jsonb_populate_recordset(NULL::public."activity_events", COALESCE(p_rows,'[]'::jsonb))
-  ON CONFLICT ("id") DO UPDATE SET "event_type"=EXCLUDED."event_type","severity"=EXCLUDED."severity","title"=EXCLUDED."title","message"=EXCLUDED."message","actor_id"=EXCLUDED."actor_id","actor_name"=EXCLUDED."actor_name","actor_role"=EXCLUDED."actor_role","terminal_id"=EXCLUDED."terminal_id","terminal_name"=EXCLUDED."terminal_name","store_id"=EXCLUDED."store_id","entity_type"=EXCLUDED."entity_type","entity_id"=EXCLUDED."entity_id","amount"=EXCLUDED."amount","meta"=EXCLUDED."meta","whatsapp_status"=EXCLUDED."whatsapp_status","whatsapp_error"=EXCLUDED."whatsapp_error","client_event_id"=EXCLUDED."client_event_id","created_at"=EXCLUDED."created_at","cleared_by"=EXCLUDED."cleared_by";
+  ON CONFLICT ("id") DO NOTHING;
   GET DIAGNOSTICS v_count=ROW_COUNT;
   
   
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_activity_events(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_activity_events(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."activity_events" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12046,13 +12077,15 @@ BEGIN DELETE FROM public."activity_events" x USING jsonb_array_elements(COALESCE
 REVOKE ALL ON FUNCTION public.sync_apply_activity_events(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_activity_events(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_activity_events() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_activity_events() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'activity_events',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."activity_events";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."activity_events" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_activity_events();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_app_users(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_activity_events() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_app_users(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12065,7 +12098,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_app_users(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_app_users(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."app_users" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12073,13 +12106,15 @@ BEGIN DELETE FROM public."app_users" x USING jsonb_array_elements(COALESCE(p_cha
 REVOKE ALL ON FUNCTION public.sync_apply_app_users(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_app_users(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_app_users() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_app_users() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'app_users',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."app_users";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."app_users" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_app_users();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_audit_logs(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_app_users() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_audit_logs(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12092,7 +12127,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_audit_logs(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_audit_logs(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."audit_logs" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12100,13 +12135,15 @@ BEGIN DELETE FROM public."audit_logs" x USING jsonb_array_elements(COALESCE(p_ch
 REVOKE ALL ON FUNCTION public.sync_apply_audit_logs(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_audit_logs(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_audit_logs() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_audit_logs() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'audit_logs',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."audit_logs";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."audit_logs" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_audit_logs();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_booking_payments(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_audit_logs() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_booking_payments(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12119,7 +12156,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_booking_payments(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_booking_payments(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."booking_payments" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (EXISTS(SELECT 1 FROM public."bookings" p WHERE p."id"::text=x."booking_id"::text AND p.store_id::text=p_branch_id)) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12127,13 +12164,15 @@ BEGIN DELETE FROM public."booking_payments" x USING jsonb_array_elements(COALESC
 REVOKE ALL ON FUNCTION public.sync_apply_booking_payments(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_booking_payments(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_booking_payments() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_booking_payments() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'booking_payments',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT p.store_id::text branch_id FROM public."bookings" p WHERE p."id"::text=COALESCE(NEW."booking_id",OLD."booking_id")::text) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."booking_payments";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."booking_payments" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_booking_payments();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_bookings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_booking_payments() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_bookings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12146,7 +12185,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_bookings(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_bookings(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."bookings" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12154,13 +12193,15 @@ BEGIN DELETE FROM public."bookings" x USING jsonb_array_elements(COALESCE(p_chan
 REVOKE ALL ON FUNCTION public.sync_apply_bookings(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_bookings(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_bookings() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_bookings() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'bookings',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."bookings";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."bookings" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_bookings();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_branch_telemetry(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_bookings() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_branch_telemetry(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12173,7 +12214,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_branch_telemetry(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_branch_telemetry(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."branch_telemetry" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."terminal_id"::text=COALESCE(c->'key'->>'terminal_id',(c->>'entityId')::jsonb->>'terminal_id',(c->>'entity_id')::jsonb->>'terminal_id');
@@ -12181,13 +12222,15 @@ BEGIN DELETE FROM public."branch_telemetry" x USING jsonb_array_elements(COALESC
 REVOKE ALL ON FUNCTION public.sync_apply_branch_telemetry(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_branch_telemetry(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_branch_telemetry() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_branch_telemetry() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'branch_telemetry',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('terminal_id',OLD."terminal_id")::text ELSE jsonb_build_object('terminal_id',NEW."terminal_id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."branch_telemetry";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."branch_telemetry" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_branch_telemetry();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_cashiers(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_branch_telemetry() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_cashiers(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12200,7 +12243,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_cashiers(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_cashiers(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."cashiers" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12208,13 +12251,15 @@ BEGIN DELETE FROM public."cashiers" x USING jsonb_array_elements(COALESCE(p_chan
 REVOKE ALL ON FUNCTION public.sync_apply_cashiers(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_cashiers(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_cashiers() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_cashiers() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'cashiers',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."cashiers";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."cashiers" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_cashiers();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_coupon_events(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_cashiers() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_coupon_events(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12227,7 +12272,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_coupon_events(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_coupon_events(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."coupon_events" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12235,13 +12280,15 @@ BEGIN DELETE FROM public."coupon_events" x USING jsonb_array_elements(COALESCE(p
 REVOKE ALL ON FUNCTION public.sync_apply_coupon_events(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_coupon_events(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_coupon_events() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_coupon_events() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'coupon_events',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."coupon_events";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."coupon_events" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_coupon_events();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_drawer_events(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_coupon_events() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_drawer_events(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12254,7 +12301,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_drawer_events(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_drawer_events(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."drawer_events" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12262,13 +12309,15 @@ BEGIN DELETE FROM public."drawer_events" x USING jsonb_array_elements(COALESCE(p
 REVOKE ALL ON FUNCTION public.sync_apply_drawer_events(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_drawer_events(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_drawer_events() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_drawer_events() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'drawer_events',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."drawer_events";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."drawer_events" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_drawer_events();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_held_orders(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_drawer_events() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_held_orders(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12281,7 +12330,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_held_orders(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_held_orders(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."held_orders" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12289,13 +12338,15 @@ BEGIN DELETE FROM public."held_orders" x USING jsonb_array_elements(COALESCE(p_c
 REVOKE ALL ON FUNCTION public.sync_apply_held_orders(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_held_orders(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_held_orders() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_held_orders() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'held_orders',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."held_orders";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."held_orders" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_held_orders();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_integration_settings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_held_orders() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_integration_settings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12308,7 +12359,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_integration_settings(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_integration_settings(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."integration_settings" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12316,13 +12367,15 @@ BEGIN DELETE FROM public."integration_settings" x USING jsonb_array_elements(COA
 REVOKE ALL ON FUNCTION public.sync_apply_integration_settings(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_integration_settings(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_integration_settings() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_integration_settings() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'integration_settings',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."integration_settings";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."integration_settings" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_integration_settings();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_item_activity_logs(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_integration_settings() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_item_activity_logs(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12339,7 +12392,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_item_activity_logs(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_item_activity_logs(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."item_activity_logs" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12347,13 +12400,15 @@ BEGIN DELETE FROM public."item_activity_logs" x USING jsonb_array_elements(COALE
 REVOKE ALL ON FUNCTION public.sync_apply_item_activity_logs(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_item_activity_logs(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_item_activity_logs() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_item_activity_logs() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'item_activity_logs',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."item_activity_logs";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."item_activity_logs" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_item_activity_logs();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_member_verifications(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_item_activity_logs() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_member_verifications(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12366,7 +12421,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_member_verifications(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_member_verifications(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."member_verifications" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12374,13 +12429,15 @@ BEGIN DELETE FROM public."member_verifications" x USING jsonb_array_elements(COA
 REVOKE ALL ON FUNCTION public.sync_apply_member_verifications(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_member_verifications(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_member_verifications() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_member_verifications() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'member_verifications',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."member_verifications";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."member_verifications" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_member_verifications();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_members(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_member_verifications() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_members(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12393,7 +12450,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_members(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_members(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."members" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12401,13 +12458,15 @@ BEGIN DELETE FROM public."members" x USING jsonb_array_elements(COALESCE(p_chang
 REVOKE ALL ON FUNCTION public.sync_apply_members(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_members(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_members() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_members() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'members',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."members";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."members" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_members();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_membership_tiers(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_members() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_membership_tiers(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12420,7 +12479,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_membership_tiers(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_membership_tiers(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."membership_tiers" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12428,13 +12487,15 @@ BEGIN DELETE FROM public."membership_tiers" x USING jsonb_array_elements(COALESC
 REVOKE ALL ON FUNCTION public.sync_apply_membership_tiers(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_membership_tiers(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_membership_tiers() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_membership_tiers() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'membership_tiers',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."membership_tiers";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."membership_tiers" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_membership_tiers();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_offline_sync_audit_log(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_membership_tiers() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_offline_sync_audit_log(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12447,7 +12508,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_offline_sync_audit_log(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_offline_sync_audit_log(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."offline_sync_audit_log" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12455,13 +12516,15 @@ BEGIN DELETE FROM public."offline_sync_audit_log" x USING jsonb_array_elements(C
 REVOKE ALL ON FUNCTION public.sync_apply_offline_sync_audit_log(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_offline_sync_audit_log(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_offline_sync_audit_log() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_offline_sync_audit_log() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'offline_sync_audit_log',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."offline_sync_audit_log";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."offline_sync_audit_log" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_offline_sync_audit_log();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_payment_transactions(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_offline_sync_audit_log() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_payment_transactions(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12474,7 +12537,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_payment_transactions(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_payment_transactions(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."payment_transactions" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12482,13 +12545,15 @@ BEGIN DELETE FROM public."payment_transactions" x USING jsonb_array_elements(COA
 REVOKE ALL ON FUNCTION public.sync_apply_payment_transactions(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_payment_transactions(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_payment_transactions() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_payment_transactions() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'payment_transactions',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."payment_transactions";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."payment_transactions" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_payment_transactions();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_payment_types(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_payment_transactions() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_payment_types(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12501,7 +12566,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_payment_types(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_payment_types(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."payment_types" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12509,13 +12574,15 @@ BEGIN DELETE FROM public."payment_types" x USING jsonb_array_elements(COALESCE(p
 REVOKE ALL ON FUNCTION public.sync_apply_payment_types(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_payment_types(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_payment_types() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_payment_types() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'payment_types',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."payment_types";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."payment_types" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_payment_types();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_pin_attempts(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_payment_types() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_pin_attempts(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12528,7 +12595,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_pin_attempts(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_pin_attempts(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."pin_attempts" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."key"::text=COALESCE(c->'key'->>'key',(c->>'entityId')::jsonb->>'key',(c->>'entity_id')::jsonb->>'key');
@@ -12536,13 +12603,15 @@ BEGIN DELETE FROM public."pin_attempts" x USING jsonb_array_elements(COALESCE(p_
 REVOKE ALL ON FUNCTION public.sync_apply_pin_attempts(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_pin_attempts(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_pin_attempts() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_pin_attempts() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'pin_attempts',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('key',OLD."key")::text ELSE jsonb_build_object('key',NEW."key")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."pin_attempts";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."pin_attempts" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_pin_attempts();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_pos_settings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_pin_attempts() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_pos_settings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12555,7 +12624,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_pos_settings(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_pos_settings(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."pos_settings" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12563,13 +12632,15 @@ BEGIN DELETE FROM public."pos_settings" x USING jsonb_array_elements(COALESCE(p_
 REVOKE ALL ON FUNCTION public.sync_apply_pos_settings(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_pos_settings(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_pos_settings() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_pos_settings() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'pos_settings',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."pos_settings";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."pos_settings" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_pos_settings();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_product_barcodes(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_pos_settings() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_product_barcodes(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12582,7 +12653,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_product_barcodes(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_product_barcodes(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."product_barcodes" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12590,13 +12661,15 @@ BEGIN DELETE FROM public."product_barcodes" x USING jsonb_array_elements(COALESC
 REVOKE ALL ON FUNCTION public.sync_apply_product_barcodes(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_product_barcodes(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_product_barcodes() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_product_barcodes() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'product_barcodes',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."product_barcodes";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."product_barcodes" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_product_barcodes();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_product_categories(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_product_barcodes() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_product_categories(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12609,7 +12682,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_product_categories(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_product_categories(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."product_categories" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12617,13 +12690,15 @@ BEGIN DELETE FROM public."product_categories" x USING jsonb_array_elements(COALE
 REVOKE ALL ON FUNCTION public.sync_apply_product_categories(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_product_categories(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_product_categories() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_product_categories() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'product_categories',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."product_categories";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."product_categories" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_product_categories();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_products(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_product_categories() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_products(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12636,7 +12711,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_products(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_products(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."products" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12644,13 +12719,15 @@ BEGIN DELETE FROM public."products" x USING jsonb_array_elements(COALESCE(p_chan
 REVOKE ALL ON FUNCTION public.sync_apply_products(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_products(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_products() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_products() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'products',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."products";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."products" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_products();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_promotions(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_products() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_promotions(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12663,7 +12740,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_promotions(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_promotions(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."promotions" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12671,13 +12748,15 @@ BEGIN DELETE FROM public."promotions" x USING jsonb_array_elements(COALESCE(p_ch
 REVOKE ALL ON FUNCTION public.sync_apply_promotions(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_promotions(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_promotions() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_promotions() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'promotions',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."promotions";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."promotions" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_promotions();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_public_flags(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_promotions() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_public_flags(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12690,7 +12769,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_public_flags(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_public_flags(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."public_flags" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."key"::text=COALESCE(c->'key'->>'key',(c->>'entityId')::jsonb->>'key',(c->>'entity_id')::jsonb->>'key');
@@ -12698,13 +12777,15 @@ BEGIN DELETE FROM public."public_flags" x USING jsonb_array_elements(COALESCE(p_
 REVOKE ALL ON FUNCTION public.sync_apply_public_flags(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_public_flags(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_public_flags() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_public_flags() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'public_flags',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('key',OLD."key")::text ELSE jsonb_build_object('key',NEW."key")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."public_flags";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."public_flags" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_public_flags();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_purchase_order_items(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_public_flags() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_purchase_order_items(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12717,7 +12798,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_purchase_order_items(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_purchase_order_items(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."purchase_order_items" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (EXISTS(SELECT 1 FROM public."purchase_orders" p WHERE p."id"::text=x."po_id"::text AND p.store_id::text=p_branch_id)) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12725,13 +12806,15 @@ BEGIN DELETE FROM public."purchase_order_items" x USING jsonb_array_elements(COA
 REVOKE ALL ON FUNCTION public.sync_apply_purchase_order_items(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_purchase_order_items(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_purchase_order_items() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_purchase_order_items() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'purchase_order_items',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT p.store_id::text branch_id FROM public."purchase_orders" p WHERE p."id"::text=COALESCE(NEW."po_id",OLD."po_id")::text) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."purchase_order_items";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."purchase_order_items" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_purchase_order_items();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_purchase_orders(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_purchase_order_items() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_purchase_orders(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12744,7 +12827,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_purchase_orders(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_purchase_orders(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."purchase_orders" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12752,13 +12835,15 @@ BEGIN DELETE FROM public."purchase_orders" x USING jsonb_array_elements(COALESCE
 REVOKE ALL ON FUNCTION public.sync_apply_purchase_orders(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_purchase_orders(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_purchase_orders() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_purchase_orders() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'purchase_orders',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."purchase_orders";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."purchase_orders" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_purchase_orders();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_sale_items(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_purchase_orders() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_sale_items(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   PERFORM set_config('pos.refunding','on',true);
@@ -12771,7 +12856,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_sale_items(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_sale_items(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."sale_items" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (EXISTS(SELECT 1 FROM public."sales" p WHERE p."id"::text=x."sale_id"::text AND p.store_id::text=p_branch_id)) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12779,13 +12864,15 @@ BEGIN DELETE FROM public."sale_items" x USING jsonb_array_elements(COALESCE(p_ch
 REVOKE ALL ON FUNCTION public.sync_apply_sale_items(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_sale_items(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_sale_items() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_sale_items() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'sale_items',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT p.store_id::text branch_id FROM public."sales" p WHERE p."id"::text=COALESCE(NEW."sale_id",OLD."sale_id")::text) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."sale_items";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."sale_items" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_sale_items();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_sales(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_sale_items() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_sales(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   PERFORM set_config('pos.refunding','on',true);
@@ -12798,7 +12885,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_sales(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_sales(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."sales" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12806,13 +12893,15 @@ BEGIN DELETE FROM public."sales" x USING jsonb_array_elements(COALESCE(p_changes
 REVOKE ALL ON FUNCTION public.sync_apply_sales(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_sales(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_sales() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_sales() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'sales',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."sales";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."sales" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_sales();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_secure_settings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_sales() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_secure_settings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12825,7 +12914,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_secure_settings(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_secure_settings(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."secure_settings" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."key"::text=COALESCE(c->'key'->>'key',(c->>'entityId')::jsonb->>'key',(c->>'entity_id')::jsonb->>'key');
@@ -12833,13 +12922,15 @@ BEGIN DELETE FROM public."secure_settings" x USING jsonb_array_elements(COALESCE
 REVOKE ALL ON FUNCTION public.sync_apply_secure_settings(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_secure_settings(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_secure_settings() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_secure_settings() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'secure_settings',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('key',OLD."key")::text ELSE jsonb_build_object('key',NEW."key")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."secure_settings";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."secure_settings" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_secure_settings();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_security_findings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_secure_settings() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_security_findings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12852,7 +12943,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_security_findings(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_security_findings(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."security_findings" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12860,13 +12951,15 @@ BEGIN DELETE FROM public."security_findings" x USING jsonb_array_elements(COALES
 REVOKE ALL ON FUNCTION public.sync_apply_security_findings(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_security_findings(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_security_findings() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_security_findings() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'security_findings',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."security_findings";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."security_findings" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_security_findings();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_settings_locks(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_security_findings() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_settings_locks(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12879,7 +12972,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_settings_locks(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_settings_locks(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."settings_locks" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."section"::text=COALESCE(c->'key'->>'section',(c->>'entityId')::jsonb->>'section',(c->>'entity_id')::jsonb->>'section');
@@ -12887,13 +12980,15 @@ BEGIN DELETE FROM public."settings_locks" x USING jsonb_array_elements(COALESCE(
 REVOKE ALL ON FUNCTION public.sync_apply_settings_locks(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_settings_locks(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_settings_locks() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_settings_locks() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'settings_locks',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('section',OLD."section")::text ELSE jsonb_build_object('section',NEW."section")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."settings_locks";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."settings_locks" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_settings_locks();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_settings_overrides(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_settings_locks() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_settings_overrides(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12906,7 +13001,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_settings_overrides(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_settings_overrides(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."settings_overrides" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."scope"::text=COALESCE(c->'key'->>'scope',(c->>'entityId')::jsonb->>'scope',(c->>'entity_id')::jsonb->>'scope') AND x."scope_id"::text=COALESCE(c->'key'->>'scope_id',(c->>'entityId')::jsonb->>'scope_id',(c->>'entity_id')::jsonb->>'scope_id') AND x."section"::text=COALESCE(c->'key'->>'section',(c->>'entityId')::jsonb->>'section',(c->>'entity_id')::jsonb->>'section');
@@ -12914,13 +13009,15 @@ BEGIN DELETE FROM public."settings_overrides" x USING jsonb_array_elements(COALE
 REVOKE ALL ON FUNCTION public.sync_apply_settings_overrides(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_settings_overrides(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_settings_overrides() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_settings_overrides() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'settings_overrides',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('scope',OLD."scope",'scope_id',OLD."scope_id",'section',OLD."section")::text ELSE jsonb_build_object('scope',NEW."scope",'scope_id',NEW."scope_id",'section',NEW."section")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."settings_overrides";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."settings_overrides" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_settings_overrides();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_shift_sessions(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_settings_overrides() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_shift_sessions(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12933,7 +13030,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_shift_sessions(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_shift_sessions(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."shift_sessions" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12941,13 +13038,15 @@ BEGIN DELETE FROM public."shift_sessions" x USING jsonb_array_elements(COALESCE(
 REVOKE ALL ON FUNCTION public.sync_apply_shift_sessions(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_shift_sessions(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_shift_sessions() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_shift_sessions() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'shift_sessions',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."shift_sessions";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."shift_sessions" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_shift_sessions();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_sku_audit(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_shift_sessions() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_sku_audit(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12960,7 +13059,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_sku_audit(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_sku_audit(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."sku_audit" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -12968,13 +13067,15 @@ BEGIN DELETE FROM public."sku_audit" x USING jsonb_array_elements(COALESCE(p_cha
 REVOKE ALL ON FUNCTION public.sync_apply_sku_audit(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_sku_audit(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_sku_audit() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_sku_audit() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'sku_audit',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."sku_audit";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."sku_audit" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_sku_audit();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_staff_roles(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_sku_audit() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_staff_roles(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -12987,7 +13088,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_staff_roles(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_staff_roles(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."staff_roles" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."slug"::text=COALESCE(c->'key'->>'slug',(c->>'entityId')::jsonb->>'slug',(c->>'entity_id')::jsonb->>'slug');
@@ -12995,13 +13096,15 @@ BEGIN DELETE FROM public."staff_roles" x USING jsonb_array_elements(COALESCE(p_c
 REVOKE ALL ON FUNCTION public.sync_apply_staff_roles(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_staff_roles(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_staff_roles() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_staff_roles() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'staff_roles',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('slug',OLD."slug")::text ELSE jsonb_build_object('slug',NEW."slug")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."staff_roles";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."staff_roles" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_staff_roles();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_stock_adjustments(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_staff_roles() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_stock_adjustments(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13014,7 +13117,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_stock_adjustments(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_stock_adjustments(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."stock_adjustments" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13022,19 +13125,21 @@ BEGIN DELETE FROM public."stock_adjustments" x USING jsonb_array_elements(COALES
 REVOKE ALL ON FUNCTION public.sync_apply_stock_adjustments(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_stock_adjustments(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_stock_adjustments() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_stock_adjustments() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'stock_adjustments',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."stock_adjustments";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."stock_adjustments" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_stock_adjustments();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_stock_delta_applied(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_stock_adjustments() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_stock_delta_applied(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer:=0; v_row jsonb;
 BEGIN FOR v_row IN SELECT value FROM jsonb_array_elements(COALESCE(p_rows,'[]'::jsonb)) LOOP
   PERFORM public.stock_apply_delta((v_row->>'movement_id')::uuid,(v_row->>'product_id')::uuid,v_row->>'store_id',COALESCE((v_row->>'delta')::integer,0)); v_count:=v_count+1;
  END LOOP; RETURN v_count; END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_stock_delta_applied(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_stock_delta_applied(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."stock_delta_applied" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."movement_id"::text=COALESCE(c->'key'->>'movement_id',(c->>'entityId')::jsonb->>'movement_id',(c->>'entity_id')::jsonb->>'movement_id');
@@ -13042,13 +13147,15 @@ BEGIN DELETE FROM public."stock_delta_applied" x USING jsonb_array_elements(COAL
 REVOKE ALL ON FUNCTION public.sync_apply_stock_delta_applied(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_stock_delta_applied(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_stock_delta_applied() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_stock_delta_applied() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'stock_delta_applied',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('movement_id',OLD."movement_id")::text ELSE jsonb_build_object('movement_id',NEW."movement_id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."stock_delta_applied";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."stock_delta_applied" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_stock_delta_applied();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_stock_transfer_items(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_stock_delta_applied() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_stock_transfer_items(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13061,7 +13168,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_stock_transfer_items(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_stock_transfer_items(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."stock_transfer_items" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (EXISTS(SELECT 1 FROM public."stock_transfers" p WHERE p."id"::text=x."transfer_id"::text AND p_branch_id IN (p.from_store_id::text,p.to_store_id::text))) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13069,13 +13176,15 @@ BEGIN DELETE FROM public."stock_transfer_items" x USING jsonb_array_elements(COA
 REVOKE ALL ON FUNCTION public.sync_apply_stock_transfer_items(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_stock_transfer_items(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_stock_transfer_items() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_stock_transfer_items() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'stock_transfer_items',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT DISTINCT branch_id FROM public."stock_transfers" p CROSS JOIN LATERAL (VALUES(p.from_store_id::text),(p.to_store_id::text)) b(branch_id) WHERE p."id"::text=COALESCE(NEW."transfer_id",OLD."transfer_id")::text AND branch_id IS NOT NULL) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."stock_transfer_items";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."stock_transfer_items" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_stock_transfer_items();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_stock_transfers(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_stock_transfer_items() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_stock_transfers(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13088,7 +13197,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_stock_transfers(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_stock_transfers(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."stock_transfers" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (p_branch_id IN (x.from_store_id::text,x.to_store_id::text)) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13096,13 +13205,15 @@ BEGIN DELETE FROM public."stock_transfers" x USING jsonb_array_elements(COALESCE
 REVOKE ALL ON FUNCTION public.sync_apply_stock_transfers(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_stock_transfers(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_stock_transfers() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_stock_transfers() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'stock_transfers',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT DISTINCT branch_id FROM (VALUES(COALESCE(NEW.from_store_id,OLD.from_store_id)::text),(COALESCE(NEW.to_store_id,OLD.to_store_id)::text)) b(branch_id) WHERE branch_id IS NOT NULL) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."stock_transfers";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."stock_transfers" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_stock_transfers();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_stores(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_stock_transfers() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_stores(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13115,7 +13226,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_stores(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_stores(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."stores" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13123,13 +13234,15 @@ BEGIN DELETE FROM public."stores" x USING jsonb_array_elements(COALESCE(p_change
 REVOKE ALL ON FUNCTION public.sync_apply_stores(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_stores(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_stores() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_stores() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'stores',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."stores";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."stores" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_stores();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_suppliers(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_stores() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_suppliers(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13142,7 +13255,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_suppliers(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_suppliers(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."suppliers" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13150,13 +13263,15 @@ BEGIN DELETE FROM public."suppliers" x USING jsonb_array_elements(COALESCE(p_cha
 REVOKE ALL ON FUNCTION public.sync_apply_suppliers(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_suppliers(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_suppliers() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_suppliers() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'suppliers',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."suppliers";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."suppliers" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_suppliers();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_sync_metadata(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_suppliers() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_sync_metadata(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13169,7 +13284,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_sync_metadata(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_sync_metadata(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."sync_metadata" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13177,13 +13292,15 @@ BEGIN DELETE FROM public."sync_metadata" x USING jsonb_array_elements(COALESCE(p
 REVOKE ALL ON FUNCTION public.sync_apply_sync_metadata(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_sync_metadata(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_sync_metadata() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_sync_metadata() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'sync_metadata',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."sync_metadata";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."sync_metadata" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_sync_metadata();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_system_audit_logs(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_sync_metadata() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_system_audit_logs(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13196,7 +13313,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_system_audit_logs(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_system_audit_logs(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."system_audit_logs" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13204,13 +13321,15 @@ BEGIN DELETE FROM public."system_audit_logs" x USING jsonb_array_elements(COALES
 REVOKE ALL ON FUNCTION public.sync_apply_system_audit_logs(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_system_audit_logs(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_system_audit_logs() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_system_audit_logs() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'system_audit_logs',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."system_audit_logs";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."system_audit_logs" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_system_audit_logs();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_terminal_commands(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_system_audit_logs() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_terminal_commands(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13223,7 +13342,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_terminal_commands(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_terminal_commands(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."terminal_commands" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13231,13 +13350,15 @@ BEGIN DELETE FROM public."terminal_commands" x USING jsonb_array_elements(COALES
 REVOKE ALL ON FUNCTION public.sync_apply_terminal_commands(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_terminal_commands(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_terminal_commands() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_terminal_commands() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'terminal_commands',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."terminal_commands";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."terminal_commands" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_terminal_commands();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_terminal_tokens(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_terminal_commands() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_terminal_tokens(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13250,7 +13371,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_terminal_tokens(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_terminal_tokens(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."terminal_tokens" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13258,13 +13379,15 @@ BEGIN DELETE FROM public."terminal_tokens" x USING jsonb_array_elements(COALESCE
 REVOKE ALL ON FUNCTION public.sync_apply_terminal_tokens(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_terminal_tokens(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_terminal_tokens() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_terminal_tokens() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'terminal_tokens',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."terminal_tokens";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."terminal_tokens" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_terminal_tokens();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_uom_units(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_terminal_tokens() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_uom_units(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13277,7 +13400,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_uom_units(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_uom_units(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."uom_units" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13285,13 +13408,15 @@ BEGIN DELETE FROM public."uom_units" x USING jsonb_array_elements(COALESCE(p_cha
 REVOKE ALL ON FUNCTION public.sync_apply_uom_units(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_uom_units(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_uom_units() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_uom_units() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'uom_units',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."uom_units";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."uom_units" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_uom_units();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_user_roles(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_uom_units() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_user_roles(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13304,7 +13429,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_user_roles(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_user_roles(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."user_roles" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13312,13 +13437,15 @@ BEGIN DELETE FROM public."user_roles" x USING jsonb_array_elements(COALESCE(p_ch
 REVOKE ALL ON FUNCTION public.sync_apply_user_roles(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_user_roles(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_user_roles() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_user_roles() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'user_roles',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."user_roles";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."user_roles" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_user_roles();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_whatsapp_queue(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_user_roles() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_whatsapp_queue(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13331,7 +13458,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_whatsapp_queue(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_whatsapp_queue(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."whatsapp_queue" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13339,13 +13466,15 @@ BEGIN DELETE FROM public."whatsapp_queue" x USING jsonb_array_elements(COALESCE(
 REVOKE ALL ON FUNCTION public.sync_apply_whatsapp_queue(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_whatsapp_queue(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_whatsapp_queue() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_whatsapp_queue() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'whatsapp_queue',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."whatsapp_queue";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."whatsapp_queue" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_whatsapp_queue();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_terminal_recovery_secrets(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_whatsapp_queue() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_terminal_recovery_secrets(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13358,7 +13487,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_terminal_recovery_secrets(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_terminal_recovery_secrets(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."terminal_recovery_secrets" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."terminal_token_id"::text=COALESCE(c->'key'->>'terminal_token_id',(c->>'entityId')::jsonb->>'terminal_token_id',(c->>'entity_id')::jsonb->>'terminal_token_id');
@@ -13366,13 +13495,15 @@ BEGIN DELETE FROM public."terminal_recovery_secrets" x USING jsonb_array_element
 REVOKE ALL ON FUNCTION public.sync_apply_terminal_recovery_secrets(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_terminal_recovery_secrets(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_terminal_recovery_secrets() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_terminal_recovery_secrets() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'terminal_recovery_secrets',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('terminal_token_id',OLD."terminal_token_id")::text ELSE jsonb_build_object('terminal_token_id',NEW."terminal_token_id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."terminal_recovery_secrets";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."terminal_recovery_secrets" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_terminal_recovery_secrets();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_pos_store_settings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_terminal_recovery_secrets() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_pos_store_settings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13385,7 +13516,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_pos_store_settings(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_pos_store_settings(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."pos_store_settings" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."store_id"::text=COALESCE(c->'key'->>'store_id',(c->>'entityId')::jsonb->>'store_id',(c->>'entity_id')::jsonb->>'store_id');
@@ -13393,13 +13524,15 @@ BEGIN DELETE FROM public."pos_store_settings" x USING jsonb_array_elements(COALE
 REVOKE ALL ON FUNCTION public.sync_apply_pos_store_settings(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_pos_store_settings(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_pos_store_settings() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_pos_store_settings() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'pos_store_settings',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('store_id',OLD."store_id")::text ELSE jsonb_build_object('store_id',NEW."store_id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."pos_store_settings";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."pos_store_settings" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_pos_store_settings();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_settings_scoped(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_pos_store_settings() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_settings_scoped(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13412,7 +13545,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_settings_scoped(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_settings_scoped(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."settings_scoped" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."scope"::text=COALESCE(c->'key'->>'scope',(c->>'entityId')::jsonb->>'scope',(c->>'entity_id')::jsonb->>'scope') AND x."scope_id"::text=COALESCE(c->'key'->>'scope_id',(c->>'entityId')::jsonb->>'scope_id',(c->>'entity_id')::jsonb->>'scope_id') AND x."key"::text=COALESCE(c->'key'->>'key',(c->>'entityId')::jsonb->>'key',(c->>'entity_id')::jsonb->>'key');
@@ -13420,13 +13553,15 @@ BEGIN DELETE FROM public."settings_scoped" x USING jsonb_array_elements(COALESCE
 REVOKE ALL ON FUNCTION public.sync_apply_settings_scoped(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_settings_scoped(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_settings_scoped() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_settings_scoped() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'settings_scoped',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('scope',OLD."scope",'scope_id',OLD."scope_id",'key',OLD."key")::text ELSE jsonb_build_object('scope',NEW."scope",'scope_id',NEW."scope_id",'key',NEW."key")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."settings_scoped";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."settings_scoped" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_settings_scoped();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_stock_count_drafts(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_settings_scoped() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_stock_count_drafts(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13439,7 +13574,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_stock_count_drafts(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_stock_count_drafts(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."stock_count_drafts" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13447,13 +13582,15 @@ BEGIN DELETE FROM public."stock_count_drafts" x USING jsonb_array_elements(COALE
 REVOKE ALL ON FUNCTION public.sync_apply_stock_count_drafts(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_stock_count_drafts(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_stock_count_drafts() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_stock_count_drafts() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'stock_count_drafts',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."stock_count_drafts";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."stock_count_drafts" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_stock_count_drafts();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_authorization_actions(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_stock_count_drafts() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_authorization_actions(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13466,7 +13603,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_authorization_actions(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_authorization_actions(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."authorization_actions" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13474,13 +13611,15 @@ BEGIN DELETE FROM public."authorization_actions" x USING jsonb_array_elements(CO
 REVOKE ALL ON FUNCTION public.sync_apply_authorization_actions(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_authorization_actions(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_authorization_actions() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_authorization_actions() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'authorization_actions',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."authorization_actions";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."authorization_actions" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_authorization_actions();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_authorization_requests(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_authorization_actions() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_authorization_requests(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13493,7 +13632,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_authorization_requests(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_authorization_requests(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."authorization_requests" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13501,13 +13640,15 @@ BEGIN DELETE FROM public."authorization_requests" x USING jsonb_array_elements(C
 REVOKE ALL ON FUNCTION public.sync_apply_authorization_requests(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_authorization_requests(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_authorization_requests() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_authorization_requests() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'authorization_requests',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."authorization_requests";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."authorization_requests" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_authorization_requests();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_authorization_log(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_authorization_requests() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_authorization_log(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13520,7 +13661,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_authorization_log(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_authorization_log(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."authorization_log" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13528,13 +13669,15 @@ BEGIN DELETE FROM public."authorization_log" x USING jsonb_array_elements(COALES
 REVOKE ALL ON FUNCTION public.sync_apply_authorization_log(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_authorization_log(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_authorization_log() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_authorization_log() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'authorization_log',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."authorization_log";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."authorization_log" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_authorization_log();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_record_edits(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_authorization_log() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_record_edits(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13547,7 +13690,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_record_edits(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_record_edits(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."record_edits" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13555,13 +13698,15 @@ BEGIN DELETE FROM public."record_edits" x USING jsonb_array_elements(COALESCE(p_
 REVOKE ALL ON FUNCTION public.sync_apply_record_edits(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_record_edits(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_record_edits() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_record_edits() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'record_edits',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."record_edits";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."record_edits" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_record_edits();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_shift_cash_counts(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_record_edits() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_shift_cash_counts(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13574,7 +13719,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_shift_cash_counts(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_shift_cash_counts(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."shift_cash_counts" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13582,13 +13727,15 @@ BEGIN DELETE FROM public."shift_cash_counts" x USING jsonb_array_elements(COALES
 REVOKE ALL ON FUNCTION public.sync_apply_shift_cash_counts(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_shift_cash_counts(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_shift_cash_counts() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_shift_cash_counts() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'shift_cash_counts',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."shift_cash_counts";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."shift_cash_counts" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_shift_cash_counts();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_shift_close_events(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_shift_cash_counts() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_shift_close_events(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13601,7 +13748,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_shift_close_events(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_shift_close_events(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."shift_close_events" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13609,13 +13756,15 @@ BEGIN DELETE FROM public."shift_close_events" x USING jsonb_array_elements(COALE
 REVOKE ALL ON FUNCTION public.sync_apply_shift_close_events(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_shift_close_events(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_shift_close_events() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_shift_close_events() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'shift_close_events',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."shift_close_events";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."shift_close_events" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_shift_close_events();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_shift_reconciliations(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_shift_close_events() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_shift_reconciliations(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13628,7 +13777,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_shift_reconciliations(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_shift_reconciliations(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."shift_reconciliations" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13636,13 +13785,15 @@ BEGIN DELETE FROM public."shift_reconciliations" x USING jsonb_array_elements(CO
 REVOKE ALL ON FUNCTION public.sync_apply_shift_reconciliations(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_shift_reconciliations(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_shift_reconciliations() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_shift_reconciliations() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'shift_reconciliations',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."shift_reconciliations";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."shift_reconciliations" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_shift_reconciliations();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_shift_variance_alerts(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_shift_reconciliations() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_shift_variance_alerts(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13655,7 +13806,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_shift_variance_alerts(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_shift_variance_alerts(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."shift_variance_alerts" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13663,13 +13814,15 @@ BEGIN DELETE FROM public."shift_variance_alerts" x USING jsonb_array_elements(CO
 REVOKE ALL ON FUNCTION public.sync_apply_shift_variance_alerts(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_shift_variance_alerts(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_shift_variance_alerts() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_shift_variance_alerts() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'shift_variance_alerts',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."shift_variance_alerts";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."shift_variance_alerts" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_shift_variance_alerts();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_entity_status_history(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_shift_variance_alerts() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_entity_status_history(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13682,7 +13835,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_entity_status_history(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_entity_status_history(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."entity_status_history" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (x.store_id::text=p_branch_id) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13690,13 +13843,15 @@ BEGIN DELETE FROM public."entity_status_history" x USING jsonb_array_elements(CO
 REVOKE ALL ON FUNCTION public.sync_apply_entity_status_history(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_entity_status_history(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_entity_status_history() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_entity_status_history() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'entity_status_history',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),COALESCE(NEW.row_version,OLD.row_version,1),TG_OP='DELETE' FROM (SELECT COALESCE(NEW.store_id,OLD.store_id,'global')::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."entity_status_history";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."entity_status_history" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_entity_status_history();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_nav_pins(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_entity_status_history() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_nav_pins(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13709,7 +13864,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_nav_pins(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_nav_pins(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."nav_pins" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13717,13 +13872,15 @@ BEGIN DELETE FROM public."nav_pins" x USING jsonb_array_elements(COALESCE(p_chan
 REVOKE ALL ON FUNCTION public.sync_apply_nav_pins(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_nav_pins(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_nav_pins() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_nav_pins() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'nav_pins',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."nav_pins";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."nav_pins" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_nav_pins();
 
-CREATE OR REPLACE FUNCTION public.sync_apply_store_groups(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+REVOKE ALL ON FUNCTION public.sync_feed_nav_pins() FROM PUBLIC, anon, authenticated;
+
+CREATE OR REPLACE FUNCTION public.sync_apply_store_groups(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
@@ -13736,7 +13893,7 @@ BEGIN
   RETURN v_count;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.sync_delete_store_groups(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
+CREATE OR REPLACE FUNCTION public.sync_delete_store_groups(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer;
 BEGIN DELETE FROM public."store_groups" x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
  WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (true) AND x."id"::text=COALESCE(c->'key'->>'id',(c->>'entityId')::jsonb->>'id',(c->>'entity_id')::jsonb->>'id');
@@ -13744,14 +13901,16 @@ BEGIN DELETE FROM public."store_groups" x USING jsonb_array_elements(COALESCE(p_
 REVOKE ALL ON FUNCTION public.sync_apply_store_groups(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_store_groups(jsonb,text) FROM PUBLIC;
 
-CREATE OR REPLACE FUNCTION public.sync_feed_store_groups() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $trg$
+CREATE OR REPLACE FUNCTION public.sync_feed_store_groups() RETURNS trigger LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $trg$
 BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,entity_id,operation,row_version,tombstone)
  SELECT 'default',branches.branch_id,'store_groups',CASE WHEN TG_OP='DELETE' THEN jsonb_build_object('id',OLD."id")::text ELSE jsonb_build_object('id',NEW."id")::text END,lower(TG_OP),1,TG_OP='DELETE' FROM (SELECT 'global'::text branch_id) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public."store_groups";
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public."store_groups" FOR EACH ROW EXECUTE FUNCTION public.sync_feed_store_groups();
 
+REVOKE ALL ON FUNCTION public.sync_feed_store_groups() FROM PUBLIC, anon, authenticated;
+
 CREATE OR REPLACE FUNCTION public.pos_sync_push_batch(p_batch_id uuid,p_organization_id text,p_branch_id text,p_table text,p_rows jsonb,p_changes jsonb DEFAULT '[]'::jsonb)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $fn$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE v_me public.app_users%ROWTYPE; v_count integer:=0; v_hash text:=md5(p_table||COALESCE(p_rows,'[]'::jsonb)::text||COALESCE(p_changes,'[]'::jsonb)::text); v_prior text;
 BEGIN
  IF auth.role()<>'service_role' THEN
@@ -13822,7 +13981,7 @@ BEGIN
 END $fn$;
 
 CREATE OR REPLACE FUNCTION public.pos_sync_push_aggregate(p_batch_id uuid,p_organization_id text,p_branch_id text,p_operations jsonb)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $fn$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE v_me public.app_users%ROWTYPE; v_op jsonb; v_table text; v_rows jsonb; v_count integer:=0; v_total integer:=0; v_hash text:=md5(COALESCE(p_operations,'[]'::jsonb)::text); v_prior text;
 BEGIN
  IF jsonb_typeof(p_operations)<>'array' OR jsonb_array_length(p_operations)>200 THEN RAISE EXCEPTION 'SYNC_AGGREGATE_INVALID'; END IF;
@@ -13897,7 +14056,7 @@ BEGIN
 END $fn$;
 
 CREATE OR REPLACE FUNCTION public.pos_sync_pull(p_organization_id text,p_branch_id text,p_after_cursor bigint DEFAULT 0,p_limit integer DEFAULT 500)
-RETURNS TABLE(cursor bigint,table_name text,entity_id text,operation text,row_version bigint,tombstone boolean,row_data jsonb) LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $fn$
+RETURNS TABLE(cursor bigint,table_name text,entity_id text,operation text,row_version bigint,tombstone boolean,row_data jsonb) LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE v_me public.app_users%ROWTYPE;
 BEGIN IF auth.role()<>'service_role' THEN SELECT * INTO v_me FROM public.app_users WHERE auth_user_id=auth.uid() AND is_active=true LIMIT 1;
  IF v_me.id IS NULL OR NOT (v_me.role='admin' OR COALESCE((v_me.permissions->>'can_manage_sync_backup')::boolean,false)) THEN RAISE EXCEPTION 'SYNC_FORBIDDEN'; END IF;
@@ -13973,7 +14132,7 @@ BEGIN IF auth.role()<>'service_role' THEN SELECT * INTO v_me FROM public.app_use
 END $fn$;
 
 CREATE OR REPLACE FUNCTION public.pos_sync_bootstrap(p_organization_id text,p_branch_id text,p_table text,p_after_cursor text DEFAULT NULL,p_history_days integer DEFAULT 90,p_limit integer DEFAULT 500)
-RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $fn$
+RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE v_rows jsonb:='[]'::jsonb; v_cursor text; v_me public.app_users%ROWTYPE;
 BEGIN IF auth.role()<>'service_role' THEN SELECT * INTO v_me FROM public.app_users WHERE auth_user_id=auth.uid() AND is_active=true LIMIT 1;
  IF v_me.id IS NULL OR NOT (v_me.role='admin' OR COALESCE((v_me.permissions->>'can_manage_sync_backup')::boolean,false)) THEN RAISE EXCEPTION 'SYNC_FORBIDDEN'; END IF;
@@ -14049,7 +14208,7 @@ BEGIN IF auth.role()<>'service_role' THEN SELECT * INTO v_me FROM public.app_use
 END $fn$;
 
 CREATE OR REPLACE FUNCTION public.pos_sync_counts(p_organization_id text,p_branch_id text,p_history_days integer DEFAULT 90)
-RETURNS TABLE(table_name text,row_count bigint) LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $fn$
+RETURNS TABLE(table_name text,row_count bigint) LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE v_me public.app_users%ROWTYPE;
 BEGIN IF auth.role()<>'service_role' THEN SELECT * INTO v_me FROM public.app_users WHERE auth_user_id=auth.uid() AND is_active=true LIMIT 1;
  IF v_me.id IS NULL OR NOT (v_me.role='admin' OR COALESCE((v_me.permissions->>'can_manage_sync_backup')::boolean,false)) THEN RAISE EXCEPTION 'SYNC_FORBIDDEN'; END IF;
@@ -14057,7 +14216,7 @@ BEGIN IF auth.role()<>'service_role' THEN SELECT * INTO v_me FROM public.app_use
  RETURN QUERY SELECT 'coupon_campaigns'::text table_name,count(*)::bigint row_count FROM public."coupon_campaigns" x WHERE true UNION ALL SELECT 'shifts'::text table_name,count(*)::bigint row_count FROM public."shifts" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'issued_vouchers'::text table_name,count(*)::bigint row_count FROM public."issued_vouchers" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'activity_events'::text table_name,count(*)::bigint row_count FROM public."activity_events" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'app_users'::text table_name,count(*)::bigint row_count FROM public."app_users" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'audit_logs'::text table_name,count(*)::bigint row_count FROM public."audit_logs" x WHERE x.store_id::text=p_branch_id AND (p_history_days>=7300 OR x."created_at">=now()-make_interval(days=>GREATEST(p_history_days,30))) UNION ALL SELECT 'booking_payments'::text table_name,count(*)::bigint row_count FROM public."booking_payments" x WHERE EXISTS(SELECT 1 FROM public."bookings" p WHERE p."id"::text=x."booking_id"::text AND p.store_id::text=p_branch_id) UNION ALL SELECT 'bookings'::text table_name,count(*)::bigint row_count FROM public."bookings" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'branch_telemetry'::text table_name,count(*)::bigint row_count FROM public."branch_telemetry" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'cashiers'::text table_name,count(*)::bigint row_count FROM public."cashiers" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'coupon_events'::text table_name,count(*)::bigint row_count FROM public."coupon_events" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'drawer_events'::text table_name,count(*)::bigint row_count FROM public."drawer_events" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'held_orders'::text table_name,count(*)::bigint row_count FROM public."held_orders" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'integration_settings'::text table_name,count(*)::bigint row_count FROM public."integration_settings" x WHERE true UNION ALL SELECT 'item_activity_logs'::text table_name,count(*)::bigint row_count FROM public."item_activity_logs" x WHERE x.store_id::text=p_branch_id AND (p_history_days>=7300 OR x."created_at">=now()-make_interval(days=>GREATEST(p_history_days,30))) UNION ALL SELECT 'member_verifications'::text table_name,count(*)::bigint row_count FROM public."member_verifications" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'members'::text table_name,count(*)::bigint row_count FROM public."members" x WHERE true UNION ALL SELECT 'membership_tiers'::text table_name,count(*)::bigint row_count FROM public."membership_tiers" x WHERE true UNION ALL SELECT 'offline_sync_audit_log'::text table_name,count(*)::bigint row_count FROM public."offline_sync_audit_log" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'payment_transactions'::text table_name,count(*)::bigint row_count FROM public."payment_transactions" x WHERE x.store_id::text=p_branch_id AND (p_history_days>=7300 OR x."created_at">=now()-make_interval(days=>GREATEST(p_history_days,30))) UNION ALL SELECT 'payment_types'::text table_name,count(*)::bigint row_count FROM public."payment_types" x WHERE true UNION ALL SELECT 'pin_attempts'::text table_name,count(*)::bigint row_count FROM public."pin_attempts" x WHERE true UNION ALL SELECT 'pos_settings'::text table_name,count(*)::bigint row_count FROM public."pos_settings" x WHERE true UNION ALL SELECT 'product_barcodes'::text table_name,count(*)::bigint row_count FROM public."product_barcodes" x WHERE true UNION ALL SELECT 'product_categories'::text table_name,count(*)::bigint row_count FROM public."product_categories" x WHERE true UNION ALL SELECT 'products'::text table_name,count(*)::bigint row_count FROM public."products" x WHERE true UNION ALL SELECT 'promotions'::text table_name,count(*)::bigint row_count FROM public."promotions" x WHERE true UNION ALL SELECT 'public_flags'::text table_name,count(*)::bigint row_count FROM public."public_flags" x WHERE true UNION ALL SELECT 'purchase_order_items'::text table_name,count(*)::bigint row_count FROM public."purchase_order_items" x WHERE EXISTS(SELECT 1 FROM public."purchase_orders" p WHERE p."id"::text=x."po_id"::text AND p.store_id::text=p_branch_id) UNION ALL SELECT 'purchase_orders'::text table_name,count(*)::bigint row_count FROM public."purchase_orders" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'sale_items'::text table_name,count(*)::bigint row_count FROM public."sale_items" x WHERE EXISTS(SELECT 1 FROM public."sales" p WHERE p."id"::text=x."sale_id"::text AND p.store_id::text=p_branch_id) AND (p_history_days>=7300 OR x."created_at">=now()-make_interval(days=>GREATEST(p_history_days,30))) UNION ALL SELECT 'sales'::text table_name,count(*)::bigint row_count FROM public."sales" x WHERE x.store_id::text=p_branch_id AND (p_history_days>=7300 OR x."created_at">=now()-make_interval(days=>GREATEST(p_history_days,30))) UNION ALL SELECT 'secure_settings'::text table_name,count(*)::bigint row_count FROM public."secure_settings" x WHERE true UNION ALL SELECT 'security_findings'::text table_name,count(*)::bigint row_count FROM public."security_findings" x WHERE true UNION ALL SELECT 'settings_locks'::text table_name,count(*)::bigint row_count FROM public."settings_locks" x WHERE true UNION ALL SELECT 'settings_overrides'::text table_name,count(*)::bigint row_count FROM public."settings_overrides" x WHERE true UNION ALL SELECT 'shift_sessions'::text table_name,count(*)::bigint row_count FROM public."shift_sessions" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'sku_audit'::text table_name,count(*)::bigint row_count FROM public."sku_audit" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'staff_roles'::text table_name,count(*)::bigint row_count FROM public."staff_roles" x WHERE true UNION ALL SELECT 'stock_adjustments'::text table_name,count(*)::bigint row_count FROM public."stock_adjustments" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'stock_delta_applied'::text table_name,count(*)::bigint row_count FROM public."stock_delta_applied" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'stock_transfer_items'::text table_name,count(*)::bigint row_count FROM public."stock_transfer_items" x WHERE EXISTS(SELECT 1 FROM public."stock_transfers" p WHERE p."id"::text=x."transfer_id"::text AND p_branch_id IN (p.from_store_id::text,p.to_store_id::text)) UNION ALL SELECT 'stock_transfers'::text table_name,count(*)::bigint row_count FROM public."stock_transfers" x WHERE p_branch_id IN (x.from_store_id::text,x.to_store_id::text) UNION ALL SELECT 'stores'::text table_name,count(*)::bigint row_count FROM public."stores" x WHERE true UNION ALL SELECT 'suppliers'::text table_name,count(*)::bigint row_count FROM public."suppliers" x WHERE true UNION ALL SELECT 'sync_metadata'::text table_name,count(*)::bigint row_count FROM public."sync_metadata" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'system_audit_logs'::text table_name,count(*)::bigint row_count FROM public."system_audit_logs" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'terminal_commands'::text table_name,count(*)::bigint row_count FROM public."terminal_commands" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'terminal_tokens'::text table_name,count(*)::bigint row_count FROM public."terminal_tokens" x WHERE true UNION ALL SELECT 'uom_units'::text table_name,count(*)::bigint row_count FROM public."uom_units" x WHERE true UNION ALL SELECT 'user_roles'::text table_name,count(*)::bigint row_count FROM public."user_roles" x WHERE true UNION ALL SELECT 'whatsapp_queue'::text table_name,count(*)::bigint row_count FROM public."whatsapp_queue" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'terminal_recovery_secrets'::text table_name,count(*)::bigint row_count FROM public."terminal_recovery_secrets" x WHERE true UNION ALL SELECT 'pos_store_settings'::text table_name,count(*)::bigint row_count FROM public."pos_store_settings" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'settings_scoped'::text table_name,count(*)::bigint row_count FROM public."settings_scoped" x WHERE true UNION ALL SELECT 'stock_count_drafts'::text table_name,count(*)::bigint row_count FROM public."stock_count_drafts" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'authorization_actions'::text table_name,count(*)::bigint row_count FROM public."authorization_actions" x WHERE true UNION ALL SELECT 'authorization_requests'::text table_name,count(*)::bigint row_count FROM public."authorization_requests" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'authorization_log'::text table_name,count(*)::bigint row_count FROM public."authorization_log" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'record_edits'::text table_name,count(*)::bigint row_count FROM public."record_edits" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'shift_cash_counts'::text table_name,count(*)::bigint row_count FROM public."shift_cash_counts" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'shift_close_events'::text table_name,count(*)::bigint row_count FROM public."shift_close_events" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'shift_reconciliations'::text table_name,count(*)::bigint row_count FROM public."shift_reconciliations" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'shift_variance_alerts'::text table_name,count(*)::bigint row_count FROM public."shift_variance_alerts" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'entity_status_history'::text table_name,count(*)::bigint row_count FROM public."entity_status_history" x WHERE x.store_id::text=p_branch_id UNION ALL SELECT 'nav_pins'::text table_name,count(*)::bigint row_count FROM public."nav_pins" x WHERE true UNION ALL SELECT 'store_groups'::text table_name,count(*)::bigint row_count FROM public."store_groups" x WHERE true;
 END $fn$;
 
-CREATE OR REPLACE FUNCTION public.pos_old_receipt_lookup(p_lookup text,p_branch_id text) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS $fn$
+CREATE OR REPLACE FUNCTION public.pos_old_receipt_lookup(p_lookup text,p_branch_id text) RETURNS jsonb LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS $fn$
 DECLARE v_me public.app_users%ROWTYPE; v_sale public.sales%ROWTYPE;
 BEGIN IF auth.role()<>'service_role' THEN SELECT * INTO v_me FROM public.app_users WHERE auth_user_id=auth.uid() AND is_active=true LIMIT 1;
  IF v_me.id IS NULL OR NOT (v_me.role='admin' OR COALESCE((v_me.permissions->>'can_process_refund')::boolean,false)) THEN RAISE EXCEPTION 'REFUND_FORBIDDEN'; END IF;
@@ -14067,11 +14226,17 @@ BEGIN IF auth.role()<>'service_role' THEN SELECT * INTO v_me FROM public.app_use
  RETURN jsonb_build_object('sale',to_jsonb(v_sale),'items',(SELECT COALESCE(jsonb_agg(to_jsonb(i)),'[]'::jsonb) FROM public.sale_items i WHERE i.sale_id=v_sale.id),'payments',(SELECT COALESCE(jsonb_agg(to_jsonb(p)),'[]'::jsonb) FROM public.payment_transactions p WHERE p.sale_id=v_sale.id));
 END $fn$;
 
-GRANT EXECUTE ON FUNCTION public.pos_sync_push_batch(uuid,text,text,text,jsonb,jsonb) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.pos_sync_push_aggregate(uuid,text,text,jsonb) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.pos_sync_pull(text,text,bigint,integer) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.pos_sync_bootstrap(text,text,text,text,integer,integer) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.pos_sync_counts(text,text,integer) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.pos_old_receipt_lookup(text,text) TO authenticated;
+REVOKE ALL ON FUNCTION public.pos_sync_push_batch(uuid,text,text,text,jsonb,jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.pos_sync_push_aggregate(uuid,text,text,jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.pos_sync_pull(text,text,bigint,integer) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.pos_sync_bootstrap(text,text,text,text,integer,integer) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.pos_sync_counts(text,text,integer) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.pos_old_receipt_lookup(text,text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.pos_sync_push_batch(uuid,text,text,text,jsonb,jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.pos_sync_push_aggregate(uuid,text,text,jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.pos_sync_pull(text,text,bigint,integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.pos_sync_bootstrap(text,text,text,text,integer,integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.pos_sync_counts(text,text,integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.pos_old_receipt_lookup(text,text) TO service_role;
 
 -- SQLSERVER_SYNC_CONTRACT_END

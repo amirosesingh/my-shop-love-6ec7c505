@@ -57,10 +57,10 @@ describe("reconnect now", () => {
     await reconnectLocalDatabase({
       server: "localhost\\SQLEXPRESS",
       port: 1433,
-      directConnect: true,
+      encrypt: true,
     });
     expect(reconnect).toHaveBeenCalledWith(
-      expect.objectContaining({ port: 1433, directConnect: true }),
+      expect.objectContaining({ port: 1433, encrypt: true }),
     );
   });
 

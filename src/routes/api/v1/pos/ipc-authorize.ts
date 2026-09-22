@@ -23,12 +23,11 @@ export const Route = createFileRoute("/api/v1/pos/ipc-authorize")({
           branchId: typeof input?.branchId === "string" ? input.branchId : null,
         });
         if (!result.ok) return Response.json(result, { status: 401 });
-        // Database connection changes are administrator-only. This role comes
-        // directly from public.app_users after the PIN check; a client-side
-        // permission object must never turn a cashier into an administrator.
-        if (result.cashier.role !== "admin" && result.cashier.role_slug !== "admin")
-          return Response.json({ ok: false, error: "An Administrator account is required." }, { status: 403 });
-        return Response.json({ ok: true, level: "admin", subject: result.cashier.username });
+        const { databaseAuthority } = await import("@/lib/desktop-database-authority.server");
+        const authority = await databaseAuthority({ userId: result.cashier.username });
+        if (!authority?.permissions.can_manage_sync_backup)
+          return Response.json({ ok: false, error: "Manage database connection permission is required." }, { status: 403 });
+        return Response.json({ ok: true, ...authority });
       },
     },
   },

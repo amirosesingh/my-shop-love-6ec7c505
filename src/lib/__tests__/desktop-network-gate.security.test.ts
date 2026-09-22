@@ -13,7 +13,6 @@ type Gate = { checkUrl: (value: unknown) => { ok: boolean; error?: string } };
 let gate: Gate;
 
 beforeAll(async () => {
-  // @ts-expect-error - desktop shell module, plain CommonJS with no types
   gate = (await import("../../../electron/net.cjs")) as unknown as Gate;
 });
 

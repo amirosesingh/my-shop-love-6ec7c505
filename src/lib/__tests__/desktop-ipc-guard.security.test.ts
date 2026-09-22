@@ -20,7 +20,6 @@ type Guard = {
 let guard: Guard;
 
 beforeAll(async () => {
-  // @ts-expect-error - desktop shell module, plain CommonJS with no types
   guard = (await import("../../../electron/ipc-guard.cjs")) as unknown as Guard;
 });
 

@@ -1,3 +1,5 @@
+const { toCloudRow } = require("./row-codec.cjs");
+
 class ChangeReader {
   constructor(connectionManager, registry = null) {
     this.connectionManager = connectionManager;
@@ -44,7 +46,7 @@ class ChangeReader {
       return `(${primary.map((column, part) => { request.input(`k${index}_${part}`, key[column]); return `[${column}]=@k${index}_${part}`; }).join(" AND ")})`;
     });
     const result = await request.query(`SELECT * FROM dbo.[${table.sqlServerTable}] WHERE ${clauses.join(" OR ")};`);
-    return result.recordset ?? [];
+    return (result.recordset ?? []).map((row) => toCloudRow(table, row));
   }
   async pendingAggregates(branchId, limit = 500) {
     const result = await this.connectionManager.pool.request().input("branch", branchId).input("limit", Math.max(1, Math.min(2000, limit))).query(`WITH selected AS (

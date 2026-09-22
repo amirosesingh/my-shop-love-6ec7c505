@@ -672,7 +672,7 @@ function registerIpc() {
     const response=await fetch(`${baseUrl}/api/v1/pos/ipc-adopt`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(proof)});
     const result=await response.json().catch(()=>({ok:false,error:"Authorization failed."}));
     if(!response.ok||!result.ok)return{ok:false,error:result.error??"Authorization failed."};
-    adminSession.grant("admin",result.subject);return{ok:true,level:"admin"};
+    adminSession.grant(result.level,result.subject,result.permissions);return{ok:true,level:result.level};
   }));
   ipcMain.handle("admin:unlock", async (_e, username, pin) => guard.guarded(async () => {
     const user = guard.text(username, { name: "username", max: 160 });
@@ -685,8 +685,8 @@ function registerIpc() {
     });
     const result = await response.json().catch(() => ({ ok: false, error: "Authorization failed." }));
     if (!response.ok || !result.ok) return { ok: false, error: result.error ?? "Authorization failed." };
-    adminSession.grant("admin", result.subject);
-    return { ok: true, level: "admin" };
+    adminSession.grant(result.level, result.subject, result.permissions);
+    return { ok: true, level: result.level };
   }));
   ipcMain.handle("database:get-state", () => databaseService.snapshot());
   ipcMain.handle("database:set-enabled", (_e, value) => guard.guarded(async()=>{const state=await databaseService.setEnabled(value===true);if(value===true&&databaseManager.pool)await prepareLocalData();return databaseService.snapshot();}));

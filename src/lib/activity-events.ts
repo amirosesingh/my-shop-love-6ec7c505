@@ -10,9 +10,9 @@
  * and flushed on the next successful write.
  */
 import { readBusinessValue, writeBusinessValue } from "./business-storage";
-import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { pushActivityEvent } from "./activity-events.functions";
 import { readCredentials } from "./pos-credentials";
+import { posFetch } from "./server-origin";
 
 export type EventSeverity = "info" | "warning" | "critical";
 
@@ -272,23 +272,21 @@ const looksMissing = (error: { code?: string; message?: string } | null) =>
 /** Newest first. Returns [] when the caller is not an admin or supervisor. */
 export async function listActivityEvents(filter: ActivityFilter = {}): Promise<ActivityEvent[]> {
   if (logMissing) return [];
-  let q = supabase
-    .from("activity_events")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(filter.limit ?? 200);
-  if (filter.types?.length) q = q.in("event_type", filter.types);
-  if (filter.severities?.length) q = q.in("severity", filter.severities);
-  if (filter.storeId) q = q.eq("store_id", filter.storeId);
-  if (filter.actor) q = q.ilike("actor_name", `%${filter.actor}%`);
-  if (filter.from) q = q.gte("created_at", filter.from);
-  if (filter.to) q = q.lte("created_at", filter.to);
-  const { data, error } = await q;
-  if (error) {
-    if (looksMissing(error)) logMissing = true;
+  try {
+    const response = await posFetch("/api/v1/pos/activity-preferences", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "list", ...filter, ...(await readCredentials()) }),
+    });
+    const result = await response.json() as { ok?: boolean; rows?: Row[]; error?: string };
+    if (!response.ok || !result.ok) {
+      if (looksMissing({ message: result.error })) logMissing = true;
+      return [];
+    }
+    return (result.rows ?? []).map(map);
+  } catch {
     return [];
   }
-  return ((data ?? []) as Row[]).map(map);
 }
 
 /* ------------------------------------------------------------ read marker */
@@ -400,37 +398,44 @@ export const clearedIds = (userId: string): string[] => readClearedMap()[who(use
  */
 export function mergeRemoteActivityPreferences(userId: string, rows: ActivityEvent[]) {
   const key = who(userId);
+  const fetched = new Set(rows.map((row) => row.id));
   const remote = rows
     .filter((row) => row.clearedBy.some((id) => who(id) === key))
     .map((row) => row.id);
-  if (!remote.length) return;
   const map = readClearedMap();
-  map[key] = [...new Set([...(map[key] ?? []), ...remote])].slice(-500);
+  map[key] = [...new Set([...(map[key] ?? []).filter((id) => !fetched.has(id)), ...remote])].slice(-500);
   writeClearedMap(map);
 }
 
-function syncClearedEntry(id: string, cleared: boolean): void {
-  void supabase.rpc("set_activity_event_cleared", { p_event_id: id, p_cleared: cleared }).then(
-    () => undefined,
-    () => undefined,
-  );
+async function syncClearedEntry(id: string, cleared: boolean): Promise<boolean> {
+  try {
+    const response = await posFetch("/api/v1/pos/activity-preferences", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "clear", eventId: id, cleared, ...(await readCredentials()) }),
+    });
+    const result = await response.json() as { ok?: boolean };
+    return response.ok && result.ok === true;
+  } catch { return false; }
 }
 
-export function clearActivityEntry(userId: string, id: string) {
+export async function clearActivityEntry(userId: string, id: string): Promise<boolean> {
+  if (!(await syncClearedEntry(id, true))) return false;
   const map = readClearedMap();
   const key = who(userId);
   const list = map[key] ?? [];
   if (!list.includes(id)) map[key] = [...list, id].slice(-500);
   writeClearedMap(map);
-  syncClearedEntry(id, true);
+  return true;
 }
 
-export function reopenActivityEntry(userId: string, id: string) {
+export async function reopenActivityEntry(userId: string, id: string): Promise<boolean> {
+  if (!(await syncClearedEntry(id, false))) return false;
   const map = readClearedMap();
   const key = who(userId);
   map[key] = (map[key] ?? []).filter((x) => x !== id);
   writeClearedMap(map);
-  syncClearedEntry(id, false);
+  return true;
 }
 
 export const isCleared = (userId: string, id: string): boolean => clearedIds(userId).includes(id);

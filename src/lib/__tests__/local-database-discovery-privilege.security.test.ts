@@ -10,7 +10,6 @@ const privilege = require("../../../electron/ipc-privilege.cjs");
 
 const DATABASE_ADMIN_CHANNELS = [
   "database:set-enabled",
-  "database:test-server",
   "database:list-databases",
   "database:validate",
   "database:migrate",
@@ -72,26 +71,31 @@ describe("local SQL Server discovery privilege", () => {
     expect(adminSession.status()).toMatchObject({ unlocked: false });
   });
 
-  it("keeps every database configuration and write channel administrator-only", () => {
+  it("requires the database permission for every configuration and write channel", () => {
     for (const channel of DATABASE_ADMIN_CHANNELS) {
       expect(privilege.CHANNEL_LEVELS[channel], channel).toBe(privilege.ADMIN);
       expect(privilege.allowed(channel), channel).toBe(false);
     }
   });
 
-  it("lets an adopted admin perform writes but refuses managers and cashiers", () => {
-    adminSession.grant("admin", "signed-in-admin");
+  it("uses the verified account permission instead of a second desktop role", () => {
+    adminSession.grant("staff", "signed-in-staff", { can_manage_sync_backup: true });
     expect(privilege.allowed("database:save-connect")).toBe(true);
+    expect(privilege.allowed("sync:run-now")).toBe(true);
+    expect(privilege.allowed("sqladmin:repair")).toBe(true);
+    expect(privilege.allowed("settings:set", ["database_host"])).toBe(true);
+    expect(privilege.allowed("terminal:write")).toBe(false);
 
-    adminSession.grant("supervisor", "signed-in-manager");
+    adminSession.grant("admin", "signed-in-admin", { can_manage_sync_backup: false });
     expect(privilege.allowed("database:save-connect")).toBe(false);
+    expect(privilege.allowed("sqladmin:repair")).toBe(false);
+    expect(privilege.allowed("config:set", ["sync_enabled"])).toBe(false);
 
     adminSession.clear();
     expect(privilege.allowed("database:save-connect")).toBe(false);
-    expect(privilege.refusal(privilege.ADMIN)).toMatchObject({
+    expect(privilege.refusal(privilege.ADMIN, "database:save-connect")).toMatchObject({
       ok: false,
       code: "EPRIVILEGE",
-      requiredLevel: "admin",
     });
   });
 
@@ -108,6 +112,12 @@ describe("local SQL Server discovery privilege", () => {
     expect(adoptRoute).toContain("cashierToken:");
     expect(adoptRoute).not.toMatch(/role\s*:\s*input/);
     expect(adoptRoute).not.toContain("can_manage_sync_backup === true");
+  });
+
+  it("allows the read-only connection probe without unlocking the terminal", () => {
+    expect(privilege.CHANNEL_LEVELS["database:test-server"]).toBe(privilege.OPEN);
+    expect(privilege.allowed("database:test-server")).toBe(true);
+    expect(adminSession.status()).toMatchObject({ unlocked: false });
   });
 
   it("keeps the central staff role through PIN sign-in so an existing admin is adopted", () => {

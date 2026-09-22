@@ -359,8 +359,8 @@ export type LocalSyncStatus = {
   lastPushAt: string | null;
   lastPullAt: string | null;
   lastRestoreAt?: string | null;
-  restore?: RestoreRun | null;
-  drill?: RestoreDrill | null;
+  restore?: Record<string, unknown> | null;
+  drill?: Record<string, unknown> | null;
 
   server?: string | null;
   database?: string | null;

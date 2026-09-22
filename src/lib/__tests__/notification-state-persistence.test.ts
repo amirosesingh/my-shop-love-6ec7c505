@@ -1,9 +1,8 @@
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
-const rpc = vi.fn(() => Promise.resolve({ data: null, error: null }));
-vi.mock("@/integrations/supabase/external-client", () => ({
-  supabaseExternal: { rpc },
-}));
+const posFetch = vi.fn(() => Promise.resolve({ ok: true, json: async () => ({ ok: true }) }));
+vi.mock("../server-origin", () => ({ posFetch }));
+vi.mock("../pos-credentials", () => ({ readCredentials: async () => ({ cashierToken: "signed-in" }) }));
 vi.mock("../activity-events.functions", () => ({ pushActivityEvent: vi.fn() }));
 
 const values = new Map<string, string>();
@@ -17,7 +16,7 @@ const localStorage = {
 describe("per-user notification state", () => {
   beforeEach(() => {
     values.clear();
-    rpc.mockClear();
+    posFetch.mockClear();
     Object.assign(globalThis, {
       window: { localStorage, dispatchEvent: vi.fn() },
       localStorage,
@@ -29,13 +28,12 @@ describe("per-user notification state", () => {
 
   it("survives refresh and remains isolated between users", async () => {
     const activity = await import("../activity-events");
-    activity.clearActivityEntry("manager-1", "event-1");
+    expect(await activity.clearActivityEntry("manager-1", "event-1")).toBe(true);
     expect(activity.isCleared("manager-1", "event-1")).toBe(true);
     expect(activity.isCleared("manager-2", "event-1")).toBe(false);
-    expect(rpc).toHaveBeenCalledWith("set_activity_event_cleared", {
-      p_event_id: "event-1",
-      p_cleared: true,
-    });
+    expect(posFetch).toHaveBeenCalledWith("/api/v1/pos/activity-preferences", expect.objectContaining({
+      body: expect.stringContaining('"eventId":"event-1"'),
+    }));
   });
 
   it("merges a dismissal made on another device", async () => {
@@ -46,6 +44,13 @@ describe("per-user notification state", () => {
     } as Parameters<typeof activity.mergeRemoteActivityPreferences>[1][number];
     activity.mergeRemoteActivityPreferences("manager-1", [row]);
     expect(activity.clearedIds("manager-1")).toContain("event-remote");
+  });
+
+  it("keeps a notification visible when the server cannot save the clear", async () => {
+    posFetch.mockResolvedValueOnce({ ok: false, json: async () => ({ ok: false }) });
+    const activity = await import("../activity-events");
+    expect(await activity.clearActivityEntry("manager-1", "event-2")).toBe(false);
+    expect(activity.isCleared("manager-1", "event-2")).toBe(false);
   });
 
   it("persists read markers across navigation and login cycles", async () => {

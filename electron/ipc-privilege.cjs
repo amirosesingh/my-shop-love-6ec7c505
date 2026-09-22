@@ -22,6 +22,30 @@ const OPEN = "open";
 const SUPERVISOR = "supervisor";
 const ADMIN = "admin";
 
+// The account's central permission matrix owns local database and sync access.
+// The desktop only enforces the server-verified grant; it does not keep a
+// second database-admin role list.
+const DATABASE_SYNC_CHANNELS = new Set([
+  "pos:connect", "pos:configure-cloud", "pos:forget-connection", "pos:remove-connection",
+  "pos:apply-schema", "pos:apply-schema-tables", "pos:restore", "pos:restore-verify",
+  "pos:restore-drill", "pos:backup", "pos:set-sync-config", "pos:set-sync-enabled",
+  "pos:retry-connection", "pos:reconnect", "pos:retry-errored", "pos:retry-row",
+  "pos:discard-row", "database:set-enabled", "database:list-databases",
+  "database:validate", "database:migrate", "database:save-connect",
+  "database:disconnect", "database:remove-configuration", "database:backup",
+  "database:restore", "sync:run-now", "sync:pause", "sync:resume",
+  "sync:reconcile", "cloud:set", "cloud:remove", "backend:set",
+  "driver:install", "sqladmin:connect", "sqladmin:cancel", "sqladmin:probe-port",
+  "sqladmin:lock", "sqladmin:databases", "sqladmin:tables", "sqladmin:columns",
+  "sqladmin:query", "sqladmin:repair", "sqladmin:disconnect",
+]);
+const DATABASE_SYNC_SETTING = /^(?:db[_.:-]|database|sql|sync|cloud|supabase|backend)/i;
+function databaseSyncAction(channel, args = []) {
+  return DATABASE_SYNC_CHANNELS.has(channel) ||
+    ((channel === "settings:set" || channel === "config:set") &&
+      DATABASE_SYNC_SETTING.test(String(args[0] ?? "")));
+}
+
 /** Explicit classification of every channel the bridge exposes. */
 const CHANNEL_LEVELS = {
   /* --- unlock surface itself: must be reachable to be able to unlock --- */
@@ -107,6 +131,9 @@ const CHANNEL_LEVELS = {
   // aliases to the wizard. It does not connect, persist credentials, or alter
   // the terminal/database configuration.
   "database:list-servers": OPEN,
+  // This is a temporary, read-only SQL Server probe. It does not save a
+  // profile or change the terminal, so it can run before an admin unlock.
+  "database:test-server": OPEN,
   "database:health": OPEN,
   "database:schema-status": OPEN,
   "jobs:get-active": OPEN,
@@ -135,7 +162,6 @@ const CHANNEL_LEVELS = {
   /* --- admin: backend, company, database, identity, credentials, audit --- */
   "pos:connect": ADMIN,
   "database:set-enabled": ADMIN,
-  "database:test-server": ADMIN,
   "database:list-databases": ADMIN,
   "database:validate": ADMIN,
   "database:migrate": ADMIN,
@@ -309,7 +335,13 @@ function levelFor(channel, args = []) {
 /** Replaced by `install()` with the real stores. */
 let firstRun = () => false;
 
-function refusal(level) {
+function refusal(level, channel, args = []) {
+  if (databaseSyncAction(channel, args)) return {
+    ok: false,
+    code: "EPRIVILEGE",
+    stage: "authorize",
+    error: "This action requires the Manage database connection permission on your staff account. Sign in with an account that has it.",
+  };
   return {
     ok: false,
     code: "EPRIVILEGE",
@@ -331,6 +363,13 @@ function allowed(channel, args = []) {
     adminSession.recoveryTouch?.();
     return true;
   }
+  if (databaseSyncAction(channel, args)) {
+    if (adminSession.hasPermission("can_manage_sync_backup")) {
+      adminSession.touch();
+      return true;
+    }
+    return false;
+  }
   if (adminSession.hasLevel(level)) {
     adminSession.touch();
     return true;
@@ -347,7 +386,7 @@ function install(ipcMain, { isFirstRun } = {}) {
   const original = ipcMain.handle.bind(ipcMain);
   ipcMain.handle = (channel, listener) =>
     original(channel, (event, ...args) => {
-      if (!allowed(channel, args)) return refusal(levelFor(channel, args));
+      if (!allowed(channel, args)) return refusal(levelFor(channel, args), channel, args);
       return listener(event, ...args);
     });
   return ipcMain;
@@ -358,6 +397,8 @@ module.exports = {
   SUPERVISOR,
   ADMIN,
   CHANNEL_LEVELS,
+  DATABASE_SYNC_CHANNELS,
+  databaseSyncAction,
   FIRST_RUN_CHANNELS,
   RECOVERY_CHANNELS,
   settingLevel,

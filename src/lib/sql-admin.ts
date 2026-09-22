@@ -158,9 +158,8 @@ export type SqlAdminBridge = {
   disconnect: () => Promise<{ ok: boolean }>;
   status: () => Promise<SqlAdminStatus>;
   /**
-   * The desktop process refuses every administration call until it is
-   * unlocked here with an administrator's own username and PIN. Hiding the
-   * screen is not a control; this is.
+   * Protected database calls use the verified staff account's
+   * can_manage_sync_backup permission from the central database.
    */
   unlock?: (
     username: string,
@@ -168,7 +167,7 @@ export type SqlAdminBridge = {
   ) => Promise<{
     ok: boolean;
     name?: string;
-    level?: "admin" | "supervisor";
+    level?: "admin" | "supervisor" | "staff";
     expiresAt?: number;
     error?: string;
   }>;
@@ -178,12 +177,12 @@ export type SqlAdminBridge = {
     sessionToken?: string;
     cashierToken?: string;
     terminalToken?: string;
-  }) => Promise<{ ok: boolean; level?: "admin" | "supervisor"; error?: string }>;
+  }) => Promise<{ ok: boolean; level?: "admin" | "supervisor" | "staff"; error?: string }>;
   lockAdmin?: () => Promise<{ ok: boolean }>;
   adminStatus?: () => Promise<{
     unlocked: boolean;
     name?: string;
-    level?: "admin" | "supervisor";
+    level?: "admin" | "supervisor" | "staff";
     expiresAt?: number;
   }>;
 };

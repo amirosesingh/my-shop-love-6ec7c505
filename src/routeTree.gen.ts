@@ -117,6 +117,7 @@ import { Route as ApiPublicTerminalStaffRouteImport } from './routes/api/public/
 import { Route as ApiSettingsSyncBatchRouteImport } from './routes/api/settings.sync-batch'
 import { Route as ApiSettingsUpsertRouteImport } from './routes/api/settings.upsert'
 import { Route as ApiPublicPosRulesSaveRouteImport } from './routes/api/public/pos-rules.save'
+import { Route as ApiV1PosActivityPreferencesRouteImport } from './routes/api/v1/pos/activity-preferences'
 import { Route as ApiV1PosIpcAdoptRouteImport } from './routes/api/v1/pos/ipc-adopt'
 import { Route as ApiV1PosIpcAuthorizeRouteImport } from './routes/api/v1/pos/ipc-authorize'
 import { Route as ApiV1PosSyncRouteImport } from './routes/api/v1/pos/sync'
@@ -662,6 +663,12 @@ const ApiPublicPosRulesSaveRoute = ApiPublicPosRulesSaveRouteImport.update({
   path: '/save',
   getParentRoute: () => ApiPublicPosRulesRoute,
 } as any)
+const ApiV1PosActivityPreferencesRoute =
+  ApiV1PosActivityPreferencesRouteImport.update({
+    id: '/api/v1/pos/activity-preferences',
+    path: '/api/v1/pos/activity-preferences',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiV1PosIpcAdoptRoute = ApiV1PosIpcAdoptRouteImport.update({
   id: '/api/v1/pos/ipc-adopt',
   path: '/api/v1/pos/ipc-adopt',
@@ -787,6 +794,7 @@ export interface FileRoutesByFullPath {
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
   '/api/public/pos-rules/save': typeof ApiPublicPosRulesSaveRoute
+  '/api/v1/pos/activity-preferences': typeof ApiV1PosActivityPreferencesRoute
   '/api/v1/pos/ipc-adopt': typeof ApiV1PosIpcAdoptRoute
   '/api/v1/pos/ipc-authorize': typeof ApiV1PosIpcAuthorizeRoute
   '/api/v1/pos/sync': typeof ApiV1PosSyncRoute
@@ -900,6 +908,7 @@ export interface FileRoutesByTo {
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
   '/api/public/pos-rules/save': typeof ApiPublicPosRulesSaveRoute
+  '/api/v1/pos/activity-preferences': typeof ApiV1PosActivityPreferencesRoute
   '/api/v1/pos/ipc-adopt': typeof ApiV1PosIpcAdoptRoute
   '/api/v1/pos/ipc-authorize': typeof ApiV1PosIpcAuthorizeRoute
   '/api/v1/pos/sync': typeof ApiV1PosSyncRoute
@@ -1014,6 +1023,7 @@ export interface FileRoutesById {
   '/api/settings/sync-batch': typeof ApiSettingsSyncBatchRoute
   '/api/settings/upsert': typeof ApiSettingsUpsertRoute
   '/api/public/pos-rules/save': typeof ApiPublicPosRulesSaveRoute
+  '/api/v1/pos/activity-preferences': typeof ApiV1PosActivityPreferencesRoute
   '/api/v1/pos/ipc-adopt': typeof ApiV1PosIpcAdoptRoute
   '/api/v1/pos/ipc-authorize': typeof ApiV1PosIpcAuthorizeRoute
   '/api/v1/pos/sync': typeof ApiV1PosSyncRoute
@@ -1129,6 +1139,7 @@ export interface FileRouteTypes {
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
     | '/api/public/pos-rules/save'
+    | '/api/v1/pos/activity-preferences'
     | '/api/v1/pos/ipc-adopt'
     | '/api/v1/pos/ipc-authorize'
     | '/api/v1/pos/sync'
@@ -1242,6 +1253,7 @@ export interface FileRouteTypes {
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
     | '/api/public/pos-rules/save'
+    | '/api/v1/pos/activity-preferences'
     | '/api/v1/pos/ipc-adopt'
     | '/api/v1/pos/ipc-authorize'
     | '/api/v1/pos/sync'
@@ -1355,6 +1367,7 @@ export interface FileRouteTypes {
     | '/api/settings/sync-batch'
     | '/api/settings/upsert'
     | '/api/public/pos-rules/save'
+    | '/api/v1/pos/activity-preferences'
     | '/api/v1/pos/ipc-adopt'
     | '/api/v1/pos/ipc-authorize'
     | '/api/v1/pos/sync'
@@ -1466,6 +1479,7 @@ export interface RootRouteChildren {
   ApiPublicSyncRoute: typeof ApiPublicSyncRoute
   ApiPublicSyncHealthRoute: typeof ApiPublicSyncHealthRoute
   ApiPublicTerminalStaffRoute: typeof ApiPublicTerminalStaffRoute
+  ApiV1PosActivityPreferencesRoute: typeof ApiV1PosActivityPreferencesRoute
   ApiV1PosIpcAdoptRoute: typeof ApiV1PosIpcAdoptRoute
   ApiV1PosIpcAuthorizeRoute: typeof ApiV1PosIpcAuthorizeRoute
   ApiV1PosSyncRoute: typeof ApiV1PosSyncRoute
@@ -2229,6 +2243,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicPosRulesSaveRouteImport
       parentRoute: typeof ApiPublicPosRulesRoute
     }
+    '/api/v1/pos/activity-preferences': {
+      id: '/api/v1/pos/activity-preferences'
+      path: '/api/v1/pos/activity-preferences'
+      fullPath: '/api/v1/pos/activity-preferences'
+      preLoaderRoute: typeof ApiV1PosActivityPreferencesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/v1/pos/ipc-adopt': {
       id: '/api/v1/pos/ipc-adopt'
       path: '/api/v1/pos/ipc-adopt'
@@ -2384,6 +2405,7 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicSyncRoute: ApiPublicSyncRoute,
   ApiPublicSyncHealthRoute: ApiPublicSyncHealthRoute,
   ApiPublicTerminalStaffRoute: ApiPublicTerminalStaffRoute,
+  ApiV1PosActivityPreferencesRoute: ApiV1PosActivityPreferencesRoute,
   ApiV1PosIpcAdoptRoute: ApiV1PosIpcAdoptRoute,
   ApiV1PosIpcAuthorizeRoute: ApiV1PosIpcAuthorizeRoute,
   ApiV1PosSyncRoute: ApiV1PosSyncRoute,

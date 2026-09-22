@@ -81,7 +81,8 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
     }
     setRows(list);
     mergeRemoteActivityPreferences(meKey, list);
-    const fresh = unseenEvents(list, meKey);
+    const hidden = new Set(clearedIds(meKey));
+    const fresh = unseenEvents(list, meKey).filter((row) => !hidden.has(row.id));
     setUnread(fresh.length);
     const critical = fresh.find((r) => r.severity === "critical");
     if (critical) {
@@ -263,7 +264,9 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
                     <button
                       type="button"
                       className="ml-auto text-[10px] text-muted-foreground underline"
-                      onClick={() => clearActivityEntry(meKey, r.id)}
+                      onClick={() => void clearActivityEntry(meKey, r.id).then((saved) => {
+                        if (!saved) toast.error("Could not clear notification. Check the connection and try again.");
+                      })}
                     >
                       Clear
                     </button>
@@ -305,7 +308,9 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
                       <button
                         type="button"
                         className="text-[10px] text-primary underline"
-                        onClick={() => reopenActivityEntry(meKey, id)}
+                        onClick={() => void reopenActivityEntry(meKey, id).then((saved) => {
+                          if (!saved) toast.error("Could not reopen notification. Check the connection and try again.");
+                        })}
                       >
                         Reopen
                       </button>

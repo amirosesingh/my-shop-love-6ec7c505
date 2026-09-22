@@ -85,6 +85,7 @@ describe("start-up ordering and the sign-in gate", () => {
     expect(hydration).toBeGreaterThan(login);
     expect(readiness).toBeGreaterThan(hydration);
     expect(passwordAuth).toBeGreaterThan(readiness);
+    expect(auth.slice(login, passwordAuth)).not.toContain('.from("app_users").select("id")');
   });
 
   it("refuses entry when the role and profile cannot be read", () => {

@@ -30,24 +30,21 @@ export const Route = createFileRoute("/api/v1/pos/ipc-adopt")({
             { status: 401 },
           );
         const { verifyRelayCaller } = await import("@/core/api/pos-relay.server");
-        const { resolveRelayScope } = await import("@/core/api/relay-policy.server");
+        const { databaseAuthority } = await import("@/lib/desktop-database-authority.server");
         try {
-          const scope = await resolveRelayScope(await verifyRelayCaller(proof));
-          // The app_users role is the authority for the desktop's admin IPC
-          // session. Do not promote a browser-provided permission matrix to
-          // administrator: that would allow a non-admin to alter the terminal
-          // connection and its sealed credentials.
-          if (!(scope.role === "admin" || scope.roleSlug === "admin")) {
+          const caller = await verifyRelayCaller(proof);
+          const authority = await databaseAuthority({
+            userId: caller.staffUserId,
+            authUserId: caller.authUserId,
+            email: caller.email,
+          });
+          if (!authority?.permissions.can_manage_sync_backup) {
             return Response.json(
-              { ok: false, error: "This account cannot manage database and sync." },
+              { ok: false, error: "This account lacks Manage database connection permission." },
               { status: 403 },
             );
           }
-          return Response.json({
-            ok: true,
-            level: "admin",
-            subject: scope.staffUserId ?? scope.label,
-          });
+          return Response.json({ ok: true, ...authority });
         } catch {
           return Response.json(
             { ok: false, error: "Your sign-in could not be verified." },

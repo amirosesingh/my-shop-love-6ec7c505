@@ -16,6 +16,7 @@ import { heartbeat } from "@/core/activation/connection-health";
 const TONE_TEXT: Record<StatusTone, string> = {
   connecting: "text-muted-foreground",
   ok: "text-success",
+  busy: "text-accent",
   offline: "text-destructive",
   error: "text-destructive",
 };
@@ -23,6 +24,7 @@ const TONE_TEXT: Record<StatusTone, string> = {
 const TONE_CHIP: Record<StatusTone, string> = {
   connecting: "border-border bg-surface-2 text-muted-foreground",
   ok: "border-success/40 bg-success/10 text-success",
+  busy: "border-accent/40 bg-accent/10 text-accent",
   offline: "border-destructive/40 bg-destructive/10 text-destructive",
   error: "border-destructive/40 bg-destructive/10 text-destructive",
 };

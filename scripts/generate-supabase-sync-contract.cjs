@@ -100,6 +100,7 @@ for (const table of tables) {
     ? `UPDATE SET "is_refunded"=(public."sales"."is_refunded" OR EXCLUDED."is_refunded"),"row_version"=GREATEST(public."sales"."row_version",EXCLUDED."row_version")`
     : table.cloudTable === "sale_items"
       ? `UPDATE SET "refunded_qty"=GREATEST(public."sale_items"."refunded_qty",EXCLUDED."refunded_qty"),"row_version"=GREATEST(public."sale_items"."row_version",EXCLUDED."row_version")`
+      : table.cloudTable === "activity_events" ? "NOTHING"
       : updates.length && !immutable ? `UPDATE SET ${updates.join(",")}${versionWhere}` : "NOTHING";
   const refundOn = ["sales", "sale_items"].includes(table.cloudTable) ? "PERFORM set_config('pos.refunding','on',true);" : "";
   const refundOff = ["sales", "sale_items"].includes(table.cloudTable) ? "PERFORM set_config('pos.refunding','off',true);" : "";
@@ -143,6 +144,7 @@ BEGIN INSERT INTO public.sync_change_feed(organization_id,branch_id,table_name,e
  SELECT ${organization},branches.branch_id,'${table.cloudTable}',${key},lower(TG_OP),${version},TG_OP='DELETE' FROM (${feedBranches(table)}) branches; RETURN NULL; END $trg$;
 DROP TRIGGER IF EXISTS sync_feed_change ON public.${q(table.cloudTable)};
 CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE ON public.${q(table.cloudTable)} FOR EACH ROW EXECUTE FUNCTION public.sync_feed_${table.cloudTable}();`);
+  out.push(`REVOKE ALL ON FUNCTION public.sync_feed_${table.cloudTable}() FROM PUBLIC, anon, authenticated;`);
 }
 
 const applyCases = (rowsExpression, changesExpression) => pushTables.map((table) => `WHEN '${table.cloudTable}' THEN ${incomingBranchGuard(table, rowsExpression)} v_count:=public.sync_apply_${table.cloudTable}(${rowsExpression})+public.sync_delete_${table.cloudTable}(${changesExpression},p_branch_id);`).join("\n    ");
@@ -228,15 +230,23 @@ BEGIN IF auth.role()<>'service_role' THEN SELECT * INTO v_me FROM public.app_use
  IF v_sale.id IS NULL THEN RETURN NULL; END IF;
  RETURN jsonb_build_object('sale',to_jsonb(v_sale),'items',(SELECT COALESCE(jsonb_agg(to_jsonb(i)),'[]'::jsonb) FROM public.sale_items i WHERE i.sale_id=v_sale.id),'payments',(SELECT COALESCE(jsonb_agg(to_jsonb(p)),'[]'::jsonb) FROM public.payment_transactions p WHERE p.sale_id=v_sale.id));
 END $fn$;`);
-out.push(`GRANT EXECUTE ON FUNCTION public.pos_sync_push_batch(uuid,text,text,text,jsonb,jsonb) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.pos_sync_push_aggregate(uuid,text,text,jsonb) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.pos_sync_pull(text,text,bigint,integer) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.pos_sync_bootstrap(text,text,text,text,integer,integer) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.pos_sync_counts(text,text,integer) TO authenticated;
-GRANT EXECUTE ON FUNCTION public.pos_old_receipt_lookup(text,text) TO authenticated;`, end);
+out.push(`REVOKE ALL ON FUNCTION public.pos_sync_push_batch(uuid,text,text,text,jsonb,jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.pos_sync_push_aggregate(uuid,text,text,jsonb) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.pos_sync_pull(text,text,bigint,integer) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.pos_sync_bootstrap(text,text,text,text,integer,integer) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.pos_sync_counts(text,text,integer) FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON FUNCTION public.pos_old_receipt_lookup(text,text) FROM PUBLIC, anon, authenticated;
+GRANT EXECUTE ON FUNCTION public.pos_sync_push_batch(uuid,text,text,text,jsonb,jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.pos_sync_push_aggregate(uuid,text,text,jsonb) TO service_role;
+GRANT EXECUTE ON FUNCTION public.pos_sync_pull(text,text,bigint,integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.pos_sync_bootstrap(text,text,text,text,integer,integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.pos_sync_counts(text,text,integer) TO service_role;
+GRANT EXECUTE ON FUNCTION public.pos_old_receipt_lookup(text,text) TO service_role;`, end);
 
 let schema = fs.readFileSync(schemaPath, "utf8");
-const block = out.join("\n\n");
+const block = out.join("\n\n")
+  .replaceAll("LANGUAGE plpgsql SECURITY INVOKER AS", "LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS")
+  .replaceAll("LANGUAGE plpgsql SECURITY DEFINER SET search_path=public AS", "LANGUAGE plpgsql SECURITY DEFINER SET search_path=public,pg_temp AS");
 const start = schema.indexOf(begin); const finish = schema.indexOf(end);
 if (start >= 0 && finish >= start) schema = schema.slice(0, start) + block + schema.slice(finish + end.length);
 else schema = `${schema.trimEnd()}\n\n${block}\n`;

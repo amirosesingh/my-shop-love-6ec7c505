@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { nextBatchSize } from "../../../electron/jobs/manager.cjs";
+import manager from "../../../electron/jobs/manager.cjs";
+const { nextBatchSize } = manager;
 
 describe("high-volume database jobs", () => {
   it("keeps batches bounded and adapts after pressure", () => {

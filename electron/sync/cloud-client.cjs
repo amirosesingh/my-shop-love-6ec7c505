@@ -1,4 +1,5 @@
 const { policy } = require("./conflicts.cjs");
+const { toLocalValue } = require("./row-codec.cjs");
 
 class CloudClient {
   constructor({ configStore, terminalStore, connectionManager = null }) { this.configStore = configStore; this.terminalStore = terminalStore; this.connectionManager = connectionManager; }
@@ -31,7 +32,7 @@ class CloudClient {
   }
   async applyLocalBatch(transaction, table, batch) {
     const sql = this.connectionManager?.sql?.() ?? require("mssql/msnodesqlv8");
-    const allowed = new Map((table.columns ?? []).map((column) => [column.cloudColumn, column.sqlServerColumn]));
+    const allowed = new Map((table.columns ?? []).map((column) => [column.cloudColumn, column]));
     const primary = table.columns.filter((column) => column.primaryKey).map((column) => column.sqlServerColumn);
     if (!primary.length) throw new Error(`No primary key is registered for ${table.sqlServerTable}.`);
     for (const change of [...(batch.rows ?? []), ...(batch.tombstones ?? [])]) {
@@ -43,7 +44,10 @@ class CloudClient {
         await request.query(`WITH CHANGE_TRACKING_CONTEXT (0x434C4F5544) DELETE FROM dbo.[${table.sqlServerTable}] WHERE ${where};`);
         continue;
       }
-      const entries = Object.entries(row).filter(([name]) => allowed.has(name)).map(([name, value]) => [allowed.get(name), value]);
+      const entries = Object.entries(row).filter(([name]) => allowed.has(name)).map(([name, value]) => {
+        const column = allowed.get(name);
+        return [column.sqlServerColumn, toLocalValue(column, value)];
+      });
       if (!entries.length || primary.some((name) => !entries.some(([column]) => column === name))) continue;
       const request = new sql.Request(transaction); const names = [];
       entries.forEach(([name, value], index) => { const parameter = `v${index}`; request.input(parameter, value); names.push([name, parameter]); });

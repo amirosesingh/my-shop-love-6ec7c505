@@ -83,20 +83,20 @@ describe("what the indicator says", () => {
   };
 
   it("shows connecting before anything else", () => {
-    expect(describeStatus({ ...base, connectivity: "connecting", pending: 4 }).tone).toBe(
+    expect(describeStatus({ ...base, connectivity: "connecting" }).tone).toBe(
       "connecting",
     );
   });
 
   it("does not advertise a device queue while offline", () => {
-    const s = describeStatus({ ...base, connectivity: "offline", pending: 3 });
+    const s = describeStatus({ ...base, connectivity: "offline" });
     expect(s.tone).toBe("offline");
     expect(s.label).toBe("Offline");
     expect(s.detail).toContain("cannot be saved");
   });
 
   it("puts rejected credentials above every other message", () => {
-    const s = describeStatus({ ...base, credentialsInvalid: true, pending: 2 });
+    const s = describeStatus({ ...base, credentialsInvalid: true });
     expect(s.tone).toBe("error");
     expect(s.label.toLowerCase()).toContain("credential");
   });
