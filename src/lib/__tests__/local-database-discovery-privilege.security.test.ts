@@ -10,8 +10,6 @@ const privilege = require("../../../electron/ipc-privilege.cjs");
 
 const DATABASE_ADMIN_CHANNELS = [
   "database:set-enabled",
-  "database:list-databases",
-  "database:validate",
   "database:migrate",
   "database:save-connect",
   "database:disconnect",
@@ -114,9 +112,31 @@ describe("local SQL Server discovery privilege", () => {
     expect(adoptRoute).not.toContain("can_manage_sync_backup === true");
   });
 
+  it("runs database listing through the installed IPC gate without a staff grant", async () => {
+    const handlers = new Map<string, (...args: unknown[]) => unknown>();
+    const ipcMain = {
+      handle(channel: string, listener: (...args: unknown[]) => unknown) {
+        handlers.set(channel, listener);
+      },
+    };
+    privilege.install(ipcMain);
+    const list = vi.fn(async () => ({ ok: true, databases: [{ name: "Shop", state_desc: "ONLINE" }] }));
+    ipcMain.handle("database:list-databases", list);
+    expect(privilege.allowed("database:list-databases")).toBe(true);
+    expect(await handlers.get("database:list-databases")?.({})).toMatchObject({
+      ok: true,
+      databases: [{ name: "Shop" }],
+    });
+    expect(adminSession.status()).toMatchObject({ unlocked: false });
+  });
+
   it("allows the read-only connection probe without unlocking the terminal", () => {
     expect(privilege.CHANNEL_LEVELS["database:test-server"]).toBe(privilege.OPEN);
     expect(privilege.allowed("database:test-server")).toBe(true);
+    expect(privilege.CHANNEL_LEVELS["database:list-databases"]).toBe(privilege.OPEN);
+    expect(privilege.CHANNEL_LEVELS["database:validate"]).toBe(privilege.OPEN);
+    expect(privilege.allowed("database:list-databases")).toBe(true);
+    expect(privilege.allowed("database:validate")).toBe(true);
     expect(adminSession.status()).toMatchObject({ unlocked: false });
   });
 

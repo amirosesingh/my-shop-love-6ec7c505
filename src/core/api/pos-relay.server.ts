@@ -551,13 +551,10 @@ export type RelayCaller = {
 /**
  * Establish who is pushing. Fails closed: an unproven caller writes nothing.
  *
- * A device usually presents several proofs at once. They answer different
- * questions, so all of them are read instead of stopping at the first:
- *   - a staff account or staff session says *who* is acting, with what role;
- *   - a terminal token says *where* the device physically is.
- * An administrator working on a registered till therefore stays an
- * administrator, pinned to that till's branch, instead of being downgraded to
- * an anonymous terminal with no permissions at all.
+ * A device can present several proofs at once. The verified person session
+ * says who is acting; the terminal token supplies the device branch. A till
+ * may also hold a separate Supabase machine account, which must not replace
+ * the person who signed in with a PIN.
  */
 export async function verifyRelayCaller(input: {
   sessionToken?: string;
@@ -619,9 +616,11 @@ export async function verifyRelayCaller(input: {
     }
   }
 
-  // A signed-in staff account always wins the identity question, even on a
-  // registered till: it is the only proof that carries a role.
-  if (input.accessToken && identity?.kind !== "staff") {
+  // Use Auth only when no person session identified the caller. PIN sign-in
+  // can coexist with a terminal's machine Auth session; replacing the proven
+  // cashier with that machine account loses the person's database permissions.
+  if (input.accessToken && (!identity || identity.kind === "terminal" ||
+    (identity.kind === "staff" && !identity.staffUserId))) {
     const res = await fetch(`${supabaseConfig().url}/auth/v1/user`, {
       headers: {
         apikey: supabaseConfig().key,

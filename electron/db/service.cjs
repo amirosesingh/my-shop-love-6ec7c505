@@ -37,10 +37,7 @@ class DatabaseService {
   }
   async schemaStatus() { const profile=this.secureConfig.credentials(); return profile ? validateDatabase(this.manager,profile) : {ok:false,code:"EDATABASE",error:"No database is configured."}; }
   async validate(profile) {
-    this.transition("enabled_validating");
-    const result = await validateDatabase(this.manager, profile);
-    this.transition(result.ok && result.ready ? "enabled_validating" : "enabled_error", result.ok ? null : result);
-    return result;
+    return validateDatabase(this.manager, profile);
   }
   async saveAndConnect(profile) {
     try {

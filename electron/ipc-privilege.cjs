@@ -30,8 +30,7 @@ const DATABASE_SYNC_CHANNELS = new Set([
   "pos:apply-schema", "pos:apply-schema-tables", "pos:restore", "pos:restore-verify",
   "pos:restore-drill", "pos:backup", "pos:set-sync-config", "pos:set-sync-enabled",
   "pos:retry-connection", "pos:reconnect", "pos:retry-errored", "pos:retry-row",
-  "pos:discard-row", "database:set-enabled", "database:list-databases",
-  "database:validate", "database:migrate", "database:save-connect",
+  "pos:discard-row", "database:set-enabled", "database:migrate", "database:save-connect",
   "database:disconnect", "database:remove-configuration", "database:backup",
   "database:restore", "sync:run-now", "sync:pause", "sync:resume",
   "sync:reconcile", "cloud:set", "cloud:remove", "backend:set",
@@ -134,6 +133,11 @@ const CHANNEL_LEVELS = {
   // This is a temporary, read-only SQL Server probe. It does not save a
   // profile or change the terminal, so it can run before an admin unlock.
   "database:test-server": OPEN,
+  // Both checks use a temporary SQL connection and do not save credentials
+  // or change the selected database. A staff account can inspect the target
+  // before an authorised operator commits configuration changes.
+  "database:list-databases": OPEN,
+  "database:validate": OPEN,
   "database:health": OPEN,
   "database:schema-status": OPEN,
   "jobs:get-active": OPEN,
@@ -162,8 +166,6 @@ const CHANNEL_LEVELS = {
   /* --- admin: backend, company, database, identity, credentials, audit --- */
   "pos:connect": ADMIN,
   "database:set-enabled": ADMIN,
-  "database:list-databases": ADMIN,
-  "database:validate": ADMIN,
   "database:migrate": ADMIN,
   "database:save-connect": ADMIN,
   "database:disconnect": ADMIN,
