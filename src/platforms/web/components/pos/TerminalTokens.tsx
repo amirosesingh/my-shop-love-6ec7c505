@@ -44,7 +44,6 @@ import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import { usePos } from "@/lib/pos-store";
 import { logger } from "@/lib/audit-log";
 import {
-  ensureLocations,
   deleteTerminalToken,
   issueTerminalToken,
   listTerminalTokens,
@@ -147,23 +146,6 @@ export function TerminalTokens({
     if (!locationId && stores.length) setLocationId(stores[0].id);
   }, [stores, locationId]);
 
-  // Mirror local locations into the central directory so the dropdown and the
-  // database agree before any token references one of them.
-  useEffect(() => {
-    if (!stores.length) return;
-    void ensureLocations(
-      stores.map((s) => ({
-        id: s.id,
-        code: s.code,
-        name: s.name,
-        address: s.address,
-        phone: s.phone,
-      })),
-    ).catch(() => {
-      /* non-fatal: issuing a token re-attempts this for the chosen location */
-    });
-  }, [stores]);
-
   const qr = useMemo(() => (code ? qrDataUrl(code) : ""), [code]);
 
   // Live 15-minute countdown for the freshly issued code.
@@ -191,7 +173,10 @@ export function TerminalTokens({
   useEffect(() => {
     if (!codeTokenId || claimed || expired) return;
     let stopped = false;
+    let pending = false;
     const check = async () => {
+      if (pending) return;
+      pending = true;
       try {
         const remote = await fetchTokenStatus(codeTokenId);
         if (!remote || stopped) return;
@@ -202,6 +187,8 @@ export function TerminalTokens({
         }
       } catch {
         /* transient — the next tick tries again */
+      } finally {
+        pending = false;
       }
     };
     const timer = window.setInterval(() => void check(), 3000);
@@ -345,8 +332,13 @@ export function TerminalTokens({
           <h2 className="text-sm font-semibold">Register a new terminal</h2>
         </div>
         <p className="mt-1 text-xs text-muted-foreground">
-          Issue one code per counter. The till scans or pastes it once and is then locked to that
-          location.
+          {only === "mobile"
+            ? "Issue one code for each Android phone or tablet. Open the POS app on that device and scan or paste the code to assign it to this location."
+            : "Issue one code for each Windows counter PC. Open the POS app on that PC and scan or paste the code to assign it to this location."}
+        </p>
+        <p className="mt-2 text-xs text-muted-foreground">
+          This registers the device, not a person. Supervisors and administrators issue codes;
+          each staff member signs in with their own account and permissions.
         </p>
 
         <div className="mt-4 grid gap-3 sm:grid-cols-[minmax(0,1fr)_minmax(0,1fr)_auto] sm:items-end">
@@ -362,12 +354,12 @@ export function TerminalTokens({
           </div>
           <div className="space-y-1.5">
             <Label htmlFor="device-name" className="text-[11px] text-muted-foreground">
-              Terminal / device name
+              {only === "mobile" ? "Phone or tablet name" : "Windows PC name"}
             </Label>
             <Input
               id="device-name"
               className="h-9"
-              placeholder="Billing Counter 1"
+              placeholder={only === "mobile" ? "Sales Tablet 1" : "Billing Counter 1"}
               value={deviceName}
               onChange={(e) => setDeviceName(e.target.value)}
             />
@@ -386,7 +378,7 @@ export function TerminalTokens({
           </Button>
         </div>
 
-        <div className="mt-4 rounded-lg border border-dashed border-border p-3">
+        {only !== "mobile" && <div className="mt-4 rounded-lg border border-dashed border-border p-3">
           <div className="flex flex-wrap items-center justify-between gap-2">
             <div className="min-w-0">
               <p className="text-xs font-medium">Pair a PC by scanning its screen</p>
@@ -423,7 +415,7 @@ export function TerminalTokens({
               />
             </div>
           )}
-        </div>
+        </div>}
 
         {code && claimed && (
           <div className="mt-5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4">

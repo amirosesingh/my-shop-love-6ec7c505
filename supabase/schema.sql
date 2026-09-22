@@ -4290,11 +4290,15 @@ BEGIN
     RETURN false;
   END IF;
 
+  IF (t.platform = 'mobile' AND p_platform IS DISTINCT FROM 'android')
+     OR (t.platform = 'pc' AND p_platform IS DISTINCT FROM 'electron') THEN
+    RAISE EXCEPTION 'TERMINAL_PLATFORM_MISMATCH';
+  END IF;
+
   UPDATE public.terminal_tokens
   SET status = 'used',
       claimed_by_device = left(coalesce(p_device, claimed_by_device), 120),
       claim_proof = coalesce(p_proof_hash, claim_proof),
-      platform = coalesce(nullif(btrim(coalesce(p_platform, '')), ''), platform),
       claimed_os = coalesce(nullif(btrim(coalesce(p_os, '')), ''), claimed_os),
       claimed_at = now(),
       activated_at = coalesce(activated_at, now()),
@@ -6047,7 +6051,7 @@ CREATE POLICY "Staff can delete stores" ON public.stores FOR DELETE TO authentic
 
 DROP POLICY IF EXISTS "Staff can delete tokens" ON public.terminal_tokens;
 
-CREATE POLICY "Staff can delete tokens" ON public.terminal_tokens FOR DELETE TO authenticated USING (( SELECT public.is_staff_now() AS is_staff_now));
+CREATE POLICY "Staff can delete tokens" ON public.terminal_tokens FOR DELETE TO authenticated USING (( SELECT public.is_app_supervisor() AS is_app_supervisor));
 
 DROP POLICY IF EXISTS "Staff can insert" ON public.members;
 
@@ -6085,7 +6089,7 @@ CREATE POLICY "Staff can insert stores" ON public.stores FOR INSERT TO authentic
 
 DROP POLICY IF EXISTS "Staff can issue tokens" ON public.terminal_tokens;
 
-CREATE POLICY "Staff can issue tokens" ON public.terminal_tokens FOR INSERT TO authenticated WITH CHECK (( SELECT public.is_staff_now() AS is_staff_now));
+CREATE POLICY "Staff can issue tokens" ON public.terminal_tokens FOR INSERT TO authenticated WITH CHECK (( SELECT public.is_app_supervisor() AS is_app_supervisor));
 
 DROP POLICY IF EXISTS "Staff can manage product categories" ON public.product_categories;
 
@@ -6097,7 +6101,7 @@ CREATE POLICY "Staff can manage suppliers" ON public.suppliers TO authenticated 
 
 DROP POLICY IF EXISTS "Staff can manage tokens" ON public.terminal_tokens;
 
-CREATE POLICY "Staff can manage tokens" ON public.terminal_tokens FOR UPDATE TO authenticated USING (( SELECT public.is_staff_now() AS is_staff_now)) WITH CHECK (( SELECT public.is_staff_now() AS is_staff_now));
+CREATE POLICY "Staff can manage tokens" ON public.terminal_tokens FOR UPDATE TO authenticated USING (( SELECT public.is_app_supervisor() AS is_app_supervisor)) WITH CHECK (( SELECT public.is_app_supervisor() AS is_app_supervisor));
 
 DROP POLICY IF EXISTS "Staff can manage units" ON public.uom_units;
 
@@ -6155,7 +6159,7 @@ CREATE POLICY "Staff can read suppliers" ON public.suppliers FOR SELECT TO authe
 
 DROP POLICY IF EXISTS "Staff can read tokens" ON public.terminal_tokens;
 
-CREATE POLICY "Staff can read tokens" ON public.terminal_tokens FOR SELECT TO authenticated USING (( SELECT public.is_staff_now() AS is_staff_now));
+CREATE POLICY "Staff can read tokens" ON public.terminal_tokens FOR SELECT TO authenticated USING (( SELECT public.is_app_supervisor() AS is_app_supervisor));
 
 DROP POLICY IF EXISTS "Staff can read units" ON public.uom_units;
 
@@ -11779,26 +11783,31 @@ CREATE POLICY "Staff can update"
   WITH CHECK (public.is_staff_now() AND public.product_visible_to_me(owner_store_id));
 
 -- 3) Activation tokens belong to a branch, and only supervisors may issue them.
+DROP POLICY IF EXISTS "Anyone can check a token status" ON public.terminal_tokens;
 DROP POLICY IF EXISTS "Staff can read tokens" ON public.terminal_tokens;
-CREATE POLICY "Staff can read tokens"
+DROP POLICY IF EXISTS "Supervisors can read tokens" ON public.terminal_tokens;
+CREATE POLICY "Supervisors can read tokens"
   ON public.terminal_tokens FOR SELECT TO authenticated
-  USING (public.is_staff_now() AND public.user_has_store_access(location_id));
+  USING ((SELECT public.is_app_supervisor()));
 
 DROP POLICY IF EXISTS "Staff can issue tokens" ON public.terminal_tokens;
+DROP POLICY IF EXISTS "Supervisors can issue tokens" ON public.terminal_tokens;
 CREATE POLICY "Supervisors can issue tokens"
   ON public.terminal_tokens FOR INSERT TO authenticated
-  WITH CHECK (public.is_supervisor_now() AND public.user_has_store_access(location_id));
+  WITH CHECK ((SELECT public.is_app_supervisor()));
 
 DROP POLICY IF EXISTS "Staff can manage tokens" ON public.terminal_tokens;
+DROP POLICY IF EXISTS "Supervisors can manage tokens" ON public.terminal_tokens;
 CREATE POLICY "Supervisors can manage tokens"
   ON public.terminal_tokens FOR UPDATE TO authenticated
-  USING (public.is_supervisor_now() AND public.user_has_store_access(location_id))
-  WITH CHECK (public.is_supervisor_now() AND public.user_has_store_access(location_id));
+  USING ((SELECT public.is_app_supervisor()))
+  WITH CHECK ((SELECT public.is_app_supervisor()));
 
 DROP POLICY IF EXISTS "Staff can delete tokens" ON public.terminal_tokens;
+DROP POLICY IF EXISTS "Supervisors can delete tokens" ON public.terminal_tokens;
 CREATE POLICY "Supervisors can delete tokens"
   ON public.terminal_tokens FOR DELETE TO authenticated
-  USING (public.is_supervisor_now() AND public.user_has_store_access(location_id));
+  USING ((SELECT public.is_app_supervisor()));
 
 -- Consolidated online security/schema change: 20260905072726_c2d95046-07c2-4f23-9fa1-6789dcb3cec6.sql
 REVOKE ALL ON FUNCTION public.product_visible_to_me(text) FROM PUBLIC;

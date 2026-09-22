@@ -329,6 +329,9 @@ export function normalizePermissions(
     const resolved = resolvePermission(key as PermissionFlag);
     if (resolved in base) base[resolved] = !!value;
   }
+  // Terminal registration belongs to supervisors and administrators even when
+  // an older stored matrix still carries the former supervisor default (false).
+  if (role === "supervisor") base.can_manage_terminals = true;
   return base;
 }
 
@@ -429,13 +432,12 @@ export function getEffectivePermissions(
 // and decide what a role can see; the matrix still decides what may be done.
 // --------------------------------------------------------------------------
 
-/** Supervisors run the floor but do not own the install: no staff control,
- *  no terminal activation, no sync/backup and no settings. */
+/** Supervisors run the floor and may register devices, but do not own staff,
+ *  sync/backup or general settings. */
 export const SUPERVISOR_PERMISSIONS: StaffPermissions = build(
   PERMISSION_KEYS.filter(
     (k) =>
       k !== "can_manage_staff" &&
-      k !== "can_manage_terminals" &&
       k !== "can_manage_sync_backup" &&
       k !== "can_access_pos_settings",
   ),
@@ -543,14 +545,13 @@ export const PERMISSION_TAGS: Record<
   },
   "supervisor-only": {
     roles: ["supervisor", "admin"],
-    keys: ["can_edit_member_points", "can_manage_promotions"],
+    keys: ["can_edit_member_points", "can_manage_promotions", "can_manage_terminals"],
   },
   "admin-only": {
     roles: ["admin"],
     keys: [
       "can_access_pos_settings",
       "can_manage_staff",
-      "can_manage_terminals",
       "can_manage_sync_backup",
     ],
   },

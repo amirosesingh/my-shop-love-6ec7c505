@@ -158,15 +158,16 @@ describe("permission tags", () => {
     expect(roleHasTag("admin", "admin-only")).toBe(true);
   });
 
-  it("supervisors never get staff, terminal, sync or settings control", () => {
+  it("supervisors manage terminals but not staff, sync or general settings", () => {
     for (const key of [
       "can_manage_staff",
-      "can_manage_terminals",
       "can_manage_sync_backup",
       "can_access_pos_settings",
     ] as PermissionKey[]) {
       expect(SUPERVISOR_PERMISSIONS[key], key).toBe(false);
     }
+    expect(SUPERVISOR_PERMISSIONS.can_manage_terminals).toBe(true);
+    expect(normalizePermissions({ can_manage_terminals: false }, "supervisor").can_manage_terminals).toBe(true);
     expect(SUPERVISOR_PERMISSIONS.can_process_sale).toBe(true);
   });
 

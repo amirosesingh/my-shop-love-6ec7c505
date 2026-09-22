@@ -32,6 +32,9 @@ export type ActivationPayloadV1 = {
   supabaseAnonKey: string;
   /** one-time claim id (the terminal_tokens row id) */
   pairToken: string;
+  /** Display name and intended shell, so activation needs no extra table read. */
+  deviceName?: string;
+  platform?: "pc" | "mobile";
   /** issue time in ms, used for the 15 minute window */
   ts: number;
 };

@@ -24,8 +24,9 @@ export const Route = createFileRoute("/settings/terminals")({
   component: () => (
     <SettingsFrame
       wide
+      terminalManagement
       title="Terminal activation"
-      description="Every Windows till registers once with a code issued here. Phones and tablets live on the Mobile terminals page. Revoke a token to cut a machine off from the company data."
+      description="Register each Windows counter PC with its own code and location. The staff member's sign-in determines what they can do. Android phones and tablets are managed under Mobile terminals. Revoke a code to disconnect a device."
     >
       <div className="space-y-5">
         <CurrentTerminalPanel />

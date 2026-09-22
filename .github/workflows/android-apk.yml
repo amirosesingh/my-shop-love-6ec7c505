@@ -129,12 +129,19 @@ jobs:
 
       - name: Stage the APK and the web bundle
         run: |
+          set -euo pipefail
           v="${{ steps.meta.outputs.version }}"
           rid="${{ steps.meta.outputs.release_id }}"
           released=$(date -u +%Y-%m-%dT%H:%M:%SZ)
           epoch=$(node -e "const m=/BUNDLE_EPOCH\s*=\s*(\d+)/.exec(require('fs').readFileSync('src/lib/bundle-epoch.ts','utf8'));if(!m){process.exit(1)}console.log(m[1])")
           mkdir -p versioned/android/web latest/android latest/android/web release-assets
           src=$(ls android/app/build/outputs/apk/release/*.apk | head -n1)
+          aapt=$(find "$ANDROID_HOME/build-tools" -maxdepth 2 -type f -name aapt | sort -V | tail -n1)
+          if [ -z "$aapt" ]; then echo "Android build tools are missing aapt"; exit 1; fi
+          actual_version=$("$aapt" dump badging "$src" | sed -n "s/.*versionName='\([^']*\)'.*/\1/p" | head -n1)
+          if [ "$actual_version" != "$v" ]; then
+            echo "APK versionName '$actual_version' does not match release version '$v'"; exit 1
+          fi
           cp "$src" "versioned/android/Retail-$v.apk"
           cp "$src" "latest/android/Retail-$v.apk"
           cp "$src" "latest/android/Retail-latest.apk"
@@ -181,7 +188,7 @@ jobs:
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: |
           if [ -z "$AWS_ACCESS_KEY_ID" ] || [ -z "$AWS_SECRET_ACCESS_KEY" ] || [ -z "$R2_ENDPOINT" ]; then
-            echo "R2 credentials are not configured; skipping upload."; exit 0
+            echo "R2 credentials are required for an Android release."; exit 1
           fi
           rid="${{ steps.meta.outputs.release_id }}"
           aws s3 sync versioned/android "s3://updatelccms/pos-app/releases/$rid/android" \
@@ -194,6 +201,9 @@ jobs:
           aws s3 cp release-assets/manifest.json s3://updatelccms/pos-app/manifest.json \
             --endpoint-url "$R2_ENDPOINT" --cache-control "no-cache" \
             --content-type "application/json"
+          aws s3 cp "s3://updatelccms/pos-app/latest/android/Retail-${{ steps.meta.outputs.version }}.apk" /tmp/published-android.apk \
+            --endpoint-url "$R2_ENDPOINT" --no-progress
+          cmp "release-assets/Retail-${{ steps.meta.outputs.version }}.apk" /tmp/published-android.apk
 
       - name: Keep only the five most recent releases
         if: ${{ startsWith(github.ref, 'refs/tags/v') }}

@@ -40,7 +40,7 @@ import {
   type ServiceState,
 } from "@/lib/system-health";
 import {
-  assessSecurityFindings,
+  listSecurityFindings,
   SEVERITY_TONE,
   SOURCE_LABEL,
   type SecurityFinding,
@@ -156,7 +156,9 @@ export function SystemAlertsButton({ className }: { className?: string }) {
   }, [probe]);
 
   const refreshFindings = useCallback(async () => {
-    const rows = (await assessSecurityFindings()).findings.filter((f) => f.status === "open");
+    // The header only needs existing alerts. Running the full database posture
+    // audit every 90 seconds made every open admin session do unnecessary work.
+    const rows = (await listSecurityFindings()).filter((f) => f.status === "open");
     setFindings(rows);
     if (typeof window !== "undefined")
       localStorage.setItem(SEEN_KEY, JSON.stringify(rows.map((f) => f.id).slice(0, 300)));
