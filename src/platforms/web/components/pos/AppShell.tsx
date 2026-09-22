@@ -558,7 +558,12 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </Button>
               </header>
 
-              <main className="min-h-0 min-w-0 flex-1 overflow-y-auto">
+              <main
+                className={cn(
+                  "min-h-0 min-w-0 flex-1",
+                  location.pathname.startsWith("/settings") ? "overflow-hidden" : "overflow-y-auto",
+                )}
+              >
                 {(() => {
                   // Decided before the page body renders: no flash of protected data.
                   if (isDesktop() && isDesktopBlocked(location.pathname))
