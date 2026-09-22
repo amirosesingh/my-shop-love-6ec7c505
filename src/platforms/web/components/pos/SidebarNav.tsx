@@ -66,10 +66,10 @@ export function SidebarNav({
 }: Props) {
   const pathname = useRouterState({ select: (r) => r.location.pathname });
   const [query, setQuery] = useState("");
-  const { authUserId, isAdmin, can } = useAuth();
+  const { authUserId, isSupervisor, can } = useAuth();
   const { pins } = useNavPins(authUserId ?? null);
 
-  const settingsAllowed = isAdmin || can("can_access_pos_settings");
+  const settingsAllowed = isSupervisor || can("can_access_pos_settings");
 
   /** The seven top-level destinations. */
   const sections: Entry[] = useMemo(() => {

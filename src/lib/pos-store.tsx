@@ -51,6 +51,8 @@ import {
   isDuplicateBillNumber,
   loadActiveShift,
   loadCloudState,
+  loadCloudSettings,
+  loadSalesPage,
   openShiftOnServer,
 } from "@/core/api/pos-db";
 import { recordActivity } from "./activity-events";
@@ -391,6 +393,19 @@ const contextRegistry = globalThis as typeof globalThis & {
 const PosContext = (contextRegistry.__posContext ??= createContext<Ctx | null>(null));
 
 /** Merge a cloud (or cached snapshot) slice into local state. */
+function mergeCloudSettings(cloudSettings: CloudSlice["settings"]): PosState["settings"] {
+  return {
+    tax: { ...defaultSettings.tax, ...cloudSettings?.tax },
+    receipt: { ...defaultSettings.receipt, ...cloudSettings?.receipt },
+    payment: { ...defaultSettings.payment, ...cloudSettings?.payment },
+    whatsapp: { ...defaultSettings.whatsapp, ...cloudSettings?.whatsapp },
+    review: { ...defaultSettings.review, ...cloudSettings?.review },
+    hours: { ...defaultSettings.hours, ...cloudSettings?.hours },
+    integrations: { ...defaultSettings.integrations, ...cloudSettings?.integrations },
+    visibility: { ...defaultSettings.visibility, ...cloudSettings?.visibility },
+  };
+}
+
 function applyCloud(s: PosState, cloud: CloudSlice): PosState {
   const cloudShifts = cloud.shifts ?? [];
   const cloudProducts = cloud.products ?? [];
@@ -418,16 +433,7 @@ function applyCloud(s: PosState, cloud: CloudSlice): PosState {
       if (!cloudStores.length) return s.currentStoreId;
       return cloudStores.find((x) => x.id === s.currentStoreId)?.id ?? cloudStores[0].id;
     })(),
-    settings: {
-      tax: { ...defaultSettings.tax, ...cloudSettings?.tax },
-      receipt: { ...defaultSettings.receipt, ...cloudSettings?.receipt },
-      payment: { ...defaultSettings.payment, ...cloudSettings?.payment },
-      whatsapp: { ...defaultSettings.whatsapp, ...cloudSettings?.whatsapp },
-      review: { ...defaultSettings.review, ...cloudSettings?.review },
-      hours: { ...defaultSettings.hours, ...cloudSettings?.hours },
-      integrations: { ...defaultSettings.integrations, ...cloudSettings?.integrations },
-      visibility: { ...defaultSettings.visibility, ...cloudSettings?.visibility },
-    },
+    settings: mergeCloudSettings(cloudSettings),
     // Keep the bill counter ahead of every receipt already in the cloud.
     counter: cloudSales.reduce(
       (max, sale) => Math.max(max, Number(sale.receiptNo.split("-").pop()) || 0),
@@ -716,20 +722,33 @@ export function PosProvider({ children }: { children: ReactNode }) {
   // catalogue, members, prices and shift from the backend.
   useEffect(() => {
     if (!isOnlineOnly() || !signedIn) return;
+    let cancelled = false;
+    let loading = false;
+    let resumeTimer: number | undefined;
     const resume = () => {
       if (document.visibilityState !== "visible" || !navigator.onLine) return;
-      void loadCloudState()
-        .then((cloud) => setState((s) => applyCloud(s, cloud)))
-        .catch(() => {
-          /* the offline gate takes over if the connection is gone */
-        });
-      void refreshActiveShift();
+      // Focus, visibility and the native app-state event often arrive together.
+      // One foreground transition needs one snapshot, not three full reads.
+      if (resumeTimer) window.clearTimeout(resumeTimer);
+      resumeTimer = window.setTimeout(() => {
+        resumeTimer = undefined;
+        if (loading || cancelled) return;
+        loading = true;
+        void loadCloudState()
+          .then((cloud) => {
+            if (!cancelled) setState((s) => applyCloud(s, cloud));
+          })
+          .catch(() => {
+            /* the offline gate takes over if the connection is gone */
+          })
+          .finally(() => { loading = false; });
+        void refreshActiveShift();
+      }, 200);
     };
     document.addEventListener("visibilitychange", resume);
     window.addEventListener("online", resume);
     window.addEventListener("focus", resume);
     let removeNative: (() => Promise<void>) | undefined;
-    let cancelled = false;
     if (platformName() === "android") {
       void import("@capacitor/app")
         .then(({ App }) =>
@@ -747,6 +766,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     }
     return () => {
       cancelled = true;
+      if (resumeTimer) window.clearTimeout(resumeTimer);
       document.removeEventListener("visibilitychange", resume);
       window.removeEventListener("online", resume);
       window.removeEventListener("focus", resume);
@@ -787,10 +807,31 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         timer = undefined;
-        void loadCloudState(active ?? undefined)
-          .then((cloud) => {
-            setState((current) => applyCloud(current, cloud));
-          })
+        // A sale notification needs the canonical bill graph, not the entire
+        // catalogue, members, promotions, stores and settings again.
+        void (active
+          ? loadSalesPage(active, null, 500).then(({ rows }) => {
+              setState((current) => {
+                const ids = new Set(rows.map((sale) => sale.id));
+                const otherBranches = current.sales.filter(
+                  (sale) => sale.storeId !== active && !ids.has(sale.id),
+                );
+                const sales = [...rows, ...otherBranches]
+                  .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+                  .slice(0, 500);
+                return {
+                  ...current,
+                  sales,
+                  counter: rows.reduce(
+                    (max, sale) => Math.max(max, Number(sale.receiptNo.split("-").pop()) || 0),
+                    current.counter,
+                  ),
+                };
+              });
+            })
+          : loadCloudState().then((cloud) => {
+              setState((current) => applyCloud(current, cloud));
+            }))
           .catch(() => {
             /* reconnect/pull remains the eventual-convergence fallback */
           });
@@ -813,9 +854,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         timer = undefined;
-        void loadCloudState()
-          .then((cloud) => {
-            setState((current) => applyCloud(current, cloud));
+        void loadCloudSettings()
+          .then((settings) => {
+            setState((current) => ({ ...current, settings: mergeCloudSettings(settings) }));
           })
           .catch(() => {
             /* reconnect/pull remains the convergence fallback */

@@ -101,7 +101,7 @@ function requiredPermission(pathname: string): PermissionFlag | null | "unknown"
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { activeShift, stores, currentStore, setCurrentStore, state, ready: dataReady } = usePos();
-  const { ready, user, isAdmin, canSwitchStores, terminalStoreId, logout, lock, can } = useAuth();
+  const { ready, user, isAdmin, isSupervisor, canSwitchStores, terminalStoreId, logout, lock, can } = useAuth();
   const [collapsed, setCollapsed] = useSidebarCollapsed();
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Set when the operator chooses to carry on from the terminal's own copy
@@ -517,7 +517,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{user.name}</p>
                   <p className="text-[11px] capitalize text-muted-foreground">
-                    {user.staffId} · {user.role}
+                    {user.staffId} · {user.metaRole ?? user.role}
                   </p>
                 </div>
                 <div className="ml-auto" />
@@ -582,8 +582,16 @@ export function AppShell({ children }: { children: ReactNode }) {
                       </div>
                     );
                   const required = requiredPermission(location.pathname);
-                  const allowed =
-                    required === null ? true : required === "unknown" ? isAdmin : can(required);
+                  const terminalManagement =
+                    location.pathname === "/settings/terminals" ||
+                    location.pathname === "/settings/mobile-terminals";
+                  const settingsHome =
+                    location.pathname === "/settings" || location.pathname === "/settings/";
+                  const allowed = terminalManagement
+                    ? isSupervisor
+                    : settingsHome
+                      ? isSupervisor || can("can_access_pos_settings")
+                    : required === null ? true : required === "unknown" ? isAdmin : can(required);
                   if (allowed && visibleRoute(location.pathname)) return children;
                   if (allowed) return <PermissionDenied title="Hidden for your role" flag={null} />;
                   return <PermissionDenied flag={required === "unknown" ? null : required} />;

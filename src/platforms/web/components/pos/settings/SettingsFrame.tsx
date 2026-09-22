@@ -89,6 +89,8 @@ type Props = {
   scopeSections?: SettingsSectionId[];
   /** Diagnostics pages need the whole window: tables and graphs, no reading column. */
   wide?: boolean;
+  /** Device registration may also be managed by supervisors. */
+  terminalManagement?: boolean;
 };
 
 export function SettingsFrame({
@@ -99,10 +101,11 @@ export function SettingsFrame({
   showPreview = false,
   scopeSections,
   wide = false,
+  terminalManagement = false,
 }: Props) {
   const { state, stores, currentStore, updateSettings, upsertStore } = usePos();
-  const { isAdmin, can } = useAuth();
-  const canSettings = isAdmin || can("can_access_pos_settings");
+  const { isAdmin, isSupervisor, can } = useAuth();
+  const canSettings = isAdmin || can("can_access_pos_settings") || (terminalManagement && isSupervisor);
   // Rendered inside the settings workspace sheet: no app shell, no back link.
   const embedded = useEmbeddedSettings();
 

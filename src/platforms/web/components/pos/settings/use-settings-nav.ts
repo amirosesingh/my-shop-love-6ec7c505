@@ -9,6 +9,8 @@
 import { useEffect, useMemo, useState } from "react";
 import { isDesktop } from "@/lib/branding";
 import { useVisibility } from "@/lib/ui-visibility";
+import { useAuth } from "@/lib/pos-auth";
+import { routePermissionForPath } from "@/platforms/web/components/pos/nav-config";
 import {
   SETTINGS_CARDS,
   SETTINGS_CATEGORIES,
@@ -37,6 +39,7 @@ export type SettingsNav = {
 
 export function useSettingsNav(): SettingsNav {
   const { visibleRoute } = useVisibility();
+  const { isAdmin, isSupervisor, can } = useAuth();
   const [desktop, setDesktop] = useState(false);
   useEffect(() => setDesktop(isDesktop()), []);
 
@@ -44,9 +47,15 @@ export function useSettingsNav(): SettingsNav {
     () =>
       SETTINGS_CARDS.filter(
         (c) =>
-          !(c.cloudOnly && desktop) && !(c.desktopOnly && !desktop) && visibleRoute(routeOf(c)),
+          !(c.cloudOnly && desktop) &&
+          !(c.desktopOnly && !desktop) &&
+          visibleRoute(routeOf(c)) &&
+          (isAdmin ||
+            ((routeOf(c) === "/settings/terminals" || routeOf(c) === "/settings/mobile-terminals")
+              ? isSupervisor
+              : can(routePermissionForPath(routeOf(c)) ?? "can_access_pos_settings"))),
       ),
-    [desktop, visibleRoute],
+    [desktop, visibleRoute, isAdmin, isSupervisor, can],
   );
 
   const categories = useMemo(

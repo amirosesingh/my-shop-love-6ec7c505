@@ -907,32 +907,26 @@ export async function importSampleData() {
 /** Load every cloud-backed slice of the POS state. */
 export async function loadCloudState(storeId?: string | null): Promise<CloudSlice> {
   await hydrateTerminalConfig();
-  const tiers = await supabase.from("membership_tiers").select("id, name").is("deleted_at", null);
-  if (tiers.error) return loadLocalState(tiers.error);
-  tierIdByName = {};
-  tierNameById = {};
-  for (const t of tiers.data ?? []) {
-    tierIdByName[t.name] = t.id;
-    tierNameById[t.id] = t.name as MemberTier;
-  }
-
-  const [products, members, sales, promotions, settings, stores, shifts] = await Promise.all([
+  // These reads are independent. Start membership tiers alongside the other
+  // slices so a full network round trip is not added to every sign-in.
+  const [tiers, products, members, sales, promotions, settings, stores, shifts] = await Promise.all([
+    supabase.from("membership_tiers").select("id, name").is("deleted_at", null),
     // Whole-catalogue reads are paged: a single request is capped at 1,000
     // rows by the database, which used to hide every item past the first
     // thousand without reporting anything.
-    readAllPages<Row>((from, to) =>
+    readAllPages<Row>((from, to, withCount) =>
       supabase
         .from("products")
-        .select("*", { count: "exact" })
+        .select("*", withCount ? { count: "exact" } : {})
         .is("deleted_at", null)
         .order("name")
         .order("id")
         .range(from, to),
     ),
-    readAllPages<Row>((from, to) =>
+    readAllPages<Row>((from, to, withCount) =>
       supabase
         .from("members")
-        .select("*", { count: "exact" })
+        .select("*", withCount ? { count: "exact" } : {})
         .is("deleted_at", null)
         .order("created_at")
         .order("id")
@@ -952,10 +946,10 @@ export async function loadCloudState(storeId?: string | null): Promise<CloudSlic
       }
       return first;
     })(),
-    readAllPages<Row>((from, to) =>
+    readAllPages<Row>((from, to, withCount) =>
       supabase
         .from("promotions")
-        .select("*", { count: "exact" })
+        .select("*", withCount ? { count: "exact" } : {})
         .is("deleted_at", null)
         .order("created_at")
         .order("id")
@@ -975,10 +969,10 @@ export async function loadCloudState(storeId?: string | null): Promise<CloudSlic
           const relayed = await relayStores();
           if (relayed.ok) return { data: (relayed.rows as Row[] | undefined) ?? [] };
         }
-        const direct = await readAllPages<Row>((from, to) =>
+        const direct = await readAllPages<Row>((from, to, withCount) =>
           supabase
             .from("stores")
-            .select("*", { count: "exact" })
+            .select("*", withCount ? { count: "exact" } : {})
             .is("deleted_at", null)
             .order("name")
             .order("id")
@@ -1011,8 +1005,15 @@ export async function loadCloudState(storeId?: string | null): Promise<CloudSlic
     })(),
   ]);
 
-  const err = products.error || members.error || sales.error || promotions.error || settings.error;
+  const err = tiers.error || products.error || members.error || sales.error || promotions.error || settings.error;
   if (err) return loadLocalState(err);
+
+  tierIdByName = {};
+  tierNameById = {};
+  for (const t of tiers.data ?? []) {
+    tierIdByName[t.name] = t.id;
+    tierNameById[t.id] = t.name as MemberTier;
+  }
 
   return {
     products: (products.data ?? []).map(rowToProduct),
@@ -1023,6 +1024,13 @@ export async function loadCloudState(storeId?: string | null): Promise<CloudSlic
     stores: ((stores.data as Row[] | null) ?? []).map(rowToStore),
     shifts: ((shifts.data as Row[] | null) ?? []).map(rowToShift),
   };
+}
+
+/** Refresh a settings notification without downloading the whole POS state. */
+export async function loadCloudSettings(): Promise<AppSettings> {
+  const { data, error } = await supabase.from("pos_settings").select("*").eq("id", 1).maybeSingle();
+  if (error) throw error;
+  return rowToSettings(data as Row | null);
 }
 
 async function loadLocalState(cause: unknown): Promise<CloudSlice> {
