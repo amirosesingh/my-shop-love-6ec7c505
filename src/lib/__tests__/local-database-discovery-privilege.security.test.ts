@@ -114,6 +114,9 @@ describe("local SQL Server discovery privilege", () => {
     expect(gate).toContain("await window.sqlAdmin?.adoptSession?.(await readCredentials())");
     expect(gate).toContain('requiredLevel === "admin" && adopted.level !== "admin"');
     expect(main).toContain('ipcMain.handle("admin:adopt-session"');
+    expect(main).toContain('configStore.get("backendUrl")');
+    expect(main).toContain('`${authorizationUrl}/api/v1/pos/ipc-adopt`');
+    expect(main).not.toContain('`${baseUrl}/api/v1/pos/ipc-adopt`');
     expect(adoptRoute).toContain("verifyRelayCaller(proof)");
     expect(adoptRoute).toContain("sessionToken:");
     expect(adoptRoute).toContain("cashierToken:");
