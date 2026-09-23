@@ -15,6 +15,8 @@ export type CachedCredential = {
   fullName: string;
   storeId: string;
   permissions: Record<string, boolean>;
+  /** Last server-verified role, restored when this terminal signs in offline. */
+  roleSlug?: string;
   salt: string;
   verifier: string;
   cachedAt: string;

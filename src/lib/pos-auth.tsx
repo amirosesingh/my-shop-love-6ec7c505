@@ -87,6 +87,13 @@ export type PosRole = "cashier" | "admin";
 export type AppRole = "admin" | "manager" | "staff";
 export const APP_ROLES: AppRole[] = ["admin", "manager", "staff"];
 
+const offlineAppRole = (roleSlug: string | null | undefined): AppRole => {
+  const role = String(roleSlug ?? "").trim().toLowerCase();
+  if (role === "admin") return "admin";
+  if (role === "manager" || role === "supervisor") return "manager";
+  return "staff";
+};
+
 export const DEFAULT_PERMISSIONS = CASHIER_PERMISSIONS;
 
 /** An employee record the admin can edit at any time. */
@@ -529,6 +536,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         fullName: next.name,
         storeId: bound ?? "",
         permissions: permissions as unknown as Record<string, boolean>,
+        roleSlug: dbRole,
       });
       try {
         const { data: sess } = await supabase.auth.getSession();
@@ -643,7 +651,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         next = {
           userCode: local.staff.username,
           name: local.staff.full_name,
-          role: "staff",
+          role: offlineAppRole(local.staff.roleSlug),
+          roleSlug: local.staff.roleSlug,
           storeId: activeBranchId(null) ?? (local.staff.store_id?.trim() || null),
           email: "",
           cashierId: local.staff.id,
@@ -658,15 +667,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           return {
             ok: false,
             error:
-              local.reason === "bad-pin"
+              local.reason === "invalid" || local.reason === "bad-pin"
                 ? "Invalid username or PIN"
+                : local.reason === "locked"
+                  ? local.error
                 : "No connection and this account has not signed in on this terminal before. Connect once, then you can sign in offline.",
           };
         signedInOffline = true;
         next = {
           userCode: cached.username,
           name: cached.fullName,
-          role: "staff",
+          role: offlineAppRole(cached.roleSlug),
+          roleSlug: cached.roleSlug ?? "staff",
           storeId: activeBranchId(null) ?? (cached.storeId?.trim() || null),
           email: "",
           cashierId: cached.cashierId,

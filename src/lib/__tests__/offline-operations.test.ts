@@ -45,6 +45,9 @@ describe("offline terminal operations", () => {
     expect(preload).toContain('verifyStaffPin: (username, pin) => invoke("staff:verify-pin"');
     expect(preload).toContain('rememberStaffPin: (username, pin) => invoke("staff:enroll"');
     expect(main).toContain('/api/public/cashier-login');
+    const auth = readFileSync("src/lib/pos-auth.tsx", "utf8");
+    expect(auth).toContain("role: offlineAppRole(local.staff.roleSlug)");
+    expect(auth).toContain("roleSlug: local.staff.roleSlug");
     expect(dialog).toContain("await verifyLocalPin(authorizerId.trim(), pin)");
     expect(dialog).toContain('mode_used: "offline_pin"');
   });
