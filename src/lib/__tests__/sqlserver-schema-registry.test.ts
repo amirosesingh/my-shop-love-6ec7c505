@@ -52,9 +52,9 @@ describe("SQL Server schema registry", () => {
 
     expect(completeSql).toContain(initial);
     expect(completeSql).toContain(pipeline);
-    expect(completeSql).toContain("IF DB_ID(N'RetailPOS') IS NULL");
-    expect(completeSql).toContain("EXEC(N'CREATE DATABASE [RetailPOS]')");
-    expect(completeSql).toContain("USE [RetailPOS]");
+    expect(completeSql).toContain("IF DB_ID(N'POS_Local') IS NULL");
+    expect(completeSql).toContain("EXEC(N'CREATE DATABASE [POS_Local]')");
+    expect(completeSql).toContain("USE [POS_Local]");
     expect(completeSql).toContain("@Required AS required_tables");
     expect(completeSql).toContain("@RequiredColumnCount AS required_columns");
     expect(completeSql).toContain("@MissingColumnCount AS missing_columns");

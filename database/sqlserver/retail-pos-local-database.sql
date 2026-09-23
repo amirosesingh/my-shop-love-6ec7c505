@@ -2,10 +2,10 @@
   Retail POS local Microsoft SQL Server schema
   Generated from the migrations loaded by the POS application.
 
-  Database name: RetailPOS
+  Database name: POS_Local
 
   Run this file while connected to the local Microsoft SQL Server instance.
-  It creates RetailPOS when needed, selects it, and installs or updates the
+  It creates POS_Local when needed, selects it, and installs or updates the
   complete schema. The script is additive and re-runnable. It does not delete
   tables or business data.
 */
@@ -13,11 +13,11 @@
 USE [master];
 GO
 
-IF DB_ID(N'RetailPOS') IS NULL
-  EXEC(N'CREATE DATABASE [RetailPOS]');
+IF DB_ID(N'POS_Local') IS NULL
+  EXEC(N'CREATE DATABASE [POS_Local]');
 GO
 
-USE [RetailPOS];
+USE [POS_Local];
 GO
 -- Generated from supabase/schema.sql. Re-runnable and additive.
 
