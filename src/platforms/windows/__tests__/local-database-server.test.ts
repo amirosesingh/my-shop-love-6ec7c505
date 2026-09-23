@@ -140,6 +140,7 @@ describe("local SQL Server wizard server step", () => {
     expect(wizard).toContain("const response = await database.listServers()");
     expect(wizard).toContain("selectDiscoveredServer(current, server)");
     expect(wizard).toContain("saveAndConnect(profile)");
+    expect(wizard).toContain("await mirrorTerminalConfigToDesktop()");
 
     const scan = wizard.slice(wizard.indexOf("const scanServers"), wizard.indexOf("const ok ="));
     expect(scan).not.toContain("saveAndConnect");
@@ -161,5 +162,6 @@ describe("local SQL Server wizard server step", () => {
     expect(operations).toContain("Synchronization failures");
     expect(operations).toContain("failure.error_message");
     expect(operations).toContain("conflict.reason");
+    expect(operations.match(/await mirrorTerminalConfigToDesktop\(\)/g)).toHaveLength(2);
   });
 });

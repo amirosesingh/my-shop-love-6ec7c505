@@ -124,7 +124,7 @@ describe("local SQL Server discovery privilege", () => {
     const main = readFileSync("electron/main.cjs", "utf8");
     const adoptRoute = readFileSync("src/routes/api/v1/pos/ipc-adopt.ts", "utf8");
 
-    expect(gate).toContain("await window.sqlAdmin?.adoptSession?.(await readCredentials())");
+    expect(gate).toContain("readTerminalConfig(),");
     expect(gate).toContain('requiredLevel === "admin" && adopted.level !== "admin"');
     expect(main).toContain('ipcMain.handle("admin:adopt-session"');
     expect(main).toContain('configStore.get("backendUrl")');
@@ -138,6 +138,7 @@ describe("local SQL Server discovery privilege", () => {
     expect(adoptRoute).not.toMatch(/role\s*:\s*input/);
     expect(adoptRoute).not.toContain("can_manage_sync_backup === true");
     expect(main).toContain('adminSession.grant(result.level,result.subject,result.permissions,"pos",result.branchId)');
+    expect(main).toContain("const mirrored=terminalStore.write(terminal)");
     expect(main).toContain("terminal.locationId,terminal.storeId,terminal.branchId,adminSession.branchId()");
     expect(ipcGate).toContain("adminSession.hasPosAuthority()");
     expect(wizard).toMatch(

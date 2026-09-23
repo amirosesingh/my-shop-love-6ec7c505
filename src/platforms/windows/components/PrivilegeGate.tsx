@@ -22,6 +22,7 @@ import { wrapBridge } from "@/platforms/windows/privilege-bridge";
 import { onRecoveryScreen } from "@/lib/recovery-route";
 import { useAuth } from "@/lib/pos-auth";
 import { readCredentials } from "@/lib/pos-credentials";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { toast } from "sonner";
 
 type Ask = {
@@ -61,7 +62,7 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
       }
       const proof = await readCredentials();
       if (!active) return;
-      await bridge.adoptSession?.(proof);
+      await bridge.adoptSession?.(proof, readTerminalConfig());
     };
     void sync();
     return () => {
@@ -79,7 +80,10 @@ export function PrivilegeGate({ children }: { children: React.ReactNode }) {
       // may be carrying older cached permissions; the server re-reads
       // public.app_users before granting desktop database access.
       if (user) {
-        const adopted = await window.sqlAdmin?.adoptSession?.(await readCredentials());
+        const adopted = await window.sqlAdmin?.adoptSession?.(
+          await readCredentials(),
+          readTerminalConfig(),
+        );
         if (adopted?.ok) {
           if (requiredLevel === "admin" && adopted.level !== "admin") {
             toast.error("Administrator access required", {
