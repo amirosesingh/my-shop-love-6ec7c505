@@ -58,6 +58,7 @@ function createLocalStaffStore(configStore) {
     const salt = randomBytes(16);
     const hash = scryptSync(String(pin), salt, 32);
     rows[name] = { ...next, verifier: `scrypt:${salt.toString("base64")}:${hash.toString("base64")}` };
+    failures.delete(name);
     return write(rows);
   }
   function verify(username, pin) {

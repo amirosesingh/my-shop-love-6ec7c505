@@ -42,6 +42,7 @@ const { discoverLocalSqlServers } = require("./db/local-server-discovery.cjs");
 const ipcPrivilege = require("./ipc-privilege.cjs");
 const adminSession = require("./admin-session.cjs");
 const { createLocalStaffStore } = require("./local-staff-store.cjs");
+const { verifySyncedStaffPin } = require("./synced-staff-login.cjs");
 
 const databaseConfig = createSecureConfig({ app, safeStorage, configStore });
 const databaseManager = new ConnectionManager();
@@ -771,7 +772,21 @@ function registerIpc() {
     if(!response.ok||!result.ok||!result.cashier)return{ok:false,error:result.error??"Credential verification failed."};
     return localStaffStore.enroll(result.cashier,String(pin??""));
   });
-  ipcMain.handle("staff:verify-pin", (_e, username, pin) => localStaffStore.verify(username, pin));
+  ipcMain.handle("staff:verify-pin", async (_e, username, pin) => {
+    const cached = localStaffStore.verify(username, pin);
+    if (cached.ok || cached.reason === "locked") return cached;
+    try {
+      const synced = await verifySyncedStaffPin(databaseManager.pool, username, pin, localBranchId());
+      if (synced.ok) {
+        const enrolled = localStaffStore.enroll(synced.staff, String(pin ?? ""));
+        return enrolled?.ok === false ? enrolled : localStaffStore.verify(username, pin);
+      }
+      if (synced.reason === "inactive") return synced;
+    } catch {
+      /* A missing local SQL connection falls back to the enrolled verifier. */
+    }
+    return cached;
+  });
   ipcMain.handle("app:ready", () => {
     markStartupSettled();
     const state = health.markHealthy();
