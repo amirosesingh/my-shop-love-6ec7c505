@@ -17,6 +17,15 @@ function fixture() {
 }
 
 describe("offline terminal operations", () => {
+  it("connects a configured local database before loading the terminal route", () => {
+    const main = readFileSync("electron/main.cjs", "utf8");
+    expect(main.indexOf("await databaseService.restore()")).toBeLessThan(
+      main.indexOf("createWindows(initialRoute)"),
+    );
+    expect(main).toContain('!restoredDatabase.connected\n    ? "/database-startup"');
+    expect(main).toContain('function createWindows(initialRoute = "/")');
+  });
+
   it("stores only a salted verifier and verifies a cached manager PIN", () => {
     const { values, store } = fixture();
     expect(store.cache([{ id: "m1", user_id: "manager", full_name: "Manager", role_slug: "manager", store_id: "s1", is_active: true }])).toMatchObject({ ok: true });

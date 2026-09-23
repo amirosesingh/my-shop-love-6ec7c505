@@ -11,6 +11,7 @@ import { hasFeature } from "@/platform-config/features";
 export type DatabaseMode = "online" | "local";
 
 const KEY = "pos.db.mode";
+export const ONLINE_STARTUP_OVERRIDE = "pos.startup.online-only";
 
 type Listener = () => void;
 const listeners = new Set<Listener>();
@@ -110,7 +111,8 @@ export function noteConnectionRestored() {
 const online = () => !isBrowser() || window.navigator.onLine;
 
 export function effectiveDatabaseMode(): DatabaseMode {
-  return isOnlineOnly() ? "online" : "local";
+  const startupOnline = isBrowser() && window.sessionStorage.getItem(ONLINE_STARTUP_OVERRIDE) === "1";
+  return isOnlineOnly() || startupOnline ? "online" : "local";
 }
 
 export function databaseModeLabel(): string {

@@ -45,6 +45,8 @@ type DbState = {
 };
 type DatabaseApi = {
   getState(): Promise<DbState>;
+  retryStartup?(): Promise<DbState>;
+  authorizeSettings?(): Promise<{ ok: boolean; error?: string }>;
   setEnabled(value: boolean): Promise<DbState>;
   listServers(): Promise<{ ok: boolean; servers?: DiscoveredSqlServer[]; error?: string }>;
   testServer(profile: Profile): Promise<Record<string, unknown>>;

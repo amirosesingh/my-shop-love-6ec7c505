@@ -19,6 +19,7 @@ import { Route as BookingsRouteImport } from './routes/bookings'
 import { Route as CouponsRouteImport } from './routes/coupons'
 import { Route as CustomersRouteImport } from './routes/customers'
 import { Route as DashboardRouteImport } from './routes/dashboard'
+import { Route as DatabaseStartupRouteImport } from './routes/database-startup'
 import { Route as DisplayRouteImport } from './routes/display'
 import { Route as HoldsRouteImport } from './routes/holds'
 import { Route as InventoryRouteImport } from './routes/inventory'
@@ -170,6 +171,11 @@ const CustomersRoute = CustomersRouteImport.update({
 const DashboardRoute = DashboardRouteImport.update({
   id: '/dashboard',
   path: '/dashboard',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DatabaseStartupRoute = DatabaseStartupRouteImport.update({
+  id: '/database-startup',
+  path: '/database-startup',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DisplayRoute = DisplayRouteImport.update({
@@ -696,6 +702,7 @@ export interface FileRoutesByFullPath {
   '/coupons': typeof CouponsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
+  '/database-startup': typeof DatabaseStartupRoute
   '/display': typeof DisplayRoute
   '/holds': typeof HoldsRoute
   '/inventory': typeof InventoryRoute
@@ -810,6 +817,7 @@ export interface FileRoutesByTo {
   '/coupons': typeof CouponsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
+  '/database-startup': typeof DatabaseStartupRoute
   '/display': typeof DisplayRoute
   '/holds': typeof HoldsRoute
   '/inventory': typeof InventoryRoute
@@ -925,6 +933,7 @@ export interface FileRoutesById {
   '/coupons': typeof CouponsRoute
   '/customers': typeof CustomersRoute
   '/dashboard': typeof DashboardRoute
+  '/database-startup': typeof DatabaseStartupRoute
   '/display': typeof DisplayRoute
   '/holds': typeof HoldsRoute
   '/inventory': typeof InventoryRoute
@@ -1041,6 +1050,7 @@ export interface FileRouteTypes {
     | '/coupons'
     | '/customers'
     | '/dashboard'
+    | '/database-startup'
     | '/display'
     | '/holds'
     | '/inventory'
@@ -1155,6 +1165,7 @@ export interface FileRouteTypes {
     | '/coupons'
     | '/customers'
     | '/dashboard'
+    | '/database-startup'
     | '/display'
     | '/holds'
     | '/inventory'
@@ -1269,6 +1280,7 @@ export interface FileRouteTypes {
     | '/coupons'
     | '/customers'
     | '/dashboard'
+    | '/database-startup'
     | '/display'
     | '/holds'
     | '/inventory'
@@ -1384,6 +1396,7 @@ export interface RootRouteChildren {
   CouponsRoute: typeof CouponsRoute
   CustomersRoute: typeof CustomersRoute
   DashboardRoute: typeof DashboardRoute
+  DatabaseStartupRoute: typeof DatabaseStartupRoute
   DisplayRoute: typeof DisplayRoute
   HoldsRoute: typeof HoldsRoute
   InventoryRoute: typeof InventoryRoute
@@ -1555,6 +1568,13 @@ declare module '@tanstack/react-router' {
       path: '/dashboard'
       fullPath: '/dashboard'
       preLoaderRoute: typeof DashboardRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/database-startup': {
+      id: '/database-startup'
+      path: '/database-startup'
+      fullPath: '/database-startup'
+      preLoaderRoute: typeof DatabaseStartupRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/display': {
@@ -2310,6 +2330,7 @@ const rootRouteChildren: RootRouteChildren = {
   CouponsRoute: CouponsRoute,
   CustomersRoute: CustomersRoute,
   DashboardRoute: DashboardRoute,
+  DatabaseStartupRoute: DatabaseStartupRoute,
   DisplayRoute: DisplayRoute,
   HoldsRoute: HoldsRoute,
   InventoryRoute: InventoryRoute,

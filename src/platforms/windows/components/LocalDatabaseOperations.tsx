@@ -15,6 +15,7 @@ type Failures = { failures?: FailureRow[]; conflictRows?: ConflictRow[]; conflic
 type Result = Record<string, unknown>;
 type DatabaseApi = {
   getState(): Promise<DatabaseState>; health(): Promise<Result>; schemaStatus(): Promise<Result>;
+  retryStartup?(): Promise<DatabaseState>; authorizeSettings?(): Promise<Result>;
   backup(file: string): Promise<Result>; restore(file: string): Promise<Result>;
   subscribe(cb: (state: DatabaseState) => void): () => void;
 };

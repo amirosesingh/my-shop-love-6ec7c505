@@ -128,6 +128,7 @@ const CHANNEL_LEVELS = {
   "window:is-maximized": OPEN,
   "branding:read": OPEN,
   "database:get-state": OPEN,
+  "database:retry-startup": OPEN,
   // Discovery only inspects the local default-instance service and returns
   // aliases to the wizard. It does not connect, persist credentials, or alter
   // the terminal/database configuration.
@@ -168,6 +169,7 @@ const CHANNEL_LEVELS = {
   /* --- admin: backend, company, database, identity, credentials, audit --- */
   "pos:connect": ADMIN,
   "database:set-enabled": ADMIN,
+  "database:authorize-settings": ADMIN,
   "database:migrate": ADMIN,
   "database:save-connect": ADMIN,
   "database:disconnect": ADMIN,
