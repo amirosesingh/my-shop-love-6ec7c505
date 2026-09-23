@@ -101,6 +101,19 @@ describe("local SQL Server discovery privilege", () => {
     });
   });
 
+  it("keeps the verified POS branch with the desktop authority session", () => {
+    adminSession.grant(
+      "admin",
+      "signed-in-admin",
+      { can_manage_sync_backup: true },
+      "pos",
+      "branch-7",
+    );
+    expect(adminSession.branchId()).toBe("branch-7");
+    adminSession.clear();
+    expect(adminSession.branchId()).toBeNull();
+  });
+
   it("keeps privileged retries wired to server-verified session adoption", () => {
     const gate = readFileSync("src/platforms/windows/components/PrivilegeGate.tsx", "utf8");
     const ipcGate = readFileSync("electron/ipc-privilege.cjs", "utf8");
@@ -124,7 +137,8 @@ describe("local SQL Server discovery privilege", () => {
     expect(adoptRoute).toContain("cashierToken:");
     expect(adoptRoute).not.toMatch(/role\s*:\s*input/);
     expect(adoptRoute).not.toContain("can_manage_sync_backup === true");
-    expect(main).toContain('adminSession.grant(result.level,result.subject,result.permissions,"pos")');
+    expect(main).toContain('adminSession.grant(result.level,result.subject,result.permissions,"pos",result.branchId)');
+    expect(main).toContain("terminal.locationId,terminal.storeId,terminal.branchId,adminSession.branchId()");
     expect(ipcGate).toContain("adminSession.hasPosAuthority()");
     expect(wizard).toMatch(
       /const authorization = await authorizeDatabaseChange\(\);[\s\S]{0,220}const migrated = await api\(\)!\.migrateDatabase\(profile\)/,

@@ -44,7 +44,13 @@ export const Route = createFileRoute("/api/v1/pos/ipc-adopt")({
               { status: 403 },
             );
           }
-          return Response.json({ ok: true, ...authority });
+          return Response.json({
+            ok: true,
+            ...authority,
+            // A cashier session or terminal token may carry the verified
+            // branch even when a global administrator has no store_id.
+            branchId: authority.branchId ?? caller.storeId ?? null,
+          });
         } catch {
           return Response.json(
             { ok: false, error: "Your sign-in could not be verified." },

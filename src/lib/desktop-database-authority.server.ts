@@ -6,6 +6,7 @@ type Account = {
   role: string | null;
   role_slug: string | null;
   permissions: Record<string, unknown> | null;
+  store_id: string | null;
   is_active: boolean;
 };
 
@@ -18,6 +19,7 @@ export async function databaseAuthority(identity: {
   subject: string;
   level: "admin" | "supervisor" | "staff";
   permissions: Record<string, boolean>;
+  branchId: string | null;
 } | null> {
   const filters = [
     identity.authUserId && `auth_user_id=eq.${encodeURIComponent(identity.authUserId)}`,
@@ -27,7 +29,7 @@ export async function databaseAuthority(identity: {
   let account: Account | undefined;
   for (const filter of filters) {
     const response = await serviceRest(
-      `app_users?${filter}&select=user_id,role,role_slug,permissions,is_active&limit=1`,
+      `app_users?${filter}&select=user_id,role,role_slug,permissions,store_id,is_active&limit=1`,
     );
     if (!response.ok) return null;
     const rows = (await response.json()) as Account[];
@@ -49,5 +51,6 @@ export async function databaseAuthority(identity: {
     subject: account.user_id,
     level: admin ? "admin" : supervisor ? "supervisor" : "staff",
     permissions,
+    branchId: account.store_id,
   };
 }
