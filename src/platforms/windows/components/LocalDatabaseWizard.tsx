@@ -18,6 +18,7 @@ import {
   type DiscoveredSqlServer,
   validateServerEndpoint,
 } from "./local-database-server";
+import { readCredentials } from "@/lib/pos-credentials";
 
 type Profile = {
   host: string;
@@ -58,6 +59,19 @@ type DatabaseApi = {
   subscribe(cb: (state: DbState) => void): () => void;
 };
 const api = () => (window.pos as unknown as { database?: DatabaseApi })?.database;
+async function authorizeDatabaseChange(): Promise<{ ok: boolean; error?: string }> {
+  const adopt = window.sqlAdmin?.adoptSession;
+  if (!adopt) {
+    return {
+      ok: false,
+      error: "Update the Windows POS app before changing the local database configuration.",
+    };
+  }
+  const result = await adopt(await readCredentials());
+  return result.ok
+    ? { ok: true }
+    : { ok: false, error: result.error ?? "The signed-in account could not be verified." };
+}
 const initial: Profile = {
   host: "127.0.0.1",
   instanceName: "",
@@ -149,8 +163,11 @@ export function LocalDatabaseWizard() {
       setOpen(true);
       return;
     }
-    void api()
-      ?.setEnabled(false)
+    void authorizeDatabaseChange()
+      .then((authorization) => {
+        if (!authorization.ok) throw new Error(authorization.error);
+        return api()!.setEnabled(false);
+      })
       .then((next) => {
         setState(next);
       })
@@ -502,6 +519,8 @@ export function LocalDatabaseWizard() {
                       disabled={busy}
                       onClick={() =>
                         run(async () => {
+                          const authorization = await authorizeDatabaseChange();
+                          if (!authorization.ok) return authorization;
                           const migrated = await api()!.migrateDatabase(profile);
                           if (!migrated.ok) return migrated;
                           return api()!.validateDatabase(profile);
@@ -537,6 +556,8 @@ export function LocalDatabaseWizard() {
                     busy={busy}
                     onClick={() =>
                       run(async () => {
+                        const authorization = await authorizeDatabaseChange();
+                        if (!authorization.ok) return authorization;
                         const response = await api()!.saveAndConnect(profile);
                         if (response.ok) {
                           setProfile((old) => ({ ...old, password: "" }));

@@ -1,9 +1,20 @@
 import { readFileSync } from "node:fs";
+import { createRequire } from "node:module";
 import { describe, expect, it } from "vitest";
+
+const require = createRequire(import.meta.url);
+const packagedRegistry = require("../../../electron/db/schema-registry.cjs");
 
 describe("SQL Server schema registry", () => {
   const registry = JSON.parse(readFileSync("database/sqlserver/schema-registry.json", "utf8"));
   const sql = readFileSync("database/sqlserver/schema.sql", "utf8");
+
+  it("loads through the same path used by the packaged desktop validator", () => {
+    expect(packagedRegistry.loadRegistry().tables).toHaveLength(67);
+    expect(packagedRegistry.registryPath().replaceAll("\\", "/")).toMatch(
+      /database\/sqlserver\/schema-registry\.json$/,
+    );
+  });
 
   it("maps every cloud domain table and column", () => {
     expect(registry.tables).toHaveLength(67);

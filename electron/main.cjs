@@ -672,7 +672,7 @@ function registerIpc() {
     const response=await fetch(`${baseUrl}/api/v1/pos/ipc-adopt`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(proof)});
     const result=await response.json().catch(()=>({ok:false,error:"Authorization failed."}));
     if(!response.ok||!result.ok)return{ok:false,error:result.error??"Authorization failed."};
-    adminSession.grant(result.level,result.subject,result.permissions);return{ok:true,level:result.level};
+    adminSession.grant(result.level,result.subject,result.permissions,"pos");return{ok:true,level:result.level};
   }));
   ipcMain.handle("admin:unlock", async (_e, username, pin) => guard.guarded(async () => {
     const user = guard.text(username, { name: "username", max: 160 });

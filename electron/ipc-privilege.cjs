@@ -366,7 +366,10 @@ function allowed(channel, args = []) {
     return true;
   }
   if (databaseSyncAction(channel, args)) {
-    if (adminSession.hasPermission("can_manage_sync_backup")) {
+    // Database authority comes only from the live POS account adopted through
+    // /api/v1/pos/ipc-adopt. A separate desktop PIN unlock must not grant it.
+    if (adminSession.hasPosAuthority() &&
+        (adminSession.hasLevel(ADMIN) || adminSession.hasPermission("can_manage_sync_backup"))) {
       adminSession.touch();
       return true;
     }

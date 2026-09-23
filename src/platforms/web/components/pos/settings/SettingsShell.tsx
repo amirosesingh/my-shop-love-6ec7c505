@@ -47,9 +47,23 @@ export function SettingsShell({ children, home = false }: { children: ReactNode;
 
   useEffect(() => setDrawer(false), [pathname, tab]);
 
+  // The app shell and this settings shell each have fixed-height panels. Keep
+  // the document itself still so expanding navigation groups cannot create a
+  // second browser/window scrollbar beside the panel scrollbars.
+  useEffect(() => {
+    const htmlOverflow = document.documentElement.style.overflow;
+    const bodyOverflow = document.body.style.overflow;
+    document.documentElement.style.overflow = "hidden";
+    document.body.style.overflow = "hidden";
+    return () => {
+      document.documentElement.style.overflow = htmlOverflow;
+      document.body.style.overflow = bodyOverflow;
+    };
+  }, []);
+
   return (
     <AppShell>
-      <div className="flex h-full min-h-0 w-full overflow-hidden">
+      <div className="flex h-full max-h-full min-h-0 w-full overflow-hidden">
         <nav
           aria-label="Settings navigation"
           className={
