@@ -1,3 +1,4 @@
+import { usePos } from "@/lib/pos-store";
 import { useEffect, useState } from "react";
 import { Printer, RefreshCw } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -10,7 +11,7 @@ import {
   listPrinters,
   printBridge,
   rawPulse,
-  setPrinterPrefs,
+  setSharedPrinterPrefs,
   type PrinterPrefs,
 } from "@/lib/receipt-printer";
 import { toast } from "sonner";
@@ -19,6 +20,8 @@ import { printTestReceipt } from "@/lib/pos-print";
 /** Terminal-local receipt printer choice used for silent printing and the
  *  raw cash-drawer pulse. Only meaningful inside the Windows desktop shell. */
 export function ReceiptPrinterSettings() {
+  const { state, updateSettings } = usePos();
+  const shared = state.settings.integrations.receiptPrinter;
   const [prefs, setPrefs] = useState<PrinterPrefs>({
     deviceName: "",
     share: "",
@@ -35,13 +38,15 @@ export function ReceiptPrinterSettings() {
   const desktop = typeof window !== "undefined" && !!printBridge();
 
   useEffect(() => {
+    setSharedPrinterPrefs(shared);
     setPrefs(getPrinterPrefs());
-    void listPrinters().then(setPrinters);
-  }, []);
+  }, [shared]);
+  useEffect(() => { void listPrinters().then(setPrinters); }, []);
 
   const update = (next: PrinterPrefs) => {
     setPrefs(next);
-    setPrinterPrefs(next);
+    setSharedPrinterPrefs(next);
+    updateSettings({ integrations: { ...state.settings.integrations, receiptPrinter: next } });
   };
 
   const margins = prefs.margins ?? { top: 4, right: 4, bottom: 4, left: 4 };
@@ -54,10 +59,10 @@ export function ReceiptPrinterSettings() {
     });
   };
 
-  const setWidth = (paper: "58mm" | "80mm", raw: string) => {
+  const setWidth = (paper: "30mm" | "58mm" | "80mm", raw: string) => {
     const n = Number(raw);
-    const max = paper === "58mm" ? 58 : 80;
-    const min = paper === "58mm" ? 30 : 50;
+    const max = paper === "30mm" ? 30 : paper === "58mm" ? 58 : 80;
+    const min = paper === "30mm" ? 20 : paper === "58mm" ? 30 : 50;
     update({
       ...prefs,
       printWidth: {
@@ -101,6 +106,8 @@ export function ReceiptPrinterSettings() {
           onChange={(v: string) => update({ ...prefs, deviceName: v === "__default__" ? "" : v })}
           options={[
             { value: "__default__", label: "System default printer" },
+            ...(prefs.deviceName && !printers.some((printer) => printer.name === prefs.deviceName)
+              ? [{ value: prefs.deviceName, label: `${prefs.deviceName} (saved)` }] : []),
             ...printers.map((p) => ({ value: p.name, label: p.displayName || p.name })),
           ]}
         />
@@ -167,6 +174,8 @@ export function ReceiptPrinterSettings() {
         </div>
       </div>
 
+      <details className="mt-4 rounded-md border border-border p-3">
+        <summary className="cursor-pointer text-sm font-medium">Advanced paper calibration</summary>
       <div className="mt-4 space-y-2">
         <Label className="text-xs text-muted-foreground">Print margins (mm)</Label>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -195,6 +204,11 @@ export function ReceiptPrinterSettings() {
       <div className="mt-4 space-y-2">
         <Label className="text-xs text-muted-foreground">Print width (mm)</Label>
         <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+          <div className="space-y-1">
+            <Label className="text-[11px] text-muted-foreground">30mm roll</Label>
+            <Input aria-label="30mm printable width" type="number" min={20} max={30} step={0.5}
+              value={widths["30mm"] ?? 24} onChange={(e) => setWidth("30mm", e.target.value)} />
+          </div>
           <div className="space-y-1">
             <Label className="text-[11px] text-muted-foreground">58mm roll</Label>
             <Input
@@ -244,6 +258,8 @@ export function ReceiptPrinterSettings() {
           nudge. “Test receipt” prints an edge ruler — both ends must be visible.
         </p>
       </div>
+
+      </details>
 
       <div className="mt-4 space-y-1">
         <Label className="text-xs text-muted-foreground">Drawer connector pin</Label>

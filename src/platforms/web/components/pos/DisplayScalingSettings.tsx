@@ -1,3 +1,7 @@
+import { usePos } from "@/lib/pos-store";
+import { PresetNumber } from "@/components/ui/preset-number";
+import { ThemedSelect } from "./ThemedSelect";
+import type { DisplayProfile } from "@/lib/display-profile";
 import { Monitor, MonitorCog, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -8,12 +12,11 @@ import {
   REGISTER_ZOOM_DEFAULT,
   REGISTER_ZOOM_MAX,
   REGISTER_ZOOM_MIN,
-  setUiScalePrefs,
   useUiScalePrefs,
   type UiDensity,
 } from "@/lib/use-ui-scale";
 import { useTheme, type ThemeChoice } from "@/lib/theme";
-import { ACCENT_PRESETS, DEFAULT_ACCENT, setAccent, useAccent } from "@/lib/accent";
+import { ACCENT_PRESETS, DEFAULT_ACCENT, useAccent } from "@/lib/accent";
 
 const THEMES: { value: ThemeChoice; label: string; icon: typeof Sun }[] = [
   { value: "system", label: "System", icon: Monitor },
@@ -34,8 +37,16 @@ const DENSITIES: { value: UiDensity; label: string }[] = [
 /** Terminal-local control for font size and control height across the app. */
 export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
   const prefs = useUiScalePrefs();
-  const { theme, setTheme } = useTheme();
+  const { theme } = useTheme();
   const accent = useAccent();
+  const { state, updateSettings } = usePos();
+  const saveProfile = (patch: Partial<DisplayProfile>) => updateSettings({ integrations: {
+    ...state.settings.integrations,
+    displayProfile: { scale: prefs, theme, accent, ...state.settings.integrations.displayProfile, ...patch },
+  } });
+  const setTheme = (value: ThemeChoice) => saveProfile({ theme: value });
+  const setAccent = (value: string) => { if (/^#[0-9a-f]{6}$/i.test(value)) saveProfile({ accent: value }); };
+  const setUiScalePrefs = (patch: Partial<typeof prefs>) => saveProfile({ scale: { ...prefs, ...patch } });
   const auto =
     typeof window === "undefined" ? 1 : computeUiScale(window.innerWidth, window.innerHeight);
   const effective = prefs.mode === "manual" ? prefs.scale : auto;
@@ -50,33 +61,18 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
         </h2>
       )}
       <p className="mt-1 text-xs text-muted-foreground">
-        Applies to this terminal only. Buttons never drop below a touch-safe size.
+        Applies to the selected settings scope. Buttons never drop below a touch-safe size.
       </p>
 
       <div className="mt-4 space-y-1">
         <Label className="text-xs text-muted-foreground">Appearance</Label>
-        <div className="flex overflow-hidden rounded-md border border-border">
-          {THEMES.map((t) => (
-            <button
-              key={t.value}
-              type="button"
-              onClick={() => setTheme(t.value)}
-              className={`flex flex-1 items-center justify-center gap-2 px-3 py-2 text-xs ${
-                theme === t.value
-                  ? "bg-primary/15 text-primary"
-                  : "text-muted-foreground hover:text-foreground"
-              }`}
-            >
-              <t.icon className="size-3.5" /> {t.label}
-            </button>
-          ))}
-        </div>
+        <ThemedSelect ariaLabel="Appearance" value={theme} onChange={(value) => setTheme(value as ThemeChoice)} options={THEMES.map(({ value, label }) => ({ value, label }))} />
       </div>
 
       <div className="mt-4 space-y-2">
         <Label className="text-xs text-muted-foreground">Accent colour</Label>
         <p className="text-[11px] text-muted-foreground">
-          Colours the buttons, icons and highlights on this terminal.
+          Colours the buttons, icons and highlights in this scope.
         </p>
         <div className="flex flex-wrap gap-2">
           {ACCENT_PRESETS.map((p) => (
@@ -118,6 +114,7 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
         </div>
       </div>
 
+      <details className="mt-4" open><summary className="cursor-pointer text-sm font-medium">Sizing & density</summary>
       <div className="mt-4 grid gap-4 lg:grid-cols-2">
         <div className="space-y-3">
           <div className="space-y-1">
@@ -173,19 +170,8 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
               onValueChange={([v]) => setUiScalePrefs({ textScale: (v ?? 100) / 100 })}
             />
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-              <Input
-                type="number"
-                min={90}
-                max={160}
-                step={1}
-                aria-label="Text size percentage"
-                value={Math.round(text * 100)}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  if (Number.isFinite(v)) setUiScalePrefs({ textScale: Math.min(160, Math.max(90, v)) / 100 });
-                }}
-                className="numeric h-9 min-w-0 text-xs"
-              />
+              <PresetNumber label="Text size percentage" value={Math.round(text * 100)} onChange={(value) => setUiScalePrefs({ textScale: value / 100 })} min={90} max={160}
+                options={[90, 100, 110, 125, 150, 160].map((value) => ({ value, label: `${value}%` }))} />
               <span className="shrink-0 text-[11px] text-muted-foreground">% of normal</span>
             </div>
             <p className="text-[10px] text-muted-foreground">
@@ -209,24 +195,8 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
               }
             />
             <div className="grid grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-              <Input
-                type="number"
-                min={Math.round(REGISTER_ZOOM_MIN * 100)}
-                max={Math.round(REGISTER_ZOOM_MAX * 100)}
-                step={1}
-                aria-label="Register zoom percentage"
-                value={Math.round(registerZoom * 100)}
-                onChange={(e) => {
-                  const v = Number(e.target.value);
-                  if (!Number.isFinite(v)) return;
-                  const pct = Math.min(
-                    REGISTER_ZOOM_MAX * 100,
-                    Math.max(REGISTER_ZOOM_MIN * 100, v),
-                  );
-                  setUiScalePrefs({ registerZoom: pct / 100 });
-                }}
-                className="numeric h-9 min-w-0 text-xs"
-              />
+              <PresetNumber label="Register zoom percentage" value={Math.round(registerZoom * 100)} onChange={(value) => setUiScalePrefs({ registerZoom: value / 100 })} min={40} max={150}
+                options={[40, 50, 60, 70, 80, 90, 100, 125, 150].map((value) => ({ value, label: `${value}%` }))} />
               <Button
                 variant="ghost"
                 size="sm"
@@ -237,7 +207,7 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
               </Button>
             </div>
             <p className="text-[10px] text-muted-foreground">
-              How much of the register screen fits at once. Saved for this terminal, so it stays
+              How much of the register screen fits at once. Saved for the selected scope, so it stays
               the same each time the till is reopened.
             </p>
           </div>
@@ -295,6 +265,7 @@ export function DisplayScalingSettings({ bare = false }: { bare?: boolean }) {
           </div>
         </div>
       </div>
+      </details>
     </section>
   );
 }

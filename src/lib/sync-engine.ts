@@ -560,6 +560,8 @@ const LIVE_TABLES = [
   "stores",
   "pos_settings",
   "pos_store_settings",
+  "settings_overrides",
+  "settings_locks",
   "sales",
   "sale_items",
   "payment_transactions",
@@ -630,7 +632,7 @@ function flushLiveChanges(): void {
   void syncNow(`live:${changes.map(([changedTable]) => changedTable).join(",")}`);
   for (const [changedTable, changedStores] of changes) {
     for (const changedStore of changedStores) {
-      if (changedTable === "pos_settings" || changedTable === "pos_store_settings") {
+      if (["pos_settings", "pos_store_settings", "settings_overrides", "settings_locks"].includes(changedTable)) {
         announceSettingsChange(`live:${changedTable}`, changedStore, changedTable);
       }
       if (

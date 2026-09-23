@@ -1,3 +1,4 @@
+import { SettingsWriteQueue } from "./settings-write-queue";
 import {
   createContext,
   useCallback,
@@ -352,10 +353,14 @@ type Ctx = {
   removePromotion: (id: string) => Promise<void>;
   togglePromotion: (id: string, active: boolean) => Promise<void>;
   updateSettings: (patch: Partial<AppSettings>) => void;
+  saveConfiguredSettings: () => Promise<void>;
   /** Which settings blocks each tier overrides, and which are locked globally. */
   settingsScope: BranchSettingsState;
   /** The cluster / branch / private ids this terminal resolves settings against. */
   scopeIds: ScopeIds;
+  settingsScopeLoading: boolean;
+  settingsTerminalId: string;
+  setSettingsTerminalId: (id: string) => void;
   /** Start (or stop) overriding one block at one tier. */
   setSectionScope: (
     section: SettingsSectionId,
@@ -467,6 +472,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
   actorRef.current = terminalUser?.name || user?.email || "Manager";
   // Scoped overrides (cluster / branch / private) and global locks.
   const [scope, setScope] = useState<BranchSettingsState>(emptyBranchSettings);
+  const settingsWrites = useRef(new SettingsWriteQueue());
+  const trackSettingsWrite = (key: string, save: () => Promise<unknown>) => settingsWrites.current.enqueue(key, save);
+  const saveConfiguredSettings = () => settingsWrites.current.flush();
+  const [settingsTerminalId, setSettingsTerminalId] = useState("");
+  const loadedScopeKey = useRef("");
+  const [confirmedScopeKey, setConfirmedScopeKey] = useState("");
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
   // Which cluster, branch and person this terminal resolves settings against.
@@ -475,9 +486,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
     return {
       CLUSTER: store?.groupId ?? "",
       BRANCH: state.currentStoreId ?? "",
+      TERMINAL: settingsTerminalId || readTerminalConfig()?.tokenId || "",
       PRIVATE: user?.staffId ?? terminalUser?.userCode ?? authUserId ?? "",
     };
-  }, [state.stores, state.currentStoreId, user?.staffId, terminalUser?.userCode, authUserId]);
+  }, [state.stores, state.currentStoreId, user?.staffId, terminalUser?.userCode, authUserId, settingsTerminalId]);
   const scopeIdsRef = useRef<ScopeIds>(emptyScopeIds);
   scopeIdsRef.current = scopeIds;
   const whoRef = useRef("Manager");
@@ -562,11 +574,38 @@ export function PosProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!signedIn || !state.currentStoreId) return;
     let cancelled = false;
-    void loadBranchSettings(scopeIds).then((next) => {
-      if (!cancelled) setScope(next);
-    });
+    const scopeKey = JSON.stringify(scopeIds);
+    if (loadedScopeKey.current !== scopeKey) {
+      loadedScopeKey.current = scopeKey;
+      setConfirmedScopeKey("");
+      setScope(emptyBranchSettings);
+    }
+    let running = false;
+    const refreshScope = async () => {
+      if (running || settingsWrites.current.pending) return;
+      running = true;
+      const revision = settingsWrites.current.revision;
+      try {
+        const next = await loadBranchSettings(scopeIds, true);
+        if (!cancelled && !settingsWrites.current.pending && revision === settingsWrites.current.revision) {
+          setScope(next);
+          setConfirmedScopeKey(scopeKey);
+        }
+      } catch { /* Preserve confirmed scope on a failed refresh. */ }
+      finally { running = false; }
+    };
+    void refreshScope();
+    const interval = window.setInterval(() => void refreshScope(), 60_000);
+    const off = subscribeSettingsChange(() => void refreshScope());
+    const onFocus = () => void refreshScope();
+    window.addEventListener("focus", onFocus);
+    window.addEventListener("online", onFocus);
     return () => {
       cancelled = true;
+      window.clearInterval(interval);
+      off();
+      window.removeEventListener("focus", onFocus);
+      window.removeEventListener("online", onFocus);
     };
   }, [signedIn, state.currentStoreId, scopeIds]);
 
@@ -847,28 +886,36 @@ export function PosProvider({ children }: { children: ReactNode }) {
     };
   }, [signedIn]);
 
-  // General business settings share the existing Realtime channel with POS
-  // rules. A pos_settings notification refreshes the canonical state; rule
-  // rows remain owned by PosRulesProvider and its store-scoped query cache.
+  // Refresh shared settings after remote edits and reconnects, with polling
+  // when Realtime is unavailable. Never overwrite an edit with an older read.
   useEffect(() => {
     if (!signedIn) return;
-    let timer: number | undefined;
+    let cancelled = false;
+    let running = false;
+    const refresh = async () => {
+      if (running || settingsWrites.current.pending) return;
+      running = true;
+      const revision = settingsWrites.current.revision;
+      try {
+        const settings = await loadCloudSettings();
+        if (!cancelled && !settingsWrites.current.pending && revision === settingsWrites.current.revision)
+          setState((current) => ({ ...current, settings: mergeCloudSettings(settings) }));
+      } catch { /* Keep the last confirmed settings until a later refresh. */ }
+      finally { running = false; }
+    };
+    const wake = () => { void refresh(); };
     const unsubscribe = subscribeSettingsChange((change) => {
-      if (change.table !== "pos_settings") return;
-      if (timer) window.clearTimeout(timer);
-      timer = window.setTimeout(() => {
-        timer = undefined;
-        void loadCloudSettings()
-          .then((settings) => {
-            setState((current) => ({ ...current, settings: mergeCloudSettings(settings) }));
-          })
-          .catch(() => {
-            /* reconnect/pull remains the convergence fallback */
-          });
-      }, 250);
+      if (change.table !== "pos_settings" && change.reason !== "reconnect" && change.reason !== "realtime:subscribed") return;
+      wake();
     });
+    const interval = window.setInterval(wake, 60_000);
+    window.addEventListener("focus", wake);
+    window.addEventListener("online", wake);
     return () => {
-      if (timer) window.clearTimeout(timer);
+      cancelled = true;
+      window.clearInterval(interval);
+      window.removeEventListener("focus", wake);
+      window.removeEventListener("online", wake);
       unsubscribe();
     };
   }, [signedIn]);
@@ -2494,8 +2541,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
   const writeGlobalSettings = useCallback((patch: Partial<AppSettings>) => {
     {
       const prev = stateRef.current.settings;
-      void db
-        .saveSettings({
+      trackSettingsWrite("GLOBAL", () => db
+        .saveSettingsNow({
           tax: { ...prev.tax, ...(patch.tax ?? {}) },
           receipt: { ...prev.receipt, ...(patch.receipt ?? {}) },
           payment: { ...prev.payment, ...(patch.payment ?? {}) },
@@ -2505,7 +2552,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
           integrations: { ...prev.integrations, ...(patch.integrations ?? {}) },
           visibility: { ...prev.visibility, ...(patch.visibility ?? {}) },
         })
-        .catch((error) => dbError("Saving display settings", error));
+        .catch((error) => { dbError("Saving display settings", error); throw error; }));
     }
     setState((s) => ({
       ...s,
@@ -2529,6 +2576,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
    */
   const updateSettings = useCallback(
     (patch: Partial<AppSettings>) => {
+      if (confirmedScopeKey !== JSON.stringify(scopeIdsRef.current)) {
+        toast.error("Settings are still loading. Please wait before editing.");
+        return;
+      }
       logger.log("settings", "Settings updated", "settings", {
         previous: stateRef.current.settings,
         updated: patch,
@@ -2538,8 +2589,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
       const byTier = new Map<SettingTier, Map<SettingsSectionId, Record<string, unknown>>>();
       let globalPatch: Record<string, unknown> = {};
       let hasGlobal = false;
+      const effective = resolveScopedSettings(stateRef.current.settings, scope, mergePatch).settings;
       for (const path of patchPaths(patch as Record<string, unknown>)) {
         const value = getPath(patch, path);
+        if (JSON.stringify(value) === JSON.stringify(getPath(effective, path))) continue;
         const section = sectionOfPath(path);
         // Strongest tier that already owns this block wins the write.
         const tier =
@@ -2567,13 +2620,17 @@ export function PosProvider({ children }: { children: ReactNode }) {
       });
       for (const [tier, bag] of byTier) {
         for (const [section, sectionPatch] of bag) {
-          void saveSectionOverride(tier, ids[tier], section, sectionPatch, whoRef.current).catch(
-            (e) => toast.error(`Scoped settings not saved: ${(e as Error).message}`),
-          );
+          const targetId = ids[tier]!;
+          const actor = whoRef.current;
+          trackSettingsWrite(`${tier}:${targetId}:${section}`, () =>
+            saveSectionOverride(tier, targetId, section, sectionPatch, actor).catch((error) => {
+              toast.error(`Scoped settings not saved: ${(error as Error).message}`);
+              throw error;
+            }));
         }
       }
     },
-    [writeGlobalSettings],
+    [writeGlobalSettings, confirmedScopeKey],
   );
   updateSettingsRef.current = updateSettings;
 
@@ -2600,21 +2657,22 @@ export function PosProvider({ children }: { children: ReactNode }) {
         toast.error("This block is locked by head office.");
         return;
       }
-      if (on) {
-        const patch = pickSection(stateRef.current.settings, def);
-        setScope((s) => ({
-          ...s,
-          overrides: { ...s.overrides, [tier]: { ...s.overrides[tier], [section]: patch } },
-        }));
-        await saveSectionOverride(tier, target, section, patch, whoRef.current);
-      } else {
-        setScope((s) => {
-          const tierBag = { ...s.overrides[tier] };
-          delete tierBag[section];
-          return { ...s, overrides: { ...s.overrides, [tier]: tierBag } };
-        });
-        await clearSectionOverride(tier, target, section);
-      }
+      await settingsWrites.current.flush();
+      settingsWrites.current.revision++;
+      try {
+        if (on) {
+          const patch = pickSection(resolveScopedSettings(stateRef.current.settings, scopeRef.current, mergePatch).settings, def);
+          await saveSectionOverride(tier, target, section, patch, whoRef.current);
+          setScope((s) => ({ ...s, overrides: { ...s.overrides, [tier]: { ...s.overrides[tier], [section]: patch } } }));
+        } else {
+          await clearSectionOverride(tier, target, section);
+          setScope((s) => {
+            const tierBag = { ...s.overrides[tier] };
+            delete tierBag[section];
+            return { ...s, overrides: { ...s.overrides, [tier]: tierBag } };
+          });
+        }
+      } finally { settingsWrites.current.revision++; }
       logger.log("settings", on ? "Scope override enabled" : "Override removed", "settings", {
         section,
         tier,
@@ -3054,6 +3112,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
     state: effectiveState,
     settingsScope: scope,
     scopeIds,
+    settingsScopeLoading: confirmedScopeKey !== JSON.stringify(scopeIds),
+    settingsTerminalId,
+    setSettingsTerminalId,
     sourceOfPath,
     setSectionScope,
     setSectionLocked,
@@ -3098,6 +3159,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     removePromotion,
     togglePromotion,
     updateSettings,
+    saveConfiguredSettings,
     createTransfer,
     approveTransfer,
     dispatchTransfer,

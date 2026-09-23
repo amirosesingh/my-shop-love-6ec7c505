@@ -100,6 +100,7 @@ function wrap(text: string, cols: number): string[] {
 /** "Item name .......  12.00" two-column row. */
 function columns(left: string, right: string, cols: number): string[] {
   if (!right) return wrap(left, cols);
+  if (right.length >= cols - 1) return [...wrap(left, cols), ...wrap(right, cols)];
   const room = Math.max(1, cols - right.length - 1);
   const wrapped = wrap(left, room);
   const first = wrapped[0] ?? "";
@@ -228,7 +229,7 @@ export function slipToBytes(
 
 /** Column count for a slip width. */
 export function columnsForPaper(paper: string): number {
-  return paper === "58mm" ? 32 : 42;
+  return paper === "30mm" ? 16 : paper === "58mm" ? 32 : 42;
 }
 
 export function htmlToEscPos(
@@ -243,6 +244,6 @@ export function htmlToEscPos(
     cols?: number;
   } = {},
 ): number[] {
-  const cols = Math.max(16, (opts.cols ?? columnsForPaper(paper)) - Math.max(0, opts.indent ?? 0));
+  const cols = Math.max(paper === "30mm" ? 8 : 16, (opts.cols ?? columnsForPaper(paper)) - Math.max(0, opts.indent ?? 0));
   return slipToBytes(htmlToSlip(html, cols), opts);
 }

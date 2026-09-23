@@ -16,6 +16,7 @@ export const Route = createFileRoute("/settings/display")({
   component: () => (
     <SettingsFrame
       title="Display & text size"
+      scopeSections={["display"]}
       description="Scale the interface for the screen this till runs on, and pick a light or dark theme."
     >
       <DisplayScalingSettings bare />

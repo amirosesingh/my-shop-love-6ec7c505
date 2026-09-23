@@ -1,3 +1,4 @@
+import { ThemedSelect } from "@/platforms/web/components/pos/ThemedSelect";
 import { createFileRoute } from "@tanstack/react-router";
 import { SettingsTabs } from "@/platforms/web/components/pos/settings/SettingsTabs";
 import { useState } from "react";
@@ -91,10 +92,11 @@ function SkuForm() {
         </div>
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Digits</Label>
-          <Input
-            className="numeric"
-            value={cfg.pad}
-            onChange={(e) => save({ pad: Math.min(12, Math.max(1, Number(e.target.value) || 1)) })}
+          <ThemedSelect
+            ariaLabel="SKU digits"
+            value={String(cfg.pad)}
+            onChange={(value) => save({ pad: Number(value) })}
+            options={Array.from({ length: 12 }, (_, index) => ({ value: String(index + 1), label: `${index + 1} digits` }))}
           />
         </div>
       </div>

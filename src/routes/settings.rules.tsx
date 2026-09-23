@@ -1,3 +1,4 @@
+import { PresetNumber } from "@/components/ui/preset-number";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SettingsTabs } from "@/platforms/web/components/pos/settings/SettingsTabs";
 import { useEffect, useState } from "react";
@@ -21,7 +22,7 @@ import { savePosRules } from "@/lib/pos-rules.functions";
 import { queueRulesSave } from "@/lib/pos-rules-offline";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { posFetch, serverOrigin } from "@/lib/server-origin";
-import { getIdleTimeout, saveIdleTimeout } from "@/lib/idle-timeout.functions";
+import { requestIdleTimeout } from "@/lib/idle-timeout-client";
 import { isWindowsShell } from "@/platform-config/features";
 
 export const Route = createFileRoute("/settings/rules")({
@@ -72,27 +73,26 @@ function RulesSettings() {
   const [draft, setDraft] = useState<PosRules>(rules);
   const [saving, setSaving] = useState(false);
   const [idle, setIdle] = useState(30);
+  const [idleScope, setIdleScope] = useState<"branch" | "global">("branch");
   const [savingIdle, setSavingIdle] = useState(false);
+  const [idleLoaded, setIdleLoaded] = useState(false);
 
   useEffect(() => {
-    void getIdleTimeout({ data: { storeId: currentStore.id } })
-      .then((r) => setIdle(r.minutes))
-      .catch(() => undefined);
-  }, [currentStore.id]);
+    let cancelled = false;
+    setIdleLoaded(false);
+    void requestIdleTimeout(currentStore.id, undefined, idleScope)
+      .then((result) => { if (!cancelled && typeof result.minutes === "number") { setIdle(result.minutes); setIdleLoaded(true); } })
+      .catch((error) => { if (!cancelled) notifyError(error, "Could not load the idle limit"); });
+    return () => { cancelled = true; };
+  }, [currentStore.id, idleScope]);
 
   async function saveIdle() {
     setSavingIdle(true);
     try {
-      const auth = await getPosCallerAuth();
-      if (!auth.accessToken) {
-        toast.error("Sign in with a supervisor account to change this");
-        return;
-      }
-      const res = await saveIdleTimeout({
-        data: { accessToken: auth.accessToken, storeId: currentStore.id, minutes: idle },
-      });
-      if (!res.ok) toast.error(res.error || "Could not save the idle limit");
-      else toast.success("Idle limit saved");
+      await requestIdleTimeout(currentStore.id, idle, idleScope);
+      toast.success(idleScope === "global" ? "Global idle limit saved for new sign-ins" : "Branch idle limit saved for new sign-ins");
+    } catch (e) {
+      notifyError(e, "Could not save the idle limit");
     } finally {
       setSavingIdle(false);
     }
@@ -302,6 +302,11 @@ function RulesSettings() {
                       checked={Boolean(draft[field.key])}
                       onCheckedChange={(v) => set(field.key, v)}
                     />
+                  ) : field.key === "auto_lock_timeout_seconds" ? (
+                    <PresetNumber label={field.label} disabled={!mayEdit} value={Number(draft[field.key])}
+                      onChange={(v) => set(field.key, v)} min={0} max={86400}
+                      options={[0, 30, 60, 90, 180, 300, 600, 900, 1800, 3600].map((value) => ({ value,
+                        label: value === 0 ? "Disabled" : value < 60 ? `${value} seconds` : `${value / 60} minutes` }))} />
                   ) : (
                     <Input
                       aria-label={field.label}
@@ -330,22 +335,23 @@ function RulesSettings() {
           <div>
             <h2 className="text-sm font-semibold">Idle session timeout</h2>
             <p className="text-xs text-muted-foreground">
-              How long a till may sit untouched before it signs itself out. Individual people can
-              be given their own limit in Staff Management.
+              Server session idle limit for new sign-ins at this branch (1–1440 minutes).
+              Existing sessions keep the limit assigned at sign-in. Use Auto-lock under Terminal
+              security & access above to set when the screen returns to sign-in.
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3 border-t border-border/60 pt-3">
+            {isAdmin && <select aria-label="Idle timeout scope" value={idleScope} disabled={savingIdle}
+              className="h-9 rounded border border-input bg-background px-2 text-sm"
+              onChange={(event) => setIdleScope(event.target.value as "branch" | "global")}>
+              <option value="branch">This branch</option><option value="global">Global default</option>
+            </select>}
             <Label className="text-sm">Minutes of inactivity</Label>
-            <Input
-              aria-label="Idle session timeout in minutes"
-              className="numeric h-8 w-28"
-              inputMode="numeric"
-              disabled={!mayEdit}
-              value={String(idle)}
-              onChange={(e) => setIdle(Math.max(1, Math.min(1440, Number(e.target.value) || 0)))}
-            />
+            <PresetNumber label="Idle session timeout in minutes" disabled={!mayEdit || savingIdle || !idleLoaded}
+              value={idle} onChange={setIdle} min={1} max={1440}
+              options={[1, 5, 10, 15, 30, 60, 120, 240, 480, 1440].map((value) => ({ value, label: `${value} minutes` }))} />
             {mayEdit && (
-              <Button size="sm" variant="outline" disabled={savingIdle} onClick={() => void saveIdle()}>
+              <Button size="sm" variant="outline" disabled={savingIdle || !idleLoaded} onClick={() => void saveIdle()}>
                 {savingIdle ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
                 Save limit
               </Button>

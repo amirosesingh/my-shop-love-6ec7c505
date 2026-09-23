@@ -41,8 +41,8 @@ export function HardwarePanel() {
           </div>
         </dl>
         <p className="mt-4 rounded-md bg-muted p-3 text-xs text-muted-foreground">
-          Hardware is physical, so it is configured where it is plugged in. If this till is
-          replaced, set the printer and drawer up again on the new machine — nothing carries over.
+          Printer profiles follow the selected scope. Use Terminal for a printer attached to one
+          registered till, or Branch to share the same configuration across the branch.
         </p>
       </section>
 

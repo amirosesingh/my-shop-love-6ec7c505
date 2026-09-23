@@ -1,3 +1,4 @@
+import type { FunctionShapes } from "@/lib/health-function-metadata";
 /**
  * Health checks that work on a till, not just in an admin's browser.
  *
@@ -9,7 +10,7 @@
 import { readCredentials, authHeaders } from "@/lib/pos-credentials";
 import { posFetch } from "@/lib/server-origin";
 
-type Answer = { ok?: boolean; error?: string; tables?: unknown; data?: unknown };
+type Answer = { ok?: boolean; error?: string; tables?: unknown; functions?: FunctionShapes; data?: unknown };
 
 async function ask(action: "shapes" | "relations"): Promise<Answer> {
   try {
@@ -29,11 +30,11 @@ async function ask(action: "shapes" | "relations"): Promise<Answer> {
 
 /** Published table definitions, read through our own server. */
 export async function relayTableShapes(): Promise<
-  { ok: true; tables: Record<string, { columns: string[]; required: string[] }> } | { ok: false; error: string }
+  { ok: true; functions: FunctionShapes; tables: Record<string, { columns: string[]; required: string[] }> } | { ok: false; error: string }
 > {
   const body = await ask("shapes");
   if (!body.ok || !body.tables) return { ok: false, error: body.error ?? "No table list returned" };
-  return { ok: true, tables: body.tables as Record<string, { columns: string[]; required: string[] }> };
+  return { ok: true, functions: body.functions ?? {}, tables: body.tables as Record<string, { columns: string[]; required: string[] }> };
 }
 
 /** The relationship & orphan check, read through our own server. */

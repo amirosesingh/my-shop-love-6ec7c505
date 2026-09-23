@@ -24,6 +24,7 @@ export type SettingDef = {
   fallback: SettingValue;
   /** Hide the value behind dots in the UI (API keys and similar). */
   secret?: boolean;
+  options?: { value: string; label: string }[];
 };
 
 export const SETTING_CATEGORIES: {
@@ -74,8 +75,9 @@ export const SETTING_DEFS: SettingDef[] = [
   },
   {
     key: "printer_paper_size",
+    options: ["30mm", "58mm", "80mm", "a4", "letter"].map((value) => ({ value, label: value.toUpperCase() })),
     label: "Paper size",
-    blurb: "Receipt width used by this branch, e.g. 80mm or 58mm.",
+    blurb: "Paper-size reference for this branch. Set the active printing layout in Receipt elements.",
     kind: "text",
     category: "device",
     tier: "BRANCH",
@@ -178,7 +180,7 @@ export const SETTING_DEFS: SettingDef[] = [
   {
     key: "session_timeout_minutes",
     label: "Session timeout (minutes)",
-    blurb: "Idle time before a signed-in user is locked out.",
+    blurb: "Session policy reference. Configure enforced screen locking and server sessions in POS Rules.",
     kind: "number",
     category: "system",
     tier: "GLOBAL",

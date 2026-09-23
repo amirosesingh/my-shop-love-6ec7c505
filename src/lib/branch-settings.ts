@@ -3,7 +3,7 @@
  *
  * A scope only stores the blocks it actually overrides; everything else
  * resolves down the chain and finally to the shipped defaults. Resolution
- * order is Private > Branch > Cluster > Global > hardcoded default. Locks are
+ * order is Private > Terminal > Branch > Cluster > Global > hardcoded default. Locks are
  * global and stop any scope from overriding a block at all.
  */
 import { dbRouter } from "@/core/api/db-router";
@@ -12,7 +12,7 @@ import type { SettingsSectionId } from "./settings-sections";
 export type SectionPatch = Record<string, unknown>;
 
 /** Override tiers, weakest first. Global is the base record, not a tier. */
-export const SETTING_TIERS = ["CLUSTER", "BRANCH", "PRIVATE"] as const;
+export const SETTING_TIERS = ["CLUSTER", "BRANCH", "TERMINAL", "PRIVATE"] as const;
 export type SettingTier = (typeof SETTING_TIERS)[number];
 export type SettingSource = "GLOBAL" | SettingTier;
 
@@ -20,12 +20,13 @@ export const TIER_LABELS: Record<SettingSource, string> = {
   GLOBAL: "Global",
   CLUSTER: "Cluster",
   BRANCH: "Branch",
+  TERMINAL: "Terminal",
   PRIVATE: "Private",
 };
 
-export type ScopeIds = { CLUSTER: string; BRANCH: string; PRIVATE: string };
+export type ScopeIds = { CLUSTER: string; BRANCH: string; TERMINAL?: string; PRIVATE: string };
 
-export const emptyScopeIds: ScopeIds = { CLUSTER: "", BRANCH: "", PRIVATE: "" };
+export const emptyScopeIds: ScopeIds = { CLUSTER: "", BRANCH: "", TERMINAL: "", PRIVATE: "" };
 
 export type TierOverrides = Partial<Record<SettingsSectionId, SectionPatch>>;
 
@@ -37,7 +38,7 @@ export type BranchSettingsState = {
 };
 
 export const emptyBranchSettings: BranchSettingsState = {
-  overrides: { CLUSTER: {}, BRANCH: {}, PRIVATE: {} },
+  overrides: { CLUSTER: {}, BRANCH: {}, TERMINAL: {}, PRIVATE: {} },
   locks: {},
 };
 
@@ -45,9 +46,9 @@ type OverrideRow = { section: string; patch: unknown };
 type LockRow = { section: string; locked: boolean };
 
 /** Overrides for every tier this terminal belongs to, plus the lock table. */
-export async function loadBranchSettings(ids: ScopeIds): Promise<BranchSettingsState> {
+export async function loadBranchSettings(ids: ScopeIds, strict = false): Promise<BranchSettingsState> {
   const state: BranchSettingsState = {
-    overrides: { CLUSTER: {}, BRANCH: {}, PRIVATE: {} },
+    overrides: { CLUSTER: {}, BRANCH: {}, TERMINAL: {}, PRIVATE: {} },
     locks: {},
   };
   try {
@@ -77,7 +78,8 @@ export async function loadBranchSettings(ids: ScopeIds): Promise<BranchSettingsS
     for (const row of locks as unknown as LockRow[]) {
       state.locks[row.section as SettingsSectionId] = !!row.locked;
     }
-  } catch {
+  } catch (error) {
+    if (strict) throw error;
     /* offline or not granted yet — the global record still applies */
   }
   return state;
@@ -149,7 +151,7 @@ export function resolveScopedSettings<T>(
   let settings = base;
   let touched = false;
   for (const tier of SETTING_TIERS) {
-    for (const key of Object.keys(scope.overrides[tier]) as SettingsSectionId[]) {
+    for (const key of Object.keys((scope.overrides[tier] ?? {})) as SettingsSectionId[]) {
       if (scope.locks[key]) continue;
       settings = merge(settings, scope.overrides[tier][key]);
       touched = true;

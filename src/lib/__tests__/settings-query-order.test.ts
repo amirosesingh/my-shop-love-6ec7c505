@@ -20,3 +20,9 @@ describe("scoped settings reads", () => {
     }
   });
 });
+
+it("loads the selected registered terminal separately from private user settings", async () => {
+  query.mockReset().mockResolvedValue([]);
+  await loadBranchSettings({ CLUSTER: "", BRANCH: "branch-1", TERMINAL: "terminal-1", PRIVATE: "user-1" });
+  expect(query).toHaveBeenCalledWith("settings_overrides", expect.objectContaining({ match: { scope: "TERMINAL", scope_id: "terminal-1" } }));
+});

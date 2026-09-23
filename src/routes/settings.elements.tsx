@@ -29,6 +29,7 @@ export const Route = createFileRoute("/settings/elements")({
     <SettingsFrame
       title="Receipt elements"
       description="Paper size and which blocks appear on the printed slip."
+      scopeSections={["receiptLayout"]}
       showPreview
     >
       <SettingsTabs current="/settings/elements" />

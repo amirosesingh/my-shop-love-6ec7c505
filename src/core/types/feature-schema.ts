@@ -14,10 +14,10 @@
  *             to spot required fields the till never sends.
  */
 import { supabaseExternal } from "@/integrations/supabase/external-client";
-import { supabaseConfig } from "@/lib/external-supabase-config";
+import { checkFunction, type FunctionShapes } from "@/lib/health-function-metadata";
 import { explainError } from "@/lib/db-health";
 import { relayTableShapes } from "@/core/api/health-relay";
-import { trulyRequired } from "@/lib/schema-required";
+
 
 export type OpKind = "read" | "write";
 
@@ -599,54 +599,17 @@ function toShapes(
  * Published table definitions straight from the live Data API — no repo file
  * is consulted. Used to name every gap at once instead of one error per run.
  */
-async function loadShapes(): Promise<Record<string, TableShape>> {
-  const { url, key } = supabaseConfig();
-  // Use the signed-in staff session, exactly like every other health call.
-  const token = (await supabaseExternal.auth.getSession()).data.session?.access_token ?? "";
-  const headers: Record<string, string> = { apikey: key, Accept: "application/openapi+json" };
-  if (token) headers.Authorization = `Bearer ${token}`;
-  const res = await fetch(`${url}/rest/v1/`, { headers });
-  if (res.status === 401 || res.status === 403) {
-    // A PIN-signed till has no cloud account, and some staff accounts are not
-    // allowed to read the table list. Ask our own server instead: it proves
-    // the device and reads the list centrally.
-    const relayed = await relayTableShapes();
-    if (relayed.ok) return toShapes(relayed.tables);
-    throw new Error(
-      `The database would not hand this device its table list, and the server check also failed: ${relayed.error}`,
-    );
-  }
-  if (!res.ok) throw new Error(`The database did not publish its table list (HTTP ${res.status})`);
-  const spec = (await res.json()) as {
-    definitions?: Record<
-      string,
-      { properties?: Record<string, { description?: string; default?: unknown }>; required?: string[] }
-    >;
-  };
-  const out: Record<string, TableShape> = {};
-  for (const [table, def] of Object.entries(spec.definitions ?? {})) {
-    out[table] = {
-      columns: new Set(Object.keys(def.properties ?? {})),
-      required: new Set(trulyRequired(def.required, def.properties)),
-    };
-  }
-  return out;
+async function loadShapes() {
+  const metadata = await relayTableShapes();
+  if (!metadata.ok) throw new Error(metadata.error);
+  return { tables: toShapes(metadata.tables), functions: metadata.functions };
 }
 
-async function probeOp(op: FeatureOp, shapes: Record<string, TableShape>): Promise<OpResult> {
+async function probeOp(op: FeatureOp, shapes: Record<string, TableShape>, functions: FunctionShapes): Promise<OpResult> {
   const base: OpResult = { ...op, ok: true, detail: "", missing: [], unmet: [] };
 
-  // Database functions: call with the real argument names, no side effect
-  // possible because the ids never match a row.
   if (op.table.startsWith("rpc:")) {
-    const fn = op.table.slice(4);
-    const args: Record<string, unknown> = {};
-    for (const c of op.columns) args[c] = c.includes("id") ? NO_ROW : null;
-    const { error } = await sb().rpc(fn, args);
-    if (error && /could not find the function|does not exist/i.test(error.message ?? "")) {
-      return { ...base, ok: false, detail: `Database function ${fn} is missing (${error.message})` };
-    }
-    return { ...base, detail: `Function ${fn} accepts this call` };
+    return { ...base, ...checkFunction(functions, op.table.slice(4), op.columns) };
   }
 
   const shape = shapes[op.table];
@@ -722,9 +685,9 @@ async function probeOp(op: FeatureOp, shapes: Record<string, TableShape>): Promi
 
 /** Run every feature's real query shapes against the live database. */
 export async function runFeatureSchemaAudit(): Promise<FeatureSchemaReport> {
-  let shapes: Record<string, TableShape>;
+  let metadata: Awaited<ReturnType<typeof loadShapes>>;
   try {
-    shapes = await loadShapes();
+    metadata = await loadShapes();
   } catch (e) {
     return {
       at: new Date().toISOString(),
@@ -743,7 +706,7 @@ export async function runFeatureSchemaAudit(): Promise<FeatureSchemaReport> {
     const ops: OpResult[] = [];
     for (const op of feature.ops) {
       try {
-        ops.push(await probeOp(op, shapes));
+        ops.push(await probeOp(op, metadata.tables, metadata.functions));
       } catch (e) {
         ops.push({ ...op, ok: false, detail: (e as Error).message, missing: [], unmet: [] });
       }
