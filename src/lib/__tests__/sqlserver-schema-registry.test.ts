@@ -57,9 +57,11 @@ describe("SQL Server schema registry", () => {
   it("ships one complete re-runnable local database script", () => {
     const initial = readFileSync("database/sqlserver/migrations/001_initial.sql", "utf8").trim();
     const pipeline = readFileSync("database/sqlserver/migrations/002_sync_pipeline.sql", "utf8").trim();
+    const normalize = (value: string) => value.replaceAll("\r\n", "\n").trim();
+    const normalizedCompleteSql = normalize(completeSql);
 
-    expect(completeSql).toContain(initial);
-    expect(completeSql).toContain(pipeline);
+    expect(normalizedCompleteSql).toContain(normalize(initial));
+    expect(normalizedCompleteSql).toContain(normalize(pipeline));
     expect(completeSql).toContain("IF DB_ID(N'POS_Local') IS NULL");
     expect(completeSql).toContain("EXEC(N'CREATE DATABASE [POS_Local]')");
     expect(completeSql).toContain("USE [POS_Local]");
@@ -84,6 +86,29 @@ describe("SQL Server schema registry", () => {
         );
       }
     }
+  });
+
+  it("uses SQL Server-compatible types for every generated index key", () => {
+    for (const table of registry.tables) {
+      for (const column of table.columns) {
+        const indexed =
+          column.primaryKey ||
+          column.unique ||
+          column.uniqueGroup ||
+          ["store_id", "branch_id", "organization_id", "updated_at"].includes(
+            column.sqlServerColumn,
+          );
+        if (indexed) {
+          expect(
+            column.sqlServerType,
+            `${table.sqlServerTable}.${column.sqlServerColumn}`,
+          ).not.toBe("nvarchar(max)");
+        }
+      }
+    }
+    expect(sql).toContain("ALTER COLUMN [store_id] nvarchar(450)");
+    expect(sql).toContain("ALTER COLUMN [updated_at] datetimeoffset(7)");
+    expect(sql).toContain("EXEC(N'CREATE INDEX IX_sync_change_journal_pending");
   });
 
   it("orders every foreign-key parent before its children", () => {
