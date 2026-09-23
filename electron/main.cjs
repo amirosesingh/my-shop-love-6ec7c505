@@ -70,7 +70,16 @@ const operationsRepository = new OperationsRepository(databaseManager, syncRegis
 const aggregateRepository = new AggregateRepository(databaseManager, operationsRepository);
 const receiptRepository = new ReceiptRepository(databaseManager, syncCloud);
 
-function localBranchId(){const terminal=terminalStore.read()??{};return terminal.locationId??terminal.storeId??terminal.branchId??null;}
+function localBranchId(){
+  const terminal=terminalStore.read()??{};
+  return [terminal.locationId,terminal.storeId,terminal.branchId,adminSession.branchId()]
+    .map(value=>String(value??"").trim()).find(Boolean)??null;
+}
+function rememberVerifiedBranch(branchId){
+  if(!branchId)return;
+  const terminal=terminalStore.read();
+  if(terminal?.tokenId&&!terminal.locationId&&!terminal.storeId&&!terminal.branchId)terminalStore.write({...terminal,branchId});
+}
 async function prepareLocalData({force=false}={}){
   const profile=databaseConfig.profile()??{};
   try{return await localDataLifecycle.ensure({branchId:localBranchId(),historyDays:Number(profile.retentionDays)||90,force});}
@@ -678,7 +687,7 @@ function registerIpc() {
     const response=await fetch(`${authorizationUrl}/api/v1/pos/ipc-adopt`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(proof)});
     const result=await response.json().catch(()=>({ok:false,error:"Authorization failed."}));
     if(!response.ok||!result.ok)return{ok:false,error:result.error??"Authorization failed."};
-    adminSession.grant(result.level,result.subject,result.permissions,"pos");return{ok:true,level:result.level};
+    adminSession.grant(result.level,result.subject,result.permissions,"pos",result.branchId);rememberVerifiedBranch(result.branchId);return{ok:true,level:result.level};
   }));
   ipcMain.handle("admin:unlock", async (_e, username, pin) => guard.guarded(async () => {
     const user = guard.text(username, { name: "username", max: 160 });
@@ -692,7 +701,7 @@ function registerIpc() {
     });
     const result = await response.json().catch(() => ({ ok: false, error: "Authorization failed." }));
     if (!response.ok || !result.ok) return { ok: false, error: result.error ?? "Authorization failed." };
-    adminSession.grant(result.level, result.subject, result.permissions);
+    adminSession.grant(result.level, result.subject, result.permissions, "manual", result.branchId);
     return { ok: true, level: result.level };
   }));
   ipcMain.handle("database:get-state", () => databaseService.snapshot());

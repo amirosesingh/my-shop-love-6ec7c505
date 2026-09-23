@@ -3,10 +3,10 @@ const MAX_IDLE_MS = 10 * 60 * 1000;
 let session = null;
 
 function clear() { session = null; }
-function grant(level, subject, permissions = {}, source = "manual") {
+function grant(level, subject, permissions = {}, source = "manual", branchId = null) {
   if (!["admin", "supervisor", "staff"].includes(level)) throw new Error("Invalid privilege level.");
   if (!["pos", "manual"].includes(source)) throw new Error("Invalid privilege source.");
-  session = { level, subject: String(subject ?? ""), permissions: { ...permissions }, source, verifiedAt: Date.now(), expiresAt: Date.now() + MAX_IDLE_MS };
+  session = { level, subject: String(subject ?? ""), permissions: { ...permissions }, source, branchId: branchId ? String(branchId) : null, verifiedAt: Date.now(), expiresAt: Date.now() + MAX_IDLE_MS };
   return status();
 }
 function active() {
@@ -20,10 +20,11 @@ function hasLevel(required) {
 }
 function hasPermission(permission) { return active()?.permissions?.[permission] === true; }
 function hasPosAuthority() { return active()?.source === "pos"; }
+function branchId() { return active()?.branchId ?? null; }
 function touch() { if (active()) session.expiresAt = Date.now() + MAX_IDLE_MS; }
 function status() {
   const current = active();
   return current ? { ok: true, unlocked: true, level: current.level, subject: current.subject } : { ok: true, unlocked: false };
 }
 
-module.exports = { clear, grant, hasLevel, hasPermission, hasPosAuthority, touch, status, recoveryActive: () => false, recoveryTouch: () => {} };
+module.exports = { clear, grant, hasLevel, hasPermission, hasPosAuthority, branchId, touch, status, recoveryActive: () => false, recoveryTouch: () => {} };
