@@ -6,7 +6,7 @@ import {
   subscribeConnectivity,
   type Connectivity,
 } from "@/core/activation/connection-health";
-import { isElectron } from "@/platform-config/platform";
+import { hasLocalSqlEngine } from "@/core/local-db/local-db";
 
 export type StatusTone = "connecting" | "ok" | "busy" | "offline" | "error";
 
@@ -68,7 +68,7 @@ export function useSystemStatus(): SystemStatus {
   const [desktopSync, setDesktopSync] = useState<Record<string, unknown> | null>(null);
   useEffect(() => subscribeConnectivity(() => force((value) => value + 1)), []);
   useEffect(() => {
-    if (!isElectron()) return;
+    if (!hasLocalSqlEngine()) return;
     const bridge = (window as unknown as { pos?: {
       database?: { getState(): Promise<Record<string, unknown>>; subscribe(cb: (value: Record<string, unknown>) => void): () => void };
       sync?: { getStatus(): Promise<Record<string, unknown>>; subscribe(cb: (value: Record<string, unknown>) => void): () => void };
@@ -83,7 +83,7 @@ export function useSystemStatus(): SystemStatus {
   const conn = connectivity();
   const health = lastHealth();
   const status = describeStatus({ connectivity: conn });
-  const desktop = isElectron();
+  const desktop = hasLocalSqlEngine();
   const localConnected = desktop && desktopDatabase?.connected === true;
   const profile = (desktopDatabase?.profile ?? null) as { server?: string; database?: string } | null;
   const syncing = desktop && (desktopSync?.running === true || (desktopSync?.phase != null && desktopSync.phase !== "idle"));
