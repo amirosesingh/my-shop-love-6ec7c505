@@ -172,6 +172,32 @@ describe("SQL Server checkpoints 7 through 12", () => {
     expect(lifecycle.bootstrapType(7300)).toBe("bootstrap_7300");
   });
 
+  it("refreshes a reference table even when an older bootstrap is already complete", async () => {
+    class Transaction {
+      begin = vi.fn();
+      commit = vi.fn();
+      rollback = vi.fn();
+    }
+    const table = {
+      cloudTable: "store_groups", sqlServerTable: "store_groups", dependencyOrder: 0,
+      columns: [{ cloudColumn: "id", primaryKey: true }],
+    };
+    const cloud = {
+      bootstrapPage: vi.fn().mockResolvedValue({ rows: [{ id: "default" }], cursor: null }),
+      applyLocalBatch: vi.fn(),
+    };
+    const { refreshTable } = await import("../../../electron/jobs/bootstrap.cjs");
+    await expect(refreshTable({
+      registry: { tables: [table] }, cloud,
+      connectionManager: { sql: () => ({ Transaction, ISOLATION_LEVEL: { SERIALIZABLE: 4 } }), pool: {} },
+      branchId: "B1", historyDays: 90, tableName: "store_groups",
+    })).resolves.toEqual({ completed: 1 });
+    expect(cloud.bootstrapPage).toHaveBeenCalledWith({ table: "store_groups", branchId: "B1", historyDays: 90, cursor: null, limit: 500 });
+    expect(cloud.applyLocalBatch).toHaveBeenCalledWith(expect.any(Transaction), table, expect.objectContaining({
+      rows: [expect.objectContaining({ row_data: { id: "default" } })],
+    }));
+  });
+
   it("pushes pending local work before the first cloud bootstrap", async () => {
     const order: string[] = [];
     const lifecycle = new (await import("../../../electron/jobs/lifecycle.cjs")).LocalDataLifecycle({
