@@ -96,6 +96,37 @@ async function prepareLocalData({force=false}={}){
   }
 }
 
+const AUTO_SYNC_OK_MS = 15_000;
+const AUTO_SYNC_RETRY_MS = 60_000;
+let automaticSyncTimer = null;
+function scheduleAutomaticSync(delay = AUTO_SYNC_OK_MS) {
+  if (quitting) return;
+  if (automaticSyncTimer) clearTimeout(automaticSyncTimer);
+  automaticSyncTimer = setTimeout(() => void runAutomaticSync(), Math.max(250, delay));
+  automaticSyncTimer.unref?.();
+}
+async function runAutomaticSync() {
+  automaticSyncTimer = null;
+  if (!databaseManager.pool || !localBranchId() || jobManager.running || syncCoordinator.running || syncCoordinator.paused) {
+    scheduleAutomaticSync();
+    return;
+  }
+  let result = await syncCoordinator.runNow({ branchId: localBranchId(), batchSize: 500 });
+  if (result.code === "ECHANGEGAP") {
+    try {
+      await prepareLocalData({ force: true });
+      result = { ok: true };
+    } catch (error) {
+      result = { ok: false, error: String(error?.message ?? error) };
+    }
+  }
+  scheduleAutomaticSync(result.ok ? AUTO_SYNC_OK_MS : AUTO_SYNC_RETRY_MS);
+}
+function stopAutomaticSync() {
+  if (automaticSyncTimer) clearTimeout(automaticSyncTimer);
+  automaticSyncTimer = null;
+}
+
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
 const DEBUG = process.env.POS_DEBUG === "1";
 
@@ -750,8 +781,8 @@ function registerIpc() {
   ipcMain.handle("database:schema-status", () => databaseService.schemaStatus());
   ipcMain.handle("database:backup", (_e, file) => guard.guarded(() => backupService.backup(guard.filePath(file,{name:"backup file",extension:"bak"}))));
   ipcMain.handle("database:restore", (_e, file) => guard.guarded(async () => { const result=await backupService.restore(guard.filePath(file,{name:"backup file",extension:"bak"})); if(result.ok)await databaseService.restore(); return result; }));
-  ipcMain.handle("business:write-batch", (_e, context, ops) => guard.guarded(() => operationsRepository.apply(guard.text(context,{name:"operation context",max:160}), guard.writeOps(ops,{max:200}))));
-  ipcMain.handle("business:commit-aggregate", (_e, value) => guard.guarded(() => { const aggregate=guard.aggregate(value); return aggregateRepository.commit(aggregate.kind,aggregate); }));
+  ipcMain.handle("business:write-batch", (_e, context, ops) => guard.guarded(async() => { const result=await operationsRepository.apply(guard.text(context,{name:"operation context",max:160}), guard.writeOps(ops,{max:200}));scheduleAutomaticSync(250);return result;}));
+  ipcMain.handle("business:commit-aggregate", (_e, value) => guard.guarded(async() => { const aggregate=guard.aggregate(value);const result=await aggregateRepository.commit(aggregate.kind,aggregate);scheduleAutomaticSync(250);return result;}));
   ipcMain.handle("business:snapshot", () => guard.guarded(() => operationsRepository.snapshot()));
   ipcMain.handle("receipts:find-exact", (_e, value, branchId, proof) => guard.guarded(() => {
     const input = guard.options(proof, { name: "receipt authorization", max: 3 });
@@ -957,6 +988,7 @@ app.whenReady().then(async () => {
     : "/";
   createWindows(initialRoute);
   if(restoredDatabase.state==="enabled_bootstrapping")void prepareLocalData().catch(error=>recordFault("local-data.prepare",error));
+  scheduleAutomaticSync(5_000);
   updater.start();
   readyWatchdog = setTimeout(() => enterSafeMode("Startup timed out"), 60_000);
   app.on("activate", () => {
@@ -966,7 +998,7 @@ app.whenReady().then(async () => {
   });
 });
 
-app.on("before-quit", () => { quitting = true; mainTelemetry.stop(); closeCustomerDisplay(); void databaseManager.close(); });
+app.on("before-quit", () => { quitting = true; stopAutomaticSync(); mainTelemetry.stop(); closeCustomerDisplay(); void databaseManager.close(); });
 app.on("window-all-closed", () => {
   if (recovery.isOpen()) return;
   markStartupSettled(); updater.stop(); stopAppServer();

@@ -22,8 +22,15 @@ describe("offline terminal operations", () => {
     expect(main.indexOf("await databaseService.restore()")).toBeLessThan(
       main.indexOf("createWindows(initialRoute)"),
     );
-    expect(main).toContain('!restoredDatabase.connected\n    ? "/database-startup"');
+    expect(main).toMatch(/!restoredDatabase\.connected\s*\? "\/database-startup"/);
     expect(main).toContain('function createWindows(initialRoute = "/")');
+    expect(main).toContain("scheduleAutomaticSync(5_000)");
+    expect(main).toContain("AUTO_SYNC_OK_MS = 15_000");
+    expect(main).toContain("scheduleAutomaticSync(250)");
+    expect(main).toContain('result.code === "ECHANGEGAP"');
+    expect(main).toContain("prepareLocalData({ force: true })");
+    const health = readFileSync("src/core/activation/connection-health.ts", "utf8");
+    expect(health).toContain("bridge.database?.getState");
   });
 
   it("stores only a salted verifier and verifies a cached manager PIN", () => {
