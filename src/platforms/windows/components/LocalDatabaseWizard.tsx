@@ -19,6 +19,7 @@ import {
   validateServerEndpoint,
 } from "./local-database-server";
 import { readCredentials } from "@/lib/pos-credentials";
+import { mirrorTerminalConfigToDesktop } from "@/core/activation/terminal-tokens";
 
 type Profile = {
   host: string;
@@ -558,6 +559,7 @@ export function LocalDatabaseWizard() {
                       run(async () => {
                         const authorization = await authorizeDatabaseChange();
                         if (!authorization.ok) return authorization;
+                        await mirrorTerminalConfigToDesktop();
                         const response = await api()!.saveAndConnect(profile);
                         if (response.ok) {
                           setProfile((old) => ({ ...old, password: "" }));

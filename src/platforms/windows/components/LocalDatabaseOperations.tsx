@@ -5,6 +5,7 @@ import { Input } from "@/components/ui/input";
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DatabaseHealthCard } from "./DatabaseHealthCard";
 import { DatabaseJobProgress, type DatabaseJob } from "./DatabaseJobProgress";
+import { mirrorTerminalConfigToDesktop } from "@/core/activation/terminal-tokens";
 
 type DatabaseState = { state?: string; enabled?: boolean; connected?: boolean; profile?: { database?: string } | null };
 type SyncState = { phase?: string; running?: boolean; paused?: boolean; pending?: number; failed?: number; conflicts?: number; lastPushAt?: string | null; lastPullAt?: string | null };
@@ -93,10 +94,10 @@ export function LocalDatabaseOperations() {
             <div><div className="text-xs text-muted-foreground">Last completed</div><div>{when([sync.lastPushAt, sync.lastPullAt].filter(Boolean).sort().at(-1))}</div></div>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Button disabled={busy || !state.connected || sync.running} onClick={() => run("Synchronization completed.", () => shell().sync!.runNow({ batchSize: 500 }))}>Sync now</Button>
+            <Button disabled={busy || !state.connected || sync.running} onClick={() => run("Synchronization completed.", async () => { await mirrorTerminalConfigToDesktop(); return shell().sync!.runNow({ batchSize: 500 }); })}>Sync now</Button>
             <Button variant="outline" disabled={busy || !!sync.paused} onClick={() => run("Synchronization paused.", () => shell().sync!.pause())}>Pause</Button>
             <Button variant="outline" disabled={busy || !sync.paused} onClick={() => run("Synchronization resumed.", () => shell().sync!.resume())}>Resume</Button>
-            <Button variant="outline" disabled={busy || !state.connected} onClick={() => run("Reconciliation completed.", () => shell().sync!.reconcile({}))}>Reconcile</Button>
+            <Button variant="outline" disabled={busy || !state.connected} onClick={() => run("Reconciliation completed.", async () => { await mirrorTerminalConfigToDesktop(); return shell().sync!.reconcile({}); })}>Reconcile</Button>
             <Button variant="ghost" disabled={busy} onClick={() => void refresh()}>Refresh</Button>
           </div>
         </CardContent>

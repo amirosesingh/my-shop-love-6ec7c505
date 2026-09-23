@@ -499,7 +499,7 @@ export function clearTerminalConfig() {
 
 type TerminalBridge = {
   readTerminalConfig: () => Promise<{ ok: boolean; config?: TerminalConfig | null }>;
-  writeTerminalConfig: (config: TerminalConfig | null) => Promise<{ ok: boolean }>;
+  writeTerminalConfig: (config: TerminalConfig | null) => Promise<{ ok: boolean; code?: string; error?: string }>;
   clearTerminalConfig?: () => Promise<{ ok: boolean }>;
 };
 
@@ -508,6 +508,33 @@ const desktopBridge = (): TerminalBridge | null => {
   const api = (window as unknown as { pos?: Partial<TerminalBridge> }).pos;
   return api && typeof api.writeTerminalConfig === "function" ? (api as TerminalBridge) : null;
 };
+
+/**
+ * Repair the Electron main-process activation mirror after the signed-in POS
+ * administrator has been adopted. Boot hydration happens before that adoption
+ * and its protected `terminal:write` can therefore be refused legitimately.
+ * Database and sync actions call this again inside their authorised click so a
+ * terminal that is already activated never needs a second activation code.
+ */
+export async function mirrorTerminalConfigToDesktop(): Promise<void> {
+  const bridge = desktopBridge();
+  if (!bridge) return;
+  const config = readTerminalConfig() ?? (await hydrateTerminalConfig());
+  if (!config?.tokenId) {
+    throw new Error("The POS activation could not be read on this device. Sign out and reopen the POS before retrying.");
+  }
+  const result = await bridge.writeTerminalConfig(config);
+  if (!result?.ok) {
+    throw new Error(
+      result?.error ??
+        "Windows secure storage could not save the existing terminal activation.",
+    );
+  }
+  const verified = await bridge.readTerminalConfig();
+  if (!verified?.ok || verified.config?.tokenId !== config.tokenId) {
+    throw new Error("Windows secure storage did not retain the terminal activation. Restart Windows and retry.");
+  }
+}
 
 /**
  * An installer refresh can wipe the renderer's storage. The desktop shell keeps
