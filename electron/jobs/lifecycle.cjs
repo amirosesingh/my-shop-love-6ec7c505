@@ -1,4 +1,4 @@
-const { runBootstrap } = require("./bootstrap.cjs");
+const { runBootstrap, refreshTable } = require("./bootstrap.cjs");
 const { runRetention } = require("./retention.cjs");
 const { localTableCounts } = require("../sync/reconciliation.cjs");
 
@@ -15,14 +15,20 @@ class LocalDataLifecycle {
     this.databaseService.transition("enabled_bootstrapping",{phase:"resume"});
     await this.resume(branchId,historyDays);
     const completed=await this.jobRepository.completed(this.bootstrapType(historyDays),branchId);
+    // Upload local changes before refreshing shared reference rows. Older
+    // databases may have a completed bootstrap from before store_groups was
+    // part of the registry, leaving stores.group_id without its local parent.
+    await this.syncCoordinator.pushWorker.run({branchId,batchSize:500});
     if(force||!completed){
       // A reused till database can contain completed offline sales before it
       // has a bootstrap checkpoint. Upload every locally tracked transaction
       // first; otherwise bootstrap could establish a new baseline over work
       // that head office has never acknowledged.
-      await this.syncCoordinator.pushWorker.run({branchId,batchSize:500});
       await this.bootstrap(branchId,historyDays);
     }
+    // Always repair this small parent table, including databases whose old
+    // completed bootstrap marker would otherwise skip newly-added tables.
+    await refreshTable({registry:this.registry,cloud:this.cloud,connectionManager:this.connectionManager,branchId,historyDays,tableName:"store_groups"});
     const synced=await this.syncCoordinator.runNow({branchId,batchSize:500});
     if(!synced.ok)throw Object.assign(new Error(synced.error??"Final synchronization failed."),{code:"ESYNC"});
     await this.retain(branchId,historyDays);
