@@ -154,4 +154,12 @@ describe("local SQL Server wizard server step", () => {
     expect(wizard).toContain("flex shrink-0 justify-between");
     expect(wizard).toContain("setStep((value) => Math.min(6, value + 1))");
   });
+
+  it("opens synchronization failure details from the failure count", () => {
+    const operations = readFileSync("src/platforms/windows/components/LocalDatabaseOperations.tsx", "utf8");
+    expect(operations).toContain("setFailureDetailsOpen(true)");
+    expect(operations).toContain("Synchronization failures");
+    expect(operations).toContain("failure.error_message");
+    expect(operations).toContain("conflict.reason");
+  });
 });

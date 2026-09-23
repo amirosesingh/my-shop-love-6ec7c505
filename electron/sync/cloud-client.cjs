@@ -4,9 +4,11 @@ const { toLocalValue } = require("./row-codec.cjs");
 class CloudClient {
   constructor({ configStore, terminalStore, connectionManager = null }) { this.configStore = configStore; this.terminalStore = terminalStore; this.connectionManager = connectionManager; }
   async request(payload) {
-    const base = String(this.configStore.get("backendUrl") ?? "").replace(/\/+$/, "");
-    const terminalToken = this.terminalStore.read()?.tokenId;
-    if (!base || !terminalToken) throw new Error("The hosted backend and terminal activation are required for synchronization.");
+    const terminal = this.terminalStore.read() ?? {};
+    const base = String(this.configStore.get("backendUrl") ?? terminal.backendUrl ?? "").trim().replace(/\/+$/, "");
+    const terminalToken = String(terminal.tokenId ?? "").trim();
+    if (!base) throw Object.assign(new Error("The terminal is activated, but its hosted POS backend address has not been restored. Open Database & Cloud Connection and save the hosted POS address once."),{code:"EBACKEND"});
+    if (!terminalToken) throw Object.assign(new Error("The renderer activation has not reached the desktop synchronization service yet. Close and reopen Settings, then retry synchronization."),{code:"EACTIVATION_MIRROR"});
     const response = await fetch(`${base}/api/v1/pos/sync`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ terminalToken, ...payload }) });
     const data = await response.json().catch(() => ({ ok: false, error: `HTTP ${response.status}` }));
     if (!response.ok || data?.ok === false) throw Object.assign(new Error(data?.error ?? `HTTP ${response.status}`), { code: data?.code ?? `HTTP_${response.status}` });

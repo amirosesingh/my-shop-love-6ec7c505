@@ -86,7 +86,14 @@ function rememberVerifiedBranch(branchId){
 async function prepareLocalData({force=false}={}){
   const profile=databaseConfig.profile()??{};
   try{return await localDataLifecycle.ensure({branchId:localBranchId(),historyDays:Number(profile.retentionDays)||90,force});}
-  catch(error){databaseService.markDegraded({code:error?.code??"EBOOTSTRAP",error:String(error?.message??error),differences:error?.differences});throw error;}
+  catch(error){
+    // Reaching this function means SQL Server already passed validation and is
+    // connected. A cloud, activation or reconciliation problem belongs to the
+    // synchronization status; it must not describe the healthy local database
+    // as degraded or disable offline trading.
+    databaseService.markReady({phase:"sync_pending",syncReady:false,code:error?.code??"EBOOTSTRAP",error:String(error?.message??error),differences:error?.differences});
+    throw error;
+  }
 }
 
 const DEV_URL = process.env.VITE_DEV_SERVER_URL;
@@ -761,7 +768,7 @@ function registerIpc() {
   ipcMain.handle("sync:pause", () => syncCoordinator.pause());
   ipcMain.handle("sync:resume", () => syncCoordinator.resume());
   ipcMain.handle("sync:get-failures", async () => ({ failures:databaseManager.pool?await jobRepository.failures():[], conflictRows:databaseManager.pool?await conflictRepository.unresolved():[], conflicts:databaseManager.pool?await conflictRepository.count():0 }));
-  ipcMain.handle("sync:reconcile", () => guard.guarded(async()=>{const branchId=localBranchId();if(!branchId)throw Object.assign(new Error("A branch is required for reconciliation."),{code:"EBRANCH"});const differences=await localDataLifecycle.reconcile(branchId,Number(databaseConfig.profile()?.retentionDays)||90);return{ok:differences.length===0,differences};}));
+  ipcMain.handle("sync:reconcile", () => guard.guarded(async()=>{try{const branchId=localBranchId();if(!branchId)throw Object.assign(new Error("A branch is required for reconciliation."),{code:"EBRANCH"});const differences=await localDataLifecycle.reconcile(branchId,Number(databaseConfig.profile()?.retentionDays)||90);return{ok:differences.length===0,differences};}catch(error){return{ok:false,code:error?.code??"ERECONCILE",error:String(error?.message??error)};}}));
   ipcMain.handle("telemetry:presence", (_e, value) => guard.guarded(() => {
     const input = guard.options(value, { name: "telemetry presence", max: 3 });
     return mainTelemetry.setPresence({

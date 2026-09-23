@@ -421,6 +421,11 @@ export async function hydrateTerminalConfig(): Promise<TerminalConfig | null> {
     cachedConfig = legacy;
     hydrated = true;
     applyTenantOverride(legacy);
+    // Keep Electron's synchronization process on the same activation as the
+    // renderer. An update or storage recovery may restore only this sealed
+    // renderer copy; without the mirror the UI looks activated while native
+    // SQL synchronization incorrectly reports that no terminal is registered.
+    await desktopBridge()?.writeTerminalConfig(legacy).catch(() => undefined);
     // One-time upgrade: seal it and drop the readable copy.
     try {
       await setDeviceSecret(SEALED_NAME, legacy);
@@ -440,6 +445,7 @@ export async function hydrateTerminalConfig(): Promise<TerminalConfig | null> {
         deviceType: shell === "android" ? "mobile" : shell === "electron" ? "pc" : sealed.deviceType,
       };
       applyTenantOverride(cachedConfig);
+      await desktopBridge()?.writeTerminalConfig(cachedConfig).catch(() => undefined);
     }
   } catch {
     /* unreadable seal — treat as not activated */

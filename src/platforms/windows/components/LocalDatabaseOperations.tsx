@@ -2,12 +2,15 @@ import { useCallback, useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { DatabaseHealthCard } from "./DatabaseHealthCard";
 import { DatabaseJobProgress, type DatabaseJob } from "./DatabaseJobProgress";
 
 type DatabaseState = { state?: string; enabled?: boolean; connected?: boolean; profile?: { database?: string } | null };
 type SyncState = { phase?: string; running?: boolean; paused?: boolean; pending?: number; failed?: number; conflicts?: number; lastPushAt?: string | null; lastPullAt?: string | null };
-type Failures = { failures?: unknown[]; conflictRows?: unknown[]; conflicts?: number };
+type FailureRow = { job_id?: string; job_type?: string; status?: string; phase?: string; current_table?: string | null; error_code?: string | null; error_message?: string | null; updated_at?: string | null };
+type ConflictRow = { conflict_id?: string; entity_type?: string; entity_id?: string; reason?: string; created_at?: string | null };
+type Failures = { failures?: FailureRow[]; conflictRows?: ConflictRow[]; conflicts?: number };
 type Result = Record<string, unknown>;
 type DatabaseApi = {
   getState(): Promise<DatabaseState>; health(): Promise<Result>; schemaStatus(): Promise<Result>;
@@ -35,6 +38,7 @@ export function LocalDatabaseOperations() {
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  const [failureDetailsOpen, setFailureDetailsOpen] = useState(false);
 
   const refresh = useCallback(async () => {
     const api = shell();
@@ -84,7 +88,7 @@ export function LocalDatabaseOperations() {
           <div className="grid gap-3 rounded-md border p-3 text-sm sm:grid-cols-2 xl:grid-cols-5">
             <div><div className="text-xs text-muted-foreground">Phase</div><div>{sync.paused ? "Paused" : label(sync.phase)}</div></div>
             <div><div className="text-xs text-muted-foreground">Waiting</div><div>{Number(sync.pending ?? 0).toLocaleString()}</div></div>
-            <div><div className="text-xs text-muted-foreground">Failures</div><div>{failureCount || Number(sync.failed ?? 0)}</div></div>
+            <div><div className="text-xs text-muted-foreground">Failures</div><Button type="button" variant="link" className="h-auto p-0 text-sm" disabled={!failureCount && !Number(sync.failed ?? 0)} onClick={() => setFailureDetailsOpen(true)}>{failureCount || Number(sync.failed ?? 0)}</Button></div>
             <div><div className="text-xs text-muted-foreground">Conflicts</div><div>{conflictCount}</div></div>
             <div><div className="text-xs text-muted-foreground">Last completed</div><div>{when([sync.lastPushAt, sync.lastPullAt].filter(Boolean).sort().at(-1))}</div></div>
           </div>
@@ -97,6 +101,16 @@ export function LocalDatabaseOperations() {
           </div>
         </CardContent>
       </Card>
+      <Dialog open={failureDetailsOpen} onOpenChange={setFailureDetailsOpen}>
+        <DialogContent className="max-h-[75vh] max-w-2xl overflow-y-auto">
+          <DialogHeader><DialogTitle>Synchronization failures</DialogTitle><DialogDescription>These records remain available for diagnosis and retry. Successful synchronization does not duplicate acknowledged transactions.</DialogDescription></DialogHeader>
+          <div className="space-y-3">
+            {(failures.failures ?? []).map((failure, index) => <div key={failure.job_id ?? index} className="rounded-md border p-3 text-sm"><div className="font-medium">{label(failure.job_type ?? "Database job")} · {label(failure.status)}</div><div className="mt-1 text-destructive">{failure.error_message || "No error message was recorded."}</div><div className="mt-1 text-xs text-muted-foreground">{[failure.error_code, failure.current_table, failure.updated_at ? when(failure.updated_at) : null].filter(Boolean).join(" · ")}</div></div>)}
+            {(failures.conflictRows ?? []).map((conflict, index) => <div key={conflict.conflict_id ?? index} className="rounded-md border p-3 text-sm"><div className="font-medium">Conflict · {conflict.entity_type ?? "record"}</div><div className="mt-1">{conflict.reason ?? "Local and cloud changes require review."}</div><div className="mt-1 break-all text-xs text-muted-foreground">{conflict.entity_id}</div></div>)}
+            {!failureCount && !(failures.conflictRows?.length) ? <p className="text-sm text-muted-foreground">No stored failure details are available. Refresh after the next synchronization attempt.</p> : null}
+          </div>
+        </DialogContent>
+      </Dialog>
       <Card>
         <CardHeader><CardTitle className="text-base">Backup and recovery</CardTitle></CardHeader>
         <CardContent className="space-y-3">
