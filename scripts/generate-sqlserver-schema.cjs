@@ -94,6 +94,18 @@ const tables = report.tables.map((table, tableIndex) => ({
 }));
 
 const tableByName = new Map(tables.map((table) => [table.cloudTable, table]));
+// SQL Server requires both sides of a foreign key to have the same type,
+// length, precision and scale. Cloud schemas can declare an identifier as
+// unconstrained text on the child while the referenced key is bounded.
+for (const table of tables) {
+  for (const column of table.columns.filter((item) => item.foreignKeyTarget)) {
+    const targetTable = tableByName.get(column.foreignKeyTarget.table);
+    const targetColumn = targetTable?.columns.find(
+      (item) => item.sqlServerColumn === column.foreignKeyTarget.column,
+    );
+    if (targetColumn) column.sqlServerType = targetColumn.sqlServerType;
+  }
+}
 function dependencyDepth(table, visiting = new Set()) {
   if (visiting.has(table.cloudTable)) return 0;
   const next = new Set(visiting).add(table.cloudTable);
@@ -122,7 +134,7 @@ for (const table of tables) {
     lines.push(`IF COL_LENGTH(N'dbo.${table.sqlServerTable}', N'${column.sqlServerColumn}') IS NULL ALTER TABLE dbo.[${table.sqlServerTable}] ADD [${column.sqlServerColumn}] ${column.sqlServerType} NULL;`);
     if (column.sqlServerType !== "nvarchar(max)" &&
         (["store_id","branch_id","organization_id","updated_at"].includes(column.sqlServerColumn) ||
-         column.primaryKey || column.unique || column.uniqueGroup)) {
+         column.primaryKey || column.unique || column.uniqueGroup || column.foreignKey)) {
       lines.push(`IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND c.name=N'${column.sqlServerColumn}' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[${table.sqlServerTable}] ALTER COLUMN [${column.sqlServerColumn}] ${column.sqlServerType}${column.nullable ? " NULL" : " NOT NULL"};`);
     }
   }

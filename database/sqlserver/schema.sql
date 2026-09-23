@@ -224,7 +224,11 @@ IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user
 
 IF COL_LENGTH(N'dbo.issued_vouchers', N'campaign_id') IS NULL ALTER TABLE dbo.[issued_vouchers] ADD [campaign_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.issued_vouchers') AND c.name=N'campaign_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[issued_vouchers] ALTER COLUMN [campaign_id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.issued_vouchers', N'member_id') IS NULL ALTER TABLE dbo.[issued_vouchers] ADD [member_id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.issued_vouchers') AND c.name=N'member_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[issued_vouchers] ALTER COLUMN [member_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.issued_vouchers', N'status') IS NULL ALTER TABLE dbo.[issued_vouchers] ADD [status] nvarchar(max) NULL;
 
@@ -485,6 +489,8 @@ IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user
 
 IF COL_LENGTH(N'dbo.booking_payments', N'booking_id') IS NULL ALTER TABLE dbo.[booking_payments] ADD [booking_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.booking_payments') AND c.name=N'booking_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[booking_payments] ALTER COLUMN [booking_id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.booking_payments', N'amount') IS NULL ALTER TABLE dbo.[booking_payments] ADD [amount] decimal(38,12) NULL;
 
 IF COL_LENGTH(N'dbo.booking_payments', N'method') IS NULL ALTER TABLE dbo.[booking_payments] ADD [method] nvarchar(max) NULL;
@@ -576,6 +582,8 @@ IF COL_LENGTH(N'dbo.bookings', N'customer_name') IS NULL ALTER TABLE dbo.[bookin
 IF COL_LENGTH(N'dbo.bookings', N'customer_phone') IS NULL ALTER TABLE dbo.[bookings] ADD [customer_phone] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.bookings', N'member_id') IS NULL ALTER TABLE dbo.[bookings] ADD [member_id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.bookings') AND c.name=N'member_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[bookings] ALTER COLUMN [member_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.bookings', N'service_type_id') IS NULL ALTER TABLE dbo.[bookings] ADD [service_type_id] nvarchar(max) NULL;
 
@@ -862,11 +870,15 @@ IF COL_LENGTH(N'dbo.coupon_events', N'event_type') IS NULL ALTER TABLE dbo.[coup
 
 IF COL_LENGTH(N'dbo.coupon_events', N'campaign_id') IS NULL ALTER TABLE dbo.[coupon_events] ADD [campaign_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.coupon_events') AND c.name=N'campaign_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[coupon_events] ALTER COLUMN [campaign_id] uniqueidentifier NULL;
+
 IF COL_LENGTH(N'dbo.coupon_events', N'campaign_name') IS NULL ALTER TABLE dbo.[coupon_events] ADD [campaign_name] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.coupon_events', N'voucher_token') IS NULL ALTER TABLE dbo.[coupon_events] ADD [voucher_token] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.coupon_events', N'member_id') IS NULL ALTER TABLE dbo.[coupon_events] ADD [member_id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.coupon_events') AND c.name=N'member_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[coupon_events] ALTER COLUMN [member_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.coupon_events', N'member_phone') IS NULL ALTER TABLE dbo.[coupon_events] ADD [member_phone] nvarchar(max) NULL;
 
@@ -1087,6 +1099,8 @@ IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user
 
 IF COL_LENGTH(N'dbo.item_activity_logs', N'product_id') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [product_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.item_activity_logs') AND c.name=N'product_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[item_activity_logs] ALTER COLUMN [product_id] uniqueidentifier NULL;
+
 IF COL_LENGTH(N'dbo.item_activity_logs', N'product_name') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [product_name] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.item_activity_logs', N'sku') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [sku] nvarchar(max) NULL;
@@ -1151,6 +1165,8 @@ IF COL_LENGTH(N'dbo.member_verifications', N'id') IS NULL ALTER TABLE dbo.[membe
 IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.member_verifications') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[member_verifications] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 
 IF COL_LENGTH(N'dbo.member_verifications', N'member_id') IS NULL ALTER TABLE dbo.[member_verifications] ADD [member_id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.member_verifications') AND c.name=N'member_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[member_verifications] ALTER COLUMN [member_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.member_verifications', N'phone') IS NULL ALTER TABLE dbo.[member_verifications] ADD [phone] nvarchar(max) NULL;
 
@@ -1223,6 +1239,8 @@ IF COL_LENGTH(N'dbo.members', N'address') IS NULL ALTER TABLE dbo.[members] ADD 
 IF COL_LENGTH(N'dbo.members', N'date_of_birth') IS NULL ALTER TABLE dbo.[members] ADD [date_of_birth] date NULL;
 
 IF COL_LENGTH(N'dbo.members', N'tier_id') IS NULL ALTER TABLE dbo.[members] ADD [tier_id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.members') AND c.name=N'tier_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[members] ALTER COLUMN [tier_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.members', N'loyalty_points') IS NULL ALTER TABLE dbo.[members] ADD [loyalty_points] decimal(38,12) NULL;
 
@@ -1374,9 +1392,15 @@ IF COL_LENGTH(N'dbo.payment_transactions', N'source_type') IS NULL ALTER TABLE d
 
 IF COL_LENGTH(N'dbo.payment_transactions', N'sale_id') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [sale_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.payment_transactions') AND c.name=N'sale_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [sale_id] uniqueidentifier NULL;
+
 IF COL_LENGTH(N'dbo.payment_transactions', N'booking_id') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [booking_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.payment_transactions') AND c.name=N'booking_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [booking_id] uniqueidentifier NULL;
+
 IF COL_LENGTH(N'dbo.payment_transactions', N'member_id') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [member_id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.payment_transactions') AND c.name=N'member_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [member_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.payment_transactions', N'store_id') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [store_id] nvarchar(450) NULL;
 
@@ -1658,6 +1682,8 @@ IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user
 
 IF COL_LENGTH(N'dbo.product_barcodes', N'product_id') IS NULL ALTER TABLE dbo.[product_barcodes] ADD [product_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.product_barcodes') AND c.name=N'product_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[product_barcodes] ALTER COLUMN [product_id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.product_barcodes', N'barcode') IS NULL ALTER TABLE dbo.[product_barcodes] ADD [barcode] nvarchar(450) NULL;
 
 IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.product_barcodes') AND c.name=N'barcode' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[product_barcodes] ALTER COLUMN [barcode] nvarchar(450) NOT NULL;
@@ -1705,6 +1731,8 @@ IF COL_LENGTH(N'dbo.product_categories', N'name') IS NULL ALTER TABLE dbo.[produ
 
 IF COL_LENGTH(N'dbo.product_categories', N'parent_id') IS NULL ALTER TABLE dbo.[product_categories] ADD [parent_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.product_categories') AND c.name=N'parent_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[product_categories] ALTER COLUMN [parent_id] uniqueidentifier NULL;
+
 IF COL_LENGTH(N'dbo.product_categories', N'sort') IS NULL ALTER TABLE dbo.[product_categories] ADD [sort] int NULL;
 
 IF COL_LENGTH(N'dbo.product_categories', N'created_at') IS NULL ALTER TABLE dbo.[product_categories] ADD [created_at] datetimeoffset(7) NULL;
@@ -1751,7 +1779,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NULL BEGIN CREATE TABLE dbo.[products] (
   [product_group] nvarchar(max) NULL,
   [barcode_variants] nvarchar(max) NOT NULL CONSTRAINT [DF_products_barcode_variants] DEFAULT ('[]'),
   [row_version] int NOT NULL CONSTRAINT [DF_products_row_version] DEFAULT (0),
-  [owner_store_id] nvarchar(max) NULL,
+  [owner_store_id] nvarchar(450) NULL,
   CONSTRAINT [PK_products] PRIMARY KEY ([id])
 
 ); END;
@@ -1820,7 +1848,9 @@ IF COL_LENGTH(N'dbo.products', N'barcode_variants') IS NULL ALTER TABLE dbo.[pro
 
 IF COL_LENGTH(N'dbo.products', N'row_version') IS NULL ALTER TABLE dbo.[products] ADD [row_version] int NULL;
 
-IF COL_LENGTH(N'dbo.products', N'owner_store_id') IS NULL ALTER TABLE dbo.[products] ADD [owner_store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.products', N'owner_store_id') IS NULL ALTER TABLE dbo.[products] ADD [owner_store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.products') AND c.name=N'owner_store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[products] ALTER COLUMN [owner_store_id] nvarchar(450) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'UX_products_barcode') CREATE UNIQUE INDEX [UX_products_barcode] ON dbo.[products]([barcode]);
 
@@ -1864,6 +1894,8 @@ IF COL_LENGTH(N'dbo.promotions', N'discount_percent') IS NULL ALTER TABLE dbo.[p
 IF COL_LENGTH(N'dbo.promotions', N'discount_amount') IS NULL ALTER TABLE dbo.[promotions] ADD [discount_amount] decimal(38,12) NULL;
 
 IF COL_LENGTH(N'dbo.promotions', N'foc_product_id') IS NULL ALTER TABLE dbo.[promotions] ADD [foc_product_id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.promotions') AND c.name=N'foc_product_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[promotions] ALTER COLUMN [foc_product_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.promotions', N'points_per_dollar') IS NULL ALTER TABLE dbo.[promotions] ADD [points_per_dollar] decimal(38,12) NULL;
 
@@ -1935,7 +1967,11 @@ IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user
 
 IF COL_LENGTH(N'dbo.purchase_order_items', N'po_id') IS NULL ALTER TABLE dbo.[purchase_order_items] ADD [po_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.purchase_order_items') AND c.name=N'po_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[purchase_order_items] ALTER COLUMN [po_id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.purchase_order_items', N'product_id') IS NULL ALTER TABLE dbo.[purchase_order_items] ADD [product_id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.purchase_order_items') AND c.name=N'product_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[purchase_order_items] ALTER COLUMN [product_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.purchase_order_items', N'barcode') IS NULL ALTER TABLE dbo.[purchase_order_items] ADD [barcode] nvarchar(max) NULL;
 
@@ -2004,6 +2040,8 @@ IF COL_LENGTH(N'dbo.purchase_orders', N'created_at') IS NULL ALTER TABLE dbo.[pu
 
 IF COL_LENGTH(N'dbo.purchase_orders', N'supplier_id') IS NULL ALTER TABLE dbo.[purchase_orders] ADD [supplier_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.purchase_orders') AND c.name=N'supplier_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[purchase_orders] ALTER COLUMN [supplier_id] uniqueidentifier NULL;
+
 IF COL_LENGTH(N'dbo.purchase_orders', N'store_id') IS NULL ALTER TABLE dbo.[purchase_orders] ADD [store_id] nvarchar(450) NULL;
 
 IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.purchase_orders') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[purchase_orders] ALTER COLUMN [store_id] nvarchar(450) NULL;
@@ -2060,7 +2098,11 @@ IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user
 
 IF COL_LENGTH(N'dbo.sale_items', N'sale_id') IS NULL ALTER TABLE dbo.[sale_items] ADD [sale_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sale_items') AND c.name=N'sale_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sale_items] ALTER COLUMN [sale_id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.sale_items', N'product_id') IS NULL ALTER TABLE dbo.[sale_items] ADD [product_id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sale_items') AND c.name=N'product_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sale_items] ALTER COLUMN [product_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.sale_items', N'product_name') IS NULL ALTER TABLE dbo.[sale_items] ADD [product_name] nvarchar(max) NULL;
 
@@ -2144,6 +2186,8 @@ IF COL_LENGTH(N'dbo.sales', N'bill_number') IS NULL ALTER TABLE dbo.[sales] ADD 
 IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sales') AND c.name=N'bill_number' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sales] ALTER COLUMN [bill_number] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.sales', N'member_id') IS NULL ALTER TABLE dbo.[sales] ADD [member_id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sales') AND c.name=N'member_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sales] ALTER COLUMN [member_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.sales', N'store_id') IS NULL ALTER TABLE dbo.[sales] ADD [store_id] nvarchar(450) NULL;
 
@@ -2556,6 +2600,8 @@ IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user
 
 IF COL_LENGTH(N'dbo.stock_adjustments', N'product_id') IS NULL ALTER TABLE dbo.[stock_adjustments] ADD [product_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stock_adjustments') AND c.name=N'product_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stock_adjustments] ALTER COLUMN [product_id] uniqueidentifier NULL;
+
 IF COL_LENGTH(N'dbo.stock_adjustments', N'product_name') IS NULL ALTER TABLE dbo.[stock_adjustments] ADD [product_name] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.stock_adjustments', N'sku') IS NULL ALTER TABLE dbo.[stock_adjustments] ADD [sku] nvarchar(max) NULL;
@@ -2651,7 +2697,11 @@ IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user
 
 IF COL_LENGTH(N'dbo.stock_transfer_items', N'transfer_id') IS NULL ALTER TABLE dbo.[stock_transfer_items] ADD [transfer_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stock_transfer_items') AND c.name=N'transfer_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stock_transfer_items] ALTER COLUMN [transfer_id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.stock_transfer_items', N'product_id') IS NULL ALTER TABLE dbo.[stock_transfer_items] ADD [product_id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stock_transfer_items') AND c.name=N'product_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stock_transfer_items] ALTER COLUMN [product_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.stock_transfer_items', N'barcode') IS NULL ALTER TABLE dbo.[stock_transfer_items] ADD [barcode] nvarchar(max) NULL;
 
@@ -2768,10 +2818,10 @@ IF OBJECT_ID(N'dbo.stores', N'U') IS NULL BEGIN CREATE TABLE dbo.[stores] (
   [phone] nvarchar(max) NULL,
   [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_stores_created_at] DEFAULT (SYSDATETIMEOFFSET()),
   [updated_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_stores_updated_at] DEFAULT (SYSDATETIMEOFFSET()),
-  [group_id] nvarchar(max) NULL,
+  [group_id] nvarchar(450) NULL,
   [row_version] int NOT NULL CONSTRAINT [DF_stores_row_version] DEFAULT (1),
   [location_type] nvarchar(max) NOT NULL CONSTRAINT [DF_stores_location_type] DEFAULT ('store'),
-  [parent_id] nvarchar(max) NULL,
+  [parent_id] nvarchar(450) NULL,
   [is_central] bit NOT NULL CONSTRAINT [DF_stores_is_central] DEFAULT (0),
   [building_name] nvarchar(max) NULL,
   [floor_label] nvarchar(max) NULL,
@@ -2803,13 +2853,17 @@ IF COL_LENGTH(N'dbo.stores', N'updated_at') IS NULL ALTER TABLE dbo.[stores] ADD
 
 IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stores') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stores] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
-IF COL_LENGTH(N'dbo.stores', N'group_id') IS NULL ALTER TABLE dbo.[stores] ADD [group_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.stores', N'group_id') IS NULL ALTER TABLE dbo.[stores] ADD [group_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stores') AND c.name=N'group_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stores] ALTER COLUMN [group_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.stores', N'row_version') IS NULL ALTER TABLE dbo.[stores] ADD [row_version] int NULL;
 
 IF COL_LENGTH(N'dbo.stores', N'location_type') IS NULL ALTER TABLE dbo.[stores] ADD [location_type] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.stores', N'parent_id') IS NULL ALTER TABLE dbo.[stores] ADD [parent_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.stores', N'parent_id') IS NULL ALTER TABLE dbo.[stores] ADD [parent_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stores') AND c.name=N'parent_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stores] ALTER COLUMN [parent_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.stores', N'is_central') IS NULL ALTER TABLE dbo.[stores] ADD [is_central] bit NULL;
 
@@ -3047,7 +3101,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.termina
 IF OBJECT_ID(N'dbo.terminal_tokens', N'U') IS NULL BEGIN CREATE TABLE dbo.[terminal_tokens] (
 
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_terminal_tokens_id] DEFAULT (NEWID()),
-  [location_id] nvarchar(max) NULL,
+  [location_id] nvarchar(450) NULL,
   [location_name] nvarchar(max) NULL,
   [device_name] nvarchar(max) NOT NULL,
   [status] nvarchar(max) NOT NULL CONSTRAINT [DF_terminal_tokens_status] DEFAULT ('active'),
@@ -3071,7 +3125,9 @@ IF COL_LENGTH(N'dbo.terminal_tokens', N'id') IS NULL ALTER TABLE dbo.[terminal_t
 
 IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.terminal_tokens') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[terminal_tokens] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 
-IF COL_LENGTH(N'dbo.terminal_tokens', N'location_id') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [location_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.terminal_tokens', N'location_id') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [location_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.terminal_tokens') AND c.name=N'location_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[terminal_tokens] ALTER COLUMN [location_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.terminal_tokens', N'location_name') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [location_name] nvarchar(max) NULL;
 
@@ -3812,6 +3868,8 @@ IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user
 
 IF COL_LENGTH(N'dbo.shift_cash_counts', N'shift_id') IS NULL ALTER TABLE dbo.[shift_cash_counts] ADD [shift_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_cash_counts') AND c.name=N'shift_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_cash_counts] ALTER COLUMN [shift_id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.shift_cash_counts', N'store_id') IS NULL ALTER TABLE dbo.[shift_cash_counts] ADD [store_id] nvarchar(450) NULL;
 
 IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_cash_counts') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_cash_counts] ALTER COLUMN [store_id] nvarchar(450) NOT NULL;
@@ -3865,6 +3923,8 @@ IF COL_LENGTH(N'dbo.shift_close_events', N'id') IS NULL ALTER TABLE dbo.[shift_c
 IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_close_events') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_close_events] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 
 IF COL_LENGTH(N'dbo.shift_close_events', N'shift_id') IS NULL ALTER TABLE dbo.[shift_close_events] ADD [shift_id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_close_events') AND c.name=N'shift_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_close_events] ALTER COLUMN [shift_id] uniqueidentifier NOT NULL;
 
 IF COL_LENGTH(N'dbo.shift_close_events', N'store_id') IS NULL ALTER TABLE dbo.[shift_close_events] ADD [store_id] nvarchar(450) NULL;
 
@@ -3920,11 +3980,15 @@ IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user
 
 IF COL_LENGTH(N'dbo.shift_reconciliations', N'shift_id') IS NULL ALTER TABLE dbo.[shift_reconciliations] ADD [shift_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_reconciliations') AND c.name=N'shift_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_reconciliations] ALTER COLUMN [shift_id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.shift_reconciliations', N'store_id') IS NULL ALTER TABLE dbo.[shift_reconciliations] ADD [store_id] nvarchar(450) NULL;
 
 IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_reconciliations') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_reconciliations] ALTER COLUMN [store_id] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.shift_reconciliations', N'count_id') IS NULL ALTER TABLE dbo.[shift_reconciliations] ADD [count_id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_reconciliations') AND c.name=N'count_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_reconciliations] ALTER COLUMN [count_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.shift_reconciliations', N'expected_cash') IS NULL ALTER TABLE dbo.[shift_reconciliations] ADD [expected_cash] decimal(38,12) NULL;
 
@@ -3982,11 +4046,15 @@ IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user
 
 IF COL_LENGTH(N'dbo.shift_variance_alerts', N'shift_id') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [shift_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_variance_alerts') AND c.name=N'shift_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_variance_alerts] ALTER COLUMN [shift_id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.shift_variance_alerts', N'store_id') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [store_id] nvarchar(450) NULL;
 
 IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_variance_alerts') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_variance_alerts] ALTER COLUMN [store_id] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.shift_variance_alerts', N'reconciliation_id') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [reconciliation_id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_variance_alerts') AND c.name=N'reconciliation_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_variance_alerts] ALTER COLUMN [reconciliation_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.shift_variance_alerts', N'variance_total') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [variance_total] decimal(38,12) NULL;
 

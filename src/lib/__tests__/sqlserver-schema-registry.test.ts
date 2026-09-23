@@ -68,6 +68,9 @@ describe("SQL Server schema registry", () => {
     expect(completeSql).toContain("@Required AS required_tables");
     expect(completeSql).toContain("@RequiredColumnCount AS required_columns");
     expect(completeSql).toContain("@MissingColumnCount AS missing_columns");
+    expect(completeSql).toContain(
+      "Retail POS local database migration history table is missing.",
+    );
     expect(completeSql).toContain("WHERE version = 2");
     const columnInserts = [
       ...completeSql.matchAll(
@@ -117,6 +120,16 @@ describe("SQL Server schema registry", () => {
       for (const column of table.columns.filter((item: { foreignKeyTarget?: { table: string } | null }) => item.foreignKeyTarget?.table && item.foreignKeyTarget.table !== table.cloudTable)) {
         const parent = byName.get(column.foreignKeyTarget.table) as { dependencyOrder: number } | undefined;
         expect(parent?.dependencyOrder).toBeLessThan(table.dependencyOrder);
+        const targetTable = byName.get(column.foreignKeyTarget.table) as
+          | { columns: Array<{ sqlServerColumn: string; sqlServerType: string }> }
+          | undefined;
+        const targetColumn = targetTable?.columns.find(
+          (candidate) => candidate.sqlServerColumn === column.foreignKeyTarget.column,
+        );
+        expect(
+          column.sqlServerType,
+          `${table.sqlServerTable}.${column.sqlServerColumn} -> ${column.foreignKeyTarget.table}.${column.foreignKeyTarget.column}`,
+        ).toBe(targetColumn?.sqlServerType);
       }
     }
   });
