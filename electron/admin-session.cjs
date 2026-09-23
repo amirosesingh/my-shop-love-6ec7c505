@@ -1,5 +1,4 @@
 const MAX_IDLE_MS = 10 * 60 * 1000;
-const MAX_VERIFIED_AGE_MS = 60 * 1000;
 
 let session = null;
 
@@ -10,7 +9,7 @@ function grant(level, subject, permissions = {}) {
   return status();
 }
 function active() {
-  if (session && (session.expiresAt <= Date.now() || session.verifiedAt + MAX_VERIFIED_AGE_MS <= Date.now())) clear();
+  if (session && session.expiresAt <= Date.now()) clear();
   return session;
 }
 function hasLevel(required) {

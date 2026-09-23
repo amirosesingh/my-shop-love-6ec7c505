@@ -2,8 +2,8 @@ const { safeError } = require("./errors.cjs");
 const { loadRegistry } = require("./schema-registry.cjs");
 
 async function validateDatabase(manager, profile) {
-  const registry = loadRegistry();
   try {
+    const registry = loadRegistry();
     return await manager.temporary(profile, profile.database, async (pool) => {
       const catalog = await pool.request().query(`SELECT t.name AS table_name, c.name AS column_name,
         ty.name AS data_type, c.max_length, c.precision, c.scale, c.is_nullable,

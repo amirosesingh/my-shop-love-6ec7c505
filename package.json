@@ -146,6 +146,7 @@
     "npmRebuild": false,
     "files": [
       "electron/**",
+      "database/sqlserver/**",
       "dist-desktop/**",
       "package.json",
       "node_modules/**"

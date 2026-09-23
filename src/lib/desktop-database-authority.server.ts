@@ -41,10 +41,10 @@ export async function databaseAuthority(identity: {
   for (const [key, value] of Object.entries(account.permissions ?? {})) {
     if (typeof value === "boolean") permissions[key] = value;
   }
-  // Admin is the full-access preset, even for manually provisioned rows with
-  // an empty matrix. An explicit false still revokes this one permission.
-  if (admin && permissions.can_manage_sync_backup === undefined)
-    permissions.can_manage_sync_backup = true;
+  // The application-wide permission resolver always grants the complete
+  // preset to an administrator. Keep the desktop gate on that same source of
+  // truth instead of allowing a stale per-user false to create a second role.
+  if (admin) permissions.can_manage_sync_backup = true;
   return {
     subject: account.user_id,
     level: admin ? "admin" : supervisor ? "supervisor" : "staff",

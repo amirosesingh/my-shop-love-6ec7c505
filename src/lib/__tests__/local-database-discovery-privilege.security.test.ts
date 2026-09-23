@@ -85,9 +85,9 @@ describe("local SQL Server discovery privilege", () => {
     expect(privilege.allowed("terminal:write")).toBe(false);
 
     adminSession.grant("admin", "signed-in-admin", { can_manage_sync_backup: false });
-    expect(privilege.allowed("database:save-connect")).toBe(false);
-    expect(privilege.allowed("sqladmin:repair")).toBe(false);
-    expect(privilege.allowed("config:set", ["sync_enabled"])).toBe(false);
+    expect(privilege.allowed("database:save-connect")).toBe(true);
+    expect(privilege.allowed("sqladmin:repair")).toBe(true);
+    expect(privilege.allowed("config:set", ["sync_enabled"])).toBe(true);
 
     adminSession.clear();
     expect(privilege.allowed("database:save-connect")).toBe(false);

@@ -366,7 +366,9 @@ function allowed(channel, args = []) {
     return true;
   }
   if (databaseSyncAction(channel, args)) {
-    if (adminSession.hasPermission("can_manage_sync_backup")) {
+    // Admin is the application's full-access preset. Custom staff can receive
+    // the same capability through the one central permission matrix.
+    if (adminSession.hasLevel(ADMIN) || adminSession.hasPermission("can_manage_sync_backup")) {
       adminSession.touch();
       return true;
     }

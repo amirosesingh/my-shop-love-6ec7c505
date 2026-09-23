@@ -12,6 +12,7 @@ check(manifest.dependencies?.mssql === "12.7.2", "mssql must remain pinned to 12
 check(manifest.optionalDependencies?.msnodesqlv8 === "5.5.0", "msnodesqlv8 must remain an optional Windows-only dependency pinned to 5.5.0");
 check(manifest.devDependencies?.["@electron/rebuild"] === "4.2.0", "@electron/rebuild must remain pinned to 4.2.0");
 check((manifest.build?.asarUnpack ?? []).some((entry) => String(entry).includes("msnodesqlv8")), "msnodesqlv8 must be unpacked from the Electron ASAR");
+check((manifest.build?.files ?? []).some((entry) => String(entry).replaceAll("\\", "/").startsWith("database/sqlserver/")), "the SQL Server schema registry and migrations must be included in the Windows package");
 check(manifest.build?.npmRebuild === false, "Electron packaging must use the vendor's N-API prebuild instead of rebuilding in the space-containing workspace path");
 
 const sourceBinding = path.join(root, "node_modules", "msnodesqlv8", "prebuilds", "win32-x64", "msnodesqlv8.node");
