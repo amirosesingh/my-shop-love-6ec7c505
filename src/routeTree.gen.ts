@@ -110,8 +110,10 @@ import { Route as TransfersNewRouteImport } from './routes/transfers.new'
 import { Route as ApiPublicCashierLoginRouteImport } from './routes/api/public/cashier-login'
 import { Route as ApiPublicDesktopSessionRouteImport } from './routes/api/public/desktop-session'
 import { Route as ApiPublicHealthMetadataRouteImport } from './routes/api/public/health-metadata'
+import { Route as ApiPublicIdleTimeoutRouteImport } from './routes/api/public/idle-timeout'
 import { Route as ApiPublicPosRulesRouteImport } from './routes/api/public/pos-rules'
 import { Route as ApiPublicSecurityAlertsRouteImport } from './routes/api/public/security-alerts'
+import { Route as ApiPublicStaffIdleTimeoutRouteImport } from './routes/api/public/staff-idle-timeout'
 import { Route as ApiPublicSyncRouteImport } from './routes/api/public/sync'
 import { Route as ApiPublicSyncHealthRouteImport } from './routes/api/public/sync-health'
 import { Route as ApiPublicTerminalStaffRouteImport } from './routes/api/public/terminal-staff'
@@ -629,6 +631,11 @@ const ApiPublicHealthMetadataRoute = ApiPublicHealthMetadataRouteImport.update({
   path: '/api/public/health-metadata',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicIdleTimeoutRoute = ApiPublicIdleTimeoutRouteImport.update({
+  id: '/api/public/idle-timeout',
+  path: '/api/public/idle-timeout',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ApiPublicPosRulesRoute = ApiPublicPosRulesRouteImport.update({
   id: '/api/public/pos-rules',
   path: '/api/public/pos-rules',
@@ -639,6 +646,12 @@ const ApiPublicSecurityAlertsRoute = ApiPublicSecurityAlertsRouteImport.update({
   path: '/api/public/security-alerts',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiPublicStaffIdleTimeoutRoute =
+  ApiPublicStaffIdleTimeoutRouteImport.update({
+    id: '/api/public/staff-idle-timeout',
+    path: '/api/public/staff-idle-timeout',
+    getParentRoute: () => rootRouteImport,
+  } as any)
 const ApiPublicSyncRoute = ApiPublicSyncRouteImport.update({
   id: '/api/public/sync',
   path: '/api/public/sync',
@@ -793,8 +806,10 @@ export interface FileRoutesByFullPath {
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/desktop-session': typeof ApiPublicDesktopSessionRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
+  '/api/public/idle-timeout': typeof ApiPublicIdleTimeoutRoute
   '/api/public/pos-rules': typeof ApiPublicPosRulesRouteWithChildren
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
+  '/api/public/staff-idle-timeout': typeof ApiPublicStaffIdleTimeoutRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
   '/api/public/terminal-staff': typeof ApiPublicTerminalStaffRoute
@@ -908,8 +923,10 @@ export interface FileRoutesByTo {
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/desktop-session': typeof ApiPublicDesktopSessionRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
+  '/api/public/idle-timeout': typeof ApiPublicIdleTimeoutRoute
   '/api/public/pos-rules': typeof ApiPublicPosRulesRouteWithChildren
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
+  '/api/public/staff-idle-timeout': typeof ApiPublicStaffIdleTimeoutRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
   '/api/public/terminal-staff': typeof ApiPublicTerminalStaffRoute
@@ -1024,8 +1041,10 @@ export interface FileRoutesById {
   '/api/public/cashier-login': typeof ApiPublicCashierLoginRoute
   '/api/public/desktop-session': typeof ApiPublicDesktopSessionRoute
   '/api/public/health-metadata': typeof ApiPublicHealthMetadataRoute
+  '/api/public/idle-timeout': typeof ApiPublicIdleTimeoutRoute
   '/api/public/pos-rules': typeof ApiPublicPosRulesRouteWithChildren
   '/api/public/security-alerts': typeof ApiPublicSecurityAlertsRoute
+  '/api/public/staff-idle-timeout': typeof ApiPublicStaffIdleTimeoutRoute
   '/api/public/sync': typeof ApiPublicSyncRoute
   '/api/public/sync-health': typeof ApiPublicSyncHealthRoute
   '/api/public/terminal-staff': typeof ApiPublicTerminalStaffRoute
@@ -1141,8 +1160,10 @@ export interface FileRouteTypes {
     | '/api/public/cashier-login'
     | '/api/public/desktop-session'
     | '/api/public/health-metadata'
+    | '/api/public/idle-timeout'
     | '/api/public/pos-rules'
     | '/api/public/security-alerts'
+    | '/api/public/staff-idle-timeout'
     | '/api/public/sync'
     | '/api/public/sync-health'
     | '/api/public/terminal-staff'
@@ -1256,8 +1277,10 @@ export interface FileRouteTypes {
     | '/api/public/cashier-login'
     | '/api/public/desktop-session'
     | '/api/public/health-metadata'
+    | '/api/public/idle-timeout'
     | '/api/public/pos-rules'
     | '/api/public/security-alerts'
+    | '/api/public/staff-idle-timeout'
     | '/api/public/sync'
     | '/api/public/sync-health'
     | '/api/public/terminal-staff'
@@ -1371,8 +1394,10 @@ export interface FileRouteTypes {
     | '/api/public/cashier-login'
     | '/api/public/desktop-session'
     | '/api/public/health-metadata'
+    | '/api/public/idle-timeout'
     | '/api/public/pos-rules'
     | '/api/public/security-alerts'
+    | '/api/public/staff-idle-timeout'
     | '/api/public/sync'
     | '/api/public/sync-health'
     | '/api/public/terminal-staff'
@@ -1487,8 +1512,10 @@ export interface RootRouteChildren {
   ApiPublicCashierLoginRoute: typeof ApiPublicCashierLoginRoute
   ApiPublicDesktopSessionRoute: typeof ApiPublicDesktopSessionRoute
   ApiPublicHealthMetadataRoute: typeof ApiPublicHealthMetadataRoute
+  ApiPublicIdleTimeoutRoute: typeof ApiPublicIdleTimeoutRoute
   ApiPublicPosRulesRoute: typeof ApiPublicPosRulesRouteWithChildren
   ApiPublicSecurityAlertsRoute: typeof ApiPublicSecurityAlertsRoute
+  ApiPublicStaffIdleTimeoutRoute: typeof ApiPublicStaffIdleTimeoutRoute
   ApiPublicSyncRoute: typeof ApiPublicSyncRoute
   ApiPublicSyncHealthRoute: typeof ApiPublicSyncHealthRoute
   ApiPublicTerminalStaffRoute: typeof ApiPublicTerminalStaffRoute
@@ -2207,6 +2234,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ApiPublicHealthMetadataRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/public/idle-timeout': {
+      id: '/api/public/idle-timeout'
+      path: '/api/public/idle-timeout'
+      fullPath: '/api/public/idle-timeout'
+      preLoaderRoute: typeof ApiPublicIdleTimeoutRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/api/public/pos-rules': {
       id: '/api/public/pos-rules'
       path: '/api/public/pos-rules'
@@ -2219,6 +2253,13 @@ declare module '@tanstack/react-router' {
       path: '/api/public/security-alerts'
       fullPath: '/api/public/security-alerts'
       preLoaderRoute: typeof ApiPublicSecurityAlertsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/api/public/staff-idle-timeout': {
+      id: '/api/public/staff-idle-timeout'
+      path: '/api/public/staff-idle-timeout'
+      fullPath: '/api/public/staff-idle-timeout'
+      preLoaderRoute: typeof ApiPublicStaffIdleTimeoutRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/api/public/sync': {
@@ -2421,8 +2462,10 @@ const rootRouteChildren: RootRouteChildren = {
   ApiPublicCashierLoginRoute: ApiPublicCashierLoginRoute,
   ApiPublicDesktopSessionRoute: ApiPublicDesktopSessionRoute,
   ApiPublicHealthMetadataRoute: ApiPublicHealthMetadataRoute,
+  ApiPublicIdleTimeoutRoute: ApiPublicIdleTimeoutRoute,
   ApiPublicPosRulesRoute: ApiPublicPosRulesRouteWithChildren,
   ApiPublicSecurityAlertsRoute: ApiPublicSecurityAlertsRoute,
+  ApiPublicStaffIdleTimeoutRoute: ApiPublicStaffIdleTimeoutRoute,
   ApiPublicSyncRoute: ApiPublicSyncRoute,
   ApiPublicSyncHealthRoute: ApiPublicSyncHealthRoute,
   ApiPublicTerminalStaffRoute: ApiPublicTerminalStaffRoute,

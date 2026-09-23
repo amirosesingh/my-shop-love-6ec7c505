@@ -159,11 +159,11 @@ function SeriesCard({
 
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Running number length</Label>
-          <Input
-            inputMode="numeric"
-            pattern="[0-9]*"
+          <ThemedSelect
+            ariaLabel="Running number length"
             value={String(pad)}
-            onChange={(e) => onPatch({ padding: Number(e.target.value.replace(/\D+/g, "")) || 4 })}
+            onChange={(value) => onPatch({ padding: Number(value) })}
+            options={[3, 4, 5, 6].map((value) => ({ value: String(value), label: `${value} digits` }))}
           />
           <p className="text-[11px] text-muted-foreground">Between 3 and 6 digits.</p>
         </div>

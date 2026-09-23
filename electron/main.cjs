@@ -507,6 +507,7 @@ const fail = (err) => ({ ok: false, error: err instanceof Error ? err.message : 
  * When no printer name is configured the system default is used.
  */
 const PAGE_SIZES = {
+  "30mm": { width: 30000, height: 297000 },
   "58mm": { width: 58000, height: 297000 },
   "80mm": { width: 80000, height: 297000 },
 };

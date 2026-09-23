@@ -90,3 +90,12 @@ describe("resolveScopedSettings", () => {
     expect(out.settings.receiptFooter).toBe("Thanks");
   });
 });
+
+it("resolves terminal profiles above branch profiles without changing sibling terminals", () => {
+  const base = { printer: "global" };
+  const shared = scope({ overrides: { ...emptyBranchSettings.overrides, BRANCH: { printer: { printer: "branch" } } } });
+  const terminal = scope({ overrides: { ...shared.overrides, TERMINAL: { printer: { printer: "terminal" } } } });
+  expect(resolveScopedSettings(base, terminal, merge).settings.printer).toBe("terminal");
+  expect(resolveScopedSettings(base, shared, merge).settings.printer).toBe("branch");
+  expect(base.printer).toBe("global");
+});

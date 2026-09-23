@@ -53,7 +53,7 @@ export type PrinterPrefs = {
    * 58mm rolls only print about 48mm; 80mm rolls about 72mm. A printer that
    * starts a few millimetres further right can be nudged with `printOffset`.
    */
-  printWidth?: { "58mm": number; "80mm": number };
+  printWidth?: { "30mm"?: number; "58mm": number; "80mm": number };
   /** Left nudge in millimetres applied to slip printing. */
   printOffset?: number;
 };
@@ -66,7 +66,7 @@ const EMPTY: PrinterPrefs = {
   encoding: "cp437",
   lineEnding: "lf",
   margins: { top: 4, right: 4, bottom: 4, left: 4 },
-  printWidth: { "58mm": 48, "80mm": 72 },
+  printWidth: { "30mm": 24, "58mm": 48, "80mm": 72 },
   printOffset: 0,
 };
 
@@ -96,6 +96,7 @@ function normalizeWidths(v: unknown): NonNullable<PrinterPrefs["printWidth"]> {
     return Math.min(max, Math.max(min, Math.round(x * 10) / 10));
   };
   return {
+    "30mm": clamp(w["30mm"], 24, 20, 30),
     "58mm": clamp(w["58mm"], 48, 30, 58),
     "80mm": clamp(w["80mm"], 72, 50, 80),
   };
@@ -122,12 +123,15 @@ export function printBridge(): PrintBridge | null {
   return bridge && typeof bridge.print === "function" ? bridge : null;
 }
 
+let sharedPrefs: PrinterPrefs | undefined;
+export function setSharedPrinterPrefs(prefs: PrinterPrefs | undefined) { sharedPrefs = prefs; }
+
 export function getPrinterPrefs(): PrinterPrefs {
   if (typeof window === "undefined") return EMPTY;
   try {
-    const raw = window.localStorage.getItem(PRINTER_KEY);
-    if (!raw) return EMPTY;
-    const parsed = JSON.parse(raw) as Partial<PrinterPrefs>;
+    const raw = sharedPrefs ? null : window.localStorage.getItem(PRINTER_KEY);
+    if (!sharedPrefs && !raw) return EMPTY;
+    const parsed = sharedPrefs ?? JSON.parse(raw!) as Partial<PrinterPrefs>;
     return {
       deviceName: parsed.deviceName ?? "",
       share: parsed.share ?? "",

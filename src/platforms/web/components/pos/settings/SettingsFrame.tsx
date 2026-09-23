@@ -32,7 +32,6 @@ import { Switch } from "@/components/ui/switch";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
-import { db } from "@/core/api/pos-db";
 import { defaultPaymentDetails, defaultWhatsApp } from "@/lib/pos-seed";
 import {
   PAPER_LABELS,
@@ -103,7 +102,7 @@ export function SettingsFrame({
   wide = false,
   terminalManagement = false,
 }: Props) {
-  const { state, stores, currentStore, updateSettings, upsertStore } = usePos();
+  const { state, stores, currentStore, updateSettings, saveConfiguredSettings, settingsScopeLoading, upsertStore } = usePos();
   const { isAdmin, isSupervisor, can } = useAuth();
   const canSettings = isAdmin || can("can_access_pos_settings") || (terminalManagement && isSupervisor);
   // Rendered inside the settings workspace sheet: no app shell, no back link.
@@ -135,7 +134,7 @@ export function SettingsFrame({
     setSaving(true);
     setSaveError("");
     try {
-      await db.saveSettingsNow(state.settings);
+      await saveConfiguredSettings();
       setSnapshot(JSON.stringify(state.settings));
       setSavedAt(new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" }));
       toast.success("Settings saved");
@@ -373,9 +372,10 @@ export function SettingsFrame({
 
         {scopeSections?.length ? <ScopePanel sections={scopeSections} /> : null}
 
-        <section className="w-full min-w-0 max-w-full space-y-4 rounded-lg border border-border bg-card p-5">
+        <fieldset disabled={settingsScopeLoading} className="w-full min-w-0 max-w-full space-y-4 rounded-lg border border-border bg-card p-5 disabled:opacity-60">
+          {settingsScopeLoading && <p role="status" className="text-sm text-muted-foreground">Loading settings for this scope. Editing becomes available when loading succeeds.</p>}
           {children}
-        </section>
+        </fieldset>
 
         {/* Nothing is considered stored until this bar confirms it. */}
         <div

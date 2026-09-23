@@ -1,3 +1,4 @@
+import { PresetNumber } from "@/components/ui/preset-number";
 import { createFileRoute } from "@tanstack/react-router";
 import { SettingsTabs } from "@/platforms/web/components/pos/settings/SettingsTabs";
 import { SettingsFrame, useSettingsCtx } from "@/platforms/web/components/pos/settings/SettingsFrame";
@@ -55,14 +56,9 @@ function QrForm() {
       <div className="grid gap-3 sm:grid-cols-2">
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Size (px)</Label>
-          <Input
-            type="number"
-            min={48}
-            max={220}
-            className="numeric"
-            value={effective.qr.size}
-            onChange={(e) => setField("qr", { ...effective.qr, size: Number(e.target.value) || 96 })}
-          />
+          <PresetNumber label="QR size" value={effective.qr.size} min={48} max={220}
+            onChange={(size) => setField("qr", { ...effective.qr, size })}
+            options={[48, 64, 80, 96, 128, 160, 192, 220].map((value) => ({ value, label: `${value} px` }))} />
         </div>
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Placement</Label>

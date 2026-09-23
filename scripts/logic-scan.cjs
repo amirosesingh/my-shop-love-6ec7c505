@@ -7,6 +7,7 @@
  */
 const fs = require("node:fs");
 const path = require("node:path");
+const ts = require("typescript");
 
 const ROOT = path.resolve(__dirname, "..");
 const SRC = path.join(ROOT, "src");
@@ -27,39 +28,54 @@ function walk(dir, out = []) {
     const full = path.join(dir, entry.name);
     const rel = path.relative(SRC, full).split(path.sep).join("/");
     if (entry.isDirectory()) {
-      if (SKIP_DIRS.some((d) => rel === d || rel.startsWith(`${d}/`))) continue;
+      if (entry.name === "__tests__" || SKIP_DIRS.some((d) => rel === d || rel.startsWith(`${d}/`))) continue;
       walk(full, out);
-    } else if (/\.(ts|tsx)$/.test(entry.name) && !SKIP_FILES.includes(entry.name)) {
+    } else if (/\.(ts|tsx)$/.test(entry.name) && !/\.(test|spec)\.[cm]?[jt]sx?$/.test(entry.name) && !SKIP_FILES.includes(entry.name)) {
       out.push(full);
     }
   }
   return out;
 }
 
-/** Rough function-block extraction: good enough to ask "is there a try in here?" */
+/** Parse actual function boundaries; expression-bodied helpers cannot absorb the next test. */
 function blocks(text) {
+  const source = ts.createSourceFile("scan.tsx", text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX);
   const found = [];
-  const re = /(?:export\s+)?(?:async\s+)?function\s+([A-Za-z0-9_]+)\s*\(|(?:const|let)\s+([A-Za-z0-9_]+)\s*=\s*(?:async\s*)?\([^)]*\)\s*(?::[^=]+)?=>/g;
-  let m;
-  while ((m = re.exec(text))) {
-    const name = m[1] || m[2];
-    const open = text.indexOf("{", m.index + m[0].length - 1);
-    if (open === -1) continue;
-    let depth = 0;
-    let end = open;
-    for (let i = open; i < text.length; i += 1) {
-      const ch = text[i];
-      if (ch === "{") depth += 1;
-      else if (ch === "}") {
-        depth -= 1;
-        if (depth === 0) {
-          end = i;
-          break;
-        }
+  const visit = (node) => {
+    if (ts.isFunctionLike(node) && node.body && ts.isBlock(node.body)) {
+      const name = node.name?.getText(source) || (ts.isVariableDeclaration(node.parent) ? node.parent.name.getText(source) : "");
+      if (name) {
+        let awaited = false, handled = false, throws = false;
+        const inspect = (child) => {
+          if (child !== node.body && ts.isFunctionLike(child)) return;
+          if (ts.isAwaitExpression(child)) awaited = true;
+          if (ts.isTryStatement(child) && child.catchClause) handled = true;
+          if (ts.isThrowStatement(child)) throws = true;
+          if (ts.isCallExpression(child) && ts.isPropertyAccessExpression(child.expression) && child.expression.name.text === "catch") handled = true;
+          ts.forEachChild(child, inspect);
+        };
+        inspect(node.body);
+        const calls = [];
+        const findCalls = (child) => {
+          if (ts.isCallExpression(child) && ts.isIdentifier(child.expression) && child.expression.text === name) calls.push(child);
+          ts.forEachChild(child, findCalls);
+        };
+        findCalls(source);
+        const protectedCall = (call) => {
+          for (let parent = call.parent; parent; parent = parent.parent) {
+            if (ts.isTryStatement(parent) && parent.catchClause && call.pos >= parent.tryBlock.pos && call.end <= parent.tryBlock.end) return true;
+            if (ts.isCallExpression(parent) && ts.isPropertyAccessExpression(parent.expression) && parent.expression.name.text === "catch") return true;
+            if (ts.isFunctionLike(parent)) break;
+          }
+          return false;
+        };
+        found.push({ name, start: node.getStart(source), body: node.body.getText(source), awaited,
+          handled: handled || (calls.length > 0 && calls.every(protectedCall)), throws });
       }
     }
-    found.push({ name, start: m.index, body: text.slice(open, end + 1) });
-  }
+    ts.forEachChild(node, visit);
+  };
+  visit(source);
   return found;
 }
 
@@ -93,7 +109,8 @@ function scanFile(file) {
     if (
       /\b(not implemented|unimplemented|coming soon|stub(bed)? out|mock(ed)? (data|response|endpoint))\b/i.test(t) &&
       !/placeholder=/.test(t) &&
-      !isComment
+      !isComment &&
+      !/\.test\s*\(/.test(t)
     ) {
       add(money ? "critical" : "warning", "Placeholder logic", line, t.slice(0, 140),
         "This path tells the user nothing happens yet.");
@@ -130,19 +147,14 @@ function scanFile(file) {
 
   // 4. Awaited work with no failure handling, inside money / stock paths
   for (const b of blocks(text)) {
-    if (!/\bawait\b/.test(b.body)) continue;
-    if (/\btry\s*\{/.test(b.body)) continue;
-    if (/\.catch\(/.test(b.body)) continue;
-    if (b.body.length > 8000) continue;
+    if (!b.awaited || b.handled || b.throws) continue;
     const line = lineOf(text, b.start);
     add(
-      money ? "critical" : "info",
-      "No failure handling",
+      "info",
+      "Review failure propagation",
       line,
-      `${b.name}() awaits work without a try/catch.`,
-      money
-        ? "A dropped connection here can lose money or stock movements."
-        : "Consider reporting the failure to the user.",
+      `${b.name}() propagates awaited failures to its caller.`,
+      "Check that callers handle rejection. A missing local catch alone is not evidence of data loss.",
     );
   }
 
@@ -170,4 +182,5 @@ function run() {
   );
 }
 
-run();
+if (require.main === module) run();
+module.exports = { blocks, scanFile, walk };

@@ -842,6 +842,27 @@ const receivingActivityRows = (inv: ReceivingInvoice, storeId: string | null) =>
       created_at: inv.entryDate || inv.createdAt,
     }));
 
+/** Pricing never writes absolute stock: movement commits own quantities. */
+export const receivingPriceOps = (inv: ReceivingInvoice): SyncOp[] => inv.status !== "posted" ? [] :
+  inv.lines.filter((line) => line.productId).map((line) => ({
+    kind: "update", table: "products", match: { id: line.productId },
+    values: { cost_price: safeNum(line.cost), selling_price: safeNum(line.price) },
+  }));
+
+/** Corrections get new movement IDs; retries of the same edit reuse them. */
+export function receivingCorrectionOps(inv: ReceivingInvoice, previous: ReceivingInvoice, attemptId: string): SyncOp[] {
+  const delta = new Map<string, number>();
+  for (const line of previous.lines) if (line.productId) delta.set(line.productId, (delta.get(line.productId) ?? 0) - line.qty);
+  for (const line of inv.lines) if (line.productId) delta.set(line.productId, (delta.get(line.productId) ?? 0) + line.qty);
+  const rows = [...delta].filter(([, qty]) => qty !== 0).sort(([a], [b]) => a.localeCompare(b)).map(([productId, qty], index) => ({
+    id: stableChildId(attemptId, "5", index), product_id: productId,
+    product_name: inv.lines.find((line) => line.productId === productId)?.name ?? previous.lines.find((line) => line.productId === productId)?.name ?? "",
+    store_id: inv.storeId, activity_type: "receive", reference: inv.reference || inv.invoiceNo,
+    quantity_delta: Math.round(qty), staff_name: inv.operator, note: "Receiving correction", created_at: new Date().toISOString(),
+  }));
+  return rows.length ? [{ kind: "upsert", table: "item_activity_logs", rows, onConflict: "id" }] : [];
+}
+
 /** The movement rows for a receiving commit, or nothing for an unposted one. */
 const receivingActivityOps = (inv: ReceivingInvoice, storeId?: string | null) => {
   if (inv.status !== "posted") return [];
@@ -1830,6 +1851,7 @@ export const db = {
           ]
         : []),
       ...receivingActivityOps(inv, movementStoreId),
+      ...receivingPriceOps(inv),
     ]),
 
   /**
@@ -1841,6 +1863,7 @@ export const db = {
     inv: ReceivingInvoice,
     removedLineIds: string[],
     movementStoreId?: string | null,
+    correction?: { previous: ReceivingInvoice; attemptId: string },
   ) =>
     commitOps("Updating receiving invoice", [
       { kind: "upsert", table: "purchase_orders", rows: [invoiceRow(inv)] },
@@ -1858,7 +1881,8 @@ export const db = {
         table: "purchase_order_items",
         match: { id },
       })),
-      ...receivingActivityOps(inv, movementStoreId),
+      ...(correction ? receivingCorrectionOps(inv, correction.previous, correction.attemptId) : receivingActivityOps(inv, movementStoreId)),
+      ...receivingPriceOps(inv),
     ]),
 
   /**

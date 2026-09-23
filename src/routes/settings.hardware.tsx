@@ -27,7 +27,8 @@ function HardwareSettings() {
   return (
     <SettingsFrame
       title="Terminal hardware"
-      description="Everything on this page is stored on this machine only. It is never sent to the central database, never copied to another till, and an administrator cannot change it remotely."
+      scopeSections={["printer"]}
+      description="Choose Global, Cluster, Branch or Terminal to manage the shared printer and drawer profile."
     >
       <HardwarePanel />
     </SettingsFrame>

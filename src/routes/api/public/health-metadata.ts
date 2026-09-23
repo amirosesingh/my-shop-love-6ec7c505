@@ -101,7 +101,7 @@ async function handle({ request }: { request: Request }) {
         { status: 502 },
       );
     }
-    const spec = (await res.json()) as {
+    const spec = (await res.json()) as import("@/lib/health-function-metadata").OpenApiFunctions & {
       definitions?: Record<
         string,
         { properties?: Record<string, unknown>; required?: string[] }
@@ -115,7 +115,8 @@ async function handle({ request }: { request: Request }) {
         required: trulyRequired(def.required, def.properties),
       };
     }
-    return Response.json({ ok: true, tables });
+    const { functionShapes } = await import("@/lib/health-function-metadata");
+    return Response.json({ ok: true, tables, functions: functionShapes(spec) });
   } catch (e) {
     return Response.json({ ok: false, error: (e as Error).message }, { status: 500 });
   }

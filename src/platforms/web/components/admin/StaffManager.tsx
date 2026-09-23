@@ -1,3 +1,4 @@
+import { StaffIdleTimeout } from "./StaffIdleTimeout";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { KeyRound, Loader2, Pencil, Plus, RefreshCw, Search, ShieldCheck, Trash2, UserX } from "lucide-react";
 import { toast } from "sonner";
@@ -115,6 +116,7 @@ export function StaffManager() {
   // gated action, so administrators and supervisors need one too.
   const [pinFor, setPinFor] = useState<Row | null>(null);
   const [pinValue, setPinValue] = useState("");
+  const [idleFor, setIdleFor] = useState<Row | null>(null);
 
   async function saveAuthPin() {
     if (!pinFor || !/^\d{4,6}$/.test(pinValue)) return;
@@ -367,6 +369,7 @@ export function StaffManager() {
                 <td className="pr-3 text-xs text-muted-foreground">{row.last_login_at ? new Date(row.last_login_at).toLocaleString() : "Never"}</td>
                 <td className="pr-3"><Switch checked={row.is_active} disabled={busy === row.user_id || row.auth_user_id === authUserId} onCheckedChange={(active) => void setActive(row, active)} aria-label={`${row.full_name} active`} /></td>
                 <td><div className="flex justify-end gap-1">
+                  <Button size="sm" variant="ghost" disabled={offline} onClick={() => setIdleFor(row)}>Idle limit</Button>
                   <Button size="icon" variant="ghost" title="Edit account" disabled={offline} onClick={() => openEdit(row)}><Pencil className="size-4" /></Button>
                   <Button size="icon" variant="ghost" title="Set authorisation PIN" disabled={offline} onClick={() => { setPinFor(row); setPinValue(""); }}><ShieldCheck className="size-4" /></Button>
                   <Button size="icon" variant="ghost" title="Edit permissions" disabled={offline} onClick={() => setPermissionsFor({ ...row, permissions: { ...row.permissions } })}><KeyRound className="size-4" /></Button>
@@ -379,6 +382,7 @@ export function StaffManager() {
         </table>
       </div>
 
+      {idleFor && <StaffIdleTimeout person={{ key: idleFor.user_id, name: idleFor.full_name, kind: "account" }} onClose={() => setIdleFor(null)} />}
       <Dialog open={!!pinFor} onOpenChange={(open) => { if (!open) { setPinFor(null); setPinValue(""); } }}>
         <DialogContent className="sm:max-w-sm">
           <DialogHeader>

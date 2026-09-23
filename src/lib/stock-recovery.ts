@@ -30,9 +30,13 @@ type Rpc = {
 export async function applyStockDeltaBatch(movements: StockMovement[]): Promise<DeltaOutcome[]> {
   const unique = new Map<string, StockMovement>();
   for (const movement of movements) {
-    if (movement.movementId && movement.productId && movement.delta !== 0) {
-      unique.set(movement.movementId, movement);
-    }
+    if (!movement.movementId || !movement.productId || !Number.isSafeInteger(movement.delta))
+      throw new Error("Stock movements require an identity, product and whole-unit quantity");
+    if (movement.delta === 0) continue;
+    const previous = unique.get(movement.movementId);
+    if (previous && (previous.productId !== movement.productId || previous.storeId !== movement.storeId || previous.delta !== movement.delta))
+      throw new Error("Conflicting stock movements share the same identity");
+    unique.set(movement.movementId, movement);
   }
   const batch = [...unique.values()];
   if (!batch.length) return [];
@@ -47,7 +51,8 @@ export async function applyStockDeltaBatch(movements: StockMovement[]): Promise<
   });
   if (error) throw new Error(error.message);
 
-  const rows = (data ?? []) as Array<{
+  if (!Array.isArray(data)) throw new Error("The database returned an invalid stock confirmation");
+  const rows = data as Array<{
     movement_id: string;
     status: DeltaStatus;
     reason: string | null;
@@ -60,7 +65,8 @@ export async function applyStockDeltaBatch(movements: StockMovement[]): Promise<
   const refused = outcomes.find((outcome) => outcome.status === "refused");
   if (refused)
     throw new Error(refused.reason || `Stock movement ${refused.movementId} was refused`);
-  if (outcomes.length !== batch.length)
+  const confirmed = new Set(outcomes.map((outcome) => outcome.movementId));
+  if (outcomes.some((outcome) => !unique.has(outcome.movementId) || !["applied", "duplicate"].includes(outcome.status)) || confirmed.size !== batch.length || outcomes.length !== batch.length)
     throw new Error("The database did not confirm every stock movement");
   return outcomes;
 }

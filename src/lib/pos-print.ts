@@ -142,6 +142,7 @@ export function setPreviewReceiptCfg(receipt: ReceiptSettings, tax: TaxSettings)
 }
 
 export const PAPER_LABELS: Record<PaperSize, string> = {
+  "30mm": "30mm Thermal (Narrow)",
   "80mm": "80mm Thermal (Standard)",
   "58mm": "58mm Thermal (Mini)",
   a4: "A4 Sheet",
@@ -151,6 +152,8 @@ export const PAPER_LABELS: Record<PaperSize, string> = {
 /** @page + body geometry for each supported slip size. */
 export function paperCss(paper: PaperSize) {
   switch (paper) {
+    case "30mm":
+      return { page: "30mm auto", width: "24mm", font: "8px", h1: "10px" };
     case "58mm":
       return { page: "58mm auto", width: "48mm", font: "10px", h1: "13px" };
     case "a4":
@@ -277,6 +280,7 @@ export function code39Text(value: string) {
 }
 
 const PAPER_MM: Record<PaperSize, number> = {
+  "30mm": 30,
   "58mm": 58,
   "80mm": 80,
   a4: 210,
@@ -299,13 +303,13 @@ function printMargins() {
 export function printableWidthMm(paper: PaperSize) {
   const prefs = getPrinterPrefs();
   const band =
-    paper === "58mm"
+    paper === "30mm" ? (prefs.printWidth?.["30mm"] ?? 24) : paper === "58mm"
       ? (prefs.printWidth?.["58mm"] ?? 48)
       : paper === "80mm"
         ? (prefs.printWidth?.["80mm"] ?? 72)
         : (PAPER_MM[paper] ?? 80);
   const m = printMargins();
-  return Math.max(20, band - m.left - m.right);
+  return Math.max(paper === "30mm" ? 8 : 20, band - m.left - m.right);
 }
 
 /** Left nudge for printers whose print head starts a few millimetres in. */
@@ -316,7 +320,7 @@ const shell = (title: string, body: string, autoPrint = true) => {
   const f = receiptCfg.fonts ?? defaultReceiptSettings.fonts;
   const m = printMargins();
   const paper = receiptCfg.paper;
-  const slip = paper === "58mm" || paper === "80mm";
+  const slip = paper === "30mm" || paper === "58mm" || paper === "80mm";
   const width = printableWidthMm(paper);
   const bodyWidth = `${width}mm`;
   // Slips are pinned to the left of the printable band (plus any nudge) so
@@ -340,6 +344,7 @@ const shell = (title: string, body: string, autoPrint = true) => {
   hr { border: none; border-top: 1px dashed #000; margin: 6px 0; }
   table { width: 100%; border-collapse: collapse; }
   td { vertical-align: top; padding: 1px 0; }
+  ${paper === "30mm" ? "td { display: block; width: 100%; overflow-wrap: anywhere; }" : ""}
   .r { text-align: right; }
   .b { font-weight: 700; }
   .big { font-size: 1.2em; }
@@ -611,17 +616,17 @@ function printHtml(title: string, body: string, slip = true, barcode?: string) {
   const paper = receiptCfg.paper;
   const mode = getPrinterPrefs().printMode ?? "dialog";
   const thermal =
-    slip && (paper === "80mm" || paper === "58mm") && mode === "thermal";
+    slip && (paper === "30mm" || paper === "80mm" || paper === "58mm") && mode === "thermal";
 
   const fallbackToBrowser = () => browserPrint(shell(title, body));
 
   void (async () => {
     if (thermal) {
       const prefs = getPrinterPrefs();
-      const ref = paper === "58mm" ? 50 : 72;
+      const ref = paper === "30mm" ? 24 : paper === "58mm" ? 50 : 72;
       const printable = printableWidthMm(paper);
       const cols = Math.max(
-        16,
+        paper === "30mm" ? 8 : 16,
         Math.floor(columnsForPaper(paper) * Math.min(1, printable / ref)),
       );
       const bytes = htmlToEscPos(desktopHtml, paper, {

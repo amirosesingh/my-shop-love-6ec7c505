@@ -74,6 +74,13 @@ export function InheritedField({
             checked={Boolean(shown)}
             onCheckedChange={(v) => onValue(v)}
           />
+        ) : def.options ? (
+          <select aria-label={def.label} disabled={disabled || locked} value={String(shown)}
+            className="h-9 w-52 rounded-md border border-input bg-background px-2 text-sm"
+            onChange={(event) => onValue(event.target.value)}>
+            {!def.options.some((option) => option.value === String(shown)) && <option value={String(shown)}>{String(shown)} (existing)</option>}
+            {def.options.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
+          </select>
         ) : (
           <Input
             aria-label={def.label}

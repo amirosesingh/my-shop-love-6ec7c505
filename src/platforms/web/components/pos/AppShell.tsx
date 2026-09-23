@@ -1,3 +1,5 @@
+import { useDisplayProfile } from "@/lib/display-profile";
+import { setSharedPrinterPrefs } from "@/lib/receipt-printer";
 import {
   Loader2,
   Lock,
@@ -101,6 +103,10 @@ function requiredPermission(pathname: string): PermissionFlag | null | "unknown"
 
 export function AppShell({ children }: { children: ReactNode }) {
   const { activeShift, stores, currentStore, setCurrentStore, state, ready: dataReady } = usePos();
+  useEffect(() => {
+    setSharedPrinterPrefs(state.settings.integrations.receiptPrinter);
+    return () => setSharedPrinterPrefs(undefined);
+  }, [state.settings.integrations.receiptPrinter]);
   const { ready, user, isAdmin, isSupervisor, canSwitchStores, terminalStoreId, logout, lock, can } = useAuth();
   const [collapsed, setCollapsed] = useSidebarCollapsed();
   const [drawerOpen, setDrawerOpen] = useState(false);
@@ -121,6 +127,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   const location = useLocation();
   const { visibleRoute } = useVisibility();
 
+  useDisplayProfile(state.settings.integrations.displayProfile);
   // Terminal-wide font / control scaling preference.
   useUiScale();
 

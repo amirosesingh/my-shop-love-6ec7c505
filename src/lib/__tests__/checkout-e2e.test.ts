@@ -28,7 +28,7 @@ vi.mock("@/integrations/supabase/external-client", () => ({
   },
 }));
 
-import { db } from "@/core/api/pos-db";
+import { db, receivingPriceOps, receivingCorrectionOps, type ReceivingInvoice } from "@/core/api/pos-db";
 import { setPreferredDatabaseMode } from "@/core/local-db/db-mode";
 import type { Sale } from "@/core/types/pos-types";
 
@@ -142,5 +142,31 @@ describe("checkout commit", () => {
     const moves = saleArgs()?.["_movements"] as { activity_type: string; quantity_delta: number }[];
     expect(moves.map((m) => m.activity_type)).toEqual(["sale", "return"]);
     expect(moves[1].quantity_delta).toBe(1);
+  });
+});
+
+describe("receiving stock ownership", () => {
+  const previous = { id: "aaaaaaaa-bbbb-4ccc-addd-eeeeeeeeeeee", status: "posted", storeId: "branch-1", invoiceNo: "PO-1", operator: "Manager",
+    lines: [{ productId: "product-1", name: "Item", qty: 4, cost: 2, price: 3 }] } as ReceivingInvoice;
+  it("changes pricing without writing absolute quantities", () => {
+    const ops = receivingPriceOps(previous);
+    expect(ops).toEqual([{ kind: "update", table: "products", match: { id: "product-1" }, values: { cost_price: 2, selling_price: 3 } }]);
+  });
+  it("posts only the correction delta and reuses IDs on retry", () => {
+    const next = { ...previous, lines: [{ ...previous.lines[0], qty: 7 }] };
+    const attempt = "bbbbbbbb-cccc-4ddd-aeee-ffffffffffff";
+    const first = receivingCorrectionOps(next, previous, attempt)[0];
+    const retry = receivingCorrectionOps(next, previous, attempt)[0];
+    if (first.kind !== "upsert" || retry.kind !== "upsert") throw new Error("Expected movement upsert");
+    expect(first.rows[0].quantity_delta).toBe(3);
+    expect(first.rows[0].id).toBe(retry.rows[0].id);
+    expect(first.rows[0].store_id).toBe("branch-1");
+  });
+  it("reverses a removed product and leaves drafts without price writes", () => {
+    const next = { ...previous, lines: [] };
+    const op = receivingCorrectionOps(next, previous, "bbbbbbbb-cccc-4ddd-aeee-ffffffffffff")[0];
+    if (op.kind !== "upsert") throw new Error("Expected movement upsert");
+    expect(op.rows[0].quantity_delta).toBe(-4);
+    expect(receivingPriceOps({ ...previous, status: "draft" })).toEqual([]);
   });
 });

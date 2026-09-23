@@ -140,7 +140,7 @@ function Purchasing() {
   useEffect(() => {
     void myServerId().then(setMeId);
   }, []);
-  const { state, currentStore, allStores, upsertProduct, adjustStock, moveStock, syncProducts } =
+  const { state, currentStore, allStores, upsertProduct, moveStock, syncProducts } =
     usePos();
   const { can, user, isAdmin, isSupervisor } = useAuth();
   const [invoiceNo, setInvoiceNo] = useState("");
@@ -156,6 +156,8 @@ function Purchasing() {
   const [editing, setEditing] = useState<ReceivingInvoice | null>(null);
   const [removedLineIds, setRemovedLineIds] = useState<string[]>([]);
   const [savingEdit, setSavingEdit] = useState(false);
+  const editAttempt = useRef(crypto.randomUUID());
+  const finalizeAttempt = useRef<string | null>(null);
   const [draft, setDraft] = useState<Product | null>(null);
   const [draftQty, setDraftQty] = useState("1");
   /*
@@ -215,6 +217,7 @@ function Purchasing() {
   /** Invoice history is a database read, so it survives reloads and restarts. */
   /** Reopening a received entry always goes through the configured authorisation. */
   const openForEdit = (h: ReceivingInvoice, grant: EditGrant | null) => {
+    editAttempt.current = crypto.randomUUID();
     setEditGrant(grant);
     setRemovedLineIds([]);
     setEditing(structuredClone(h));
@@ -442,6 +445,7 @@ function Purchasing() {
 
   /** Clear the form back to a fresh entry without touching what is stored. */
   function clearForm() {
+    finalizeAttempt.current = null;
     setOpenDraftId(null);
     setReference(null);
     setDraftLineRemovals([]);
@@ -680,7 +684,9 @@ function Purchasing() {
 
     setSaving(true);
     try {
-      if (await invoiceNumberTaken(ref)) {
+      const attemptId = openDraftId ?? finalizeAttempt.current ?? crypto.randomUUID();
+      finalizeAttempt.current = attemptId;
+      if (await invoiceNumberTaken(ref, attemptId)) {
         toast.error(`Invoice ${ref} already exists`, {
           description: "Open it in the history below to correct it, or use a different number.",
         });
@@ -710,7 +716,7 @@ function Purchasing() {
           "receiving",
         );
       const invoice: ReceivingInvoice = {
-        ...buildInvoice("posted", wasDraft ?? crypto.randomUUID(), grn),
+        ...buildInvoice("posted", attemptId, grn),
         invoiceNo: ref,
         storeId,
       };
@@ -726,7 +732,7 @@ function Purchasing() {
           state.products.find((p) => p.id === l.productId) ?? ({ stockByStore: {} } as Product),
           hubId,
         );
-        await applyLineToStock(l.productId, l.qty, l.cost, l.price, hubId);
+        // The receiving commit has already applied this movement exactly once.
         movements.push({
           productId: l.productId,
           barcode: l.barcode,
@@ -783,35 +789,6 @@ function Purchasing() {
     }
   }
 
-  /**
-   * Post a stock delta for one line and merge cost/price into the product as
-   * it is *after* the movement, never a stale copy.
-   */
-  async function applyLineToStock(
-    productId: string,
-    delta: number,
-    cost: number,
-    price?: number,
-    locationId: string = currentStore.id,
-  ) {
-    if (delta) await adjustStock(productId, delta, locationId);
-    const current = state.products.find((p) => p.id === productId);
-    if (!current) return;
-    const nextCost = cost;
-    const nextPrice = price ?? current.price;
-    if (current.cost === nextCost && current.price === nextPrice) return;
-    await upsertProduct({
-      ...current,
-      cost: nextCost,
-      price: nextPrice,
-      // Take the quantity we just posted with us — never the pre-adjust map.
-      stockByStore: {
-        ...current.stockByStore,
-        [locationId]: stockAt(current, locationId) + delta,
-      },
-    });
-  }
-
   /** Save corrections to an already-received invoice, applying stock deltas. */
   // Line-level corrections are a supervisor action; anyone may fix the header.
   const mayEditLines = isAdmin || isSupervisor;
@@ -845,9 +822,9 @@ function Purchasing() {
         totalCost: cost,
         itemCount: editing.lines.length,
       };
-      // Corrections rewrite the same movement rows, so the item history shows
-      // the corrected quantity rather than the original plus a duplicate.
-      await db.updateReceivingInvoice(next, removedLineIds, next.storeId);
+      // Corrections append only the quantity difference under stable retry IDs.
+      if (!original) throw new Error("Reload the invoice before editing it");
+      await db.updateReceivingInvoice(next, removedLineIds, next.storeId, { previous: original, attemptId: editAttempt.current });
 
       // Deltas only: nothing is removed and re-added, so history stays intact.
       const deltas: Record<string, number> = {};
@@ -857,16 +834,10 @@ function Purchasing() {
       for (const l of next.lines) {
         if (l.productId) deltas[l.productId] = (deltas[l.productId] ?? 0) + l.qty;
       }
-      // Keep an untouched copy: the loop below zeroes each delta as it goes.
+      // Retain the movement difference for the audit record.
       const auditDeltas: Record<string, number> = { ...deltas };
-      for (const l of next.lines) {
-        if (!l.productId) continue;
-        await applyLineToStock(l.productId, deltas[l.productId] ?? 0, l.cost, l.price);
-        deltas[l.productId] = 0;
-      }
-      for (const [productId, delta] of Object.entries(deltas)) {
-        if (delta) await adjustStock(productId, delta, currentStore.id);
-      }
+      // Stock and pricing were committed above; do not apply a second adjustment.
+      await syncProducts([...new Set([...next.lines, ...original.lines].map((line) => line.productId ?? "").filter(Boolean))]);
 
       logger.log("inventory_edit", "Receiving invoice corrected", "purchasing", {
         invoiceId: next.id,

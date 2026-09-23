@@ -827,7 +827,7 @@ export type TaxSettings = {
   mode: TaxMode;
 };
 
-export type PaperSize = "80mm" | "58mm" | "a4" | "letter";
+export type PaperSize = "30mm" | "80mm" | "58mm" | "a4" | "letter";
 
 export type FontFamilyKey = "mono" | "sans" | "serif";
 
@@ -937,6 +937,9 @@ export type DateFormat = "dmy" | "mdy" | "ymd";
 export type TimeFormat = "12h" | "24h";
 
 export type IntegrationSettings = {
+  displayProfile?: import("@/lib/display-profile").DisplayProfile;
+  /** Printer profile resolved using the selected settings scope. */
+  receiptPrinter?: import("@/lib/receipt-printer").PrinterPrefs;
   /** public member signup domain */
   memberDomain: string;
   /** public voucher redemption domain */

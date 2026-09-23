@@ -9,6 +9,8 @@
 import type { AppSettings } from "@/core/types/pos-types";
 
 export type SettingsSectionId =
+  | "display"
+  | "printer"
   | "tax"
   | "review"
   | "hours"
@@ -32,6 +34,8 @@ export type SettingsSectionDef = {
 };
 
 export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
+  { id: "display", label: "Display & appearance", blurb: "Theme, accent, text size, density and register zoom.", paths: ["integrations.displayProfile"], lockedByDefault: false },
+  { id: "printer", label: "Printer profile", blurb: "Printer, encoding, drawer and paper calibration.", paths: ["integrations.receiptPrinter"], lockedByDefault: false },
   {
     id: "tax",
     label: "Tax policy",

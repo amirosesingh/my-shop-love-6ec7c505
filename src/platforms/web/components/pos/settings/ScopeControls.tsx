@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import { listTerminalTokens, type TerminalToken } from "@/core/activation/terminal-tokens";
 /**
  * Scope controls for the settings pages.
  *
@@ -24,6 +26,7 @@ const TONE: Record<SettingSource, string> = {
   GLOBAL: "bg-muted text-muted-foreground",
   CLUSTER: "bg-sky-500/15 text-sky-600 dark:text-sky-300",
   BRANCH: "bg-amber-500/15 text-amber-600 dark:text-amber-300",
+  TERMINAL: "bg-violet-500/15 text-violet-600 dark:text-violet-300",
   PRIVATE: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-300",
 };
 
@@ -36,6 +39,7 @@ export function ScopeBadge({ path, className = "" }: { path: string; className?:
       ? `Branch: ${currentStore.name}`
       : source === "CLUSTER"
         ? `Cluster: ${scopeIds.CLUSTER || "—"}`
+        : source === "TERMINAL" ? `Terminal: ${scopeIds.TERMINAL || "—"}`
         : source === "PRIVATE"
           ? "Private override"
           : "Global";
@@ -48,7 +52,7 @@ export function ScopeBadge({ path, className = "" }: { path: string; className?:
 
 /** Scope selector for one block: pick which tier owns it, or lock it globally. */
 export function SectionScope({ section }: { section: SettingsSectionId }) {
-  const { settingsScope, setSectionScope, setSectionLocked, scopeIds, currentStore } = usePos();
+  const { settingsScope, setSectionScope, setSectionLocked, scopeIds, currentStore, saveConfiguredSettings, settingsScopeLoading } = usePos();
   const { isAdmin } = useAuth();
   const def = SECTION_BY_ID[section];
   if (!def) return null;
@@ -59,8 +63,13 @@ export function SectionScope({ section }: { section: SettingsSectionId }) {
   const choose = async (tier: SettingSource) => {
     if (tier === active) return;
     try {
-      // Only one tier owns a block at a time — clear the old one first.
-      if (active !== "GLOBAL") await setSectionScope(section, false, active as SettingTier);
+      await saveConfiguredSettings();
+      const order: SettingSource[] = ["GLOBAL", ...SETTING_TIERS];
+      // Keep inherited lower scopes; remove only overrides above the chosen tier.
+      for (const existing of [...SETTING_TIERS].reverse()) {
+        if (order.indexOf(existing) > order.indexOf(tier) && settingsScope.overrides[existing]?.[section])
+          await setSectionScope(section, false, existing);
+      }
       if (tier !== "GLOBAL") await setSectionScope(section, true, tier as SettingTier);
       toast.success(
         tier === "GLOBAL" ? `${def.label} follows the global rule` : `${def.label} → ${TIER_LABELS[tier]}`,
@@ -86,7 +95,7 @@ export function SectionScope({ section }: { section: SettingsSectionId }) {
             size="sm"
             variant={active === tier ? "default" : "outline"}
             className="h-7 text-[11px]"
-            disabled={locked && tier !== "GLOBAL"}
+            disabled={settingsScopeLoading || (locked && tier !== "GLOBAL") || (tier !== "GLOBAL" && !scopeIds[tier])}
             title={scopeName(tier)}
             onClick={() => void choose(tier)}
           >
@@ -98,6 +107,7 @@ export function SectionScope({ section }: { section: SettingsSectionId }) {
             <Lock className="size-3" />
             <Switch
               aria-label={`Lock ${def.label} globally`}
+              disabled={settingsScopeLoading}
               checked={locked}
               onCheckedChange={(on) => void setSectionLocked(section, on)}
             />
@@ -110,13 +120,31 @@ export function SectionScope({ section }: { section: SettingsSectionId }) {
 
 /** Scope selectors for a whole settings page. */
 export function ScopePanel({ sections }: { sections: SettingsSectionId[] }) {
+  const { currentStore, settingsTerminalId, setSettingsTerminalId, saveConfiguredSettings } = usePos();
+  const [terminals, setTerminals] = useState<TerminalToken[]>([]);
+  const [terminalError, setTerminalError] = useState("");
+  useEffect(() => {
+    let cancelled = false;
+    void listTerminalTokens().then((rows) => { if (!cancelled) setTerminals(rows); })
+      .catch((error) => { if (!cancelled) setTerminalError((error as Error).message); });
+    return () => { cancelled = true; setSettingsTerminalId(""); };
+  }, [setSettingsTerminalId]);
   if (!sections.length) return null;
   return (
     <div className="space-y-2 rounded-lg border border-border bg-card p-3">
       <p className="text-xs font-medium">Applies to</p>
       <p className="text-[11px] text-muted-foreground">
-        Private beats Branch, Branch beats Cluster, Cluster beats Global.
+        Private beats Terminal, Terminal beats Branch, Branch beats Cluster, Cluster beats Global.
       </p>
+      <label className="grid gap-1 text-xs">Terminal to configure
+        <select aria-label="Terminal to configure" className="h-9 rounded border border-input bg-background px-2" value={settingsTerminalId}
+          onChange={(event) => { const id = event.target.value; void saveConfiguredSettings().then(() => setSettingsTerminalId(id)).catch((error) => toast.error((error as Error).message)); }}>
+          <option value="">This device / branch defaults</option>
+          {terminals.filter((terminal) => terminal.locationId === currentStore.id && terminal.status !== "revoked").map((terminal) =>
+            <option key={terminal.id} value={terminal.id}>{terminal.deviceName || terminal.id} ({terminal.platform})</option>)}
+        </select>
+        {terminalError && <span className="text-destructive">Terminal list unavailable: {terminalError}</span>}
+      </label>
       {sections.map((id) => (
         <SectionScope key={id} section={id} />
       ))}

@@ -21,7 +21,8 @@ export const Route = createFileRoute("/settings/printer")({
   component: () => (
     <SettingsFrame
       title="Receipt printer"
-      description="Printer hardware for this terminal: device, encoding, margins and the cash drawer pulse."
+      scopeSections={["printer"]}
+      description="Printer profile shared with the selected scope: device, encoding, margins and cash drawer."
     >
       <SettingsTabs current="/settings/printer" />
 
