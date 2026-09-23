@@ -22,7 +22,7 @@ function sqlType(declaration) {
   if (/^(?:numeric|decimal)\b/.test(d)) return `decimal(${sized("(?:numeric|decimal)", "38,12")})`;
   if (/^(?:double precision|real)\b/.test(d)) return "float";
   if (/^boolean\b/.test(d)) return "bit";
-  if (/^timestamp with time zone\b/.test(d)) return "datetimeoffset(7)";
+  if (/^(?:timestamp with time zone|timestamptz)\b/.test(d)) return "datetimeoffset(7)";
   if (/^timestamp without time zone\b|^timestamp\b/.test(d)) return "datetime2(7)";
   if (/^date\b/.test(d)) return "date";
   if (/^time\b/.test(d)) return "time(7)";
@@ -68,7 +68,10 @@ const tables = report.tables.map((table, tableIndex) => ({
     const primary = primaryNames.includes(column.name);
     const uniqueGroup=(table.uniqueKeys??[]).findIndex(key=>key.includes(column.name));
     const unique = /\bUNIQUE\b/i.test(column.declaration) || (uniqueGroup>=0&&(table.uniqueKeys[uniqueGroup]?.length===1));
-    if ((primary || unique) && type === "nvarchar(max)") type = "nvarchar(450)";
+    const keyGroups = [primaryNames, ...(table.uniqueKeys ?? [])];
+    const compositeKey = keyGroups.some((key) => key.length > 1 && key.includes(column.name));
+    const indexed = primary || uniqueGroup >= 0 || ["store_id","branch_id","organization_id","updated_at"].includes(column.name);
+    if (indexed && type === "nvarchar(max)") type = compositeKey ? "nvarchar(128)" : "nvarchar(450)";
     const reference = /\bREFERENCES\s+(?:public\.)?([a-z_][a-z0-9_]*)\s*\(([^)]+)\)/i.exec(column.declaration);
     const tableReference=table.foreignKeys?.find(item=>item.column===column.name);
     return {
@@ -117,6 +120,11 @@ for (const table of tables) {
   lines.push(columns.join(",\n"), "); END;", `IF OBJECT_ID(N'dbo.${table.sqlServerTable}', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}')) ALTER TABLE dbo.[${table.sqlServerTable}] ENABLE CHANGE_TRACKING;`);
   for (const column of table.columns) {
     lines.push(`IF COL_LENGTH(N'dbo.${table.sqlServerTable}', N'${column.sqlServerColumn}') IS NULL ALTER TABLE dbo.[${table.sqlServerTable}] ADD [${column.sqlServerColumn}] ${column.sqlServerType} NULL;`);
+    if (column.sqlServerType !== "nvarchar(max)" &&
+        (["store_id","branch_id","organization_id","updated_at"].includes(column.sqlServerColumn) ||
+         column.primaryKey || column.unique || column.uniqueGroup)) {
+      lines.push(`IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND c.name=N'${column.sqlServerColumn}' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[${table.sqlServerTable}] ALTER COLUMN [${column.sqlServerColumn}] ${column.sqlServerType}${column.nullable ? " NULL" : " NOT NULL"};`);
+    }
   }
   for (const column of table.columns.filter((item)=>item.unique)) {
     lines.push(`IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'UX_${table.sqlServerTable}_${column.sqlServerColumn}') CREATE UNIQUE INDEX [UX_${table.sqlServerTable}_${column.sqlServerColumn}] ON dbo.[${table.sqlServerTable}]([${column.sqlServerColumn}]);`);
@@ -163,7 +171,7 @@ lines.push(`IF COL_LENGTH(N'dbo.sync_change_journal',N'aggregate_id') IS NULL AL
 IF COL_LENGTH(N'dbo.sync_change_journal',N'acknowledged_at') IS NULL ALTER TABLE dbo.sync_change_journal ADD acknowledged_at datetimeoffset(7) NULL;
 IF COL_LENGTH(N'dbo.sync_change_journal',N'retry_count') IS NULL ALTER TABLE dbo.sync_change_journal ADD retry_count int NOT NULL CONSTRAINT DF_sync_change_journal_retry_count DEFAULT 0;
 IF COL_LENGTH(N'dbo.sync_change_journal',N'last_error') IS NULL ALTER TABLE dbo.sync_change_journal ADD last_error nvarchar(1000) NULL;
-IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.sync_change_journal') AND name=N'IX_sync_change_journal_pending') CREATE INDEX IX_sync_change_journal_pending ON dbo.sync_change_journal(branch_id,acknowledged_at,aggregate_id,change_id);`);
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.sync_change_journal') AND name=N'IX_sync_change_journal_pending') EXEC(N'CREATE INDEX IX_sync_change_journal_pending ON dbo.sync_change_journal(branch_id,acknowledged_at,aggregate_id,change_id)');`);
 lines.push(`IF OBJECT_ID(N'dbo.sync_conflicts', N'U') IS NULL CREATE TABLE dbo.sync_conflicts (
  conflict_id uniqueidentifier NOT NULL PRIMARY KEY, entity_type nvarchar(128) NOT NULL, entity_id nvarchar(128) NOT NULL,
  branch_id nvarchar(128) NOT NULL, local_version bigint NULL, remote_version bigint NULL, reason nvarchar(1000) NOT NULL,

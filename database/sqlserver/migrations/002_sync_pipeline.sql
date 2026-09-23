@@ -16,8 +16,8 @@ IF NOT EXISTS(
   WHERE object_id=OBJECT_ID(N'dbo.sync_change_journal')
     AND name=N'IX_sync_change_journal_pending'
 )
-  CREATE INDEX IX_sync_change_journal_pending
-    ON dbo.sync_change_journal(branch_id,acknowledged_at,aggregate_id,change_id);
+  EXEC(N'CREATE INDEX IX_sync_change_journal_pending
+    ON dbo.sync_change_journal(branch_id,acknowledged_at,aggregate_id,change_id)');
 
 IF NOT EXISTS(SELECT 1 FROM dbo.pos_schema_migrations WHERE version=2)
   INSERT dbo.pos_schema_migrations(version,name)

@@ -54,9 +54,13 @@ IF OBJECT_ID(N'dbo.coupon_campaigns', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1
 
 IF COL_LENGTH(N'dbo.coupon_campaigns', N'id') IS NULL ALTER TABLE dbo.[coupon_campaigns] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.coupon_campaigns') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[coupon_campaigns] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.coupon_campaigns', N'name') IS NULL ALTER TABLE dbo.[coupon_campaigns] ADD [name] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.coupon_campaigns', N'slug') IS NULL ALTER TABLE dbo.[coupon_campaigns] ADD [slug] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.coupon_campaigns') AND c.name=N'slug' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[coupon_campaigns] ALTER COLUMN [slug] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.coupon_campaigns', N'discount_type') IS NULL ALTER TABLE dbo.[coupon_campaigns] ADD [discount_type] nvarchar(max) NULL;
 
@@ -84,6 +88,8 @@ IF COL_LENGTH(N'dbo.coupon_campaigns', N'created_at') IS NULL ALTER TABLE dbo.[c
 
 IF COL_LENGTH(N'dbo.coupon_campaigns', N'updated_at') IS NULL ALTER TABLE dbo.[coupon_campaigns] ADD [updated_at] datetimeoffset(7) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.coupon_campaigns') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[coupon_campaigns] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
 IF COL_LENGTH(N'dbo.coupon_campaigns', N'row_version') IS NULL ALTER TABLE dbo.[coupon_campaigns] ADD [row_version] int NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.coupon_campaigns') AND name=N'UX_coupon_campaigns_slug') CREATE UNIQUE INDEX [UX_coupon_campaigns_slug] ON dbo.[coupon_campaigns]([slug]);
@@ -93,7 +99,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.coupon_
 IF OBJECT_ID(N'dbo.shifts', N'U') IS NULL BEGIN CREATE TABLE dbo.[shifts] (
 
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_shifts_id] DEFAULT (NEWID()),
-  [store_id] nvarchar(max) NOT NULL,
+  [store_id] nvarchar(450) NOT NULL,
   [terminal_id] nvarchar(max) NULL,
   [terminal_name] nvarchar(max) NULL,
   [opened_by_name] nvarchar(max) NOT NULL CONSTRAINT [DF_shifts_opened_by_name] DEFAULT ('Cashier'),
@@ -132,7 +138,11 @@ IF OBJECT_ID(N'dbo.shifts', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.
 
 IF COL_LENGTH(N'dbo.shifts', N'id') IS NULL ALTER TABLE dbo.[shifts] ADD [id] uniqueidentifier NULL;
 
-IF COL_LENGTH(N'dbo.shifts', N'store_id') IS NULL ALTER TABLE dbo.[shifts] ADD [store_id] nvarchar(max) NULL;
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shifts') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shifts] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
+IF COL_LENGTH(N'dbo.shifts', N'store_id') IS NULL ALTER TABLE dbo.[shifts] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shifts') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shifts] ALTER COLUMN [store_id] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.shifts', N'terminal_id') IS NULL ALTER TABLE dbo.[shifts] ADD [terminal_id] nvarchar(max) NULL;
 
@@ -167,6 +177,8 @@ IF COL_LENGTH(N'dbo.shifts', N'overdue') IS NULL ALTER TABLE dbo.[shifts] ADD [o
 IF COL_LENGTH(N'dbo.shifts', N'created_at') IS NULL ALTER TABLE dbo.[shifts] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.shifts', N'updated_at') IS NULL ALTER TABLE dbo.[shifts] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shifts') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shifts] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.shifts', N'status') IS NULL ALTER TABLE dbo.[shifts] ADD [status] nvarchar(max) NULL;
 
@@ -215,7 +227,7 @@ IF OBJECT_ID(N'dbo.issued_vouchers', N'U') IS NULL BEGIN CREATE TABLE dbo.[issue
   [disabled_at] datetimeoffset(7) NULL,
   [disabled_by] nvarchar(max) NULL,
   [disable_reason] nvarchar(max) NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [row_version] int NOT NULL CONSTRAINT [DF_issued_vouchers_row_version] DEFAULT (1),
   CONSTRAINT [PK_issued_vouchers] PRIMARY KEY ([id])
 
@@ -225,7 +237,11 @@ IF OBJECT_ID(N'dbo.issued_vouchers', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 
 
 IF COL_LENGTH(N'dbo.issued_vouchers', N'id') IS NULL ALTER TABLE dbo.[issued_vouchers] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.issued_vouchers') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[issued_vouchers] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.issued_vouchers', N'token_slug') IS NULL ALTER TABLE dbo.[issued_vouchers] ADD [token_slug] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.issued_vouchers') AND c.name=N'token_slug' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[issued_vouchers] ALTER COLUMN [token_slug] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.issued_vouchers', N'campaign_id') IS NULL ALTER TABLE dbo.[issued_vouchers] ADD [campaign_id] uniqueidentifier NULL;
 
@@ -253,7 +269,9 @@ IF COL_LENGTH(N'dbo.issued_vouchers', N'disabled_by') IS NULL ALTER TABLE dbo.[i
 
 IF COL_LENGTH(N'dbo.issued_vouchers', N'disable_reason') IS NULL ALTER TABLE dbo.[issued_vouchers] ADD [disable_reason] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.issued_vouchers', N'store_id') IS NULL ALTER TABLE dbo.[issued_vouchers] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.issued_vouchers', N'store_id') IS NULL ALTER TABLE dbo.[issued_vouchers] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.issued_vouchers') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[issued_vouchers] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.issued_vouchers', N'row_version') IS NULL ALTER TABLE dbo.[issued_vouchers] ADD [row_version] int NULL;
 
@@ -273,7 +291,7 @@ IF OBJECT_ID(N'dbo.activity_events', N'U') IS NULL BEGIN CREATE TABLE dbo.[activ
   [actor_role] nvarchar(max) NULL,
   [terminal_id] nvarchar(max) NULL,
   [terminal_name] nvarchar(max) NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [entity_type] nvarchar(max) NULL,
   [entity_id] nvarchar(max) NULL,
   [amount] decimal(38,12) NULL,
@@ -290,6 +308,8 @@ IF OBJECT_ID(N'dbo.activity_events', N'U') IS NULL BEGIN CREATE TABLE dbo.[activ
 IF OBJECT_ID(N'dbo.activity_events', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.activity_events')) ALTER TABLE dbo.[activity_events] ENABLE CHANGE_TRACKING;
 
 IF COL_LENGTH(N'dbo.activity_events', N'id') IS NULL ALTER TABLE dbo.[activity_events] ADD [id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.activity_events') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[activity_events] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 
 IF COL_LENGTH(N'dbo.activity_events', N'event_type') IS NULL ALTER TABLE dbo.[activity_events] ADD [event_type] nvarchar(max) NULL;
 
@@ -309,7 +329,9 @@ IF COL_LENGTH(N'dbo.activity_events', N'terminal_id') IS NULL ALTER TABLE dbo.[a
 
 IF COL_LENGTH(N'dbo.activity_events', N'terminal_name') IS NULL ALTER TABLE dbo.[activity_events] ADD [terminal_name] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.activity_events', N'store_id') IS NULL ALTER TABLE dbo.[activity_events] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.activity_events', N'store_id') IS NULL ALTER TABLE dbo.[activity_events] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.activity_events') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[activity_events] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.activity_events', N'entity_type') IS NULL ALTER TABLE dbo.[activity_events] ADD [entity_type] nvarchar(max) NULL;
 
@@ -349,7 +371,7 @@ IF OBJECT_ID(N'dbo.app_users', N'U') IS NULL BEGIN CREATE TABLE dbo.[app_users] 
   [role_slug] nvarchar(max) NULL,
   [pin_length] smallint NOT NULL CONSTRAINT [DF_app_users_pin_length] DEFAULT (6),
   [row_version] int NOT NULL CONSTRAINT [DF_app_users_row_version] DEFAULT (1),
-  [pin_set_at] nvarchar(max) NULL,
+  [pin_set_at] datetimeoffset(7) NULL,
   [pin_updated_by] nvarchar(max) NULL,
   CONSTRAINT [PK_app_users] PRIMARY KEY ([id])
 
@@ -359,7 +381,11 @@ IF OBJECT_ID(N'dbo.app_users', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM s
 
 IF COL_LENGTH(N'dbo.app_users', N'id') IS NULL ALTER TABLE dbo.[app_users] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.app_users') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[app_users] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.app_users', N'user_id') IS NULL ALTER TABLE dbo.[app_users] ADD [user_id] nvarchar(64) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.app_users') AND c.name=N'user_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[app_users] ALTER COLUMN [user_id] nvarchar(64) NOT NULL;
 
 IF COL_LENGTH(N'dbo.app_users', N'full_name') IS NULL ALTER TABLE dbo.[app_users] ADD [full_name] nvarchar(160) NULL;
 
@@ -368,6 +394,8 @@ IF COL_LENGTH(N'dbo.app_users', N'email') IS NULL ALTER TABLE dbo.[app_users] AD
 IF COL_LENGTH(N'dbo.app_users', N'role') IS NULL ALTER TABLE dbo.[app_users] ADD [role] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.app_users', N'store_id') IS NULL ALTER TABLE dbo.[app_users] ADD [store_id] nvarchar(64) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.app_users') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[app_users] ALTER COLUMN [store_id] nvarchar(64) NULL;
 
 IF COL_LENGTH(N'dbo.app_users', N'is_active') IS NULL ALTER TABLE dbo.[app_users] ADD [is_active] bit NULL;
 
@@ -383,13 +411,15 @@ IF COL_LENGTH(N'dbo.app_users', N'created_at') IS NULL ALTER TABLE dbo.[app_user
 
 IF COL_LENGTH(N'dbo.app_users', N'updated_at') IS NULL ALTER TABLE dbo.[app_users] ADD [updated_at] datetimeoffset(7) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.app_users') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[app_users] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
 IF COL_LENGTH(N'dbo.app_users', N'role_slug') IS NULL ALTER TABLE dbo.[app_users] ADD [role_slug] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.app_users', N'pin_length') IS NULL ALTER TABLE dbo.[app_users] ADD [pin_length] smallint NULL;
 
 IF COL_LENGTH(N'dbo.app_users', N'row_version') IS NULL ALTER TABLE dbo.[app_users] ADD [row_version] int NULL;
 
-IF COL_LENGTH(N'dbo.app_users', N'pin_set_at') IS NULL ALTER TABLE dbo.[app_users] ADD [pin_set_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.app_users', N'pin_set_at') IS NULL ALTER TABLE dbo.[app_users] ADD [pin_set_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.app_users', N'pin_updated_by') IS NULL ALTER TABLE dbo.[app_users] ADD [pin_updated_by] nvarchar(max) NULL;
 
@@ -413,7 +443,7 @@ IF OBJECT_ID(N'dbo.audit_logs', N'U') IS NULL BEGIN CREATE TABLE dbo.[audit_logs
   [entity] nvarchar(max) NULL,
   [before_state] nvarchar(max) NULL,
   [after_state] nvarchar(max) NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   CONSTRAINT [PK_audit_logs] PRIMARY KEY ([id])
 
 ); END;
@@ -421,6 +451,8 @@ IF OBJECT_ID(N'dbo.audit_logs', N'U') IS NULL BEGIN CREATE TABLE dbo.[audit_logs
 IF OBJECT_ID(N'dbo.audit_logs', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.audit_logs')) ALTER TABLE dbo.[audit_logs] ENABLE CHANGE_TRACKING;
 
 IF COL_LENGTH(N'dbo.audit_logs', N'id') IS NULL ALTER TABLE dbo.[audit_logs] ADD [id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.audit_logs') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[audit_logs] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 
 IF COL_LENGTH(N'dbo.audit_logs', N'user_name') IS NULL ALTER TABLE dbo.[audit_logs] ADD [user_name] nvarchar(max) NULL;
 
@@ -444,7 +476,9 @@ IF COL_LENGTH(N'dbo.audit_logs', N'before_state') IS NULL ALTER TABLE dbo.[audit
 
 IF COL_LENGTH(N'dbo.audit_logs', N'after_state') IS NULL ALTER TABLE dbo.[audit_logs] ADD [after_state] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.audit_logs', N'store_id') IS NULL ALTER TABLE dbo.[audit_logs] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.audit_logs', N'store_id') IS NULL ALTER TABLE dbo.[audit_logs] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.audit_logs') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[audit_logs] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.audit_logs') AND name=N'IX_audit_logs_store_id') CREATE INDEX [IX_audit_logs_store_id] ON dbo.[audit_logs]([store_id]);
 
@@ -468,6 +502,8 @@ IF OBJECT_ID(N'dbo.booking_payments', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1
 
 IF COL_LENGTH(N'dbo.booking_payments', N'id') IS NULL ALTER TABLE dbo.[booking_payments] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.booking_payments') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[booking_payments] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.booking_payments', N'booking_id') IS NULL ALTER TABLE dbo.[booking_payments] ADD [booking_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.booking_payments', N'amount') IS NULL ALTER TABLE dbo.[booking_payments] ADD [amount] decimal(38,12) NULL;
@@ -490,7 +526,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NULL BEGIN CREATE TABLE dbo.[bookings] (
 
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_bookings_id] DEFAULT (NEWID()),
   [ref] nvarchar(max) NOT NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [shift_id] nvarchar(max) NULL,
   [customer_name] nvarchar(max) NOT NULL CONSTRAINT [DF_bookings_customer_name] DEFAULT (''),
   [customer_phone] nvarchar(max) NOT NULL CONSTRAINT [DF_bookings_customer_phone] DEFAULT (''),
@@ -546,9 +582,13 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sy
 
 IF COL_LENGTH(N'dbo.bookings', N'id') IS NULL ALTER TABLE dbo.[bookings] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.bookings') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[bookings] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.bookings', N'ref') IS NULL ALTER TABLE dbo.[bookings] ADD [ref] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.bookings', N'store_id') IS NULL ALTER TABLE dbo.[bookings] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.bookings', N'store_id') IS NULL ALTER TABLE dbo.[bookings] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.bookings') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[bookings] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.bookings', N'shift_id') IS NULL ALTER TABLE dbo.[bookings] ADD [shift_id] nvarchar(max) NULL;
 
@@ -620,6 +660,8 @@ IF COL_LENGTH(N'dbo.bookings', N'created_at') IS NULL ALTER TABLE dbo.[bookings]
 
 IF COL_LENGTH(N'dbo.bookings', N'updated_at') IS NULL ALTER TABLE dbo.[bookings] ADD [updated_at] datetimeoffset(7) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.bookings') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[bookings] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
 IF COL_LENGTH(N'dbo.bookings', N'tag_id') IS NULL ALTER TABLE dbo.[bookings] ADD [tag_id] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.bookings', N'intake_note') IS NULL ALTER TABLE dbo.[bookings] ADD [intake_note] nvarchar(max) NULL;
@@ -651,7 +693,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.booking
 IF OBJECT_ID(N'dbo.branch_telemetry', N'U') IS NULL BEGIN CREATE TABLE dbo.[branch_telemetry] (
 
   [terminal_id] nvarchar(450) NOT NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [terminal_name] nvarchar(max) NULL,
   [staff_name] nvarchar(max) NULL,
   [staff_role] nvarchar(max) NULL,
@@ -666,7 +708,7 @@ IF OBJECT_ID(N'dbo.branch_telemetry', N'U') IS NULL BEGIN CREATE TABLE dbo.[bran
   [last_seen_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_branch_telemetry_last_seen_at] DEFAULT (SYSDATETIMEOFFSET()),
   [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_branch_telemetry_created_at] DEFAULT (SYSDATETIMEOFFSET()),
   [updated_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_branch_telemetry_updated_at] DEFAULT (SYSDATETIMEOFFSET()),
-  [branch_id] nvarchar(max) NULL,
+  [branch_id] nvarchar(450) NULL,
   [pending_queue_count] int NULL,
   [last_ping] datetimeoffset(7) NULL,
   [status] nvarchar(max) NULL,
@@ -688,7 +730,11 @@ IF OBJECT_ID(N'dbo.branch_telemetry', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1
 
 IF COL_LENGTH(N'dbo.branch_telemetry', N'terminal_id') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [terminal_id] nvarchar(450) NULL;
 
-IF COL_LENGTH(N'dbo.branch_telemetry', N'store_id') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [store_id] nvarchar(max) NULL;
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.branch_telemetry') AND c.name=N'terminal_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[branch_telemetry] ALTER COLUMN [terminal_id] nvarchar(450) NOT NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'store_id') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.branch_telemetry') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[branch_telemetry] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.branch_telemetry', N'terminal_name') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [terminal_name] nvarchar(max) NULL;
 
@@ -718,7 +764,11 @@ IF COL_LENGTH(N'dbo.branch_telemetry', N'created_at') IS NULL ALTER TABLE dbo.[b
 
 IF COL_LENGTH(N'dbo.branch_telemetry', N'updated_at') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [updated_at] datetimeoffset(7) NULL;
 
-IF COL_LENGTH(N'dbo.branch_telemetry', N'branch_id') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [branch_id] nvarchar(max) NULL;
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.branch_telemetry') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[branch_telemetry] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'branch_id') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [branch_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.branch_telemetry') AND c.name=N'branch_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[branch_telemetry] ALTER COLUMN [branch_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.branch_telemetry', N'pending_queue_count') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [pending_queue_count] int NULL;
 
@@ -758,7 +808,7 @@ IF OBJECT_ID(N'dbo.cashiers', N'U') IS NULL BEGIN CREATE TABLE dbo.[cashiers] (
   [username] nvarchar(max) NOT NULL,
   [full_name] nvarchar(max) NOT NULL CONSTRAINT [DF_cashiers_full_name] DEFAULT (''),
   [pin_hash] nvarchar(max) NOT NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [permissions] nvarchar(max) NOT NULL CONSTRAINT [DF_cashiers_permissions] DEFAULT (N'[]'),
   [is_active] bit NOT NULL CONSTRAINT [DF_cashiers_is_active] DEFAULT (1),
   [last_login_at] datetimeoffset(7) NULL,
@@ -773,13 +823,17 @@ IF OBJECT_ID(N'dbo.cashiers', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sy
 
 IF COL_LENGTH(N'dbo.cashiers', N'id') IS NULL ALTER TABLE dbo.[cashiers] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.cashiers') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[cashiers] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.cashiers', N'username') IS NULL ALTER TABLE dbo.[cashiers] ADD [username] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.cashiers', N'full_name') IS NULL ALTER TABLE dbo.[cashiers] ADD [full_name] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.cashiers', N'pin_hash') IS NULL ALTER TABLE dbo.[cashiers] ADD [pin_hash] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.cashiers', N'store_id') IS NULL ALTER TABLE dbo.[cashiers] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.cashiers', N'store_id') IS NULL ALTER TABLE dbo.[cashiers] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.cashiers') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[cashiers] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.cashiers', N'permissions') IS NULL ALTER TABLE dbo.[cashiers] ADD [permissions] nvarchar(max) NULL;
 
@@ -790,6 +844,8 @@ IF COL_LENGTH(N'dbo.cashiers', N'last_login_at') IS NULL ALTER TABLE dbo.[cashie
 IF COL_LENGTH(N'dbo.cashiers', N'created_at') IS NULL ALTER TABLE dbo.[cashiers] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.cashiers', N'updated_at') IS NULL ALTER TABLE dbo.[cashiers] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.cashiers') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[cashiers] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.cashiers', N'role_slug') IS NULL ALTER TABLE dbo.[cashiers] ADD [role_slug] nvarchar(max) NULL;
 
@@ -806,7 +862,7 @@ IF OBJECT_ID(N'dbo.coupon_events', N'U') IS NULL BEGIN CREATE TABLE dbo.[coupon_
   [voucher_token] nvarchar(max) NULL,
   [member_id] uniqueidentifier NULL,
   [member_phone] nvarchar(max) NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [terminal_id] nvarchar(max) NULL,
   [staff_name] nvarchar(max) NULL,
   [staff_role] nvarchar(max) NULL,
@@ -821,6 +877,8 @@ IF OBJECT_ID(N'dbo.coupon_events', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FR
 
 IF COL_LENGTH(N'dbo.coupon_events', N'id') IS NULL ALTER TABLE dbo.[coupon_events] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.coupon_events') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[coupon_events] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.coupon_events', N'event_type') IS NULL ALTER TABLE dbo.[coupon_events] ADD [event_type] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.coupon_events', N'campaign_id') IS NULL ALTER TABLE dbo.[coupon_events] ADD [campaign_id] uniqueidentifier NULL;
@@ -833,7 +891,9 @@ IF COL_LENGTH(N'dbo.coupon_events', N'member_id') IS NULL ALTER TABLE dbo.[coupo
 
 IF COL_LENGTH(N'dbo.coupon_events', N'member_phone') IS NULL ALTER TABLE dbo.[coupon_events] ADD [member_phone] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.coupon_events', N'store_id') IS NULL ALTER TABLE dbo.[coupon_events] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.coupon_events', N'store_id') IS NULL ALTER TABLE dbo.[coupon_events] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.coupon_events') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[coupon_events] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.coupon_events', N'terminal_id') IS NULL ALTER TABLE dbo.[coupon_events] ADD [terminal_id] nvarchar(max) NULL;
 
@@ -852,7 +912,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.coupon_
 IF OBJECT_ID(N'dbo.drawer_events', N'U') IS NULL BEGIN CREATE TABLE dbo.[drawer_events] (
 
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_drawer_events_id] DEFAULT (NEWID()),
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [terminal_id] nvarchar(max) NULL,
   [shift_id] nvarchar(max) NULL,
   [staff_id] nvarchar(max) NULL,
@@ -870,7 +930,11 @@ IF OBJECT_ID(N'dbo.drawer_events', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FR
 
 IF COL_LENGTH(N'dbo.drawer_events', N'id') IS NULL ALTER TABLE dbo.[drawer_events] ADD [id] uniqueidentifier NULL;
 
-IF COL_LENGTH(N'dbo.drawer_events', N'store_id') IS NULL ALTER TABLE dbo.[drawer_events] ADD [store_id] nvarchar(max) NULL;
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.drawer_events') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[drawer_events] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
+IF COL_LENGTH(N'dbo.drawer_events', N'store_id') IS NULL ALTER TABLE dbo.[drawer_events] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.drawer_events') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[drawer_events] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.drawer_events', N'terminal_id') IS NULL ALTER TABLE dbo.[drawer_events] ADD [terminal_id] nvarchar(max) NULL;
 
@@ -896,7 +960,7 @@ IF OBJECT_ID(N'dbo.held_orders', N'U') IS NULL BEGIN CREATE TABLE dbo.[held_orde
 
   [id] nvarchar(450) NOT NULL CONSTRAINT [DF_held_orders_id] DEFAULT (NEWID()),
   [label] nvarchar(max) NOT NULL CONSTRAINT [DF_held_orders_label] DEFAULT (''),
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [shift_id] nvarchar(max) NULL,
   [held_by] nvarchar(max) NULL,
   [total] decimal(38,12) NOT NULL CONSTRAINT [DF_held_orders_total] DEFAULT (0),
@@ -922,9 +986,13 @@ IF OBJECT_ID(N'dbo.held_orders', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM
 
 IF COL_LENGTH(N'dbo.held_orders', N'id') IS NULL ALTER TABLE dbo.[held_orders] ADD [id] nvarchar(450) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.held_orders') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[held_orders] ALTER COLUMN [id] nvarchar(450) NOT NULL;
+
 IF COL_LENGTH(N'dbo.held_orders', N'label') IS NULL ALTER TABLE dbo.[held_orders] ADD [label] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.held_orders', N'store_id') IS NULL ALTER TABLE dbo.[held_orders] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.held_orders', N'store_id') IS NULL ALTER TABLE dbo.[held_orders] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.held_orders') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[held_orders] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.held_orders', N'shift_id') IS NULL ALTER TABLE dbo.[held_orders] ADD [shift_id] nvarchar(max) NULL;
 
@@ -956,6 +1024,8 @@ IF COL_LENGTH(N'dbo.held_orders', N'created_at') IS NULL ALTER TABLE dbo.[held_o
 
 IF COL_LENGTH(N'dbo.held_orders', N'updated_at') IS NULL ALTER TABLE dbo.[held_orders] ADD [updated_at] datetimeoffset(7) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.held_orders') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[held_orders] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
 IF COL_LENGTH(N'dbo.held_orders', N'row_version') IS NULL ALTER TABLE dbo.[held_orders] ADD [row_version] int NULL;
 
 IF COL_LENGTH(N'dbo.held_orders', N'status') IS NULL ALTER TABLE dbo.[held_orders] ADD [status] nvarchar(max) NULL;
@@ -983,6 +1053,8 @@ IF OBJECT_ID(N'dbo.integration_settings', N'U') IS NOT NULL AND NOT EXISTS (SELE
 
 IF COL_LENGTH(N'dbo.integration_settings', N'id') IS NULL ALTER TABLE dbo.[integration_settings] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.integration_settings') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[integration_settings] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.integration_settings', N'provider_name') IS NULL ALTER TABLE dbo.[integration_settings] ADD [provider_name] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.integration_settings', N'api_keys_encrypted') IS NULL ALTER TABLE dbo.[integration_settings] ADD [api_keys_encrypted] nvarchar(max) NULL;
@@ -999,6 +1071,8 @@ IF COL_LENGTH(N'dbo.integration_settings', N'created_at') IS NULL ALTER TABLE db
 
 IF COL_LENGTH(N'dbo.integration_settings', N'updated_at') IS NULL ALTER TABLE dbo.[integration_settings] ADD [updated_at] datetimeoffset(7) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.integration_settings') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[integration_settings] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.integration_settings') AND name=N'IX_integration_settings_updated_at') CREATE INDEX [IX_integration_settings_updated_at] ON dbo.[integration_settings]([updated_at]);
 
 IF OBJECT_ID(N'dbo.item_activity_logs', N'U') IS NULL BEGIN CREATE TABLE dbo.[item_activity_logs] (
@@ -1008,7 +1082,7 @@ IF OBJECT_ID(N'dbo.item_activity_logs', N'U') IS NULL BEGIN CREATE TABLE dbo.[it
   [product_name] nvarchar(max) NULL,
   [sku] nvarchar(max) NULL,
   [barcode] nvarchar(max) NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [terminal_id] nvarchar(max) NULL,
   [activity_type] nvarchar(max) NOT NULL,
   [reference] nvarchar(max) NULL,
@@ -1030,6 +1104,8 @@ IF OBJECT_ID(N'dbo.item_activity_logs', N'U') IS NOT NULL AND NOT EXISTS (SELECT
 
 IF COL_LENGTH(N'dbo.item_activity_logs', N'id') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.item_activity_logs') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[item_activity_logs] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.item_activity_logs', N'product_id') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [product_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.item_activity_logs', N'product_name') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [product_name] nvarchar(max) NULL;
@@ -1038,7 +1114,9 @@ IF COL_LENGTH(N'dbo.item_activity_logs', N'sku') IS NULL ALTER TABLE dbo.[item_a
 
 IF COL_LENGTH(N'dbo.item_activity_logs', N'barcode') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [barcode] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.item_activity_logs', N'store_id') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.item_activity_logs', N'store_id') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.item_activity_logs') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[item_activity_logs] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.item_activity_logs', N'terminal_id') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [terminal_id] nvarchar(max) NULL;
 
@@ -1079,7 +1157,7 @@ IF OBJECT_ID(N'dbo.member_verifications', N'U') IS NULL BEGIN CREATE TABLE dbo.[
   [attempts] int NOT NULL CONSTRAINT [DF_member_verifications_attempts] DEFAULT (0),
   [status] nvarchar(max) NOT NULL CONSTRAINT [DF_member_verifications_status] DEFAULT ('pending'),
   [sent_by] nvarchar(max) NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [expires_at] datetimeoffset(7) NOT NULL,
   [verified_at] datetimeoffset(7) NULL,
   [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_member_verifications_created_at] DEFAULT (SYSDATETIMEOFFSET()),
@@ -1090,6 +1168,8 @@ IF OBJECT_ID(N'dbo.member_verifications', N'U') IS NULL BEGIN CREATE TABLE dbo.[
 IF OBJECT_ID(N'dbo.member_verifications', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.member_verifications')) ALTER TABLE dbo.[member_verifications] ENABLE CHANGE_TRACKING;
 
 IF COL_LENGTH(N'dbo.member_verifications', N'id') IS NULL ALTER TABLE dbo.[member_verifications] ADD [id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.member_verifications') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[member_verifications] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 
 IF COL_LENGTH(N'dbo.member_verifications', N'member_id') IS NULL ALTER TABLE dbo.[member_verifications] ADD [member_id] uniqueidentifier NULL;
 
@@ -1107,7 +1187,9 @@ IF COL_LENGTH(N'dbo.member_verifications', N'status') IS NULL ALTER TABLE dbo.[m
 
 IF COL_LENGTH(N'dbo.member_verifications', N'sent_by') IS NULL ALTER TABLE dbo.[member_verifications] ADD [sent_by] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.member_verifications', N'store_id') IS NULL ALTER TABLE dbo.[member_verifications] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.member_verifications', N'store_id') IS NULL ALTER TABLE dbo.[member_verifications] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.member_verifications') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[member_verifications] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.member_verifications', N'expires_at') IS NULL ALTER TABLE dbo.[member_verifications] ADD [expires_at] datetimeoffset(7) NULL;
 
@@ -1143,11 +1225,17 @@ IF OBJECT_ID(N'dbo.members', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys
 
 IF COL_LENGTH(N'dbo.members', N'id') IS NULL ALTER TABLE dbo.[members] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.members') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[members] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.members', N'member_code') IS NULL ALTER TABLE dbo.[members] ADD [member_code] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.members') AND c.name=N'member_code' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[members] ALTER COLUMN [member_code] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.members', N'full_name') IS NULL ALTER TABLE dbo.[members] ADD [full_name] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.members', N'phone') IS NULL ALTER TABLE dbo.[members] ADD [phone] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.members') AND c.name=N'phone' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[members] ALTER COLUMN [phone] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.members', N'email') IS NULL ALTER TABLE dbo.[members] ADD [email] nvarchar(max) NULL;
 
@@ -1164,6 +1252,8 @@ IF COL_LENGTH(N'dbo.members', N'total_spent') IS NULL ALTER TABLE dbo.[members] 
 IF COL_LENGTH(N'dbo.members', N'created_at') IS NULL ALTER TABLE dbo.[members] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.members', N'updated_at') IS NULL ALTER TABLE dbo.[members] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.members') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[members] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.members', N'row_version') IS NULL ALTER TABLE dbo.[members] ADD [row_version] int NULL;
 
@@ -1196,7 +1286,11 @@ IF OBJECT_ID(N'dbo.membership_tiers', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1
 
 IF COL_LENGTH(N'dbo.membership_tiers', N'id') IS NULL ALTER TABLE dbo.[membership_tiers] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.membership_tiers') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[membership_tiers] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.membership_tiers', N'name') IS NULL ALTER TABLE dbo.[membership_tiers] ADD [name] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.membership_tiers') AND c.name=N'name' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[membership_tiers] ALTER COLUMN [name] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.membership_tiers', N'discount_percentage') IS NULL ALTER TABLE dbo.[membership_tiers] ADD [discount_percentage] decimal(38,12) NULL;
 
@@ -1205,6 +1299,8 @@ IF COL_LENGTH(N'dbo.membership_tiers', N'points_multiplier') IS NULL ALTER TABLE
 IF COL_LENGTH(N'dbo.membership_tiers', N'created_at') IS NULL ALTER TABLE dbo.[membership_tiers] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.membership_tiers', N'updated_at') IS NULL ALTER TABLE dbo.[membership_tiers] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.membership_tiers') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[membership_tiers] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.membership_tiers', N'row_version') IS NULL ALTER TABLE dbo.[membership_tiers] ADD [row_version] int NULL;
 
@@ -1216,7 +1312,7 @@ IF OBJECT_ID(N'dbo.offline_sync_audit_log', N'U') IS NULL BEGIN CREATE TABLE dbo
 
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_offline_sync_audit_log_id] DEFAULT (NEWID()),
   [terminal_id] nvarchar(max) NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [direction] nvarchar(max) NOT NULL,
   [table_name] nvarchar(max) NOT NULL,
   [record_id] nvarchar(max) NULL,
@@ -1234,9 +1330,13 @@ IF OBJECT_ID(N'dbo.offline_sync_audit_log', N'U') IS NOT NULL AND NOT EXISTS (SE
 
 IF COL_LENGTH(N'dbo.offline_sync_audit_log', N'id') IS NULL ALTER TABLE dbo.[offline_sync_audit_log] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.offline_sync_audit_log') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[offline_sync_audit_log] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.offline_sync_audit_log', N'terminal_id') IS NULL ALTER TABLE dbo.[offline_sync_audit_log] ADD [terminal_id] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.offline_sync_audit_log', N'store_id') IS NULL ALTER TABLE dbo.[offline_sync_audit_log] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.offline_sync_audit_log', N'store_id') IS NULL ALTER TABLE dbo.[offline_sync_audit_log] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.offline_sync_audit_log') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[offline_sync_audit_log] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.offline_sync_audit_log', N'direction') IS NULL ALTER TABLE dbo.[offline_sync_audit_log] ADD [direction] nvarchar(max) NULL;
 
@@ -1265,7 +1365,7 @@ IF OBJECT_ID(N'dbo.payment_transactions', N'U') IS NULL BEGIN CREATE TABLE dbo.[
   [sale_id] uniqueidentifier NULL,
   [booking_id] uniqueidentifier NULL,
   [member_id] uniqueidentifier NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [shift_id] nvarchar(max) NULL,
   [terminal_id] nvarchar(max) NULL,
   [amount] decimal(38,12) NOT NULL CONSTRAINT [DF_payment_transactions_amount] DEFAULT (0),
@@ -1289,6 +1389,8 @@ IF OBJECT_ID(N'dbo.payment_transactions', N'U') IS NOT NULL AND NOT EXISTS (SELE
 
 IF COL_LENGTH(N'dbo.payment_transactions', N'id') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.payment_transactions') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.payment_transactions', N'source_type') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [source_type] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.payment_transactions', N'sale_id') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [sale_id] uniqueidentifier NULL;
@@ -1297,7 +1399,9 @@ IF COL_LENGTH(N'dbo.payment_transactions', N'booking_id') IS NULL ALTER TABLE db
 
 IF COL_LENGTH(N'dbo.payment_transactions', N'member_id') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [member_id] uniqueidentifier NULL;
 
-IF COL_LENGTH(N'dbo.payment_transactions', N'store_id') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.payment_transactions', N'store_id') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.payment_transactions') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.payment_transactions', N'shift_id') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [shift_id] nvarchar(max) NULL;
 
@@ -1322,6 +1426,8 @@ IF COL_LENGTH(N'dbo.payment_transactions', N'paid_at') IS NULL ALTER TABLE dbo.[
 IF COL_LENGTH(N'dbo.payment_transactions', N'created_at') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.payment_transactions', N'updated_at') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.payment_transactions') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.payment_transactions', N'row_version') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [row_version] int NULL;
 
@@ -1354,9 +1460,13 @@ IF OBJECT_ID(N'dbo.payment_types', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FR
 
 IF COL_LENGTH(N'dbo.payment_types', N'id') IS NULL ALTER TABLE dbo.[payment_types] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.payment_types') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[payment_types] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.payment_types', N'name') IS NULL ALTER TABLE dbo.[payment_types] ADD [name] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.payment_types', N'type_code') IS NULL ALTER TABLE dbo.[payment_types] ADD [type_code] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.payment_types') AND c.name=N'type_code' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[payment_types] ALTER COLUMN [type_code] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.payment_types', N'requires_reference') IS NULL ALTER TABLE dbo.[payment_types] ADD [requires_reference] bit NULL;
 
@@ -1371,6 +1481,8 @@ IF COL_LENGTH(N'dbo.payment_types', N'is_system') IS NULL ALTER TABLE dbo.[payme
 IF COL_LENGTH(N'dbo.payment_types', N'created_at') IS NULL ALTER TABLE dbo.[payment_types] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.payment_types', N'updated_at') IS NULL ALTER TABLE dbo.[payment_types] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.payment_types') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[payment_types] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.payment_types', N'row_version') IS NULL ALTER TABLE dbo.[payment_types] ADD [row_version] int NULL;
 
@@ -1394,6 +1506,8 @@ IF OBJECT_ID(N'dbo.pin_attempts', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FRO
 
 IF COL_LENGTH(N'dbo.pin_attempts', N'key') IS NULL ALTER TABLE dbo.[pin_attempts] ADD [key] nvarchar(450) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.pin_attempts') AND c.name=N'key' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[pin_attempts] ALTER COLUMN [key] nvarchar(450) NOT NULL;
+
 IF COL_LENGTH(N'dbo.pin_attempts', N'attempts') IS NULL ALTER TABLE dbo.[pin_attempts] ADD [attempts] int NULL;
 
 IF COL_LENGTH(N'dbo.pin_attempts', N'window_started_at') IS NULL ALTER TABLE dbo.[pin_attempts] ADD [window_started_at] datetimeoffset(7) NULL;
@@ -1403,6 +1517,8 @@ IF COL_LENGTH(N'dbo.pin_attempts', N'locked_until') IS NULL ALTER TABLE dbo.[pin
 IF COL_LENGTH(N'dbo.pin_attempts', N'created_at') IS NULL ALTER TABLE dbo.[pin_attempts] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.pin_attempts', N'updated_at') IS NULL ALTER TABLE dbo.[pin_attempts] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.pin_attempts') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[pin_attempts] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.pin_attempts') AND name=N'IX_pin_attempts_updated_at') CREATE INDEX [IX_pin_attempts_updated_at] ON dbo.[pin_attempts]([updated_at]);
 
@@ -1456,6 +1572,8 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FRO
 
 IF COL_LENGTH(N'dbo.pos_settings', N'id') IS NULL ALTER TABLE dbo.[pos_settings] ADD [id] int NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.pos_settings') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[pos_settings] ALTER COLUMN [id] int NOT NULL;
+
 IF COL_LENGTH(N'dbo.pos_settings', N'tax_percentage') IS NULL ALTER TABLE dbo.[pos_settings] ADD [tax_percentage] decimal(38,12) NULL;
 
 IF COL_LENGTH(N'dbo.pos_settings', N'enable_tax') IS NULL ALTER TABLE dbo.[pos_settings] ADD [enable_tax] bit NULL;
@@ -1477,6 +1595,8 @@ IF COL_LENGTH(N'dbo.pos_settings', N'show_barcode') IS NULL ALTER TABLE dbo.[pos
 IF COL_LENGTH(N'dbo.pos_settings', N'show_tax_details') IS NULL ALTER TABLE dbo.[pos_settings] ADD [show_tax_details] bit NULL;
 
 IF COL_LENGTH(N'dbo.pos_settings', N'updated_at') IS NULL ALTER TABLE dbo.[pos_settings] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.pos_settings') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[pos_settings] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.pos_settings', N'company_name') IS NULL ALTER TABLE dbo.[pos_settings] ADD [company_name] nvarchar(max) NULL;
 
@@ -1555,9 +1675,13 @@ IF OBJECT_ID(N'dbo.product_barcodes', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1
 
 IF COL_LENGTH(N'dbo.product_barcodes', N'id') IS NULL ALTER TABLE dbo.[product_barcodes] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.product_barcodes') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[product_barcodes] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.product_barcodes', N'product_id') IS NULL ALTER TABLE dbo.[product_barcodes] ADD [product_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.product_barcodes', N'barcode') IS NULL ALTER TABLE dbo.[product_barcodes] ADD [barcode] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.product_barcodes') AND c.name=N'barcode' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[product_barcodes] ALTER COLUMN [barcode] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.product_barcodes', N'label') IS NULL ALTER TABLE dbo.[product_barcodes] ADD [label] nvarchar(max) NULL;
 
@@ -1568,6 +1692,8 @@ IF COL_LENGTH(N'dbo.product_barcodes', N'is_primary') IS NULL ALTER TABLE dbo.[p
 IF COL_LENGTH(N'dbo.product_barcodes', N'created_at') IS NULL ALTER TABLE dbo.[product_barcodes] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.product_barcodes', N'updated_at') IS NULL ALTER TABLE dbo.[product_barcodes] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.product_barcodes') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[product_barcodes] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.product_barcodes', N'row_version') IS NULL ALTER TABLE dbo.[product_barcodes] ADD [row_version] int NULL;
 
@@ -1594,6 +1720,8 @@ IF OBJECT_ID(N'dbo.product_categories', N'U') IS NOT NULL AND NOT EXISTS (SELECT
 
 IF COL_LENGTH(N'dbo.product_categories', N'id') IS NULL ALTER TABLE dbo.[product_categories] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.product_categories') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[product_categories] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.product_categories', N'name') IS NULL ALTER TABLE dbo.[product_categories] ADD [name] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.product_categories', N'parent_id') IS NULL ALTER TABLE dbo.[product_categories] ADD [parent_id] uniqueidentifier NULL;
@@ -1603,6 +1731,8 @@ IF COL_LENGTH(N'dbo.product_categories', N'sort') IS NULL ALTER TABLE dbo.[produ
 IF COL_LENGTH(N'dbo.product_categories', N'created_at') IS NULL ALTER TABLE dbo.[product_categories] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.product_categories', N'updated_at') IS NULL ALTER TABLE dbo.[product_categories] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.product_categories') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[product_categories] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.product_categories', N'kind') IS NULL ALTER TABLE dbo.[product_categories] ADD [kind] nvarchar(max) NULL;
 
@@ -1651,7 +1781,11 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sy
 
 IF COL_LENGTH(N'dbo.products', N'id') IS NULL ALTER TABLE dbo.[products] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.products') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[products] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.products', N'barcode') IS NULL ALTER TABLE dbo.[products] ADD [barcode] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.products') AND c.name=N'barcode' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[products] ALTER COLUMN [barcode] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.products', N'name') IS NULL ALTER TABLE dbo.[products] ADD [name] nvarchar(max) NULL;
 
@@ -1682,6 +1816,8 @@ IF COL_LENGTH(N'dbo.products', N'ecom_visible') IS NULL ALTER TABLE dbo.[product
 IF COL_LENGTH(N'dbo.products', N'stock_by_store') IS NULL ALTER TABLE dbo.[products] ADD [stock_by_store] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.products', N'updated_at') IS NULL ALTER TABLE dbo.[products] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.products') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[products] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.products', N'landing_pct') IS NULL ALTER TABLE dbo.[products] ADD [landing_pct] decimal(38,12) NULL;
 
@@ -1736,6 +1872,8 @@ IF OBJECT_ID(N'dbo.promotions', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM 
 
 IF COL_LENGTH(N'dbo.promotions', N'id') IS NULL ALTER TABLE dbo.[promotions] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.promotions') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[promotions] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.promotions', N'title') IS NULL ALTER TABLE dbo.[promotions] ADD [title] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.promotions', N'promo_type') IS NULL ALTER TABLE dbo.[promotions] ADD [promo_type] nvarchar(max) NULL;
@@ -1762,6 +1900,8 @@ IF COL_LENGTH(N'dbo.promotions', N'created_at') IS NULL ALTER TABLE dbo.[promoti
 
 IF COL_LENGTH(N'dbo.promotions', N'updated_at') IS NULL ALTER TABLE dbo.[promotions] ADD [updated_at] datetimeoffset(7) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.promotions') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[promotions] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
 IF COL_LENGTH(N'dbo.promotions', N'row_version') IS NULL ALTER TABLE dbo.[promotions] ADD [row_version] int NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.promotions') AND name=N'IX_promotions_updated_at') CREATE INDEX [IX_promotions_updated_at] ON dbo.[promotions]([updated_at]);
@@ -1779,9 +1919,13 @@ IF OBJECT_ID(N'dbo.public_flags', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FRO
 
 IF COL_LENGTH(N'dbo.public_flags', N'key') IS NULL ALTER TABLE dbo.[public_flags] ADD [key] nvarchar(450) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.public_flags') AND c.name=N'key' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[public_flags] ALTER COLUMN [key] nvarchar(450) NOT NULL;
+
 IF COL_LENGTH(N'dbo.public_flags', N'enabled') IS NULL ALTER TABLE dbo.[public_flags] ADD [enabled] bit NULL;
 
 IF COL_LENGTH(N'dbo.public_flags', N'updated_at') IS NULL ALTER TABLE dbo.[public_flags] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.public_flags') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[public_flags] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.public_flags') AND name=N'IX_public_flags_updated_at') CREATE INDEX [IX_public_flags_updated_at] ON dbo.[public_flags]([updated_at]);
 
@@ -1808,6 +1952,8 @@ IF OBJECT_ID(N'dbo.purchase_order_items', N'U') IS NOT NULL AND NOT EXISTS (SELE
 
 IF COL_LENGTH(N'dbo.purchase_order_items', N'id') IS NULL ALTER TABLE dbo.[purchase_order_items] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.purchase_order_items') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[purchase_order_items] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.purchase_order_items', N'po_id') IS NULL ALTER TABLE dbo.[purchase_order_items] ADD [po_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.purchase_order_items', N'product_id') IS NULL ALTER TABLE dbo.[purchase_order_items] ADD [product_id] uniqueidentifier NULL;
@@ -1830,6 +1976,8 @@ IF COL_LENGTH(N'dbo.purchase_order_items', N'sku') IS NULL ALTER TABLE dbo.[purc
 
 IF COL_LENGTH(N'dbo.purchase_order_items', N'updated_at') IS NULL ALTER TABLE dbo.[purchase_order_items] ADD [updated_at] datetimeoffset(7) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.purchase_order_items') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[purchase_order_items] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
 IF COL_LENGTH(N'dbo.purchase_order_items', N'row_version') IS NULL ALTER TABLE dbo.[purchase_order_items] ADD [row_version] int NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.purchase_order_items') AND name=N'IX_purchase_order_items_updated_at') CREATE INDEX [IX_purchase_order_items_updated_at] ON dbo.[purchase_order_items]([updated_at]);
@@ -1844,7 +1992,7 @@ IF OBJECT_ID(N'dbo.purchase_orders', N'U') IS NULL BEGIN CREATE TABLE dbo.[purch
   [total_items_count] int NOT NULL CONSTRAINT [DF_purchase_orders_total_items_count] DEFAULT (0),
   [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_purchase_orders_created_at] DEFAULT (SYSDATETIMEOFFSET()),
   [supplier_id] uniqueidentifier NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [store_code] nvarchar(max) NULL,
   [invoice_date] date NULL,
   [invoice_entry_date] datetimeoffset(7) NULL CONSTRAINT [DF_purchase_orders_invoice_entry_date] DEFAULT (SYSDATETIMEOFFSET()),
@@ -1859,7 +2007,11 @@ IF OBJECT_ID(N'dbo.purchase_orders', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 
 
 IF COL_LENGTH(N'dbo.purchase_orders', N'id') IS NULL ALTER TABLE dbo.[purchase_orders] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.purchase_orders') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[purchase_orders] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.purchase_orders', N'po_number') IS NULL ALTER TABLE dbo.[purchase_orders] ADD [po_number] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.purchase_orders') AND c.name=N'po_number' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[purchase_orders] ALTER COLUMN [po_number] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.purchase_orders', N'supplier_name') IS NULL ALTER TABLE dbo.[purchase_orders] ADD [supplier_name] nvarchar(max) NULL;
 
@@ -1873,7 +2025,9 @@ IF COL_LENGTH(N'dbo.purchase_orders', N'created_at') IS NULL ALTER TABLE dbo.[pu
 
 IF COL_LENGTH(N'dbo.purchase_orders', N'supplier_id') IS NULL ALTER TABLE dbo.[purchase_orders] ADD [supplier_id] uniqueidentifier NULL;
 
-IF COL_LENGTH(N'dbo.purchase_orders', N'store_id') IS NULL ALTER TABLE dbo.[purchase_orders] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.purchase_orders', N'store_id') IS NULL ALTER TABLE dbo.[purchase_orders] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.purchase_orders') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[purchase_orders] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.purchase_orders', N'store_code') IS NULL ALTER TABLE dbo.[purchase_orders] ADD [store_code] nvarchar(max) NULL;
 
@@ -1882,6 +2036,8 @@ IF COL_LENGTH(N'dbo.purchase_orders', N'invoice_date') IS NULL ALTER TABLE dbo.[
 IF COL_LENGTH(N'dbo.purchase_orders', N'invoice_entry_date') IS NULL ALTER TABLE dbo.[purchase_orders] ADD [invoice_entry_date] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.purchase_orders', N'updated_at') IS NULL ALTER TABLE dbo.[purchase_orders] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.purchase_orders') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[purchase_orders] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.purchase_orders', N'row_version') IS NULL ALTER TABLE dbo.[purchase_orders] ADD [row_version] int NULL;
 
@@ -1920,6 +2076,8 @@ IF OBJECT_ID(N'dbo.sale_items', N'U') IS NULL BEGIN CREATE TABLE dbo.[sale_items
 IF OBJECT_ID(N'dbo.sale_items', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.sale_items')) ALTER TABLE dbo.[sale_items] ENABLE CHANGE_TRACKING;
 
 IF COL_LENGTH(N'dbo.sale_items', N'id') IS NULL ALTER TABLE dbo.[sale_items] ADD [id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sale_items') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sale_items] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 
 IF COL_LENGTH(N'dbo.sale_items', N'sale_id') IS NULL ALTER TABLE dbo.[sale_items] ADD [sale_id] uniqueidentifier NULL;
 
@@ -1960,7 +2118,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NULL BEGIN CREATE TABLE dbo.[sales] (
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_sales_id] DEFAULT (NEWID()),
   [bill_number] nvarchar(450) NOT NULL,
   [member_id] uniqueidentifier NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [cashier_name] nvarchar(max) NULL,
   [subtotal_amount] decimal(38,12) NOT NULL CONSTRAINT [DF_sales_subtotal_amount] DEFAULT (0),
   [total_amount] decimal(38,12) NOT NULL CONSTRAINT [DF_sales_total_amount] DEFAULT (0),
@@ -2000,11 +2158,17 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.c
 
 IF COL_LENGTH(N'dbo.sales', N'id') IS NULL ALTER TABLE dbo.[sales] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sales') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sales] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.sales', N'bill_number') IS NULL ALTER TABLE dbo.[sales] ADD [bill_number] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sales') AND c.name=N'bill_number' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sales] ALTER COLUMN [bill_number] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.sales', N'member_id') IS NULL ALTER TABLE dbo.[sales] ADD [member_id] uniqueidentifier NULL;
 
-IF COL_LENGTH(N'dbo.sales', N'store_id') IS NULL ALTER TABLE dbo.[sales] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.sales', N'store_id') IS NULL ALTER TABLE dbo.[sales] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sales') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sales] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.sales', N'cashier_name') IS NULL ALTER TABLE dbo.[sales] ADD [cashier_name] nvarchar(max) NULL;
 
@@ -2088,6 +2252,8 @@ IF OBJECT_ID(N'dbo.secure_settings', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 
 
 IF COL_LENGTH(N'dbo.secure_settings', N'key') IS NULL ALTER TABLE dbo.[secure_settings] ADD [key] nvarchar(450) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.secure_settings') AND c.name=N'key' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[secure_settings] ALTER COLUMN [key] nvarchar(450) NOT NULL;
+
 IF COL_LENGTH(N'dbo.secure_settings', N'ciphertext') IS NULL ALTER TABLE dbo.[secure_settings] ADD [ciphertext] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.secure_settings', N'hint') IS NULL ALTER TABLE dbo.[secure_settings] ADD [hint] nvarchar(max) NULL;
@@ -2097,6 +2263,8 @@ IF COL_LENGTH(N'dbo.secure_settings', N'updated_by') IS NULL ALTER TABLE dbo.[se
 IF COL_LENGTH(N'dbo.secure_settings', N'created_at') IS NULL ALTER TABLE dbo.[secure_settings] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.secure_settings', N'updated_at') IS NULL ALTER TABLE dbo.[secure_settings] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.secure_settings') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[secure_settings] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.secure_settings') AND name=N'IX_secure_settings_updated_at') CREATE INDEX [IX_secure_settings_updated_at] ON dbo.[secure_settings]([updated_at]);
 
@@ -2125,7 +2293,11 @@ IF OBJECT_ID(N'dbo.security_findings', N'U') IS NOT NULL AND NOT EXISTS (SELECT 
 
 IF COL_LENGTH(N'dbo.security_findings', N'id') IS NULL ALTER TABLE dbo.[security_findings] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.security_findings') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[security_findings] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.security_findings', N'fingerprint') IS NULL ALTER TABLE dbo.[security_findings] ADD [fingerprint] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.security_findings') AND c.name=N'fingerprint' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[security_findings] ALTER COLUMN [fingerprint] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.security_findings', N'source') IS NULL ALTER TABLE dbo.[security_findings] ADD [source] nvarchar(max) NULL;
 
@@ -2153,6 +2325,8 @@ IF COL_LENGTH(N'dbo.security_findings', N'created_at') IS NULL ALTER TABLE dbo.[
 
 IF COL_LENGTH(N'dbo.security_findings', N'updated_at') IS NULL ALTER TABLE dbo.[security_findings] ADD [updated_at] datetimeoffset(7) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.security_findings') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[security_findings] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.security_findings') AND name=N'UX_security_findings_fingerprint') CREATE UNIQUE INDEX [UX_security_findings_fingerprint] ON dbo.[security_findings]([fingerprint]);
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.security_findings') AND name=N'IX_security_findings_updated_at') CREATE INDEX [IX_security_findings_updated_at] ON dbo.[security_findings]([updated_at]);
@@ -2172,6 +2346,8 @@ IF OBJECT_ID(N'dbo.settings_locks', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 F
 
 IF COL_LENGTH(N'dbo.settings_locks', N'section') IS NULL ALTER TABLE dbo.[settings_locks] ADD [section] nvarchar(450) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.settings_locks') AND c.name=N'section' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[settings_locks] ALTER COLUMN [section] nvarchar(450) NOT NULL;
+
 IF COL_LENGTH(N'dbo.settings_locks', N'locked') IS NULL ALTER TABLE dbo.[settings_locks] ADD [locked] bit NULL;
 
 IF COL_LENGTH(N'dbo.settings_locks', N'updated_by') IS NULL ALTER TABLE dbo.[settings_locks] ADD [updated_by] nvarchar(max) NULL;
@@ -2180,13 +2356,15 @@ IF COL_LENGTH(N'dbo.settings_locks', N'created_at') IS NULL ALTER TABLE dbo.[set
 
 IF COL_LENGTH(N'dbo.settings_locks', N'updated_at') IS NULL ALTER TABLE dbo.[settings_locks] ADD [updated_at] datetimeoffset(7) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.settings_locks') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[settings_locks] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.settings_locks') AND name=N'IX_settings_locks_updated_at') CREATE INDEX [IX_settings_locks_updated_at] ON dbo.[settings_locks]([updated_at]);
 
 IF OBJECT_ID(N'dbo.settings_overrides', N'U') IS NULL BEGIN CREATE TABLE dbo.[settings_overrides] (
 
-  [scope] nvarchar(450) NOT NULL CONSTRAINT [DF_settings_overrides_scope] DEFAULT ('BRANCH'),
-  [scope_id] nvarchar(450) NOT NULL CONSTRAINT [DF_settings_overrides_scope_id] DEFAULT (''),
-  [section] nvarchar(450) NOT NULL,
+  [scope] nvarchar(128) NOT NULL CONSTRAINT [DF_settings_overrides_scope] DEFAULT ('BRANCH'),
+  [scope_id] nvarchar(128) NOT NULL CONSTRAINT [DF_settings_overrides_scope_id] DEFAULT (''),
+  [section] nvarchar(128) NOT NULL,
   [patch] nvarchar(max) NOT NULL CONSTRAINT [DF_settings_overrides_patch] DEFAULT (N'[]'),
   [updated_by] nvarchar(max) NULL,
   [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_settings_overrides_created_at] DEFAULT (SYSDATETIMEOFFSET()),
@@ -2197,11 +2375,17 @@ IF OBJECT_ID(N'dbo.settings_overrides', N'U') IS NULL BEGIN CREATE TABLE dbo.[se
 
 IF OBJECT_ID(N'dbo.settings_overrides', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.settings_overrides')) ALTER TABLE dbo.[settings_overrides] ENABLE CHANGE_TRACKING;
 
-IF COL_LENGTH(N'dbo.settings_overrides', N'scope') IS NULL ALTER TABLE dbo.[settings_overrides] ADD [scope] nvarchar(450) NULL;
+IF COL_LENGTH(N'dbo.settings_overrides', N'scope') IS NULL ALTER TABLE dbo.[settings_overrides] ADD [scope] nvarchar(128) NULL;
 
-IF COL_LENGTH(N'dbo.settings_overrides', N'scope_id') IS NULL ALTER TABLE dbo.[settings_overrides] ADD [scope_id] nvarchar(450) NULL;
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.settings_overrides') AND c.name=N'scope' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[settings_overrides] ALTER COLUMN [scope] nvarchar(128) NOT NULL;
 
-IF COL_LENGTH(N'dbo.settings_overrides', N'section') IS NULL ALTER TABLE dbo.[settings_overrides] ADD [section] nvarchar(450) NULL;
+IF COL_LENGTH(N'dbo.settings_overrides', N'scope_id') IS NULL ALTER TABLE dbo.[settings_overrides] ADD [scope_id] nvarchar(128) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.settings_overrides') AND c.name=N'scope_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[settings_overrides] ALTER COLUMN [scope_id] nvarchar(128) NOT NULL;
+
+IF COL_LENGTH(N'dbo.settings_overrides', N'section') IS NULL ALTER TABLE dbo.[settings_overrides] ADD [section] nvarchar(128) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.settings_overrides') AND c.name=N'section' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[settings_overrides] ALTER COLUMN [section] nvarchar(128) NOT NULL;
 
 IF COL_LENGTH(N'dbo.settings_overrides', N'patch') IS NULL ALTER TABLE dbo.[settings_overrides] ADD [patch] nvarchar(max) NULL;
 
@@ -2211,13 +2395,15 @@ IF COL_LENGTH(N'dbo.settings_overrides', N'created_at') IS NULL ALTER TABLE dbo.
 
 IF COL_LENGTH(N'dbo.settings_overrides', N'updated_at') IS NULL ALTER TABLE dbo.[settings_overrides] ADD [updated_at] datetimeoffset(7) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.settings_overrides') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[settings_overrides] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.settings_overrides') AND name=N'IX_settings_overrides_updated_at') CREATE INDEX [IX_settings_overrides_updated_at] ON dbo.[settings_overrides]([updated_at]);
 
 IF OBJECT_ID(N'dbo.shift_sessions', N'U') IS NULL BEGIN CREATE TABLE dbo.[shift_sessions] (
 
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_shift_sessions_id] DEFAULT (NEWID()),
   [shift_id] nvarchar(max) NULL,
-  [store_id] nvarchar(max) NOT NULL,
+  [store_id] nvarchar(450) NOT NULL,
   [terminal_id] nvarchar(max) NULL,
   [terminal_name] nvarchar(max) NULL,
   [staff_id] nvarchar(max) NULL,
@@ -2236,9 +2422,13 @@ IF OBJECT_ID(N'dbo.shift_sessions', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 F
 
 IF COL_LENGTH(N'dbo.shift_sessions', N'id') IS NULL ALTER TABLE dbo.[shift_sessions] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_sessions') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_sessions] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.shift_sessions', N'shift_id') IS NULL ALTER TABLE dbo.[shift_sessions] ADD [shift_id] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.shift_sessions', N'store_id') IS NULL ALTER TABLE dbo.[shift_sessions] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.shift_sessions', N'store_id') IS NULL ALTER TABLE dbo.[shift_sessions] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_sessions') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_sessions] ALTER COLUMN [store_id] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.shift_sessions', N'terminal_id') IS NULL ALTER TABLE dbo.[shift_sessions] ADD [terminal_id] nvarchar(max) NULL;
 
@@ -2258,6 +2448,8 @@ IF COL_LENGTH(N'dbo.shift_sessions', N'created_at') IS NULL ALTER TABLE dbo.[shi
 
 IF COL_LENGTH(N'dbo.shift_sessions', N'updated_at') IS NULL ALTER TABLE dbo.[shift_sessions] ADD [updated_at] datetimeoffset(7) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_sessions') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_sessions] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
 IF COL_LENGTH(N'dbo.shift_sessions', N'row_version') IS NULL ALTER TABLE dbo.[shift_sessions] ADD [row_version] int NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.shift_sessions') AND name=N'IX_shift_sessions_store_id') CREATE INDEX [IX_shift_sessions_store_id] ON dbo.[shift_sessions]([store_id]);
@@ -2272,7 +2464,7 @@ IF OBJECT_ID(N'dbo.sku_audit', N'U') IS NULL BEGIN CREATE TABLE dbo.[sku_audit] 
   [product_name] nvarchar(max) NULL,
   [source] nvarchar(max) NOT NULL CONSTRAINT [DF_sku_audit_source] DEFAULT ('auto'),
   [previous_sku] nvarchar(max) NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [store_name] nvarchar(max) NULL,
   [terminal_id] nvarchar(max) NULL,
   [staff_id] nvarchar(max) NULL,
@@ -2287,6 +2479,8 @@ IF OBJECT_ID(N'dbo.sku_audit', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM s
 
 IF COL_LENGTH(N'dbo.sku_audit', N'id') IS NULL ALTER TABLE dbo.[sku_audit] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sku_audit') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sku_audit] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.sku_audit', N'sku') IS NULL ALTER TABLE dbo.[sku_audit] ADD [sku] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.sku_audit', N'product_id') IS NULL ALTER TABLE dbo.[sku_audit] ADD [product_id] uniqueidentifier NULL;
@@ -2297,7 +2491,9 @@ IF COL_LENGTH(N'dbo.sku_audit', N'source') IS NULL ALTER TABLE dbo.[sku_audit] A
 
 IF COL_LENGTH(N'dbo.sku_audit', N'previous_sku') IS NULL ALTER TABLE dbo.[sku_audit] ADD [previous_sku] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.sku_audit', N'store_id') IS NULL ALTER TABLE dbo.[sku_audit] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.sku_audit', N'store_id') IS NULL ALTER TABLE dbo.[sku_audit] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sku_audit') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sku_audit] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.sku_audit', N'store_name') IS NULL ALTER TABLE dbo.[sku_audit] ADD [store_name] nvarchar(max) NULL;
 
@@ -2330,6 +2526,8 @@ IF OBJECT_ID(N'dbo.staff_roles', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM
 
 IF COL_LENGTH(N'dbo.staff_roles', N'slug') IS NULL ALTER TABLE dbo.[staff_roles] ADD [slug] nvarchar(450) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.staff_roles') AND c.name=N'slug' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[staff_roles] ALTER COLUMN [slug] nvarchar(450) NOT NULL;
+
 IF COL_LENGTH(N'dbo.staff_roles', N'name') IS NULL ALTER TABLE dbo.[staff_roles] ADD [name] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.staff_roles', N'base_level') IS NULL ALTER TABLE dbo.[staff_roles] ADD [base_level] nvarchar(max) NULL;
@@ -2342,6 +2540,8 @@ IF COL_LENGTH(N'dbo.staff_roles', N'created_at') IS NULL ALTER TABLE dbo.[staff_
 
 IF COL_LENGTH(N'dbo.staff_roles', N'updated_at') IS NULL ALTER TABLE dbo.[staff_roles] ADD [updated_at] datetimeoffset(7) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.staff_roles') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[staff_roles] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.staff_roles') AND name=N'IX_staff_roles_updated_at') CREATE INDEX [IX_staff_roles_updated_at] ON dbo.[staff_roles]([updated_at]);
 
 IF OBJECT_ID(N'dbo.stock_adjustments', N'U') IS NULL BEGIN CREATE TABLE dbo.[stock_adjustments] (
@@ -2351,7 +2551,7 @@ IF OBJECT_ID(N'dbo.stock_adjustments', N'U') IS NULL BEGIN CREATE TABLE dbo.[sto
   [product_name] nvarchar(max) NULL,
   [sku] nvarchar(max) NULL,
   [barcode] nvarchar(max) NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [terminal_id] nvarchar(max) NULL,
   [reason] nvarchar(max) NOT NULL CONSTRAINT [DF_stock_adjustments_reason] DEFAULT ('manual'),
   [note] nvarchar(max) NOT NULL CONSTRAINT [DF_stock_adjustments_note] DEFAULT (''),
@@ -2373,6 +2573,8 @@ IF OBJECT_ID(N'dbo.stock_adjustments', N'U') IS NOT NULL AND NOT EXISTS (SELECT 
 
 IF COL_LENGTH(N'dbo.stock_adjustments', N'id') IS NULL ALTER TABLE dbo.[stock_adjustments] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stock_adjustments') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stock_adjustments] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.stock_adjustments', N'product_id') IS NULL ALTER TABLE dbo.[stock_adjustments] ADD [product_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.stock_adjustments', N'product_name') IS NULL ALTER TABLE dbo.[stock_adjustments] ADD [product_name] nvarchar(max) NULL;
@@ -2381,7 +2583,9 @@ IF COL_LENGTH(N'dbo.stock_adjustments', N'sku') IS NULL ALTER TABLE dbo.[stock_a
 
 IF COL_LENGTH(N'dbo.stock_adjustments', N'barcode') IS NULL ALTER TABLE dbo.[stock_adjustments] ADD [barcode] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.stock_adjustments', N'store_id') IS NULL ALTER TABLE dbo.[stock_adjustments] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.stock_adjustments', N'store_id') IS NULL ALTER TABLE dbo.[stock_adjustments] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stock_adjustments') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stock_adjustments] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.stock_adjustments', N'terminal_id') IS NULL ALTER TABLE dbo.[stock_adjustments] ADD [terminal_id] nvarchar(max) NULL;
 
@@ -2415,7 +2619,7 @@ IF OBJECT_ID(N'dbo.stock_delta_applied', N'U') IS NULL BEGIN CREATE TABLE dbo.[s
 
   [movement_id] uniqueidentifier NOT NULL,
   [product_id] uniqueidentifier NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [delta] int NOT NULL CONSTRAINT [DF_stock_delta_applied_delta] DEFAULT (0),
   [applied_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_stock_delta_applied_applied_at] DEFAULT (SYSDATETIMEOFFSET()),
   CONSTRAINT [PK_stock_delta_applied] PRIMARY KEY ([movement_id])
@@ -2426,9 +2630,13 @@ IF OBJECT_ID(N'dbo.stock_delta_applied', N'U') IS NOT NULL AND NOT EXISTS (SELEC
 
 IF COL_LENGTH(N'dbo.stock_delta_applied', N'movement_id') IS NULL ALTER TABLE dbo.[stock_delta_applied] ADD [movement_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stock_delta_applied') AND c.name=N'movement_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stock_delta_applied] ALTER COLUMN [movement_id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.stock_delta_applied', N'product_id') IS NULL ALTER TABLE dbo.[stock_delta_applied] ADD [product_id] uniqueidentifier NULL;
 
-IF COL_LENGTH(N'dbo.stock_delta_applied', N'store_id') IS NULL ALTER TABLE dbo.[stock_delta_applied] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.stock_delta_applied', N'store_id') IS NULL ALTER TABLE dbo.[stock_delta_applied] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stock_delta_applied') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stock_delta_applied] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.stock_delta_applied', N'delta') IS NULL ALTER TABLE dbo.[stock_delta_applied] ADD [delta] int NULL;
 
@@ -2459,6 +2667,8 @@ IF OBJECT_ID(N'dbo.stock_transfer_items', N'U') IS NULL BEGIN CREATE TABLE dbo.[
 IF OBJECT_ID(N'dbo.stock_transfer_items', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.stock_transfer_items')) ALTER TABLE dbo.[stock_transfer_items] ENABLE CHANGE_TRACKING;
 
 IF COL_LENGTH(N'dbo.stock_transfer_items', N'id') IS NULL ALTER TABLE dbo.[stock_transfer_items] ADD [id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stock_transfer_items') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stock_transfer_items] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 
 IF COL_LENGTH(N'dbo.stock_transfer_items', N'transfer_id') IS NULL ALTER TABLE dbo.[stock_transfer_items] ADD [transfer_id] uniqueidentifier NULL;
 
@@ -2518,7 +2728,11 @@ IF OBJECT_ID(N'dbo.stock_transfers', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 
 
 IF COL_LENGTH(N'dbo.stock_transfers', N'id') IS NULL ALTER TABLE dbo.[stock_transfers] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stock_transfers') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stock_transfers] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.stock_transfers', N'ref') IS NULL ALTER TABLE dbo.[stock_transfers] ADD [ref] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stock_transfers') AND c.name=N'ref' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stock_transfers] ALTER COLUMN [ref] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.stock_transfers', N'kind') IS NULL ALTER TABLE dbo.[stock_transfers] ADD [kind] nvarchar(max) NULL;
 
@@ -2556,6 +2770,8 @@ IF COL_LENGTH(N'dbo.stock_transfers', N'created_at') IS NULL ALTER TABLE dbo.[st
 
 IF COL_LENGTH(N'dbo.stock_transfers', N'updated_at') IS NULL ALTER TABLE dbo.[stock_transfers] ADD [updated_at] datetimeoffset(7) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stock_transfers') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stock_transfers] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
 IF COL_LENGTH(N'dbo.stock_transfers', N'row_version') IS NULL ALTER TABLE dbo.[stock_transfers] ADD [row_version] int NULL;
 
 IF COL_LENGTH(N'dbo.stock_transfers', N'verified_by') IS NULL ALTER TABLE dbo.[stock_transfers] ADD [verified_by] nvarchar(max) NULL;
@@ -2592,6 +2808,8 @@ IF OBJECT_ID(N'dbo.stores', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.
 
 IF COL_LENGTH(N'dbo.stores', N'id') IS NULL ALTER TABLE dbo.[stores] ADD [id] nvarchar(450) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stores') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stores] ALTER COLUMN [id] nvarchar(450) NOT NULL;
+
 IF COL_LENGTH(N'dbo.stores', N'code') IS NULL ALTER TABLE dbo.[stores] ADD [code] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.stores', N'name') IS NULL ALTER TABLE dbo.[stores] ADD [name] nvarchar(max) NULL;
@@ -2603,6 +2821,8 @@ IF COL_LENGTH(N'dbo.stores', N'phone') IS NULL ALTER TABLE dbo.[stores] ADD [pho
 IF COL_LENGTH(N'dbo.stores', N'created_at') IS NULL ALTER TABLE dbo.[stores] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.stores', N'updated_at') IS NULL ALTER TABLE dbo.[stores] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stores') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stores] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.stores', N'group_id') IS NULL ALTER TABLE dbo.[stores] ADD [group_id] nvarchar(max) NULL;
 
@@ -2650,6 +2870,8 @@ IF OBJECT_ID(N'dbo.suppliers', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM s
 
 IF COL_LENGTH(N'dbo.suppliers', N'id') IS NULL ALTER TABLE dbo.[suppliers] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.suppliers') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[suppliers] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.suppliers', N'name') IS NULL ALTER TABLE dbo.[suppliers] ADD [name] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.suppliers', N'contact_name') IS NULL ALTER TABLE dbo.[suppliers] ADD [contact_name] nvarchar(max) NULL;
@@ -2670,6 +2892,8 @@ IF COL_LENGTH(N'dbo.suppliers', N'created_at') IS NULL ALTER TABLE dbo.[supplier
 
 IF COL_LENGTH(N'dbo.suppliers', N'updated_at') IS NULL ALTER TABLE dbo.[suppliers] ADD [updated_at] datetimeoffset(7) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.suppliers') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[suppliers] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
 IF COL_LENGTH(N'dbo.suppliers', N'row_version') IS NULL ALTER TABLE dbo.[suppliers] ADD [row_version] int NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.suppliers') AND name=N'IX_suppliers_updated_at') CREATE INDEX [IX_suppliers_updated_at] ON dbo.[suppliers]([updated_at]);
@@ -2677,9 +2901,9 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.supplie
 IF OBJECT_ID(N'dbo.sync_metadata', N'U') IS NULL BEGIN CREATE TABLE dbo.[sync_metadata] (
 
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_sync_metadata_id] DEFAULT (NEWID()),
-  [store_id] nvarchar(max) NULL,
-  [terminal_id] nvarchar(max) NULL,
-  [table_name] nvarchar(max) NOT NULL,
+  [store_id] nvarchar(128) NULL,
+  [terminal_id] nvarchar(128) NULL,
+  [table_name] nvarchar(128) NOT NULL,
   [last_synced_at] datetimeoffset(7) NULL,
   [last_pushed_at] datetimeoffset(7) NULL,
   [rows_pushed] int NOT NULL CONSTRAINT [DF_sync_metadata_rows_pushed] DEFAULT (0),
@@ -2694,11 +2918,19 @@ IF OBJECT_ID(N'dbo.sync_metadata', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FR
 
 IF COL_LENGTH(N'dbo.sync_metadata', N'id') IS NULL ALTER TABLE dbo.[sync_metadata] ADD [id] uniqueidentifier NULL;
 
-IF COL_LENGTH(N'dbo.sync_metadata', N'store_id') IS NULL ALTER TABLE dbo.[sync_metadata] ADD [store_id] nvarchar(max) NULL;
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sync_metadata') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sync_metadata] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 
-IF COL_LENGTH(N'dbo.sync_metadata', N'terminal_id') IS NULL ALTER TABLE dbo.[sync_metadata] ADD [terminal_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.sync_metadata', N'store_id') IS NULL ALTER TABLE dbo.[sync_metadata] ADD [store_id] nvarchar(128) NULL;
 
-IF COL_LENGTH(N'dbo.sync_metadata', N'table_name') IS NULL ALTER TABLE dbo.[sync_metadata] ADD [table_name] nvarchar(max) NULL;
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sync_metadata') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sync_metadata] ALTER COLUMN [store_id] nvarchar(128) NULL;
+
+IF COL_LENGTH(N'dbo.sync_metadata', N'terminal_id') IS NULL ALTER TABLE dbo.[sync_metadata] ADD [terminal_id] nvarchar(128) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sync_metadata') AND c.name=N'terminal_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sync_metadata] ALTER COLUMN [terminal_id] nvarchar(128) NULL;
+
+IF COL_LENGTH(N'dbo.sync_metadata', N'table_name') IS NULL ALTER TABLE dbo.[sync_metadata] ADD [table_name] nvarchar(128) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sync_metadata') AND c.name=N'table_name' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sync_metadata] ALTER COLUMN [table_name] nvarchar(128) NOT NULL;
 
 IF COL_LENGTH(N'dbo.sync_metadata', N'last_synced_at') IS NULL ALTER TABLE dbo.[sync_metadata] ADD [last_synced_at] datetimeoffset(7) NULL;
 
@@ -2711,6 +2943,8 @@ IF COL_LENGTH(N'dbo.sync_metadata', N'last_error') IS NULL ALTER TABLE dbo.[sync
 IF COL_LENGTH(N'dbo.sync_metadata', N'created_at') IS NULL ALTER TABLE dbo.[sync_metadata] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.sync_metadata', N'updated_at') IS NULL ALTER TABLE dbo.[sync_metadata] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sync_metadata') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sync_metadata] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.sync_metadata') AND name=N'UQ_sync_metadata_0') CREATE UNIQUE INDEX [UQ_sync_metadata_0] ON dbo.[sync_metadata]([store_id],[terminal_id],[table_name]);
 
@@ -2731,7 +2965,7 @@ IF OBJECT_ID(N'dbo.system_audit_logs', N'U') IS NULL BEGIN CREATE TABLE dbo.[sys
   [new_value] nvarchar(max) NULL,
   [terminal_id] nvarchar(max) NULL,
   [ip_address] nvarchar(max) NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [note] nvarchar(max) NULL,
   [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_system_audit_logs_created_at] DEFAULT (SYSDATETIMEOFFSET()),
   CONSTRAINT [PK_system_audit_logs] PRIMARY KEY ([id])
@@ -2741,6 +2975,8 @@ IF OBJECT_ID(N'dbo.system_audit_logs', N'U') IS NULL BEGIN CREATE TABLE dbo.[sys
 IF OBJECT_ID(N'dbo.system_audit_logs', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.system_audit_logs')) ALTER TABLE dbo.[system_audit_logs] ENABLE CHANGE_TRACKING;
 
 IF COL_LENGTH(N'dbo.system_audit_logs', N'id') IS NULL ALTER TABLE dbo.[system_audit_logs] ADD [id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.system_audit_logs') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[system_audit_logs] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 
 IF COL_LENGTH(N'dbo.system_audit_logs', N'actor_id') IS NULL ALTER TABLE dbo.[system_audit_logs] ADD [actor_id] nvarchar(max) NULL;
 
@@ -2762,7 +2998,9 @@ IF COL_LENGTH(N'dbo.system_audit_logs', N'terminal_id') IS NULL ALTER TABLE dbo.
 
 IF COL_LENGTH(N'dbo.system_audit_logs', N'ip_address') IS NULL ALTER TABLE dbo.[system_audit_logs] ADD [ip_address] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.system_audit_logs', N'store_id') IS NULL ALTER TABLE dbo.[system_audit_logs] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.system_audit_logs', N'store_id') IS NULL ALTER TABLE dbo.[system_audit_logs] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.system_audit_logs') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[system_audit_logs] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.system_audit_logs', N'note') IS NULL ALTER TABLE dbo.[system_audit_logs] ADD [note] nvarchar(max) NULL;
 
@@ -2774,7 +3012,7 @@ IF OBJECT_ID(N'dbo.terminal_commands', N'U') IS NULL BEGIN CREATE TABLE dbo.[ter
 
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_terminal_commands_id] DEFAULT (NEWID()),
   [terminal_id] nvarchar(max) NOT NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [command] nvarchar(max) NOT NULL,
   [status] nvarchar(max) NOT NULL CONSTRAINT [DF_terminal_commands_status] DEFAULT ('pending'),
   [note] nvarchar(max) NULL,
@@ -2793,9 +3031,13 @@ IF OBJECT_ID(N'dbo.terminal_commands', N'U') IS NOT NULL AND NOT EXISTS (SELECT 
 
 IF COL_LENGTH(N'dbo.terminal_commands', N'id') IS NULL ALTER TABLE dbo.[terminal_commands] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.terminal_commands') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[terminal_commands] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.terminal_commands', N'terminal_id') IS NULL ALTER TABLE dbo.[terminal_commands] ADD [terminal_id] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.terminal_commands', N'store_id') IS NULL ALTER TABLE dbo.[terminal_commands] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.terminal_commands', N'store_id') IS NULL ALTER TABLE dbo.[terminal_commands] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.terminal_commands') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[terminal_commands] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.terminal_commands', N'command') IS NULL ALTER TABLE dbo.[terminal_commands] ADD [command] nvarchar(max) NULL;
 
@@ -2816,6 +3058,8 @@ IF COL_LENGTH(N'dbo.terminal_commands', N'finished_at') IS NULL ALTER TABLE dbo.
 IF COL_LENGTH(N'dbo.terminal_commands', N'created_at') IS NULL ALTER TABLE dbo.[terminal_commands] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.terminal_commands', N'updated_at') IS NULL ALTER TABLE dbo.[terminal_commands] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.terminal_commands') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[terminal_commands] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.terminal_commands') AND name=N'IX_terminal_commands_store_id') CREATE INDEX [IX_terminal_commands_store_id] ON dbo.[terminal_commands]([store_id]);
 
@@ -2845,6 +3089,8 @@ IF OBJECT_ID(N'dbo.terminal_tokens', N'U') IS NULL BEGIN CREATE TABLE dbo.[termi
 IF OBJECT_ID(N'dbo.terminal_tokens', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.terminal_tokens')) ALTER TABLE dbo.[terminal_tokens] ENABLE CHANGE_TRACKING;
 
 IF COL_LENGTH(N'dbo.terminal_tokens', N'id') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.terminal_tokens') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[terminal_tokens] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 
 IF COL_LENGTH(N'dbo.terminal_tokens', N'location_id') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [location_id] nvarchar(max) NULL;
 
@@ -2893,7 +3139,11 @@ IF OBJECT_ID(N'dbo.uom_units', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM s
 
 IF COL_LENGTH(N'dbo.uom_units', N'id') IS NULL ALTER TABLE dbo.[uom_units] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.uom_units') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[uom_units] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.uom_units', N'code') IS NULL ALTER TABLE dbo.[uom_units] ADD [code] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.uom_units') AND c.name=N'code' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[uom_units] ALTER COLUMN [code] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.uom_units', N'name') IS NULL ALTER TABLE dbo.[uom_units] ADD [name] nvarchar(max) NULL;
 
@@ -2904,6 +3154,8 @@ IF COL_LENGTH(N'dbo.uom_units', N'sort') IS NULL ALTER TABLE dbo.[uom_units] ADD
 IF COL_LENGTH(N'dbo.uom_units', N'created_at') IS NULL ALTER TABLE dbo.[uom_units] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.uom_units', N'updated_at') IS NULL ALTER TABLE dbo.[uom_units] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.uom_units') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[uom_units] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.uom_units', N'row_version') IS NULL ALTER TABLE dbo.[uom_units] ADD [row_version] int NULL;
 
@@ -2917,7 +3169,7 @@ IF OBJECT_ID(N'dbo.user_roles', N'U') IS NULL BEGIN CREATE TABLE dbo.[user_roles
 
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_user_roles_id] DEFAULT (NEWID()),
   [user_id] uniqueidentifier NOT NULL,
-  [role] nvarchar(max) NOT NULL,
+  [role] nvarchar(128) NOT NULL,
   [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_user_roles_created_at] DEFAULT (SYSDATETIMEOFFSET()),
   CONSTRAINT [PK_user_roles] PRIMARY KEY ([id])
 
@@ -2927,9 +3179,15 @@ IF OBJECT_ID(N'dbo.user_roles', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM 
 
 IF COL_LENGTH(N'dbo.user_roles', N'id') IS NULL ALTER TABLE dbo.[user_roles] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.user_roles') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[user_roles] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.user_roles', N'user_id') IS NULL ALTER TABLE dbo.[user_roles] ADD [user_id] uniqueidentifier NULL;
 
-IF COL_LENGTH(N'dbo.user_roles', N'role') IS NULL ALTER TABLE dbo.[user_roles] ADD [role] nvarchar(max) NULL;
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.user_roles') AND c.name=N'user_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[user_roles] ALTER COLUMN [user_id] uniqueidentifier NOT NULL;
+
+IF COL_LENGTH(N'dbo.user_roles', N'role') IS NULL ALTER TABLE dbo.[user_roles] ADD [role] nvarchar(128) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.user_roles') AND c.name=N'role' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[user_roles] ALTER COLUMN [role] nvarchar(128) NOT NULL;
 
 IF COL_LENGTH(N'dbo.user_roles', N'created_at') IS NULL ALTER TABLE dbo.[user_roles] ADD [created_at] datetimeoffset(7) NULL;
 
@@ -2942,7 +3200,7 @@ IF OBJECT_ID(N'dbo.whatsapp_queue', N'U') IS NULL BEGIN CREATE TABLE dbo.[whatsa
   [recipient] nvarchar(max) NOT NULL,
   [body] nvarchar(max) NOT NULL CONSTRAINT [DF_whatsapp_queue_body] DEFAULT (''),
   [reference] nvarchar(max) NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [status] nvarchar(max) NOT NULL CONSTRAINT [DF_whatsapp_queue_status] DEFAULT ('QUEUED'),
   [error] nvarchar(max) NULL,
   [queued_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_whatsapp_queue_queued_at] DEFAULT (SYSDATETIMEOFFSET()),
@@ -2957,6 +3215,8 @@ IF OBJECT_ID(N'dbo.whatsapp_queue', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 F
 
 IF COL_LENGTH(N'dbo.whatsapp_queue', N'id') IS NULL ALTER TABLE dbo.[whatsapp_queue] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.whatsapp_queue') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[whatsapp_queue] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.whatsapp_queue', N'phone_number_id') IS NULL ALTER TABLE dbo.[whatsapp_queue] ADD [phone_number_id] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.whatsapp_queue', N'recipient') IS NULL ALTER TABLE dbo.[whatsapp_queue] ADD [recipient] nvarchar(max) NULL;
@@ -2965,7 +3225,9 @@ IF COL_LENGTH(N'dbo.whatsapp_queue', N'body') IS NULL ALTER TABLE dbo.[whatsapp_
 
 IF COL_LENGTH(N'dbo.whatsapp_queue', N'reference') IS NULL ALTER TABLE dbo.[whatsapp_queue] ADD [reference] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.whatsapp_queue', N'store_id') IS NULL ALTER TABLE dbo.[whatsapp_queue] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.whatsapp_queue', N'store_id') IS NULL ALTER TABLE dbo.[whatsapp_queue] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.whatsapp_queue') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[whatsapp_queue] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.whatsapp_queue', N'status') IS NULL ALTER TABLE dbo.[whatsapp_queue] ADD [status] nvarchar(max) NULL;
 
@@ -2978,6 +3240,8 @@ IF COL_LENGTH(N'dbo.whatsapp_queue', N'sent_at') IS NULL ALTER TABLE dbo.[whatsa
 IF COL_LENGTH(N'dbo.whatsapp_queue', N'created_at') IS NULL ALTER TABLE dbo.[whatsapp_queue] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.whatsapp_queue', N'updated_at') IS NULL ALTER TABLE dbo.[whatsapp_queue] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.whatsapp_queue') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[whatsapp_queue] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.whatsapp_queue') AND name=N'IX_whatsapp_queue_store_id') CREATE INDEX [IX_whatsapp_queue_store_id] ON dbo.[whatsapp_queue]([store_id]);
 
@@ -3001,6 +3265,8 @@ IF OBJECT_ID(N'dbo.terminal_recovery_secrets', N'U') IS NOT NULL AND NOT EXISTS 
 
 IF COL_LENGTH(N'dbo.terminal_recovery_secrets', N'terminal_token_id') IS NULL ALTER TABLE dbo.[terminal_recovery_secrets] ADD [terminal_token_id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.terminal_recovery_secrets') AND c.name=N'terminal_token_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[terminal_recovery_secrets] ALTER COLUMN [terminal_token_id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.terminal_recovery_secrets', N'sealed_secret') IS NULL ALTER TABLE dbo.[terminal_recovery_secrets] ADD [sealed_secret] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.terminal_recovery_secrets', N'fingerprint') IS NULL ALTER TABLE dbo.[terminal_recovery_secrets] ADD [fingerprint] nvarchar(max) NULL;
@@ -3014,6 +3280,8 @@ IF COL_LENGTH(N'dbo.terminal_recovery_secrets', N'utc_offset_minutes') IS NULL A
 IF COL_LENGTH(N'dbo.terminal_recovery_secrets', N'created_at') IS NULL ALTER TABLE dbo.[terminal_recovery_secrets] ADD [created_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.terminal_recovery_secrets', N'updated_at') IS NULL ALTER TABLE dbo.[terminal_recovery_secrets] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.terminal_recovery_secrets') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[terminal_recovery_secrets] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.terminal_recovery_secrets') AND name=N'IX_terminal_recovery_secrets_updated_at') CREATE INDEX [IX_terminal_recovery_secrets_updated_at] ON dbo.[terminal_recovery_secrets]([updated_at]);
 
@@ -3060,7 +3328,7 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NULL BEGIN CREATE TABLE dbo.[po
   [require_pin_terminal_reset] bit NULL,
   [row_version] int NOT NULL CONSTRAINT [DF_pos_store_settings_row_version] DEFAULT (1),
   [updated_by] nvarchar(max) NULL,
-  [updated_at] nvarchar(max) NOT NULL CONSTRAINT [DF_pos_store_settings_updated_at] DEFAULT (SYSUTCDATETIME()),
+  [updated_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_pos_store_settings_updated_at] DEFAULT (SYSDATETIMEOFFSET()),
   [allow_offline_approvals] bit NOT NULL,
   CONSTRAINT [PK_pos_store_settings] PRIMARY KEY ([store_id])
 
@@ -3069,6 +3337,8 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NULL BEGIN CREATE TABLE dbo.[po
 IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings')) ALTER TABLE dbo.[pos_store_settings] ENABLE CHANGE_TRACKING;
 
 IF COL_LENGTH(N'dbo.pos_store_settings', N'store_id') IS NULL ALTER TABLE dbo.[pos_store_settings] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.pos_store_settings') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [store_id] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.pos_store_settings', N'block_shift_close_on_hold') IS NULL ALTER TABLE dbo.[pos_store_settings] ADD [block_shift_close_on_hold] bit NULL;
 
@@ -3150,7 +3420,9 @@ IF COL_LENGTH(N'dbo.pos_store_settings', N'row_version') IS NULL ALTER TABLE dbo
 
 IF COL_LENGTH(N'dbo.pos_store_settings', N'updated_by') IS NULL ALTER TABLE dbo.[pos_store_settings] ADD [updated_by] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.pos_store_settings', N'updated_at') IS NULL ALTER TABLE dbo.[pos_store_settings] ADD [updated_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.pos_store_settings', N'updated_at') IS NULL ALTER TABLE dbo.[pos_store_settings] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.pos_store_settings') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.pos_store_settings', N'allow_offline_approvals') IS NULL ALTER TABLE dbo.[pos_store_settings] ADD [allow_offline_approvals] bit NULL;
 
@@ -3160,25 +3432,31 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.pos_sto
 
 IF OBJECT_ID(N'dbo.settings_scoped', N'U') IS NULL BEGIN CREATE TABLE dbo.[settings_scoped] (
 
-  [scope] nvarchar(450) NOT NULL CONSTRAINT [DF_settings_scoped_scope] DEFAULT ('GLOBAL'),
-  [scope_id] nvarchar(450) NOT NULL CONSTRAINT [DF_settings_scoped_scope_id] DEFAULT (''),
-  [key] nvarchar(450) NOT NULL,
+  [scope] nvarchar(128) NOT NULL CONSTRAINT [DF_settings_scoped_scope] DEFAULT ('GLOBAL'),
+  [scope_id] nvarchar(128) NOT NULL CONSTRAINT [DF_settings_scoped_scope_id] DEFAULT (''),
+  [key] nvarchar(128) NOT NULL,
   [value] nvarchar(max) NULL,
   [is_overridden] bit NOT NULL CONSTRAINT [DF_settings_scoped_is_overridden] DEFAULT (1),
   [updated_by] nvarchar(max) NULL,
-  [created_at] nvarchar(max) NOT NULL CONSTRAINT [DF_settings_scoped_created_at] DEFAULT (SYSUTCDATETIME()),
-  [updated_at] nvarchar(max) NOT NULL CONSTRAINT [DF_settings_scoped_updated_at] DEFAULT (SYSUTCDATETIME()),
+  [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_settings_scoped_created_at] DEFAULT (SYSDATETIMEOFFSET()),
+  [updated_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_settings_scoped_updated_at] DEFAULT (SYSDATETIMEOFFSET()),
   CONSTRAINT [PK_settings_scoped] PRIMARY KEY ([scope], [scope_id], [key])
 
 ); END;
 
 IF OBJECT_ID(N'dbo.settings_scoped', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.settings_scoped')) ALTER TABLE dbo.[settings_scoped] ENABLE CHANGE_TRACKING;
 
-IF COL_LENGTH(N'dbo.settings_scoped', N'scope') IS NULL ALTER TABLE dbo.[settings_scoped] ADD [scope] nvarchar(450) NULL;
+IF COL_LENGTH(N'dbo.settings_scoped', N'scope') IS NULL ALTER TABLE dbo.[settings_scoped] ADD [scope] nvarchar(128) NULL;
 
-IF COL_LENGTH(N'dbo.settings_scoped', N'scope_id') IS NULL ALTER TABLE dbo.[settings_scoped] ADD [scope_id] nvarchar(450) NULL;
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.settings_scoped') AND c.name=N'scope' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[settings_scoped] ALTER COLUMN [scope] nvarchar(128) NOT NULL;
 
-IF COL_LENGTH(N'dbo.settings_scoped', N'key') IS NULL ALTER TABLE dbo.[settings_scoped] ADD [key] nvarchar(450) NULL;
+IF COL_LENGTH(N'dbo.settings_scoped', N'scope_id') IS NULL ALTER TABLE dbo.[settings_scoped] ADD [scope_id] nvarchar(128) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.settings_scoped') AND c.name=N'scope_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[settings_scoped] ALTER COLUMN [scope_id] nvarchar(128) NOT NULL;
+
+IF COL_LENGTH(N'dbo.settings_scoped', N'key') IS NULL ALTER TABLE dbo.[settings_scoped] ADD [key] nvarchar(128) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.settings_scoped') AND c.name=N'key' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[settings_scoped] ALTER COLUMN [key] nvarchar(128) NOT NULL;
 
 IF COL_LENGTH(N'dbo.settings_scoped', N'value') IS NULL ALTER TABLE dbo.[settings_scoped] ADD [value] nvarchar(max) NULL;
 
@@ -3186,16 +3464,18 @@ IF COL_LENGTH(N'dbo.settings_scoped', N'is_overridden') IS NULL ALTER TABLE dbo.
 
 IF COL_LENGTH(N'dbo.settings_scoped', N'updated_by') IS NULL ALTER TABLE dbo.[settings_scoped] ADD [updated_by] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.settings_scoped', N'created_at') IS NULL ALTER TABLE dbo.[settings_scoped] ADD [created_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.settings_scoped', N'created_at') IS NULL ALTER TABLE dbo.[settings_scoped] ADD [created_at] datetimeoffset(7) NULL;
 
-IF COL_LENGTH(N'dbo.settings_scoped', N'updated_at') IS NULL ALTER TABLE dbo.[settings_scoped] ADD [updated_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.settings_scoped', N'updated_at') IS NULL ALTER TABLE dbo.[settings_scoped] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.settings_scoped') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[settings_scoped] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.settings_scoped') AND name=N'IX_settings_scoped_updated_at') CREATE INDEX [IX_settings_scoped_updated_at] ON dbo.[settings_scoped]([updated_at]);
 
 IF OBJECT_ID(N'dbo.stock_count_drafts', N'U') IS NULL BEGIN CREATE TABLE dbo.[stock_count_drafts] (
 
   [id] uniqueidentifier NOT NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [terminal_id] nvarchar(max) NULL,
   [staff_id] nvarchar(max) NULL,
   [staff_name] nvarchar(max) NULL,
@@ -3205,10 +3485,10 @@ IF OBJECT_ID(N'dbo.stock_count_drafts', N'U') IS NULL BEGIN CREATE TABLE dbo.[st
   [lines] nvarchar(max) NOT NULL CONSTRAINT [DF_stock_count_drafts_lines] DEFAULT ('[]'),
   [line_count] int NOT NULL CONSTRAINT [DF_stock_count_drafts_line_count] DEFAULT (0),
   [total_impact] decimal(18,4) NOT NULL CONSTRAINT [DF_stock_count_drafts_total_impact] DEFAULT (0),
-  [posted_at] nvarchar(max) NULL,
+  [posted_at] datetimeoffset(7) NULL,
   [posted_by] nvarchar(max) NULL,
-  [created_at] nvarchar(max) NOT NULL CONSTRAINT [DF_stock_count_drafts_created_at] DEFAULT (SYSUTCDATETIME()),
-  [updated_at] nvarchar(max) NOT NULL CONSTRAINT [DF_stock_count_drafts_updated_at] DEFAULT (SYSUTCDATETIME()),
+  [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_stock_count_drafts_created_at] DEFAULT (SYSDATETIMEOFFSET()),
+  [updated_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_stock_count_drafts_updated_at] DEFAULT (SYSDATETIMEOFFSET()),
   [reference] nvarchar(max) NULL,
   [store_code] nvarchar(max) NULL,
   [pending_edit_request_id] uniqueidentifier NULL,
@@ -3220,7 +3500,11 @@ IF OBJECT_ID(N'dbo.stock_count_drafts', N'U') IS NOT NULL AND NOT EXISTS (SELECT
 
 IF COL_LENGTH(N'dbo.stock_count_drafts', N'id') IS NULL ALTER TABLE dbo.[stock_count_drafts] ADD [id] uniqueidentifier NULL;
 
-IF COL_LENGTH(N'dbo.stock_count_drafts', N'store_id') IS NULL ALTER TABLE dbo.[stock_count_drafts] ADD [store_id] nvarchar(max) NULL;
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stock_count_drafts') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stock_count_drafts] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
+IF COL_LENGTH(N'dbo.stock_count_drafts', N'store_id') IS NULL ALTER TABLE dbo.[stock_count_drafts] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stock_count_drafts') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stock_count_drafts] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.stock_count_drafts', N'terminal_id') IS NULL ALTER TABLE dbo.[stock_count_drafts] ADD [terminal_id] nvarchar(max) NULL;
 
@@ -3240,13 +3524,15 @@ IF COL_LENGTH(N'dbo.stock_count_drafts', N'line_count') IS NULL ALTER TABLE dbo.
 
 IF COL_LENGTH(N'dbo.stock_count_drafts', N'total_impact') IS NULL ALTER TABLE dbo.[stock_count_drafts] ADD [total_impact] decimal(18,4) NULL;
 
-IF COL_LENGTH(N'dbo.stock_count_drafts', N'posted_at') IS NULL ALTER TABLE dbo.[stock_count_drafts] ADD [posted_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.stock_count_drafts', N'posted_at') IS NULL ALTER TABLE dbo.[stock_count_drafts] ADD [posted_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.stock_count_drafts', N'posted_by') IS NULL ALTER TABLE dbo.[stock_count_drafts] ADD [posted_by] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.stock_count_drafts', N'created_at') IS NULL ALTER TABLE dbo.[stock_count_drafts] ADD [created_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.stock_count_drafts', N'created_at') IS NULL ALTER TABLE dbo.[stock_count_drafts] ADD [created_at] datetimeoffset(7) NULL;
 
-IF COL_LENGTH(N'dbo.stock_count_drafts', N'updated_at') IS NULL ALTER TABLE dbo.[stock_count_drafts] ADD [updated_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.stock_count_drafts', N'updated_at') IS NULL ALTER TABLE dbo.[stock_count_drafts] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stock_count_drafts') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stock_count_drafts] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.stock_count_drafts', N'reference') IS NULL ALTER TABLE dbo.[stock_count_drafts] ADD [reference] nvarchar(max) NULL;
 
@@ -3275,8 +3561,8 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NULL BEGIN CREATE TABLE dbo.
   [require_reason] bit NOT NULL CONSTRAINT [DF_authorization_actions_require_reason] DEFAULT (0),
   [threshold] decimal(38,12) NULL,
   [is_enabled] bit NOT NULL CONSTRAINT [DF_authorization_actions_is_enabled] DEFAULT (1),
-  [created_at] nvarchar(max) NOT NULL CONSTRAINT [DF_authorization_actions_created_at] DEFAULT (SYSUTCDATETIME()),
-  [updated_at] nvarchar(max) NOT NULL CONSTRAINT [DF_authorization_actions_updated_at] DEFAULT (SYSUTCDATETIME()),
+  [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_authorization_actions_created_at] DEFAULT (SYSDATETIMEOFFSET()),
+  [updated_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_authorization_actions_updated_at] DEFAULT (SYSDATETIMEOFFSET()),
   CONSTRAINT [PK_authorization_actions] PRIMARY KEY ([id])
 
 ); END;
@@ -3284,6 +3570,8 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NULL BEGIN CREATE TABLE dbo.
 IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.authorization_actions')) ALTER TABLE dbo.[authorization_actions] ENABLE CHANGE_TRACKING;
 
 IF COL_LENGTH(N'dbo.authorization_actions', N'id') IS NULL ALTER TABLE dbo.[authorization_actions] ADD [id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.authorization_actions') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 
 IF COL_LENGTH(N'dbo.authorization_actions', N'action_key') IS NULL ALTER TABLE dbo.[authorization_actions] ADD [action_key] nvarchar(max) NULL;
 
@@ -3313,9 +3601,11 @@ IF COL_LENGTH(N'dbo.authorization_actions', N'threshold') IS NULL ALTER TABLE db
 
 IF COL_LENGTH(N'dbo.authorization_actions', N'is_enabled') IS NULL ALTER TABLE dbo.[authorization_actions] ADD [is_enabled] bit NULL;
 
-IF COL_LENGTH(N'dbo.authorization_actions', N'created_at') IS NULL ALTER TABLE dbo.[authorization_actions] ADD [created_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.authorization_actions', N'created_at') IS NULL ALTER TABLE dbo.[authorization_actions] ADD [created_at] datetimeoffset(7) NULL;
 
-IF COL_LENGTH(N'dbo.authorization_actions', N'updated_at') IS NULL ALTER TABLE dbo.[authorization_actions] ADD [updated_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.authorization_actions', N'updated_at') IS NULL ALTER TABLE dbo.[authorization_actions] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.authorization_actions') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.authorization_actions') AND name=N'IX_authorization_actions_updated_at') CREATE INDEX [IX_authorization_actions_updated_at] ON dbo.[authorization_actions]([updated_at]);
 
@@ -3325,21 +3615,21 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NULL BEGIN CREATE TABLE dbo
   [action_key] nvarchar(max) NOT NULL,
   [requested_by] nvarchar(max) NOT NULL,
   [requested_by_name] nvarchar(max) NOT NULL CONSTRAINT [DF_authorization_requests_requested_by_name] DEFAULT (''),
-  [store_id] nvarchar(max) NOT NULL CONSTRAINT [DF_authorization_requests_store_id] DEFAULT (''),
+  [store_id] nvarchar(450) NOT NULL CONSTRAINT [DF_authorization_requests_store_id] DEFAULT (''),
   [terminal_id] nvarchar(max) NOT NULL CONSTRAINT [DF_authorization_requests_terminal_id] DEFAULT (''),
   [reason] nvarchar(max) NOT NULL CONSTRAINT [DF_authorization_requests_reason] DEFAULT (''),
   [payload] nvarchar(max) NOT NULL CONSTRAINT [DF_authorization_requests_payload] DEFAULT (N'[]'),
   [status] nvarchar(max) NOT NULL CONSTRAINT [DF_authorization_requests_status] DEFAULT ('pending'),
   [decided_by] nvarchar(max) NULL,
   [decided_by_name] nvarchar(max) NULL,
-  [decided_at] nvarchar(max) NULL,
+  [decided_at] datetimeoffset(7) NULL,
   [decision_note] nvarchar(max) NULL,
-  [expires_at] nvarchar(max) NOT NULL,
-  [consumed_at] nvarchar(max) NULL,
+  [expires_at] datetimeoffset(7) NOT NULL,
+  [consumed_at] datetimeoffset(7) NULL,
   [requester_direct_limit] decimal(38,12) NULL,
   [value_unit] nvarchar(max) NOT NULL CONSTRAINT [DF_authorization_requests_value_unit] DEFAULT ('number'),
-  [created_at] nvarchar(max) NOT NULL CONSTRAINT [DF_authorization_requests_created_at] DEFAULT (SYSUTCDATETIME()),
-  [updated_at] nvarchar(max) NOT NULL CONSTRAINT [DF_authorization_requests_updated_at] DEFAULT (SYSUTCDATETIME()),
+  [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_authorization_requests_created_at] DEFAULT (SYSDATETIMEOFFSET()),
+  [updated_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_authorization_requests_updated_at] DEFAULT (SYSDATETIMEOFFSET()),
   [requested_amount] decimal(38,12) NOT NULL CONSTRAINT [DF_authorization_requests_requested_amount] DEFAULT (N'[]'),
   CONSTRAINT [PK_authorization_requests] PRIMARY KEY ([id])
 
@@ -3349,13 +3639,17 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND NOT EXISTS (SE
 
 IF COL_LENGTH(N'dbo.authorization_requests', N'id') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.authorization_requests') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.authorization_requests', N'action_key') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [action_key] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.authorization_requests', N'requested_by') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [requested_by] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.authorization_requests', N'requested_by_name') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [requested_by_name] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.authorization_requests', N'store_id') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.authorization_requests', N'store_id') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.authorization_requests') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [store_id] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.authorization_requests', N'terminal_id') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [terminal_id] nvarchar(max) NULL;
 
@@ -3369,21 +3663,23 @@ IF COL_LENGTH(N'dbo.authorization_requests', N'decided_by') IS NULL ALTER TABLE 
 
 IF COL_LENGTH(N'dbo.authorization_requests', N'decided_by_name') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [decided_by_name] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.authorization_requests', N'decided_at') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [decided_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.authorization_requests', N'decided_at') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [decided_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.authorization_requests', N'decision_note') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [decision_note] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.authorization_requests', N'expires_at') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [expires_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.authorization_requests', N'expires_at') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [expires_at] datetimeoffset(7) NULL;
 
-IF COL_LENGTH(N'dbo.authorization_requests', N'consumed_at') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [consumed_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.authorization_requests', N'consumed_at') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [consumed_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.authorization_requests', N'requester_direct_limit') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [requester_direct_limit] decimal(38,12) NULL;
 
 IF COL_LENGTH(N'dbo.authorization_requests', N'value_unit') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [value_unit] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.authorization_requests', N'created_at') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [created_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.authorization_requests', N'created_at') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [created_at] datetimeoffset(7) NULL;
 
-IF COL_LENGTH(N'dbo.authorization_requests', N'updated_at') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [updated_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.authorization_requests', N'updated_at') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.authorization_requests') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.authorization_requests', N'requested_amount') IS NULL ALTER TABLE dbo.[authorization_requests] ADD [requested_amount] decimal(38,12) NULL;
 
@@ -3400,11 +3696,11 @@ IF OBJECT_ID(N'dbo.authorization_log', N'U') IS NULL BEGIN CREATE TABLE dbo.[aut
   [requested_by] nvarchar(max) NULL,
   [authorized_by] nvarchar(max) NULL,
   [authorizer_role] nvarchar(max) NULL,
-  [store_id] nvarchar(max) NOT NULL CONSTRAINT [DF_authorization_log_store_id] DEFAULT (''),
+  [store_id] nvarchar(450) NOT NULL CONSTRAINT [DF_authorization_log_store_id] DEFAULT (''),
   [terminal_id] nvarchar(max) NOT NULL CONSTRAINT [DF_authorization_log_terminal_id] DEFAULT (''),
   [outcome] nvarchar(max) NOT NULL,
   [detail] nvarchar(max) NOT NULL CONSTRAINT [DF_authorization_log_detail] DEFAULT (N'[]'),
-  [created_at] nvarchar(max) NOT NULL CONSTRAINT [DF_authorization_log_created_at] DEFAULT (SYSUTCDATETIME()),
+  [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_authorization_log_created_at] DEFAULT (SYSDATETIMEOFFSET()),
   CONSTRAINT [PK_authorization_log] PRIMARY KEY ([id])
 
 ); END;
@@ -3412,6 +3708,8 @@ IF OBJECT_ID(N'dbo.authorization_log', N'U') IS NULL BEGIN CREATE TABLE dbo.[aut
 IF OBJECT_ID(N'dbo.authorization_log', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.authorization_log')) ALTER TABLE dbo.[authorization_log] ENABLE CHANGE_TRACKING;
 
 IF COL_LENGTH(N'dbo.authorization_log', N'id') IS NULL ALTER TABLE dbo.[authorization_log] ADD [id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.authorization_log') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[authorization_log] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 
 IF COL_LENGTH(N'dbo.authorization_log', N'action_key') IS NULL ALTER TABLE dbo.[authorization_log] ADD [action_key] nvarchar(max) NULL;
 
@@ -3425,7 +3723,9 @@ IF COL_LENGTH(N'dbo.authorization_log', N'authorized_by') IS NULL ALTER TABLE db
 
 IF COL_LENGTH(N'dbo.authorization_log', N'authorizer_role') IS NULL ALTER TABLE dbo.[authorization_log] ADD [authorizer_role] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.authorization_log', N'store_id') IS NULL ALTER TABLE dbo.[authorization_log] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.authorization_log', N'store_id') IS NULL ALTER TABLE dbo.[authorization_log] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.authorization_log') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[authorization_log] ALTER COLUMN [store_id] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.authorization_log', N'terminal_id') IS NULL ALTER TABLE dbo.[authorization_log] ADD [terminal_id] nvarchar(max) NULL;
 
@@ -3433,7 +3733,7 @@ IF COL_LENGTH(N'dbo.authorization_log', N'outcome') IS NULL ALTER TABLE dbo.[aut
 
 IF COL_LENGTH(N'dbo.authorization_log', N'detail') IS NULL ALTER TABLE dbo.[authorization_log] ADD [detail] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.authorization_log', N'created_at') IS NULL ALTER TABLE dbo.[authorization_log] ADD [created_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.authorization_log', N'created_at') IS NULL ALTER TABLE dbo.[authorization_log] ADD [created_at] datetimeoffset(7) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.authorization_log') AND name=N'IX_authorization_log_store_id') CREATE INDEX [IX_authorization_log_store_id] ON dbo.[authorization_log]([store_id]);
 
@@ -3443,7 +3743,7 @@ IF OBJECT_ID(N'dbo.record_edits', N'U') IS NULL BEGIN CREATE TABLE dbo.[record_e
   [record_type] nvarchar(max) NOT NULL,
   [record_id] nvarchar(max) NOT NULL,
   [reference] nvarchar(max) NULL,
-  [store_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
   [terminal_id] nvarchar(max) NULL,
   [action_key] nvarchar(max) NOT NULL,
   [request_id] uniqueidentifier NULL,
@@ -3456,7 +3756,7 @@ IF OBJECT_ID(N'dbo.record_edits', N'U') IS NULL BEGIN CREATE TABLE dbo.[record_e
   [after_value] nvarchar(max) NOT NULL CONSTRAINT [DF_record_edits_after_value] DEFAULT (N'[]'),
   [stock_deltas] nvarchar(max) NOT NULL CONSTRAINT [DF_record_edits_stock_deltas] DEFAULT (N'[]'),
   [note] nvarchar(max) NULL,
-  [created_at] nvarchar(max) NOT NULL CONSTRAINT [DF_record_edits_created_at] DEFAULT (SYSUTCDATETIME()),
+  [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_record_edits_created_at] DEFAULT (SYSDATETIMEOFFSET()),
   CONSTRAINT [PK_record_edits] PRIMARY KEY ([id])
 
 ); END;
@@ -3465,13 +3765,17 @@ IF OBJECT_ID(N'dbo.record_edits', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FRO
 
 IF COL_LENGTH(N'dbo.record_edits', N'id') IS NULL ALTER TABLE dbo.[record_edits] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.record_edits') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[record_edits] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.record_edits', N'record_type') IS NULL ALTER TABLE dbo.[record_edits] ADD [record_type] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.record_edits', N'record_id') IS NULL ALTER TABLE dbo.[record_edits] ADD [record_id] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.record_edits', N'reference') IS NULL ALTER TABLE dbo.[record_edits] ADD [reference] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.record_edits', N'store_id') IS NULL ALTER TABLE dbo.[record_edits] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.record_edits', N'store_id') IS NULL ALTER TABLE dbo.[record_edits] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.record_edits') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[record_edits] ALTER COLUMN [store_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.record_edits', N'terminal_id') IS NULL ALTER TABLE dbo.[record_edits] ADD [terminal_id] nvarchar(max) NULL;
 
@@ -3497,7 +3801,7 @@ IF COL_LENGTH(N'dbo.record_edits', N'stock_deltas') IS NULL ALTER TABLE dbo.[rec
 
 IF COL_LENGTH(N'dbo.record_edits', N'note') IS NULL ALTER TABLE dbo.[record_edits] ADD [note] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.record_edits', N'created_at') IS NULL ALTER TABLE dbo.[record_edits] ADD [created_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.record_edits', N'created_at') IS NULL ALTER TABLE dbo.[record_edits] ADD [created_at] datetimeoffset(7) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.record_edits') AND name=N'IX_record_edits_store_id') CREATE INDEX [IX_record_edits_store_id] ON dbo.[record_edits]([store_id]);
 
@@ -3505,7 +3809,7 @@ IF OBJECT_ID(N'dbo.shift_cash_counts', N'U') IS NULL BEGIN CREATE TABLE dbo.[shi
 
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_shift_cash_counts_id] DEFAULT (NEWID()),
   [shift_id] uniqueidentifier NOT NULL,
-  [store_id] nvarchar(max) NOT NULL,
+  [store_id] nvarchar(450) NOT NULL,
   [terminal_id] nvarchar(max) NULL,
   [kind] nvarchar(max) NOT NULL CONSTRAINT [DF_shift_cash_counts_kind] DEFAULT ('ORIGINAL'),
   [counted_cash] decimal(38,12) NOT NULL,
@@ -3516,7 +3820,7 @@ IF OBJECT_ID(N'dbo.shift_cash_counts', N'U') IS NULL BEGIN CREATE TABLE dbo.[shi
   [counted_by_staff_id] nvarchar(max) NULL,
   [counted_by_user_id] uniqueidentifier NULL,
   [client_key] nvarchar(max) NULL,
-  [created_at] nvarchar(max) NOT NULL CONSTRAINT [DF_shift_cash_counts_created_at] DEFAULT (SYSUTCDATETIME()),
+  [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_shift_cash_counts_created_at] DEFAULT (SYSDATETIMEOFFSET()),
   CONSTRAINT [PK_shift_cash_counts] PRIMARY KEY ([id])
 
 ); END;
@@ -3525,9 +3829,13 @@ IF OBJECT_ID(N'dbo.shift_cash_counts', N'U') IS NOT NULL AND NOT EXISTS (SELECT 
 
 IF COL_LENGTH(N'dbo.shift_cash_counts', N'id') IS NULL ALTER TABLE dbo.[shift_cash_counts] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_cash_counts') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_cash_counts] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.shift_cash_counts', N'shift_id') IS NULL ALTER TABLE dbo.[shift_cash_counts] ADD [shift_id] uniqueidentifier NULL;
 
-IF COL_LENGTH(N'dbo.shift_cash_counts', N'store_id') IS NULL ALTER TABLE dbo.[shift_cash_counts] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.shift_cash_counts', N'store_id') IS NULL ALTER TABLE dbo.[shift_cash_counts] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_cash_counts') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_cash_counts] ALTER COLUMN [store_id] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.shift_cash_counts', N'terminal_id') IS NULL ALTER TABLE dbo.[shift_cash_counts] ADD [terminal_id] nvarchar(max) NULL;
 
@@ -3549,7 +3857,7 @@ IF COL_LENGTH(N'dbo.shift_cash_counts', N'counted_by_user_id') IS NULL ALTER TAB
 
 IF COL_LENGTH(N'dbo.shift_cash_counts', N'client_key') IS NULL ALTER TABLE dbo.[shift_cash_counts] ADD [client_key] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.shift_cash_counts', N'created_at') IS NULL ALTER TABLE dbo.[shift_cash_counts] ADD [created_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.shift_cash_counts', N'created_at') IS NULL ALTER TABLE dbo.[shift_cash_counts] ADD [created_at] datetimeoffset(7) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.shift_cash_counts') AND name=N'IX_shift_cash_counts_store_id') CREATE INDEX [IX_shift_cash_counts_store_id] ON dbo.[shift_cash_counts]([store_id]);
 
@@ -3557,7 +3865,7 @@ IF OBJECT_ID(N'dbo.shift_close_events', N'U') IS NULL BEGIN CREATE TABLE dbo.[sh
 
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_shift_close_events_id] DEFAULT (NEWID()),
   [shift_id] uniqueidentifier NOT NULL,
-  [store_id] nvarchar(max) NOT NULL,
+  [store_id] nvarchar(450) NOT NULL,
   [terminal_id] nvarchar(max) NULL,
   [event] nvarchar(max) NOT NULL,
   [from_state] nvarchar(max) NULL,
@@ -3566,7 +3874,7 @@ IF OBJECT_ID(N'dbo.shift_close_events', N'U') IS NULL BEGIN CREATE TABLE dbo.[sh
   [actor_name] nvarchar(max) NULL,
   [actor_staff_id] nvarchar(max) NULL,
   [actor_user_id] uniqueidentifier NULL,
-  [created_at] nvarchar(max) NOT NULL CONSTRAINT [DF_shift_close_events_created_at] DEFAULT (SYSUTCDATETIME()),
+  [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_shift_close_events_created_at] DEFAULT (SYSDATETIMEOFFSET()),
   CONSTRAINT [PK_shift_close_events] PRIMARY KEY ([id])
 
 ); END;
@@ -3575,9 +3883,13 @@ IF OBJECT_ID(N'dbo.shift_close_events', N'U') IS NOT NULL AND NOT EXISTS (SELECT
 
 IF COL_LENGTH(N'dbo.shift_close_events', N'id') IS NULL ALTER TABLE dbo.[shift_close_events] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_close_events') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_close_events] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.shift_close_events', N'shift_id') IS NULL ALTER TABLE dbo.[shift_close_events] ADD [shift_id] uniqueidentifier NULL;
 
-IF COL_LENGTH(N'dbo.shift_close_events', N'store_id') IS NULL ALTER TABLE dbo.[shift_close_events] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.shift_close_events', N'store_id') IS NULL ALTER TABLE dbo.[shift_close_events] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_close_events') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_close_events] ALTER COLUMN [store_id] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.shift_close_events', N'terminal_id') IS NULL ALTER TABLE dbo.[shift_close_events] ADD [terminal_id] nvarchar(max) NULL;
 
@@ -3595,7 +3907,7 @@ IF COL_LENGTH(N'dbo.shift_close_events', N'actor_staff_id') IS NULL ALTER TABLE 
 
 IF COL_LENGTH(N'dbo.shift_close_events', N'actor_user_id') IS NULL ALTER TABLE dbo.[shift_close_events] ADD [actor_user_id] uniqueidentifier NULL;
 
-IF COL_LENGTH(N'dbo.shift_close_events', N'created_at') IS NULL ALTER TABLE dbo.[shift_close_events] ADD [created_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.shift_close_events', N'created_at') IS NULL ALTER TABLE dbo.[shift_close_events] ADD [created_at] datetimeoffset(7) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.shift_close_events') AND name=N'IX_shift_close_events_store_id') CREATE INDEX [IX_shift_close_events_store_id] ON dbo.[shift_close_events]([store_id]);
 
@@ -3603,7 +3915,7 @@ IF OBJECT_ID(N'dbo.shift_reconciliations', N'U') IS NULL BEGIN CREATE TABLE dbo.
 
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_shift_reconciliations_id] DEFAULT (NEWID()),
   [shift_id] uniqueidentifier NOT NULL,
-  [store_id] nvarchar(max) NOT NULL,
+  [store_id] nvarchar(450) NOT NULL,
   [count_id] uniqueidentifier NULL,
   [expected_cash] decimal(38,12) NOT NULL CONSTRAINT [DF_shift_reconciliations_expected_cash] DEFAULT (0),
   [expected_card] decimal(38,12) NOT NULL CONSTRAINT [DF_shift_reconciliations_expected_card] DEFAULT (0),
@@ -3616,7 +3928,7 @@ IF OBJECT_ID(N'dbo.shift_reconciliations', N'U') IS NULL BEGIN CREATE TABLE dbo.
   [variance_digital] decimal(38,12) NULL,
   [variance_total] decimal(38,12) NULL,
   [variance_status] nvarchar(max) NOT NULL CONSTRAINT [DF_shift_reconciliations_variance_status] DEFAULT ('NO_VARIANCE'),
-  [created_at] nvarchar(max) NOT NULL CONSTRAINT [DF_shift_reconciliations_created_at] DEFAULT (SYSUTCDATETIME()),
+  [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_shift_reconciliations_created_at] DEFAULT (SYSDATETIMEOFFSET()),
   CONSTRAINT [PK_shift_reconciliations] PRIMARY KEY ([id])
 
 ); END;
@@ -3625,9 +3937,13 @@ IF OBJECT_ID(N'dbo.shift_reconciliations', N'U') IS NOT NULL AND NOT EXISTS (SEL
 
 IF COL_LENGTH(N'dbo.shift_reconciliations', N'id') IS NULL ALTER TABLE dbo.[shift_reconciliations] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_reconciliations') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_reconciliations] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.shift_reconciliations', N'shift_id') IS NULL ALTER TABLE dbo.[shift_reconciliations] ADD [shift_id] uniqueidentifier NULL;
 
-IF COL_LENGTH(N'dbo.shift_reconciliations', N'store_id') IS NULL ALTER TABLE dbo.[shift_reconciliations] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.shift_reconciliations', N'store_id') IS NULL ALTER TABLE dbo.[shift_reconciliations] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_reconciliations') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_reconciliations] ALTER COLUMN [store_id] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.shift_reconciliations', N'count_id') IS NULL ALTER TABLE dbo.[shift_reconciliations] ADD [count_id] uniqueidentifier NULL;
 
@@ -3653,7 +3969,7 @@ IF COL_LENGTH(N'dbo.shift_reconciliations', N'variance_total') IS NULL ALTER TAB
 
 IF COL_LENGTH(N'dbo.shift_reconciliations', N'variance_status') IS NULL ALTER TABLE dbo.[shift_reconciliations] ADD [variance_status] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.shift_reconciliations', N'created_at') IS NULL ALTER TABLE dbo.[shift_reconciliations] ADD [created_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.shift_reconciliations', N'created_at') IS NULL ALTER TABLE dbo.[shift_reconciliations] ADD [created_at] datetimeoffset(7) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.shift_reconciliations') AND name=N'IX_shift_reconciliations_store_id') CREATE INDEX [IX_shift_reconciliations_store_id] ON dbo.[shift_reconciliations]([store_id]);
 
@@ -3661,7 +3977,7 @@ IF OBJECT_ID(N'dbo.shift_variance_alerts', N'U') IS NULL BEGIN CREATE TABLE dbo.
 
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_shift_variance_alerts_id] DEFAULT (NEWID()),
   [shift_id] uniqueidentifier NOT NULL,
-  [store_id] nvarchar(max) NOT NULL,
+  [store_id] nvarchar(450) NOT NULL,
   [reconciliation_id] uniqueidentifier NULL,
   [variance_total] decimal(38,12) NOT NULL,
   [variance_status] nvarchar(max) NOT NULL,
@@ -3670,11 +3986,11 @@ IF OBJECT_ID(N'dbo.shift_variance_alerts', N'U') IS NULL BEGIN CREATE TABLE dbo.
   [delivery_status] nvarchar(max) NOT NULL CONSTRAINT [DF_shift_variance_alerts_delivery_status] DEFAULT ('pending'),
   [attempts] int NOT NULL CONSTRAINT [DF_shift_variance_alerts_attempts] DEFAULT (0),
   [last_error] nvarchar(max) NULL,
-  [last_attempt_at] nvarchar(max) NULL,
-  [acknowledged_at] nvarchar(max) NULL,
+  [last_attempt_at] datetimeoffset(7) NULL,
+  [acknowledged_at] datetimeoffset(7) NULL,
   [acknowledged_by] nvarchar(max) NULL,
-  [created_at] nvarchar(max) NOT NULL CONSTRAINT [DF_shift_variance_alerts_created_at] DEFAULT (SYSUTCDATETIME()),
-  [updated_at] nvarchar(max) NOT NULL CONSTRAINT [DF_shift_variance_alerts_updated_at] DEFAULT (SYSUTCDATETIME()),
+  [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_shift_variance_alerts_created_at] DEFAULT (SYSDATETIMEOFFSET()),
+  [updated_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_shift_variance_alerts_updated_at] DEFAULT (SYSDATETIMEOFFSET()),
   CONSTRAINT [PK_shift_variance_alerts] PRIMARY KEY ([id])
 
 ); END;
@@ -3683,9 +3999,13 @@ IF OBJECT_ID(N'dbo.shift_variance_alerts', N'U') IS NOT NULL AND NOT EXISTS (SEL
 
 IF COL_LENGTH(N'dbo.shift_variance_alerts', N'id') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_variance_alerts') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_variance_alerts] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.shift_variance_alerts', N'shift_id') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [shift_id] uniqueidentifier NULL;
 
-IF COL_LENGTH(N'dbo.shift_variance_alerts', N'store_id') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.shift_variance_alerts', N'store_id') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [store_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_variance_alerts') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_variance_alerts] ALTER COLUMN [store_id] nvarchar(450) NOT NULL;
 
 IF COL_LENGTH(N'dbo.shift_variance_alerts', N'reconciliation_id') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [reconciliation_id] uniqueidentifier NULL;
 
@@ -3703,15 +4023,17 @@ IF COL_LENGTH(N'dbo.shift_variance_alerts', N'attempts') IS NULL ALTER TABLE dbo
 
 IF COL_LENGTH(N'dbo.shift_variance_alerts', N'last_error') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [last_error] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.shift_variance_alerts', N'last_attempt_at') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [last_attempt_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.shift_variance_alerts', N'last_attempt_at') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [last_attempt_at] datetimeoffset(7) NULL;
 
-IF COL_LENGTH(N'dbo.shift_variance_alerts', N'acknowledged_at') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [acknowledged_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.shift_variance_alerts', N'acknowledged_at') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [acknowledged_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.shift_variance_alerts', N'acknowledged_by') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [acknowledged_by] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.shift_variance_alerts', N'created_at') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [created_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.shift_variance_alerts', N'created_at') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [created_at] datetimeoffset(7) NULL;
 
-IF COL_LENGTH(N'dbo.shift_variance_alerts', N'updated_at') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [updated_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.shift_variance_alerts', N'updated_at') IS NULL ALTER TABLE dbo.[shift_variance_alerts] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.shift_variance_alerts') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[shift_variance_alerts] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.shift_variance_alerts') AND name=N'IX_shift_variance_alerts_store_id') CREATE INDEX [IX_shift_variance_alerts_store_id] ON dbo.[shift_variance_alerts]([store_id]);
 
@@ -3729,16 +4051,16 @@ IF OBJECT_ID(N'dbo.entity_status_history', N'U') IS NULL BEGIN CREATE TABLE dbo.
   [actor_id] nvarchar(max) NULL,
   [actor_name] nvarchar(max) NULL,
   [actor_role] nvarchar(max) NULL,
-  [store_id] nvarchar(max) NULL,
-  [branch_id] nvarchar(max) NULL,
+  [store_id] nvarchar(450) NULL,
+  [branch_id] nvarchar(450) NULL,
   [terminal_id] nvarchar(max) NULL,
   [related_entity_type] nvarchar(max) NULL,
   [related_entity_id] nvarchar(max) NULL,
   [metadata] nvarchar(max) NOT NULL CONSTRAINT [DF_entity_status_history_metadata] DEFAULT (N'[]'),
   [client_event_id] nvarchar(max) NULL,
-  [occurred_at] nvarchar(max) NOT NULL CONSTRAINT [DF_entity_status_history_occurred_at] DEFAULT (SYSUTCDATETIME()),
-  [created_at] nvarchar(max) NOT NULL CONSTRAINT [DF_entity_status_history_created_at] DEFAULT (SYSUTCDATETIME()),
-  [updated_at] nvarchar(max) NOT NULL CONSTRAINT [DF_entity_status_history_updated_at] DEFAULT (SYSUTCDATETIME()),
+  [occurred_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_entity_status_history_occurred_at] DEFAULT (SYSDATETIMEOFFSET()),
+  [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_entity_status_history_created_at] DEFAULT (SYSDATETIMEOFFSET()),
+  [updated_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_entity_status_history_updated_at] DEFAULT (SYSDATETIMEOFFSET()),
   [row_version] bigint NOT NULL CONSTRAINT [DF_entity_status_history_row_version] DEFAULT (1),
   CONSTRAINT [PK_entity_status_history] PRIMARY KEY ([id])
 
@@ -3747,6 +4069,8 @@ IF OBJECT_ID(N'dbo.entity_status_history', N'U') IS NULL BEGIN CREATE TABLE dbo.
 IF OBJECT_ID(N'dbo.entity_status_history', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.entity_status_history')) ALTER TABLE dbo.[entity_status_history] ENABLE CHANGE_TRACKING;
 
 IF COL_LENGTH(N'dbo.entity_status_history', N'id') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.entity_status_history') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[entity_status_history] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 
 IF COL_LENGTH(N'dbo.entity_status_history', N'entity_type') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [entity_type] nvarchar(max) NULL;
 
@@ -3766,9 +4090,13 @@ IF COL_LENGTH(N'dbo.entity_status_history', N'actor_name') IS NULL ALTER TABLE d
 
 IF COL_LENGTH(N'dbo.entity_status_history', N'actor_role') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [actor_role] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.entity_status_history', N'store_id') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [store_id] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.entity_status_history', N'store_id') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [store_id] nvarchar(450) NULL;
 
-IF COL_LENGTH(N'dbo.entity_status_history', N'branch_id') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [branch_id] nvarchar(max) NULL;
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.entity_status_history') AND c.name=N'store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[entity_status_history] ALTER COLUMN [store_id] nvarchar(450) NULL;
+
+IF COL_LENGTH(N'dbo.entity_status_history', N'branch_id') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [branch_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.entity_status_history') AND c.name=N'branch_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[entity_status_history] ALTER COLUMN [branch_id] nvarchar(450) NULL;
 
 IF COL_LENGTH(N'dbo.entity_status_history', N'terminal_id') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [terminal_id] nvarchar(max) NULL;
 
@@ -3780,11 +4108,13 @@ IF COL_LENGTH(N'dbo.entity_status_history', N'metadata') IS NULL ALTER TABLE dbo
 
 IF COL_LENGTH(N'dbo.entity_status_history', N'client_event_id') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [client_event_id] nvarchar(max) NULL;
 
-IF COL_LENGTH(N'dbo.entity_status_history', N'occurred_at') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [occurred_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.entity_status_history', N'occurred_at') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [occurred_at] datetimeoffset(7) NULL;
 
-IF COL_LENGTH(N'dbo.entity_status_history', N'created_at') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [created_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.entity_status_history', N'created_at') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [created_at] datetimeoffset(7) NULL;
 
-IF COL_LENGTH(N'dbo.entity_status_history', N'updated_at') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [updated_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.entity_status_history', N'updated_at') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.entity_status_history') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[entity_status_history] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF COL_LENGTH(N'dbo.entity_status_history', N'row_version') IS NULL ALTER TABLE dbo.[entity_status_history] ADD [row_version] bigint NULL;
 
@@ -3811,6 +4141,8 @@ IF OBJECT_ID(N'dbo.nav_pins', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sy
 
 IF COL_LENGTH(N'dbo.nav_pins', N'id') IS NULL ALTER TABLE dbo.[nav_pins] ADD [id] uniqueidentifier NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.nav_pins') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[nav_pins] ALTER COLUMN [id] uniqueidentifier NOT NULL;
+
 IF COL_LENGTH(N'dbo.nav_pins', N'owner_id') IS NULL ALTER TABLE dbo.[nav_pins] ADD [owner_id] uniqueidentifier NULL;
 
 IF COL_LENGTH(N'dbo.nav_pins', N'item_kind') IS NULL ALTER TABLE dbo.[nav_pins] ADD [item_kind] nvarchar(max) NULL;
@@ -3823,6 +4155,8 @@ IF COL_LENGTH(N'dbo.nav_pins', N'created_at') IS NULL ALTER TABLE dbo.[nav_pins]
 
 IF COL_LENGTH(N'dbo.nav_pins', N'updated_at') IS NULL ALTER TABLE dbo.[nav_pins] ADD [updated_at] datetimeoffset(7) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.nav_pins') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[nav_pins] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.nav_pins') AND name=N'IX_nav_pins_updated_at') CREATE INDEX [IX_nav_pins_updated_at] ON dbo.[nav_pins]([updated_at]);
 
 IF OBJECT_ID(N'dbo.store_groups', N'U') IS NULL BEGIN CREATE TABLE dbo.[store_groups] (
@@ -3831,9 +4165,9 @@ IF OBJECT_ID(N'dbo.store_groups', N'U') IS NULL BEGIN CREATE TABLE dbo.[store_gr
   [code] nvarchar(max) NOT NULL,
   [name] nvarchar(max) NOT NULL,
   [is_active] bit NOT NULL CONSTRAINT [DF_store_groups_is_active] DEFAULT (1),
-  [archived_at] nvarchar(max) NULL,
-  [created_at] nvarchar(max) NOT NULL CONSTRAINT [DF_store_groups_created_at] DEFAULT (SYSUTCDATETIME()),
-  [updated_at] nvarchar(max) NOT NULL CONSTRAINT [DF_store_groups_updated_at] DEFAULT (SYSUTCDATETIME()),
+  [archived_at] datetimeoffset(7) NULL,
+  [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_store_groups_created_at] DEFAULT (SYSDATETIMEOFFSET()),
+  [updated_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_store_groups_updated_at] DEFAULT (SYSDATETIMEOFFSET()),
   CONSTRAINT [PK_store_groups] PRIMARY KEY ([id])
 
 ); END;
@@ -3842,17 +4176,21 @@ IF OBJECT_ID(N'dbo.store_groups', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FRO
 
 IF COL_LENGTH(N'dbo.store_groups', N'id') IS NULL ALTER TABLE dbo.[store_groups] ADD [id] nvarchar(450) NULL;
 
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.store_groups') AND c.name=N'id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[store_groups] ALTER COLUMN [id] nvarchar(450) NOT NULL;
+
 IF COL_LENGTH(N'dbo.store_groups', N'code') IS NULL ALTER TABLE dbo.[store_groups] ADD [code] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.store_groups', N'name') IS NULL ALTER TABLE dbo.[store_groups] ADD [name] nvarchar(max) NULL;
 
 IF COL_LENGTH(N'dbo.store_groups', N'is_active') IS NULL ALTER TABLE dbo.[store_groups] ADD [is_active] bit NULL;
 
-IF COL_LENGTH(N'dbo.store_groups', N'archived_at') IS NULL ALTER TABLE dbo.[store_groups] ADD [archived_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.store_groups', N'archived_at') IS NULL ALTER TABLE dbo.[store_groups] ADD [archived_at] datetimeoffset(7) NULL;
 
-IF COL_LENGTH(N'dbo.store_groups', N'created_at') IS NULL ALTER TABLE dbo.[store_groups] ADD [created_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.store_groups', N'created_at') IS NULL ALTER TABLE dbo.[store_groups] ADD [created_at] datetimeoffset(7) NULL;
 
-IF COL_LENGTH(N'dbo.store_groups', N'updated_at') IS NULL ALTER TABLE dbo.[store_groups] ADD [updated_at] nvarchar(max) NULL;
+IF COL_LENGTH(N'dbo.store_groups', N'updated_at') IS NULL ALTER TABLE dbo.[store_groups] ADD [updated_at] datetimeoffset(7) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.store_groups') AND c.name=N'updated_at' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[store_groups] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.store_groups') AND name=N'IX_store_groups_updated_at') CREATE INDEX [IX_store_groups_updated_at] ON dbo.[store_groups]([updated_at]);
 
@@ -3954,7 +4292,7 @@ IF COL_LENGTH(N'dbo.sync_change_journal',N'aggregate_id') IS NULL ALTER TABLE db
 IF COL_LENGTH(N'dbo.sync_change_journal',N'acknowledged_at') IS NULL ALTER TABLE dbo.sync_change_journal ADD acknowledged_at datetimeoffset(7) NULL;
 IF COL_LENGTH(N'dbo.sync_change_journal',N'retry_count') IS NULL ALTER TABLE dbo.sync_change_journal ADD retry_count int NOT NULL CONSTRAINT DF_sync_change_journal_retry_count DEFAULT 0;
 IF COL_LENGTH(N'dbo.sync_change_journal',N'last_error') IS NULL ALTER TABLE dbo.sync_change_journal ADD last_error nvarchar(1000) NULL;
-IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.sync_change_journal') AND name=N'IX_sync_change_journal_pending') CREATE INDEX IX_sync_change_journal_pending ON dbo.sync_change_journal(branch_id,acknowledged_at,aggregate_id,change_id);
+IF NOT EXISTS(SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.sync_change_journal') AND name=N'IX_sync_change_journal_pending') EXEC(N'CREATE INDEX IX_sync_change_journal_pending ON dbo.sync_change_journal(branch_id,acknowledged_at,aggregate_id,change_id)');
 
 IF OBJECT_ID(N'dbo.sync_conflicts', N'U') IS NULL CREATE TABLE dbo.sync_conflicts (
  conflict_id uniqueidentifier NOT NULL PRIMARY KEY, entity_type nvarchar(128) NOT NULL, entity_id nvarchar(128) NOT NULL,
@@ -3989,8 +4327,8 @@ IF NOT EXISTS(
   WHERE object_id=OBJECT_ID(N'dbo.sync_change_journal')
     AND name=N'IX_sync_change_journal_pending'
 )
-  CREATE INDEX IX_sync_change_journal_pending
-    ON dbo.sync_change_journal(branch_id,acknowledged_at,aggregate_id,change_id);
+  EXEC(N'CREATE INDEX IX_sync_change_journal_pending
+    ON dbo.sync_change_journal(branch_id,acknowledged_at,aggregate_id,change_id)');
 
 IF NOT EXISTS(SELECT 1 FROM dbo.pos_schema_migrations WHERE version=2)
   INSERT dbo.pos_schema_migrations(version,name)
