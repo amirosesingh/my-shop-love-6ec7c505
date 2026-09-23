@@ -54,7 +54,12 @@ const clean = (value: unknown): string =>
 export function normaliseBackendUrl(value: string): string {
   let url = clean(value);
   if (!url) return "";
-  if (!/^https?:\/\//i.test(url)) url = `https://${url}`;
+  // A terminal sends staff sessions and its activation token to this origin.
+  // Never persist or use a clear-text HTTP endpoint. A bare hostname is safe
+  // to helpfully complete, but an explicitly typed http:// address is rejected
+  // so a typo cannot silently weaken an existing configuration.
+  if (/^http:\/\//i.test(url)) return "";
+  if (!/^https:\/\//i.test(url)) url = `https://${url}`;
   url = url.replace(/\/api(\/.*)?$/i, "");
   return url.replace(/\/+$/, "");
 }
