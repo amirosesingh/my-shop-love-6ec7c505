@@ -4,6 +4,8 @@ import { describe, expect, it } from "vitest";
 
 const require = createRequire(import.meta.url);
 const { createLocalStaffStore } = require("../../../electron/local-staff-store.cjs");
+const { verifySyncedStaffPin } = require("../../../electron/synced-staff-login.cjs");
+const bcrypt = require("bcryptjs");
 
 function fixture() {
   const values = new Map<string, unknown>();
@@ -34,6 +36,25 @@ describe("offline terminal operations", () => {
     store.remember("admin", "1357");
     for (let attempt = 0; attempt < 5; attempt += 1) store.verify("admin", "0000");
     expect(store.verify("admin", "1357")).toMatchObject({ ok: false, reason: "locked" });
+  });
+
+  it("accepts the same PIN for a user synchronized into local SQL", async () => {
+    const pinHash = bcrypt.hashSync("2468", 4);
+    const pool = {
+      request: () => ({
+        input() { return this; },
+        query: async () => ({ recordset: [{
+          id: "a1", username: "admin", full_name: "Administrator",
+          store_id: "s1", role: "admin", role_slug: "admin",
+          permissions: '{"can_manage_database":true}', is_active: true, pin_hash: pinHash,
+        }] }),
+      }),
+    };
+    await expect(verifySyncedStaffPin(pool, "admin", "2468", "s1")).resolves.toMatchObject({
+      ok: true,
+      staff: { username: "admin", role_slug: "admin", permissions: { can_manage_database: true } },
+    });
+    await expect(verifySyncedStaffPin(pool, "admin", "0000", "s1")).resolves.toMatchObject({ ok: false, reason: "invalid" });
   });
 
   it("wires reconnect sync and local approval through Electron", () => {
