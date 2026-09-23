@@ -41,6 +41,7 @@ const { applyMigrations } = require("./db/migrations.cjs");
 const { discoverLocalSqlServers } = require("./db/local-server-discovery.cjs");
 const ipcPrivilege = require("./ipc-privilege.cjs");
 const adminSession = require("./admin-session.cjs");
+const { createLocalStaffStore } = require("./local-staff-store.cjs");
 
 const databaseConfig = createSecureConfig({ app, safeStorage, configStore });
 const databaseManager = new ConnectionManager();
@@ -69,6 +70,7 @@ const mainTelemetry = createTelemetry({ databaseService,syncCoordinator,jobRepos
 const operationsRepository = new OperationsRepository(databaseManager, syncRegistry);
 const aggregateRepository = new AggregateRepository(databaseManager, operationsRepository);
 const receiptRepository = new ReceiptRepository(databaseManager, syncCloud);
+const localStaffStore = createLocalStaffStore(configStore);
 
 function localBranchId(){
   const terminal=terminalStore.read()??{};
@@ -739,6 +741,10 @@ function registerIpc() {
   ipcMain.handle("jobs:get-history", async (_e, limit) => databaseManager.pool ? jobRepository.history(Number(limit)||50) : []);
   ipcMain.handle("sync:get-status", () => syncCoordinator.snapshot());
   ipcMain.handle("sync:run-now", (_e, options) => guard.guarded(async()=>{const input=guard.options(options,{name:"sync options"});const result=await syncCoordinator.runNow({...input,branchId:input.branchId??localBranchId()});return result.code==="ECHANGEGAP"?prepareLocalData({force:true}):result;}));
+  ipcMain.handle("sync:auto", async () => {
+    if(!databaseManager.pool||!localBranchId())return{ok:false,skipped:true};
+    return syncCoordinator.runNow({branchId:localBranchId(),batchSize:500});
+  });
   ipcMain.handle("sync:pause", () => syncCoordinator.pause());
   ipcMain.handle("sync:resume", () => syncCoordinator.resume());
   ipcMain.handle("sync:get-failures", async () => ({ failures:databaseManager.pool?await jobRepository.failures():[], conflictRows:databaseManager.pool?await conflictRepository.unresolved():[], conflicts:databaseManager.pool?await conflictRepository.count():0 }));
@@ -751,6 +757,21 @@ function registerIpc() {
       staffRole: input.staffRole ? guard.text(input.staffRole, { name: "staff role", max: 64 }) : null,
     });
   }));
+  ipcMain.handle("staff:roster", (_e, storeId) => localStaffStore.roster(storeId));
+  ipcMain.handle("staff:cache-roster", (_e, rows) => localStaffStore.cache(rows));
+  ipcMain.handle("staff:enroll", async (_e, username, pin) => {
+    const authorizationUrl=authorizationServerUrl();
+    if(!authorizationUrl)return{ok:false,error:"The hosted POS backend is not configured."};
+    const terminal=terminalStore.read()??{};
+    const response=await fetch(`${authorizationUrl}/api/public/cashier-login`,{
+      method:"POST",headers:{"content-type":"application/json"},
+      body:JSON.stringify({username:String(username??""),pin:String(pin??""),platform:"windows-offline-enrollment",terminalId:terminal.tokenId??null,branchId:localBranchId()}),
+    });
+    const result=await response.json().catch(()=>({ok:false,error:"Credential verification failed."}));
+    if(!response.ok||!result.ok||!result.cashier)return{ok:false,error:result.error??"Credential verification failed."};
+    return localStaffStore.enroll(result.cashier,String(pin??""));
+  });
+  ipcMain.handle("staff:verify-pin", (_e, username, pin) => localStaffStore.verify(username, pin));
   ipcMain.handle("app:ready", () => {
     markStartupSettled();
     const state = health.markHealthy();

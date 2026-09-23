@@ -3,6 +3,7 @@ import { sendWhatsAppBill } from "./whatsapp.functions";
 import { listQueuedMessages, queueMessage, resolveMessage } from "./whatsapp-queue";
 import { db } from "@/core/api/pos-db";
 import { getPosCallerAuth } from "./pos-caller-auth";
+import { looksOffline } from "./governance-offline";
 import {
   PAYMENT_LABELS,
   bookingBalance,
@@ -100,10 +101,9 @@ export async function sendBillOnWhatsApp({ cfg, to, body, reference, member }: S
   const number = normalizeWhatsAppNumber(to, cfg.countryCode);
   if (!number) return { ok: false, error: "This customer has no WhatsApp number on file" };
 
-  // No connection: park the message and tell the cashier it will go out later.
-  if (typeof navigator !== "undefined" && !navigator.onLine) {
+  const park = async () => {
     const parked = queueMessage({ phoneNumberId: cfg.phoneNumberId, to: number, body, reference });
-    db.queueWhatsAppMessage({
+    await db.queueWhatsAppMessage({
       id: parked.id,
       phoneNumberId: parked.phoneNumberId,
       to: parked.to,
@@ -117,7 +117,10 @@ export async function sendBillOnWhatsApp({ cfg, to, body, reference, member }: S
       customer: member?.name ?? null,
     });
     return { ok: true, queued: true as const };
-  }
+  };
+
+  // No connection: park the message and tell the cashier it will go out later.
+  if (typeof navigator !== "undefined" && !navigator.onLine) return park();
 
   const res = await sendWhatsAppBill({
     data: { ...(await getPosCallerAuth()), phoneNumberId: cfg.phoneNumberId, to: number, body },
@@ -135,7 +138,9 @@ export async function sendBillOnWhatsApp({ cfg, to, body, reference, member }: S
       error: res.ok ? null : ("error" in res ? res.error : "unknown"),
     },
   );
-  return res.ok ? { ok: true } : { ok: false, error: ("error" in res && res.error) || "Send failed" };
+  if (res.ok) return { ok: true };
+  const error = ("error" in res && res.error) || "Send failed";
+  return looksOffline(error) ? park() : { ok: false, error };
 }
 
 
@@ -154,7 +159,7 @@ export async function flushWhatsAppQueue() {
     }).catch(() => ({ ok: false as const }));
     if (!res.ok) break;
     resolveMessage(msg.id);
-    db.settleWhatsAppMessage(msg.id, true);
+    await db.settleWhatsAppMessage(msg.id, true);
     sent += 1;
     logger.log("messaging", "Queued WhatsApp bill sent", "messaging", {
       reference: msg.reference,

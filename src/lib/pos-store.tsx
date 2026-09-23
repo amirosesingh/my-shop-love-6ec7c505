@@ -781,7 +781,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     if (isOnlineOnly() || !signedIn) return;
     const focus = () => {
       const bridge = localDb();
-      if (bridge?.push) void bridge.push();
+      void bridge?.sync?.auto?.();
       const active =
         activeBranchId(stateRef.current.currentStoreId) ?? stateRef.current.currentStoreId;
       void loadCloudState(active ?? undefined)
@@ -791,7 +791,11 @@ export function PosProvider({ children }: { children: ReactNode }) {
         });
     };
     window.addEventListener("focus", focus);
-    return () => window.removeEventListener("focus", focus);
+    window.addEventListener("online", focus);
+    return () => {
+      window.removeEventListener("focus", focus);
+      window.removeEventListener("online", focus);
+    };
   }, [signedIn]);
 
   // A committed sale is announced by the existing shared Realtime channel.

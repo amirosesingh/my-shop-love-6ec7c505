@@ -699,6 +699,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             full_name: account.full_name,
             store_id: account.store_id,
             permissions: account.permissions,
+            role_slug: account.role_slug ?? account.role,
             is_active: true,
             pin_length: pin.length,
           },

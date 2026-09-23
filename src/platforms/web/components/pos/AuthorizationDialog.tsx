@@ -27,7 +27,9 @@ import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import { authorizeWithPin, submitAuthorizationRequest } from "@/lib/authorization.functions";
 import { looksOffline, parkGovernanceRow } from "@/lib/governance-offline";
 import { useAuthOptional } from "@/lib/pos-auth";
-import type { AuthMode, AuthPayload } from "@/lib/authorization";
+import type { AuthActionKey, AuthMode, AuthPayload, AuthorizationRule } from "@/lib/authorization";
+import { canAuthorizeAmount } from "@/lib/authorization";
+import { verifyLocalPin } from "@/core/local-db/local-staff";
 import type { TicketSnapshot } from "@/lib/ticket-snapshot";
 
 const newId = () =>
@@ -50,6 +52,11 @@ export type AuthorizationPrompt = {
   requesterDirectLimit?: number | null;
   valueUnit?: "percent" | "currency" | "quantity" | "number";
   heldOrderId?: string | null;
+  allowedRoles?: string[];
+  allowedUserIds?: string[];
+  authorityLimits?: Record<string, number>;
+  extraAuthority?: Record<string, number>;
+  absoluteCeilings?: Record<string, number>;
 };
 
 export type PromptOutcome =
@@ -72,28 +79,46 @@ export function AuthorizationDialog({
   const session = useAuthOptional();
   const me = session?.user ?? null;
 
-  /**
-   * The line is down. A PIN cannot be checked without the database, so the
-   * action is refused — but the attempt is still written to this till's
-   * governance trail and pushed with the next sync.
-   */
-  async function parkRefusedPin(message: string) {
+  async function authorizeLocalPin() {
+    if (!prompt) return false;
+    const result = await verifyLocalPin(authorizerId.trim(), pin);
+    if (!result.ok) {
+      toast.error(result.error);
+      return false;
+    }
+    const rule: AuthorizationRule = {
+      actionKey: prompt.actionKey as AuthActionKey,
+      scopeType: "branch" as const,
+      scopeId: prompt.storeId ?? "",
+      mode: "pin" as const,
+      allowedRoles: prompt.allowedRoles ?? ["admin", "manager"],
+      allowedUserIds: prompt.allowedUserIds ?? [],
+      requesterRoles: [], requesterUserIds: [],
+      authorityLimits: prompt.authorityLimits ?? {},
+      extraAuthority: prompt.extraAuthority ?? {},
+      absoluteCeilings: prompt.absoluteCeilings ?? {},
+      requireReason: prompt.requireReason,
+      threshold: null,
+      isEnabled: true,
+    };
+    if (!canAuthorizeAmount(rule, { userId: result.staff.id, role: result.staff.roleSlug }, prompt.requestedAmount, prompt.requesterDirectLimit)) {
+      toast.error("This locally verified account is not allowed to approve this action.");
+      return false;
+    }
     const parked = await parkGovernanceRow("authorization_log", {
-      id: newId(),
-      action_key: prompt?.actionKey ?? "",
-      mode_used: "pin",
-      requested_by: me?.staffId ?? null,
-      authorized_by: authorizerId.trim() || null,
-      store_id: prompt?.storeId ?? "",
-      terminal_id: prompt?.terminalId ?? "",
-      outcome: "denied",
-      detail: { reason: note.trim(), offline: true, error: message.slice(0, 200) },
+      id: newId(), action_key: prompt.actionKey, mode_used: "offline_pin",
+      requested_by: me?.staffId ?? null, authorized_by: result.staff.id,
+      authorizer_role: result.staff.roleSlug, store_id: prompt.storeId ?? "",
+      terminal_id: prompt.terminalId ?? "", outcome: "approved",
+      detail: { reason: note.trim(), offline: true, requested_amount: prompt.requestedAmount ?? null },
     });
-    toast.error("No connection — a PIN cannot be checked", {
-      description: parked.parked
-        ? "The attempt was recorded on this till and will sync later."
-        : "The attempt could not be recorded on this till either.",
-    });
+    if (!parked.parked) {
+      toast.error("The approval could not be recorded in the local database.");
+      return false;
+    }
+    toast.success(`Approved offline by ${result.staff.full_name || result.staff.username}`);
+    onFinish({ kind: "approved", grantToken: "", by: result.staff.full_name || result.staff.username });
+    return true;
   }
 
   /**
@@ -137,6 +162,10 @@ export function AuthorizationDialog({
     if (!prompt) return;
     setBusy(true);
     try {
+      if (typeof navigator !== "undefined" && !navigator.onLine) {
+        await authorizeLocalPin();
+        return;
+      }
       const auth = await getPosCallerAuth();
       const res = await authorizeWithPin({
         data: {
@@ -154,7 +183,7 @@ export function AuthorizationDialog({
         },
       });
       if (!res.ok) {
-        if (looksOffline(res.error)) await parkRefusedPin(res.error ?? "");
+        if (looksOffline(res.error)) await authorizeLocalPin();
         else toast.error(res.error ?? "Authorisation failed");
         return;
       }
@@ -162,7 +191,7 @@ export function AuthorizationDialog({
       toast.success(`Approved by ${res.authorizer.name}`);
       onFinish({ kind: "approved", grantToken: res.grantToken, by: res.authorizer.name });
     } catch (e) {
-      if (looksOffline(e)) await parkRefusedPin(String((e as Error)?.message ?? e));
+      if (looksOffline(e)) await authorizeLocalPin();
       else notifyError(e, "Authorisation failed");
     } finally {
       setBusy(false);

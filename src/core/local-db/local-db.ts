@@ -373,6 +373,9 @@ export type PosBridge = {
   telemetry?: {
     presence: (value: { sessionStatus: "signed_in" | "idle"; staffName: string | null; staffRole: string | null }) => Promise<{ ok: boolean }>;
   };
+  sync?: {
+    auto?: () => Promise<{ ok: boolean; busy?: boolean; skipped?: boolean; error?: string }>;
+  };
   /** Persist one operation to local SQL Server. Resolves once committed. */
   write: (context: string, op: SyncOp) => Promise<{ ok: boolean; error?: string }>;
   /** Persist a related operation set in one SQL transaction. */
