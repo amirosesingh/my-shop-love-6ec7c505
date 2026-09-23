@@ -22,6 +22,8 @@ contextBridge.exposeInMainWorld("pos", {
   refundReceipt: (value) => invoke("receipts:refund", value),
   database: {
     getState: () => invoke("database:get-state"),
+    retryStartup: () => invoke("database:retry-startup"),
+    authorizeSettings: () => invoke("database:authorize-settings"),
     setEnabled: (enabled) => invoke("database:set-enabled", enabled),
     listServers: () => invoke("database:list-servers"),
     testServer: (profile) => invoke("database:test-server", profile),

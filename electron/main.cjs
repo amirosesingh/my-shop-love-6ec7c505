@@ -395,7 +395,7 @@ function instrument(win, route) {
   if (DEBUG) win.webContents.openDevTools({ mode: "detach" });
 }
 
-function createWindows() {
+function createWindows(initialRoute = "/") {
   mainWindow = new BrowserWindow({
     width: 1440,
     height: 900,
@@ -413,8 +413,8 @@ function createWindows() {
       nodeIntegration: false,
     },
   });
-  instrument(mainWindow, "/");
-  void load(mainWindow, "/");
+  instrument(mainWindow, initialRoute);
+  void load(mainWindow, initialRoute);
   mainWindow.once("ready-to-show", () => {
     mainWindow.show();
     // No tenant keys sealed on this device yet: nudge once, never block.
@@ -723,6 +723,8 @@ function registerIpc() {
     return { ok: true, level: result.level };
   }));
   ipcMain.handle("database:get-state", () => databaseService.snapshot());
+  ipcMain.handle("database:retry-startup", () => databaseService.restore());
+  ipcMain.handle("database:authorize-settings", () => ({ ok: true }));
   ipcMain.handle("database:set-enabled", (_e, value) => guard.guarded(async()=>{const state=await databaseService.setEnabled(value===true);if(value===true&&databaseManager.pool)void prepareLocalData().catch(error=>recordFault("local-data.prepare",error));return databaseService.snapshot();}));
   ipcMain.handle("database:list-servers", () => discoverLocalSqlServers());
   ipcMain.handle("database:test-server", (_e, value) => guard.guarded(() => databaseService.testServer(guard.databaseProfile(value))));
@@ -947,11 +949,21 @@ app.whenReady().then(async () => {
   if (health.shouldEnterSafeMode(boot)) { safeMode = true; health.beginRecovery(boot.reason ?? "Repeated failed launches"); updater.pause(); recovery.open(); return; }
   try { if (!baseUrl) baseUrl = await startAppServer(); }
   catch (err) { enterSafeMode(err instanceof Error ? err.message : String(err)); return; }
-  createWindows();
+  // A configured till restores its SQL connection before the terminal route
+  // is loaded. If SQL Server is stopped or unreachable, open the database
+  // recovery screen instead of exposing a register that cannot persist sales.
+  const initialRoute = restoredDatabase.enabled && restoredDatabase.configured && !restoredDatabase.connected
+    ? "/database-startup"
+    : "/";
+  createWindows(initialRoute);
   if(restoredDatabase.state==="enabled_bootstrapping")void prepareLocalData().catch(error=>recordFault("local-data.prepare",error));
   updater.start();
   readyWatchdog = setTimeout(() => enterSafeMode("Startup timed out"), 60_000);
-  app.on("activate", () => { if (BrowserWindow.getAllWindows().length === 0) createWindows(); });
+  app.on("activate", () => {
+    if (BrowserWindow.getAllWindows().length !== 0) return;
+    const database = databaseService.snapshot();
+    createWindows(database.enabled && database.configured && !database.connected ? "/database-startup" : "/");
+  });
 });
 
 app.on("before-quit", () => { quitting = true; mainTelemetry.stop(); closeCustomerDisplay(); void databaseManager.close(); });
