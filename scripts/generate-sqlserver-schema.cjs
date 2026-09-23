@@ -76,7 +76,10 @@ const tables = report.tables.map((table, tableIndex) => ({
       sqlServerColumn: column.name,
       cloudType: column.declaration.split(/\s+(?:DEFAULT|NOT|NULL|CONSTRAINT|PRIMARY|REFERENCES|CHECK)\b/i)[0].trim(),
       sqlServerType: type,
-      nullable: column.nullable,
+      // SQL Server forbids nullable columns in a PRIMARY KEY. Some legacy
+      // cloud declarations are nullable even though the registry supplies a
+      // canonical primary key for local storage, so the key wins here.
+      nullable: primary ? false : column.nullable,
       defaultRule: defaultRule(column.declaration, type),
       primaryKey: primary,
       foreignKey: Boolean(reference||tableReference),

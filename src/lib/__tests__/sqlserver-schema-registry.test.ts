@@ -29,6 +29,14 @@ describe("SQL Server schema registry", () => {
       expect(table.deleteRule).toBeTruthy();
       expect(table.conflictRule).toBeTruthy();
       expect(table.testName).toBeTruthy();
+      for (const column of table.columns.filter(
+        (candidate: { primaryKey: boolean }) => candidate.primaryKey,
+      )) {
+        expect(column.nullable, `${table.sqlServerTable}.${column.sqlServerColumn}`).toBe(false);
+        expect(sql).toContain(
+          `[${column.sqlServerColumn}] ${column.sqlServerType} NOT NULL`,
+        );
+      }
     }
   });
 
