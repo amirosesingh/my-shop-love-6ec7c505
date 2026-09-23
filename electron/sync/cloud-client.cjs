@@ -5,9 +5,12 @@ class CloudClient {
   constructor({ configStore, terminalStore, connectionManager = null }) { this.configStore = configStore; this.terminalStore = terminalStore; this.connectionManager = connectionManager; }
   async request(payload) {
     const terminal = this.terminalStore.read() ?? {};
-    const base = String(this.configStore.get("backendUrl") ?? terminal.backendUrl ?? "").trim().replace(/\/+$/, "");
+    // An empty config-store value must not mask the HTTPS recovery copy sealed
+    // with the terminal activation (nullish coalescing treats "" as present).
+    const base = String(this.configStore.get("backendUrl") || terminal.backendUrl || "").trim().replace(/\/+$/, "");
     const terminalToken = String(terminal.tokenId ?? "").trim();
     if (!base) throw Object.assign(new Error("The terminal is activated, but its hosted POS backend address has not been restored. Open Database & Cloud Connection and save the hosted POS address once."),{code:"EBACKEND"});
+    if (!/^https:\/\/.+/i.test(base)) throw Object.assign(new Error("The hosted POS backend must be a full HTTPS address. Open Database & Cloud Connection and save the POS website address again."),{code:"EBACKEND_HTTPS"});
     if (!terminalToken) throw Object.assign(new Error("The renderer activation has not reached the desktop synchronization service yet. Close and reopen Settings, then retry synchronization."),{code:"EACTIVATION_MIRROR"});
     const response = await fetch(`${base}/api/v1/pos/sync`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ terminalToken, ...payload }) });
     const data = await response.json().catch(() => ({ ok: false, error: `HTTP ${response.status}` }));

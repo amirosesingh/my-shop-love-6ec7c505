@@ -215,6 +215,19 @@ describe("connection profile", () => {
     expect((await connectionProfile()).backendUrl).toBe("https://pws.mycompanywebsite.com");
   });
 
+  it("rejects an explicitly insecure HTTP backend address", async () => {
+    shell.mobile = false;
+    shell.windows = true;
+    const res = await saveConnectionProfile({
+      supabaseUrl: "https://tenant.example.co",
+      supabaseKey: KEY_A,
+      backendUrl: "http://pos.example.com",
+    });
+    expect(res.ok).toBe(false);
+    expect(res.stage).toBe("validate");
+    expect(electronStore.backendUrl).toBe("");
+  });
+
   it("survives a backend change: A → B → restart still reads B", async () => {
     await saveConnectionProfile({
       supabaseUrl: "https://tenant.example.co",

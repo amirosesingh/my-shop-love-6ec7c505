@@ -863,8 +863,14 @@ function registerIpc() {
   ipcMain.handle("terminal:write", (_e, raw) => {
     try {
       const config=guard.terminalConfig(raw);
-      if(config?.backendUrl&&/^https?:\/\//i.test(String(config.backendUrl)))configStore.set("backendUrl",String(config.backendUrl).trim().replace(/\/+$/,""));
-      return terminalStore.write(config);
+      const activationBackend=String(config?.backendUrl??"").trim().replace(/\/+$/,"");
+      const savedBackend=String(configStore.get("backendUrl")??"").trim().replace(/\/+$/,"");
+      // The connection page is authoritative. Older activation payloads may
+      // have no backend, while a development activation may contain a local
+      // http origin; neither may erase a proven HTTPS deployment address.
+      const backend=/^https:\/\/.+/i.test(savedBackend)?savedBackend:/^https:\/\/.+/i.test(activationBackend)?activationBackend:"";
+      if(backend)configStore.set("backendUrl",backend);
+      return terminalStore.write(config?{...config,...(backend?{backendUrl:backend}:{})}:config);
     }
     catch (err) { return guard.refuse(err.message); }
   });
@@ -882,9 +888,19 @@ function registerIpc() {
   ipcMain.handle("backend:get", () => ({ ok: true, url: String(configStore.get("backendUrl") ?? "").trim() }));
   ipcMain.handle("backend:set", (_e, value) => {
     const next = String(value ?? "").trim().replace(/\/+$/, "");
-    if (next && !/^https?:\/\/.+/i.test(next)) return { ok: false, error: "Enter a full address starting with https://" };
+    if (next && !/^https:\/\/.+/i.test(next)) return { ok: false, error: "Enter a full address starting with https://" };
     const saved = configStore.set("backendUrl", next || null);
-    return saved?.ok === false ? saved : { ok: true, url: next };
+    if(saved?.ok===false)return saved;
+    // Keep the native synchronization identity self-contained as a recovery
+    // copy. Both files are protected by the same Windows DPAPI user profile.
+    const terminal=terminalStore.read();
+    if(terminal){
+      const mirroredConfig={...terminal};
+      if(next)mirroredConfig.backendUrl=next;else delete mirroredConfig.backendUrl;
+      const mirrored=terminalStore.write(mirroredConfig);
+      if(mirrored?.ok===false)return mirrored;
+    }
+    return { ok: true, url: next };
   });
   ipcMain.handle("cloud:status", () => ({ ok: true, ...cloudCredentials.status() }));
   ipcMain.handle("cloud:bootstrap", () => {
