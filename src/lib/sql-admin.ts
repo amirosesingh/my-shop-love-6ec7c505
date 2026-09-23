@@ -177,7 +177,7 @@ export type SqlAdminBridge = {
     sessionToken?: string;
     cashierToken?: string;
     terminalToken?: string;
-  }) => Promise<{ ok: boolean; level?: "admin" | "supervisor" | "staff"; error?: string }>;
+  }, terminalConfig?: import("@/core/activation/terminal-tokens").TerminalConfig | null) => Promise<{ ok: boolean; level?: "admin" | "supervisor" | "staff"; error?: string }>;
   lockAdmin?: () => Promise<{ ok: boolean }>;
   adminStatus?: () => Promise<{
     unlocked: boolean;

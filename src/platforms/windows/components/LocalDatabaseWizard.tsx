@@ -19,7 +19,7 @@ import {
   validateServerEndpoint,
 } from "./local-database-server";
 import { readCredentials } from "@/lib/pos-credentials";
-import { mirrorTerminalConfigToDesktop } from "@/core/activation/terminal-tokens";
+import { mirrorTerminalConfigToDesktop, readTerminalConfig } from "@/core/activation/terminal-tokens";
 
 type Profile = {
   host: string;
@@ -68,7 +68,7 @@ async function authorizeDatabaseChange(): Promise<{ ok: boolean; error?: string 
       error: "Update the Windows POS app before changing the local database configuration.",
     };
   }
-  const result = await adopt(await readCredentials());
+  const result = await adopt(await readCredentials(), readTerminalConfig());
   return result.ok
     ? { ok: true }
     : { ok: false, error: result.error ?? "The signed-in account could not be verified." };

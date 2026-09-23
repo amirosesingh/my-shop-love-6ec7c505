@@ -689,7 +689,7 @@ function registerIpc() {
   });
   ipcMain.handle("admin:status", () => adminSession.status());
   ipcMain.handle("admin:lock", () => { adminSession.clear(); return adminSession.status(); });
-  ipcMain.handle("admin:adopt-session", async (_e, value) => guard.guarded(async () => {
+  ipcMain.handle("admin:adopt-session", async (_e, value, rawTerminal) => guard.guarded(async () => {
     const proof=guard.credentialProof(typeof value==="string"?{accessToken:value}:value);
     if(!proof.accessToken&&!proof.sessionToken&&!proof.cashierToken)return{ok:false,error:"A verified signed-in user is required."};
     const authorizationUrl=authorizationServerUrl();
@@ -697,6 +697,14 @@ function registerIpc() {
     const response=await fetch(`${authorizationUrl}/api/v1/pos/ipc-adopt`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(proof)});
     const result=await response.json().catch(()=>({ok:false,error:"Authorization failed."}));
     if(!response.ok||!result.ok)return{ok:false,error:result.error??"Authorization failed."};
+    // The hosted backend has now verified this live POS identity. This is the
+    // safe point to repair the native activation mirror that boot hydration
+    // could not write before a staff session existed.
+    const terminal=rawTerminal==null?null:guard.terminalConfig(rawTerminal);
+    if(terminal){
+      const mirrored=terminalStore.write(terminal);
+      if(mirrored?.ok===false)return{ok:false,code:"EACTIVATION_STORE",error:mirrored.error??"Windows secure storage could not save the terminal activation."};
+    }
     adminSession.grant(result.level,result.subject,result.permissions,"pos",result.branchId);rememberVerifiedBranch(result.branchId);return{ok:true,level:result.level};
   }));
   ipcMain.handle("admin:unlock", async (_e, username, pin) => guard.guarded(async () => {
