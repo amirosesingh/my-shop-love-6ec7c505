@@ -120,7 +120,13 @@ function settleVerdict(cloud: boolean) {
 async function probeLocal(): Promise<boolean> {
   const bridge = localDb();
   if (!bridge) return false;
-  const status = await bridge.status();
+  // Current Electron builds expose the startup-restored SQL Server state on
+  // `database.getState`. Keep the old `status` fallback for installed shells
+  // that have not updated yet; calling only the legacy API made the loader say
+  // "Terminal database unavailable" while the main process was connected.
+  const status = bridge.database?.getState
+    ? await bridge.database.getState()
+    : await bridge.status();
   return !!status?.connected;
 }
 

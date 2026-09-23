@@ -6,6 +6,7 @@ import {
   subscribeConnectivity,
   type Connectivity,
 } from "@/core/activation/connection-health";
+import { hasLocalSqlEngine } from "@/core/local-db/local-db";
 
 export type StatusTone = "connecting" | "ok" | "busy" | "offline" | "error";
 
@@ -16,20 +17,18 @@ export type SystemStatus = {
   detail: string;
   checkedAt: string | null;
   credentialsInvalid: boolean;
-  databaseMode: "Central database";
-  // Compatibility fields for non-interactive status consumers. Online-only
-  // clients never have queued, conflicting, syncing or local database state.
-  pending: 0;
-  conflicts: 0;
-  syncing: false;
+  databaseMode: string;
+  pending: number;
+  conflicts: number;
+  syncing: boolean;
   syncEnabled: true;
-  lastSyncAt: null;
-  lastError: null;
+  lastSyncAt: string | null;
+  lastError: string | null;
   cloudConfigured: boolean;
   local: {
-    connected: false;
-    server: null;
-    database: null;
+    connected: boolean;
+    server: string | null;
+    database: string | null;
     lastReadAt: null;
     lastWriteAt: null;
   };
@@ -65,28 +64,61 @@ export function describeStatus(input: {
 
 export function useSystemStatus(): SystemStatus {
   const [, force] = useState(0);
+  const [desktopDatabase, setDesktopDatabase] = useState<Record<string, unknown> | null>(null);
+  const [desktopSync, setDesktopSync] = useState<Record<string, unknown> | null>(null);
   useEffect(() => subscribeConnectivity(() => force((value) => value + 1)), []);
+  useEffect(() => {
+    if (!hasLocalSqlEngine()) return;
+    const bridge = (window as unknown as { pos?: {
+      database?: { getState(): Promise<Record<string, unknown>>; subscribe(cb: (value: Record<string, unknown>) => void): () => void };
+      sync?: { getStatus(): Promise<Record<string, unknown>>; subscribe(cb: (value: Record<string, unknown>) => void): () => void };
+    } }).pos;
+    void bridge?.database?.getState().then(setDesktopDatabase);
+    void bridge?.sync?.getStatus().then(setDesktopSync);
+    const offDatabase = bridge?.database?.subscribe(setDesktopDatabase);
+    const offSync = bridge?.sync?.subscribe(setDesktopSync);
+    return () => { offDatabase?.(); offSync?.(); };
+  }, []);
 
   const conn = connectivity();
   const health = lastHealth();
   const status = describeStatus({ connectivity: conn });
+  const desktop = hasLocalSqlEngine();
+  const localConnected = desktop && desktopDatabase?.connected === true;
+  const profile = (desktopDatabase?.profile ?? null) as { server?: string; database?: string } | null;
+  const syncing = desktop && (desktopSync?.running === true || (desktopSync?.phase != null && desktopSync.phase !== "idle"));
+  const lastPushAt = typeof desktopSync?.lastPushAt === "string" ? desktopSync.lastPushAt : null;
+  const lastPullAt = typeof desktopSync?.lastPullAt === "string" ? desktopSync.lastPullAt : null;
+  const lastSyncAt = [lastPushAt, lastPullAt].filter((value): value is string => Boolean(value)).sort().at(-1) ?? null;
+  const syncError = typeof desktopSync?.lastError === "string" ? desktopSync.lastError : null;
+  const desktopView = desktop
+    ? syncing
+      ? { tone: "busy" as const, label: "Synchronizing", detail: "Sending local changes and checking Supabase for updates." }
+      : localConnected && conn === "offline"
+        ? { tone: "busy" as const, label: "Offline · local", detail: "SQL Server is connected. Cloud work will synchronize automatically when internet returns." }
+        : syncError
+          ? { tone: "error" as const, label: "Sync needs attention", detail: "Local SQL Server remains available; automatic cloud synchronization will retry." }
+          : localConnected
+            ? { tone: "ok" as const, label: "Local + cloud", detail: "SQL Server is active and Supabase synchronization runs automatically." }
+            : status
+    : status;
   return {
     connectivity: conn,
-    ...status,
+    ...desktopView,
     checkedAt: health?.at ? new Date(health.at).toISOString() : null,
     credentialsInvalid: false,
-    databaseMode: "Central database",
-    pending: 0,
-    conflicts: 0,
-    syncing: false,
+    databaseMode: localConnected ? "Local SQL Server + Supabase sync" : "Central database",
+    pending: Number(desktopSync?.pending ?? 0),
+    conflicts: Number(desktopSync?.conflicts ?? 0),
+    syncing,
     syncEnabled: true,
-    lastSyncAt: null,
-    lastError: null,
+    lastSyncAt,
+    lastError: syncError,
     cloudConfigured: conn !== "connecting",
     local: {
-      connected: false,
-      server: null,
-      database: null,
+      connected: localConnected,
+      server: profile?.server ?? null,
+      database: profile?.database ?? null,
       lastReadAt: null,
       lastWriteAt: null,
     },

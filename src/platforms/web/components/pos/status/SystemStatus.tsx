@@ -101,12 +101,22 @@ export function SystemStatusBadge({
       <PopoverContent align="end" className="w-80 space-y-3">
         <div className="flex items-center gap-2">
           <CloudStateIcon tone={status.tone} />
-          <p className="text-sm font-semibold">Central database connection</p>
+          <p className="text-sm font-semibold">
+            {status.local.connected ? "Database connections" : "Central database connection"}
+          </p>
           <span className="ml-auto text-[11px] text-muted-foreground">{status.label}</span>
         </div>
         <p className="text-[11px] text-muted-foreground">{status.detail}</p>
 
         <dl className="space-y-1.5 text-[11px]">
+          {status.local.connected && (
+            <div className="flex justify-between gap-3">
+              <dt className="text-muted-foreground">Central Supabase</dt>
+              <dd className={cn("font-medium", status.connectivity === "online" ? "text-success" : "text-destructive")}>
+                {status.connectivity === "online" ? "Connected" : "Unavailable"}
+              </dd>
+            </div>
+          )}
           <div className="flex justify-between gap-3">
             <dt className="text-muted-foreground">Database in use</dt>
             <dd className="truncate font-medium">{status.databaseMode}</dd>
@@ -115,6 +125,26 @@ export function SystemStatusBadge({
             <dt className="text-muted-foreground">Connection checked</dt>
             <dd className="font-medium">{time(status.checkedAt)}</dd>
           </div>
+          {status.local.connected && (
+            <>
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">Offline database</dt>
+                <dd className="truncate font-medium text-success">Connected · {status.local.database ?? "SQL Server"}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">Automatic synchronization</dt>
+                <dd className="font-medium">{status.syncing ? "Running now" : status.lastError ? "Retry scheduled" : "Active"}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">Last cloud synchronization</dt>
+                <dd className="font-medium">{time(status.lastSyncAt)}</dd>
+              </div>
+              <div className="flex justify-between gap-3">
+                <dt className="text-muted-foreground">Conflicts</dt>
+                <dd className="font-medium">{status.conflicts}</dd>
+              </div>
+            </>
+          )}
         </dl>
 
         {status.lastError && (

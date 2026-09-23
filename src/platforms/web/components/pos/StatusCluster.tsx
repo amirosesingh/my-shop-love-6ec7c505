@@ -46,6 +46,7 @@ import {
   type SecurityFinding,
 } from "@/lib/security-alerts";
 import { SystemStatusBadge } from "@/platforms/web/components/pos/status/SystemStatus";
+import { usePublicFlags } from "@/lib/public-flags";
 
 const DOT: Record<ServiceState, string> = {
   ok: "bg-success",
@@ -130,6 +131,7 @@ export function SystemAlertsButton({ className }: { className?: string }) {
   const { state: pos } = usePos();
   const { isAdmin } = useAuth();
   const integrations = pos.settings.integrations;
+  const { flags } = usePublicFlags();
   const [checks, setChecks] = useState<ServiceCheck[]>([]);
   const [busy, setBusy] = useState(false);
   const [findings, setFindings] = useState<SecurityFinding[]>([]);
@@ -138,10 +140,14 @@ export function SystemAlertsButton({ className }: { className?: string }) {
   const probe = useCallback(
     () =>
       runDiagnostics([
-        { url: integrations.memberDomain, label: "Member domain" },
-        { url: integrations.redeemDomain, label: "Redeem domain" },
+        ...(flags.member ? [{ url: integrations.memberDomain, label: "Member domain" }] : []),
+        ...(flags.redeem ? [{ url: integrations.redeemDomain, label: "Redeem domain" }] : []),
+      ]).then((results) => [
+        ...results,
+        ...(!flags.member ? [{ id: "domain:member-disabled", label: "Member domain", state: "ok" as const, detail: "Switched off in settings.", at: new Date().toISOString() }] : []),
+        ...(!flags.redeem ? [{ id: "domain:redeem-disabled", label: "Redeem domain", state: "ok" as const, detail: "Switched off in settings.", at: new Date().toISOString() }] : []),
       ]),
-    [integrations.memberDomain, integrations.redeemDomain],
+    [flags.member, flags.redeem, integrations.memberDomain, integrations.redeemDomain],
   );
 
   useEffect(() => {
