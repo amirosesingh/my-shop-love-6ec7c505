@@ -564,6 +564,7 @@ export async function verifyRelayCaller(input: {
 }): Promise<RelayCaller> {
   let identity: RelayCaller | null = null;
   let terminalStore: string | null = null;
+  let endedSession = false;
 
   // A cryptographic session record is the strongest proof: it can be revoked
   // centrally and expires when the till has been left idle.
@@ -581,14 +582,22 @@ export async function verifyRelayCaller(input: {
         staffUserId: s.staff_user_id ?? null,
       };
     }
-    if (!check.ok && (check.reason === "revoked" || check.reason === "idle")) {
-      throw new Error("Your session has ended — please sign in again.");
-    }
+    // A device can retain an older raw session token while the same POS login
+    // has already issued a fresh signed cashier or Auth proof. Do not let that
+    // stale value prevent the other independently verified proofs below from
+    // identifying the person who is currently signed in.
+    endedSession = !check.ok && (check.reason === "revoked" || check.reason === "idle");
   }
 
   if (!identity && input.cashierToken) {
     const { verifyCashierSession } = await import("@/lib/pos-session.server");
-    const session = verifyCashierSession(input.cashierToken);
+    const session = (() => {
+      try {
+        return verifyCashierSession(input.cashierToken!);
+      } catch {
+        return null;
+      }
+    })();
     if (session)
       identity = { kind: "cashier", label: session.username, staffUserId: session.username };
   }
@@ -645,6 +654,9 @@ export async function verifyRelayCaller(input: {
       }
     }
   }
+
+  if (!identity && endedSession)
+    throw new Error("Your session has ended — please sign in again.");
 
   if (!identity)
     throw new Error("This till could not prove who it is — sign in again or re-activate it.");
