@@ -30,6 +30,8 @@ export type ActivationPayload = {
 export type ActivationPayloadV1 = {
   supabaseUrl: string;
   supabaseAnonKey: string;
+  /** Hosted POS origin that serves privileged sync and sign-in routes. */
+  backendUrl?: string;
   /** one-time claim id (the terminal_tokens row id) */
   pairToken: string;
   /** Display name and intended shell, so activation needs no extra table read. */

@@ -15,7 +15,14 @@ class LocalDataLifecycle {
     this.databaseService.transition("enabled_bootstrapping",{phase:"resume"});
     await this.resume(branchId,historyDays);
     const completed=await this.jobRepository.completed(this.bootstrapType(historyDays),branchId);
-    if(force||!completed)await this.bootstrap(branchId,historyDays);
+    if(force||!completed){
+      // A reused till database can contain completed offline sales before it
+      // has a bootstrap checkpoint. Upload every locally tracked transaction
+      // first; otherwise bootstrap could establish a new baseline over work
+      // that head office has never acknowledged.
+      await this.syncCoordinator.pushWorker.run({branchId,batchSize:500});
+      await this.bootstrap(branchId,historyDays);
+    }
     const synced=await this.syncCoordinator.runNow({branchId,batchSize:500});
     if(!synced.ok)throw Object.assign(new Error(synced.error??"Final synchronization failed."),{code:"ESYNC"});
     await this.retain(branchId,historyDays);
