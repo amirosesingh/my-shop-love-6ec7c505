@@ -708,13 +708,25 @@ function registerIpc() {
     return { ok: true, level: result.level };
   }));
   ipcMain.handle("database:get-state", () => databaseService.snapshot());
-  ipcMain.handle("database:set-enabled", (_e, value) => guard.guarded(async()=>{const state=await databaseService.setEnabled(value===true);if(value===true&&databaseManager.pool)await prepareLocalData();return databaseService.snapshot();}));
+  ipcMain.handle("database:set-enabled", (_e, value) => guard.guarded(async()=>{const state=await databaseService.setEnabled(value===true);if(value===true&&databaseManager.pool)void prepareLocalData().catch(error=>recordFault("local-data.prepare",error));return databaseService.snapshot();}));
   ipcMain.handle("database:list-servers", () => discoverLocalSqlServers());
   ipcMain.handle("database:test-server", (_e, value) => guard.guarded(() => databaseService.testServer(guard.databaseProfile(value))));
   ipcMain.handle("database:list-databases", (_e, value) => guard.guarded(() => databaseService.databases(guard.databaseProfile(value))));
   ipcMain.handle("database:validate", (_e, value) => guard.guarded(() => databaseService.validate(guard.databaseProfile(value, { requireDatabase: true }))));
   ipcMain.handle("database:migrate", (_e, value) => guard.guarded(() => applyMigrations(databaseManager,guard.databaseProfile(value,{requireDatabase:true}))));
-  ipcMain.handle("database:save-connect", (_e, value) => guard.guarded(async()=>{const result=await databaseService.saveAndConnect(guard.databaseProfile(value,{requireDatabase:true}));if(!result.ok)return result;await prepareLocalData();return{...result,state:databaseService.snapshot()};}));
+  ipcMain.handle("database:save-connect", (_e, value) => guard.guarded(async()=>{
+    const result=await databaseService.saveAndConnect(guard.databaseProfile(value,{requireDatabase:true}));
+    if(!result.ok)return result;
+    try{
+      const synchronization=await prepareLocalData();
+      return{...result,synchronization,state:databaseService.snapshot()};
+    }catch(error){
+      // SQL Server is already validated, connected and saved. Cloud readiness
+      // is reported separately so missing activation or internet never turns a
+      // valid local connection into a failed Save and Connect operation.
+      return{...result,ok:true,synchronization:{ok:false,pending:true,code:error?.code??"ESYNC",message:String(error?.message??error)},state:databaseService.snapshot()};
+    }
+  }));
   ipcMain.handle("database:disconnect", () => databaseService.disconnect());
   ipcMain.handle("database:remove-configuration", () => databaseService.remove());
   ipcMain.handle("database:health", () => databaseService.health());
@@ -842,7 +854,11 @@ function registerIpc() {
 
   ipcMain.handle("terminal:read", () => ({ ok: true, config: terminalStore.read() }));
   ipcMain.handle("terminal:write", (_e, raw) => {
-    try { return terminalStore.write(guard.terminalConfig(raw)); }
+    try {
+      const config=guard.terminalConfig(raw);
+      if(config?.backendUrl&&/^https?:\/\//i.test(String(config.backendUrl)))configStore.set("backendUrl",String(config.backendUrl).trim().replace(/\/+$/,""));
+      return terminalStore.write(config);
+    }
     catch (err) { return guard.refuse(err.message); }
   });
   ipcMain.handle("terminal:clear", () => terminalStore.write(null));

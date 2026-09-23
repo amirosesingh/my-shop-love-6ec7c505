@@ -171,4 +171,24 @@ describe("SQL Server checkpoints 7 through 12", () => {
     expect(lifecycle.bootstrapType(30)).toBe("bootstrap_30");
     expect(lifecycle.bootstrapType(7300)).toBe("bootstrap_7300");
   });
+
+  it("pushes pending local work before the first cloud bootstrap", async () => {
+    const order: string[] = [];
+    const lifecycle = new (await import("../../../electron/jobs/lifecycle.cjs")).LocalDataLifecycle({
+      connectionManager: {},
+      databaseService: { transition: vi.fn(), markReady: vi.fn() },
+      jobManager: {},
+      jobRepository: { active: vi.fn().mockResolvedValue(null), completed: vi.fn().mockResolvedValue(null) },
+      registry: {}, cloud: {}, checkpoints: {},
+      syncCoordinator: {
+        pushWorker: { run: vi.fn(async () => { order.push("push"); return { pushed: 1 }; }) },
+        runNow: vi.fn(async () => { order.push("sync"); return { ok: true }; }),
+      },
+    });
+    lifecycle.bootstrap = vi.fn(async () => { order.push("bootstrap"); return {}; });
+    lifecycle.retain = vi.fn(async () => ({}));
+    lifecycle.reconcile = vi.fn(async () => []);
+    await lifecycle.ensure({ branchId: "B1", historyDays: 90 });
+    expect(order).toEqual(["push", "bootstrap", "sync"]);
+  });
 });

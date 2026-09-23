@@ -21,6 +21,7 @@ import { clearDeviceSecret, getDeviceSecret, setDeviceSecret } from "@/lib/devic
 import { recordActivationAttempt } from "@/core/activation/terminal-activation-log";
 import { resetHealthCache } from "@/core/activation/connection-health";
 import { canRelay, relayOp } from "@/core/api/sync-relay";
+import { saveBackendUrl } from "@/lib/backend-config";
 
 import {
   clearTerminalSupabaseOverride,
@@ -286,6 +287,7 @@ export async function issueTerminalToken(input: {
     code: await encryptActivationV1({
       supabaseUrl: supabaseConfig().url,
       supabaseAnonKey: supabaseConfig().key,
+      backendUrl: typeof window !== "undefined" ? window.location.origin : undefined,
       pairToken: id,
       ts: issuedAt,
       deviceName: input.deviceName,
@@ -336,6 +338,7 @@ export async function reissueTerminalToken(
     code: await encryptActivationV1({
       supabaseUrl: supabaseConfig().url,
       supabaseAnonKey: supabaseConfig().key,
+      backendUrl: typeof window !== "undefined" ? window.location.origin : undefined,
       pairToken: id,
       ts: issuedAt,
       deviceName: token.deviceName,
@@ -370,6 +373,7 @@ export type TerminalConfig = {
   locationName: string;
   supabaseUrl: string;
   supabaseKey: string;
+  backendUrl?: string;
   activatedAt: string;
 };
 
@@ -644,6 +648,7 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
     location_name: string;
     supabase_url: string;
     supabase_key: string;
+    backend_url?: string;
     device_name?: string;
     platform?: TerminalPlatform;
   };
@@ -670,6 +675,7 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
         location_name: "",
         supabase_url: v1.supabaseUrl,
         supabase_key: v1.supabaseAnonKey,
+        backend_url: v1.backendUrl,
         device_name: v1.deviceName,
         platform: v1.platform,
       };
@@ -780,8 +786,10 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
     locationName: remote.locationName || payload.location_name,
     supabaseUrl: payload.supabase_url,
     supabaseKey: payload.supabase_key,
+    backendUrl: payload.backend_url,
     activatedAt: new Date().toISOString(),
   };
+  if (config.backendUrl) await saveBackendUrl(config.backendUrl);
   writeTerminalConfig(config);
   note("succeeded", "This till claimed the code and registered.", {
     id: config.locationId,

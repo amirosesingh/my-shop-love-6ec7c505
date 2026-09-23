@@ -11,7 +11,11 @@ describe("SQL Server persistent state machine", () => {
       credentials: () => ({ host: "db", port: 1433, database: "POS", authMode: "windows" }),
       remove: vi.fn(), save: vi.fn(),
     };
-    const manager = { open: vi.fn(), close: vi.fn() };
+    const manager: { pool?: object; open: ReturnType<typeof vi.fn>; close: ReturnType<typeof vi.fn> } = {
+      pool: undefined,
+      open: vi.fn(async function (this: { pool?: object }) { this.pool = {}; }),
+      close: vi.fn(),
+    };
     const service = new DatabaseService({ secureConfig, manager });
     await service.restore();
     expect(service.snapshot().state).toBe("disabled");
@@ -19,7 +23,8 @@ describe("SQL Server persistent state machine", () => {
     await service.setEnabled(true);
     expect(manager.open).toHaveBeenCalledOnce();
     expect(service.snapshot().state).toBe("enabled_bootstrapping");
-    expect(service.snapshot().tradingReady).toBe(false);
+    expect(service.snapshot().connected).toBe(true);
+    expect(service.snapshot().tradingReady).toBe(true);
     service.markReady();
     expect(service.snapshot().state).toBe("enabled_ready");
   });

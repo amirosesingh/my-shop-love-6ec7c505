@@ -14,8 +14,9 @@ class DatabaseService {
     this.detail = null; this.lastCheckedAt = null;
   }
   snapshot() {
+    const locallyConnected = Boolean(this.manager.pool);
     return { state: this.state, enabled: this.secureConfig.enabled(), configured: Boolean(this.secureConfig.profile()),
-      connected: this.state === "enabled_ready", tradingReady: this.state === "enabled_ready", profile: this.secureConfig.profile(), detail: this.detail,
+      connected: locallyConnected, tradingReady: locallyConnected, profile: this.secureConfig.profile(), detail: this.detail,
       lastCheckedAt: this.lastCheckedAt };
   }
   transition(state, detail = null) {
