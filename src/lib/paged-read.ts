@@ -36,18 +36,18 @@ export type PagedRead<T> = {
 /**
  * Read every row a query matches.
  *
- * `build(from, to)` must produce the same query each time, differing only by
- * the row window; the caller is responsible for a deterministic order, or
- * rows can shift between windows.
+ * `build(from, to, withCount)` must produce the same filtered, ordered query
+ * for every window. Only the first window needs an exact count; asking the
+ * database to recount the whole table on every page wastes work.
  */
 export async function readAllPages<T>(
-  build: (from: number, to: number) => PromiseLike<PageResult<T>>,
+  build: (from: number, to: number, withCount: boolean) => PromiseLike<PageResult<T>>,
   opts: { pageSize?: number; maxRows?: number } = {},
 ): Promise<PagedRead<T>> {
   const size = Math.max(1, opts.pageSize ?? PAGE);
   const ceiling = Math.max(size, opts.maxRows ?? MAX_ROWS);
 
-  const first = await build(0, size - 1);
+  const first = await build(0, size - 1, true);
   if (first.error) return { data: null, error: first.error, total: null, capped: false };
 
   const rows = [...(first.data ?? [])];
@@ -62,7 +62,7 @@ export async function readAllPages<T>(
     for (let from = size; from < wanted; from += size) starts.push(from);
     for (let i = 0; i < starts.length; i += CONCURRENCY) {
       const group = starts.slice(i, i + CONCURRENCY);
-      const results = await Promise.all(group.map((from) => build(from, from + size - 1)));
+      const results = await Promise.all(group.map((from) => build(from, from + size - 1, false)));
       for (const res of results) {
         if (res.error) return { data: null, error: res.error, total, capped: false };
         rows.push(...(res.data ?? []));
@@ -75,7 +75,7 @@ export async function readAllPages<T>(
   let from = size;
   for (;;) {
     if (from >= ceiling) return { data: rows, error: null, total: rows.length, capped: true };
-    const res = await build(from, from + size - 1);
+    const res = await build(from, from + size - 1, false);
     if (res.error) return { data: null, error: res.error, total: null, capped: false };
     const page = res.data ?? [];
     rows.push(...page);

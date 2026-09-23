@@ -34,6 +34,7 @@ import { subscribeConnectivity } from "@/core/activation/connection-health";
 import { CameraScanner } from "@/platforms/web/components/pos/CameraScanner";
 import { EmergencyAccessLink } from "@/components/shared/EmergencyAccessLink";
 import { useBranding } from "@/lib/branding";
+import { isAndroid } from "@/platform-config/platform";
 
 const qrDataUrl = (value: string) => {
   const qr = qrcode(0, "M");
@@ -74,6 +75,7 @@ export function TerminalActivation({
   const [online, setOnline] = useState(() => isCloudConnected());
   useEffect(() => subscribeConnectivity(() => setOnline(isCloudConnected())), []);
   const branding = useBranding();
+  const mobile = isAndroid();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
@@ -117,7 +119,10 @@ export function TerminalActivation({
   useEffect(() => {
     if (!pairing || !online || done) return;
     let stopped = false;
+    let pending = false;
     const tick = async () => {
+      if (pending) return;
+      pending = true;
       try {
         const config = await activateWithTokenId(pairing.tokenId);
         if (config && !stopped) {
@@ -127,6 +132,8 @@ export function TerminalActivation({
         }
       } catch (e) {
         if (!stopped && e instanceof ActivationError) setError(e.message);
+      } finally {
+        pending = false;
       }
     };
     void tick();
@@ -185,7 +192,7 @@ export function TerminalActivation({
           <ShieldCheck className="size-6" />
         </div>
         <div>
-          <h1 className="text-lg font-semibold">Activate this terminal</h1>
+          <h1 className="text-lg font-semibold">Activate this {mobile ? "phone or tablet" : "Windows till"}</h1>
           <p className="text-xs text-slate-400">
             {branding.company} · {branding.terminal}
           </p>
@@ -193,8 +200,9 @@ export function TerminalActivation({
       </div>
 
       <p className="mt-4 text-sm text-slate-400">
-        Ask your administrator for an activation code for this counter. Scan the QR code or paste
-        the text block below.
+        Ask a supervisor or administrator for {mobile ? "a mobile terminal" : "a Windows till"} activation code
+        for this location. Scan the QR code or paste the text block below. This code registers the
+        device; each staff member signs in with their own account afterward.
       </p>
 
       <Tabs defaultValue="scan" className="mt-4">
@@ -266,7 +274,7 @@ export function TerminalActivation({
         </TabsContent>
       </Tabs>
 
-      <div className="mt-4 rounded-xl border border-slate-700 bg-slate-950/50">
+      {!mobile && <div className="mt-4 rounded-xl border border-slate-700 bg-slate-950/50">
         <button
           type="button"
           onClick={() => setShowPairing((v) => !v)}
@@ -312,7 +320,7 @@ export function TerminalActivation({
             </div>
           </div>
         )}
-      </div>
+      </div>}
 
       {!online && (
         <div className="mt-3 rounded-lg border border-slate-700 bg-slate-950/50 p-3 text-sm text-slate-400">

@@ -31,6 +31,16 @@ describe("readAllPages", () => {
     expect(res.data?.[2499]?.id).toBe(2499);
   });
 
+  it("requests an exact count only for the first window", async () => {
+    const counted: boolean[] = [];
+    const t = table(2500);
+    await readAllPages<Row>((from, to, withCount) => {
+      counted.push(withCount);
+      return t.build(from, to);
+    });
+    expect(counted).toEqual([true, false, false]);
+  });
+
   it("handles an exact multiple of the window size", async () => {
     const t = table(2000);
     const res = await readAllPages<Row>(t.build, { pageSize: 1000 });

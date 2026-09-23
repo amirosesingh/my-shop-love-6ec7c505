@@ -231,7 +231,7 @@ const rowToToken = (r: Record<string, any>): TerminalToken => ({
   locationId: r.location_id ?? null,
   locationName: r.location_name ?? "",
   deviceName: r.device_name ?? "",
-  platform: r.platform === "mobile" ? "mobile" : "pc",
+  platform: r.platform === "mobile" || r.platform === "android" ? "mobile" : "pc",
   status: asStatus(r.status),
   createdAt: r.created_at,
   activatedAt: r.activated_at ?? null,
@@ -289,6 +289,8 @@ export async function issueTerminalToken(input: {
       supabaseAnonKey: supabaseConfig().key,
       pairToken: id,
       ts: issuedAt,
+      deviceName: input.deviceName,
+      platform: input.platform ?? "pc",
     }),
   };
 }
@@ -337,6 +339,8 @@ export async function reissueTerminalToken(
       supabaseAnonKey: supabaseConfig().key,
       pairToken: id,
       ts: issuedAt,
+      deviceName: token.deviceName,
+      platform: token.platform,
     }),
   };
 }
@@ -387,7 +391,12 @@ const parseConfig = (raw: string | null): TerminalConfig | null => {
   if (!raw) return null;
   try {
     const parsed = JSON.parse(raw) as TerminalConfig;
-    return parsed?.tokenId ? parsed : null;
+    if (!parsed?.tokenId) return null;
+    const shell = claimPlatform();
+    return {
+      ...parsed,
+      deviceType: shell === "android" ? "mobile" : shell === "electron" ? "pc" : parsed.deviceType,
+    };
   } catch {
     return null;
   }
@@ -422,8 +431,12 @@ export async function hydrateTerminalConfig(): Promise<TerminalConfig | null> {
   try {
     const sealed = await getDeviceSecret<TerminalConfig>(SEALED_NAME);
     if (sealed?.tokenId) {
-      cachedConfig = sealed;
-      applyTenantOverride(sealed);
+      const shell = claimPlatform();
+      cachedConfig = {
+        ...sealed,
+        deviceType: shell === "android" ? "mobile" : shell === "electron" ? "pc" : sealed.deviceType,
+      };
+      applyTenantOverride(cachedConfig);
     }
   } catch {
     /* unreadable seal — treat as not activated */
@@ -589,6 +602,9 @@ function activationFailureMessage(e: unknown): string {
   if (/TERMINAL_TOKEN_REVOKED/.test(message)) {
     return "This activation code has been revoked by management.";
   }
+  if (/TERMINAL_PLATFORM_MISMATCH/.test(message)) {
+    return "This code is for a different device type. Ask a supervisor for the correct PC or mobile activation code.";
+  }
   if (/TERMINAL_TOKEN_EXPIRED/.test(message)) {
     return "This activation code has expired. Ask an administrator to generate a new one.";
   }
@@ -635,6 +651,8 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
     location_name: string;
     supabase_url: string;
     supabase_key: string;
+    device_name?: string;
+    platform?: TerminalPlatform;
   };
   try {
     if (isEncryptedV1(code)) {
@@ -659,6 +677,8 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
         location_name: "",
         supabase_url: v1.supabaseUrl,
         supabase_key: v1.supabaseAnonKey,
+        device_name: v1.deviceName,
+        platform: v1.platform,
       };
     } else {
       payload = await decryptActivation(code);
@@ -671,6 +691,16 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
       reason: "The activation code could not be read.",
     });
     throw new ActivationError("This activation code is not valid.");
+  }
+
+  const shell = claimPlatform();
+  if (
+    (payload.platform === "mobile" && shell !== "android") ||
+    (payload.platform === "pc" && shell !== "electron")
+  ) {
+    throw new ActivationError(
+      "This code is for a different device type. Ask a supervisor for the correct PC or mobile activation code.",
+    );
   }
 
   // The claim runs against the tenant named inside the token, not against
@@ -749,20 +779,10 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
     throw new ActivationError("This activation token has already been used or expired.");
   }
 
-  // Best effort: carry the name management gave this machine onto the device
-  // itself, so logs and telemetry read "Front counter" rather than a UUID.
-  const named = await (tenant as any)
-    .from("terminal_tokens")
-    .select("device_name, platform")
-    .eq("id", payload.token_id)
-    .maybeSingle()
-    .then((r: any) => r?.data ?? null)
-    .catch(() => null);
-
   const config: TerminalConfig = {
     tokenId: payload.token_id,
-    deviceName: (named?.device_name as string | undefined)?.trim() || remote.locationName || "",
-    deviceType: named?.platform === "mobile" ? "mobile" : "pc",
+    deviceName: payload.device_name?.trim() || remote.locationName || "",
+    deviceType: claimPlatform() === "android" ? "mobile" : "pc",
     locationId: payload.location_id || remote.locationId,
     locationName: remote.locationName || payload.location_name,
     supabaseUrl: payload.supabase_url,
@@ -910,6 +930,8 @@ export async function activateWithTokenId(tokenId: string): Promise<TerminalConf
   }
   const config: TerminalConfig = {
     tokenId,
+    deviceName: getPairingRequest().deviceName,
+    deviceType: claimPlatform() === "android" ? "mobile" : "pc",
     locationId: remote.locationId,
     locationName: remote.locationName,
     supabaseUrl: supabaseConfig().url,
