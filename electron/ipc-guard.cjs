@@ -186,6 +186,27 @@ function connectionConfig(value, { name = "connection details" } = {}) {
   return options(value, { name, max: 40 });
 }
 
+/** Signed-in POS proof with token-specific limits. */
+function credentialProof(value) {
+  const raw = plainObject(value ?? {}, { name: "signed-in session" });
+  const limits = {
+    accessToken: 4000,
+    sessionToken: 400,
+    cashierToken: 2000,
+    terminalToken: 2000,
+  };
+  for (const key of Object.keys(raw)) {
+    if (!Object.hasOwn(limits, key))
+      throw new BadArg("The signed-in session contains an unexpected setting.");
+  }
+  const proof = {};
+  for (const [key, max] of Object.entries(limits)) {
+    if (raw[key] !== null && raw[key] !== undefined && raw[key] !== "")
+      proof[key] = text(raw[key], { name: key, max });
+  }
+  return proof;
+}
+
 const HOST = /^(?=.{1,253}$)(?:[A-Za-z0-9](?:[A-Za-z0-9.-]*[A-Za-z0-9])?|\[[0-9A-Fa-f:]+\])$/;
 const INSTANCE_NAME = /^[A-Za-z0-9_$-]{1,128}$/;
 const DB_NAME = /^[^;{}\\/\x00-\x1f]{1,128}$/;
@@ -303,6 +324,7 @@ module.exports = {
   aggregate,
   options,
   connectionConfig,
+  credentialProof,
   databaseProfile,
   uuid,
   terminalConfig,

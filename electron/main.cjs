@@ -662,11 +662,7 @@ function registerIpc() {
   ipcMain.handle("admin:status", () => adminSession.status());
   ipcMain.handle("admin:lock", () => { adminSession.clear(); return adminSession.status(); });
   ipcMain.handle("admin:adopt-session", async (_e, value) => guard.guarded(async () => {
-    const input=typeof value==="string"?{accessToken:value}:guard.options(value,{name:"signed-in session",max:4});
-    const proof={};
-    for(const [key,max] of [["accessToken",4000],["sessionToken",400],["cashierToken",2000],["terminalToken",2000]]){
-      if(input[key])proof[key]=guard.text(input[key],{name:key,max});
-    }
+    const proof=guard.credentialProof(typeof value==="string"?{accessToken:value}:value);
     if(!proof.accessToken&&!proof.sessionToken&&!proof.cashierToken)return{ok:false,error:"A verified signed-in user is required."};
     if(!baseUrl)return{ok:false,error:"The authorization service is still starting."};
     const response=await fetch(`${baseUrl}/api/v1/pos/ipc-adopt`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(proof)});

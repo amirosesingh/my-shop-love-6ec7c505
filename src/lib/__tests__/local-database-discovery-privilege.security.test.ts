@@ -7,6 +7,7 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const require = createRequire(import.meta.url);
 const adminSession = require("../../../electron/admin-session.cjs");
 const privilege = require("../../../electron/ipc-privilege.cjs");
+const ipcGuard = require("../../../electron/ipc-guard.cjs");
 
 const DATABASE_ADMIN_CHANNELS = [
   "database:set-enabled",
@@ -122,6 +123,20 @@ describe("local SQL Server discovery privilege", () => {
     expect(ipcGate).toContain("adminSession.hasPosAuthority()");
     expect(wizard).toMatch(
       /const authorization = await authorizeDatabaseChange\(\);[\s\S]{0,220}const migrated = await api\(\)!\.migrateDatabase\(profile\)/,
+    );
+  });
+
+  it("accepts legitimate long POS access tokens without relaxing token limits", () => {
+    const proof = ipcGuard.credentialProof({
+      accessToken: "a".repeat(2000),
+      sessionToken: "pst_signed_in",
+    });
+    expect(proof.accessToken).toHaveLength(2000);
+    expect(() => ipcGuard.credentialProof({ accessToken: "a".repeat(4001) })).toThrow(
+      /accessToken is too long/,
+    );
+    expect(() => ipcGuard.credentialProof({ role: "admin" })).toThrow(
+      /unexpected setting/,
     );
   });
 
