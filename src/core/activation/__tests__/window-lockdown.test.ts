@@ -47,4 +47,10 @@ describe("desktop window lockdown", () => {
   it("never opens a second window that would inherit the bridge", () => {
     expect(main).toMatch(/setWindowOpenHandler\(\(\{ url \}\) => \{[\s\S]{0,400}action: "deny"/);
   });
+
+  it("does not load stylesheets that the desktop policy blocks", () => {
+    const root = readFileSync("src/routes/__root.tsx", "utf8");
+    expect(root).not.toContain("fonts.googleapis.com");
+    expect(root).not.toContain("fonts.gstatic.com");
+  });
 });

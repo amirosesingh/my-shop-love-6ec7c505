@@ -19,7 +19,6 @@ import {
 } from "@/lib/terminal-crypto";
 import { clearDeviceSecret, getDeviceSecret, setDeviceSecret } from "@/lib/device-secrets";
 import { recordActivationAttempt } from "@/core/activation/terminal-activation-log";
-import { APP_VERSION } from "@/version";
 import { resetHealthCache } from "@/core/activation/connection-health";
 import { canRelay, relayOp } from "@/core/api/sync-relay";
 
@@ -568,22 +567,16 @@ export async function fetchTokenStatus(
 
 export async function stampHeartbeat(
   tokenId: string,
-  opts: { version?: string; synced?: boolean } = {},
+  _opts: { version?: string; synced?: boolean } = {},
 ): Promise<void> {
-  try {
-    await rpc("terminal_token_heartbeat", {
-      p_token_id: tokenId,
-      p_activate: false,
-      p_version: opts.version ?? APP_VERSION,
-      p_synced: opts.synced === true,
-    });
-  } catch (e) {
-    // A database that predates the version/sync arguments still accepts the
-    // original two — never let a check-in fail over an optional detail.
-    const message = (e as { message?: string })?.message ?? "";
-    if (!/p_version|p_synced|PGRST202|could not choose/i.test(message)) throw e;
-    await rpc("terminal_token_heartbeat", { p_token_id: tokenId, p_activate: false });
-  }
+  // Current heartbeat functions accept UUIDs. Old desktop profiles can carry
+  // an opaque pre-v1 token; sending it to PostgREST produces a noisy 400 on
+  // every revocation interval without updating anything.
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(tokenId)) return;
+  // Keep the call compatible with databases that still expose the original
+  // two-argument function. The current four-argument function supplies
+  // defaults for both omitted telemetry fields.
+  await rpc("terminal_token_heartbeat", { p_token_id: tokenId, p_activate: false });
 }
 
 export class ActivationError extends Error {}
@@ -797,8 +790,6 @@ export async function activateTerminal(code: string): Promise<TerminalConfig> {
   await rpcOn(tenant, "terminal_token_heartbeat", {
     p_token_id: config.tokenId,
     p_activate: true,
-    p_version: APP_VERSION,
-    p_synced: false,
   });
   // Give this till its own machine account so its writes are accepted by the
   // central database even when a cashier signs in with a PIN.
@@ -943,8 +934,6 @@ export async function activateWithTokenId(tokenId: string): Promise<TerminalConf
   await rpc("terminal_token_heartbeat", {
     p_token_id: tokenId,
     p_activate: true,
-    p_version: APP_VERSION,
-    p_synced: false,
   });
   void import("@/lib/terminal-session").then((m) => m.provisionTerminalAccount(tokenId)).catch(() => null);
   return config;

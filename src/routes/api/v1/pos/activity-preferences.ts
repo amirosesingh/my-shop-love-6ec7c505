@@ -1,5 +1,6 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { z } from "zod";
+import { corsPreflight, withCors } from "@/lib/public-cors";
 
 const bodySchema = z.object({
   action: z.enum(["list", "clear"]),
@@ -22,20 +23,22 @@ export const Route = createFileRoute("/api/v1/pos/activity-preferences")({
   server: {
     handlers: {
       POST: async ({ request }) => {
+        const reply = (body: unknown, status = 200) =>
+          withCors(Response.json(body, { status }), request);
         const raw = await request.text();
-        if (raw.length > 12_000) return Response.json({ ok: false, error: "Request too large" }, { status: 413 });
+        if (raw.length > 12_000) return reply({ ok: false, error: "Request too large" }, 413);
         let body: unknown;
         try { body = JSON.parse(raw); }
-        catch { return Response.json({ ok: false, error: "Invalid JSON" }, { status: 400 }); }
+        catch { return reply({ ok: false, error: "Invalid JSON" }, 400); }
         const parsed = bodySchema.safeParse(body);
-        if (!parsed.success) return Response.json({ ok: false, error: "Invalid request" }, { status: 400 });
+        if (!parsed.success) return reply({ ok: false, error: "Invalid request" }, 400);
         const input = parsed.data;
         const { verifyRelayCaller, serviceRest } = await import("@/core/api/pos-relay.server");
         let caller: Awaited<ReturnType<typeof verifyRelayCaller>>;
         try {
           caller = await verifyRelayCaller(input);
         } catch {
-          return Response.json({ ok: false, error: "Sign in is required" }, { status: 401 });
+          return reply({ ok: false, error: "Sign in is required" }, 401);
         }
         // Resolve from the live account row. A terminal token or cached role
         // claim alone must never read this feed or clear another user's row.
@@ -48,7 +51,7 @@ export const Route = createFileRoute("/api/v1/pos/activity-preferences")({
         let account: Account | undefined;
         for (const identity of identities) {
           const response = await serviceRest(`app_users?${identity}&select=user_id,role,role_slug,permissions,store_id,is_active&limit=1`);
-          if (!response.ok) return Response.json({ ok: false, error: "Account lookup failed" }, { status: 503 });
+          if (!response.ok) return reply({ ok: false, error: "Account lookup failed" }, 503);
           account = ((await response.json()) as Account[])[0];
           if (account) break;
         }
@@ -56,17 +59,17 @@ export const Route = createFileRoute("/api/v1/pos/activity-preferences")({
           account.role === "admin" || account.role === "manager" ||
           account.role_slug === "admin" || account.role_slug === "supervisor" ||
           account.permissions?.can_view_audit_trail === true
-        )) return Response.json({ ok: false, error: "Activity access denied" }, { status: 403 });
+        )) return reply({ ok: false, error: "Activity access denied" }, 403);
 
         if (input.action === "clear") {
           if (!input.eventId || input.cleared === undefined)
-            return Response.json({ ok: false, error: "Event and clear state are required" }, { status: 400 });
+            return reply({ ok: false, error: "Event and clear state are required" }, 400);
           const response = await serviceRest("rpc/pos_set_activity_event_cleared", {
             method: "POST",
             body: JSON.stringify({ p_event_id: input.eventId, p_user_id: account.user_id, p_cleared: input.cleared }),
           });
-          if (!response.ok) return Response.json({ ok: false, error: "Could not save notification state" }, { status: 503 });
-          return Response.json({ ok: true });
+          if (!response.ok) return reply({ ok: false, error: "Could not save notification state" }, 503);
+          return reply({ ok: true });
         }
 
         const params = new URLSearchParams({ select: "*", order: "created_at.desc", limit: String(input.limit ?? 200) });
@@ -75,16 +78,17 @@ export const Route = createFileRoute("/api/v1/pos/activity-preferences")({
         const branch = account.store_id ?? caller.storeId ?? null;
         if (branch && account.role !== "admin" && account.role_slug !== "admin") {
           if (input.storeId && input.storeId !== branch)
-            return Response.json({ ok: false, error: "Branch access denied" }, { status: 403 });
+            return reply({ ok: false, error: "Branch access denied" }, 403);
           params.set("store_id", `eq.${branch}`);
         } else if (input.storeId) params.set("store_id", `eq.${input.storeId}`);
         if (input.actor) params.set("actor_name", `ilike.*${input.actor.replace(/[,*()]/g, "")}*`);
         if (input.from) params.set("created_at", `gte.${input.from}`);
         if (input.to) params.append("created_at", `lte.${input.to}`);
         const response = await serviceRest(`activity_events?${params}`);
-        if (!response.ok) return Response.json({ ok: false, error: "Could not load activity" }, { status: 503 });
-        return Response.json({ ok: true, rows: await response.json() });
+        if (!response.ok) return reply({ ok: false, error: "Could not load activity" }, 503);
+        return reply({ ok: true, rows: await response.json() });
       },
+      OPTIONS: async ({ request }) => corsPreflight(request),
     },
   },
 });

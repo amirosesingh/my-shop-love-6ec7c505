@@ -1,3 +1,4 @@
+import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const posFetch = vi.fn(() => Promise.resolve({ ok: true, json: async () => ({ ok: true }) }));
@@ -58,5 +59,11 @@ describe("per-user notification state", () => {
     activity.markActivitySeen("2026-09-15T12:00:00.000Z", "manager-1");
     expect(activity.lastSeenAt("manager-1")).toBe("2026-09-15T12:00:00.000Z");
     expect(activity.lastSeenAt("manager-2")).toBe("");
+  });
+
+  it("allows terminal shells to call the hosted preference endpoint", () => {
+    const route = readFileSync("src/routes/api/v1/pos/activity-preferences.ts", "utf8");
+    expect(route).toContain("withCors(Response.json");
+    expect(route).toContain("OPTIONS: async ({ request }) => corsPreflight(request)");
   });
 });

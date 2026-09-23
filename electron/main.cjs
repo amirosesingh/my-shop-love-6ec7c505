@@ -655,6 +655,15 @@ async function printRaw(bytes, options = {}) {
 }
 
 
+function authorizationServerUrl() {
+  const configured = String(configStore.get("backendUrl") ?? "").trim().replace(/\/+$/, "");
+  if (/^https?:\/\//i.test(configured)) return configured;
+  // The Vite server owns the API routes during development. A packaged till
+  // must use its configured hosted backend because its local app server never
+  // carries the central database service credential.
+  return DEV_URL ? baseUrl : null;
+}
+
 function registerIpc() {
   ipcPrivilege.install(ipcMain, {
     isFirstRun: () => !terminalStore.read() && !cloudCredentials.status().configured,
@@ -664,8 +673,9 @@ function registerIpc() {
   ipcMain.handle("admin:adopt-session", async (_e, value) => guard.guarded(async () => {
     const proof=guard.credentialProof(typeof value==="string"?{accessToken:value}:value);
     if(!proof.accessToken&&!proof.sessionToken&&!proof.cashierToken)return{ok:false,error:"A verified signed-in user is required."};
-    if(!baseUrl)return{ok:false,error:"The authorization service is still starting."};
-    const response=await fetch(`${baseUrl}/api/v1/pos/ipc-adopt`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(proof)});
+    const authorizationUrl=authorizationServerUrl();
+    if(!authorizationUrl)return{ok:false,error:"Configure the hosted POS backend address before connecting the local database."};
+    const response=await fetch(`${authorizationUrl}/api/v1/pos/ipc-adopt`,{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify(proof)});
     const result=await response.json().catch(()=>({ok:false,error:"Authorization failed."}));
     if(!response.ok||!result.ok)return{ok:false,error:result.error??"Authorization failed."};
     adminSession.grant(result.level,result.subject,result.permissions,"pos");return{ok:true,level:result.level};
@@ -673,8 +683,9 @@ function registerIpc() {
   ipcMain.handle("admin:unlock", async (_e, username, pin) => guard.guarded(async () => {
     const user = guard.text(username, { name: "username", max: 160 });
     const secret = guard.text(pin, { name: "PIN", max: 32 });
-    if (!baseUrl) return { ok: false, error: "The authorization service is still starting." };
-    const response = await fetch(`${baseUrl}/api/v1/pos/ipc-authorize`, {
+    const authorizationUrl = authorizationServerUrl();
+    if (!authorizationUrl) return { ok: false, error: "Configure the hosted POS backend address before connecting the local database." };
+    const response = await fetch(`${authorizationUrl}/api/v1/pos/ipc-authorize`, {
       method: "POST",
       headers: { "content-type": "application/json" },
       body: JSON.stringify({ username: user, pin: secret, terminalId: terminalStore.read()?.terminalId ?? null }),
