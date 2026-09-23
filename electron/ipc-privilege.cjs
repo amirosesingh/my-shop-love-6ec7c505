@@ -94,6 +94,8 @@ const CHANNEL_LEVELS = {
   "staff:roster": OPEN,
   "staff:cache-roster": OPEN,
   "staff:verify-pin": OPEN,
+  "staff:enroll": OPEN,
+  "sync:auto": OPEN,
   "settings:get": OPEN,
   "config:read": OPEN,
   "config:get": OPEN,

@@ -49,12 +49,17 @@ contextBridge.exposeInMainWorld("pos", {
   sync: {
     getStatus: () => invoke("sync:get-status"),
     runNow: (options) => invoke("sync:run-now", options),
+    auto: () => invoke("sync:auto"),
     pause: () => invoke("sync:pause"),
     resume: () => invoke("sync:resume"),
     getFailures: () => invoke("sync:get-failures"),
     reconcile: (options) => invoke("sync:reconcile", options),
     subscribe: (cb) => { const handler=(_event,payload)=>cb(payload); ipcRenderer.on("sync:state",handler); return()=>ipcRenderer.removeListener("sync:state",handler); },
   },
+  staffRoster: (storeId) => invoke("staff:roster", storeId),
+  cacheStaffRoster: (rows) => invoke("staff:cache-roster", rows),
+  rememberStaffPin: (username, pin) => invoke("staff:enroll", username, pin),
+  verifyStaffPin: (username, pin) => invoke("staff:verify-pin", username, pin),
   telemetry: {
     presence: (value) => invoke("telemetry:presence", value),
   },

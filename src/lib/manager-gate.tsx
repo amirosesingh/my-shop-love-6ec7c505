@@ -186,6 +186,11 @@ export function ManagerGateProvider({
             : { requesterDirectLimit: request.requesterDirectLimit }),
           ...(request.valueUnit ? { valueUnit: request.valueUnit } : {}),
           ...(request.heldOrderId ? { heldOrderId: request.heldOrderId } : {}),
+          allowedRoles: rule?.allowedRoles ?? ["admin", "manager"],
+          allowedUserIds: rule?.allowedUserIds ?? [],
+          authorityLimits: rule?.authorityLimits ?? {},
+          extraAuthority: rule?.extraAuthority ?? {},
+          absoluteCeilings: rule?.absoluteCeilings ?? {},
         });
       });
 
