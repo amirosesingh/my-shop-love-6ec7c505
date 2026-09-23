@@ -99,6 +99,10 @@ describe("local SQL Server discovery privilege", () => {
 
   it("keeps privileged retries wired to server-verified session adoption", () => {
     const gate = readFileSync("src/platforms/windows/components/PrivilegeGate.tsx", "utf8");
+    const wizard = readFileSync(
+      "src/platforms/windows/components/LocalDatabaseWizard.tsx",
+      "utf8",
+    );
     const main = readFileSync("electron/main.cjs", "utf8");
     const adoptRoute = readFileSync("src/routes/api/v1/pos/ipc-adopt.ts", "utf8");
 
@@ -110,6 +114,9 @@ describe("local SQL Server discovery privilege", () => {
     expect(adoptRoute).toContain("cashierToken:");
     expect(adoptRoute).not.toMatch(/role\s*:\s*input/);
     expect(adoptRoute).not.toContain("can_manage_sync_backup === true");
+    expect(wizard).toMatch(
+      /const authorization = await authorizeDatabaseChange\(\);[\s\S]{0,220}const migrated = await api\(\)!\.migrateDatabase\(profile\)/,
+    );
   });
 
   it("runs database listing through the installed IPC gate without a staff grant", async () => {
