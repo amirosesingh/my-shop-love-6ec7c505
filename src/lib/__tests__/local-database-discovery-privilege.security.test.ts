@@ -76,18 +76,21 @@ describe("local SQL Server discovery privilege", () => {
     }
   });
 
-  it("uses the verified account permission instead of a second desktop role", () => {
-    adminSession.grant("staff", "signed-in-staff", { can_manage_sync_backup: true });
+  it("uses only the verified POS account permission instead of a desktop role", () => {
+    adminSession.grant("staff", "signed-in-staff", { can_manage_sync_backup: true }, "pos");
     expect(privilege.allowed("database:save-connect")).toBe(true);
     expect(privilege.allowed("sync:run-now")).toBe(true);
     expect(privilege.allowed("sqladmin:repair")).toBe(true);
     expect(privilege.allowed("settings:set", ["database_host"])).toBe(true);
     expect(privilege.allowed("terminal:write")).toBe(false);
 
-    adminSession.grant("admin", "signed-in-admin", { can_manage_sync_backup: false });
+    adminSession.grant("admin", "signed-in-admin", { can_manage_sync_backup: false }, "pos");
     expect(privilege.allowed("database:save-connect")).toBe(true);
     expect(privilege.allowed("sqladmin:repair")).toBe(true);
     expect(privilege.allowed("config:set", ["sync_enabled"])).toBe(true);
+
+    adminSession.grant("admin", "desktop-unlock", { can_manage_sync_backup: true }, "manual");
+    expect(privilege.allowed("database:save-connect")).toBe(false);
 
     adminSession.clear();
     expect(privilege.allowed("database:save-connect")).toBe(false);
@@ -99,6 +102,7 @@ describe("local SQL Server discovery privilege", () => {
 
   it("keeps privileged retries wired to server-verified session adoption", () => {
     const gate = readFileSync("src/platforms/windows/components/PrivilegeGate.tsx", "utf8");
+    const ipcGate = readFileSync("electron/ipc-privilege.cjs", "utf8");
     const wizard = readFileSync(
       "src/platforms/windows/components/LocalDatabaseWizard.tsx",
       "utf8",
@@ -114,6 +118,8 @@ describe("local SQL Server discovery privilege", () => {
     expect(adoptRoute).toContain("cashierToken:");
     expect(adoptRoute).not.toMatch(/role\s*:\s*input/);
     expect(adoptRoute).not.toContain("can_manage_sync_backup === true");
+    expect(main).toContain('adminSession.grant(result.level,result.subject,result.permissions,"pos")');
+    expect(ipcGate).toContain("adminSession.hasPosAuthority()");
     expect(wizard).toMatch(
       /const authorization = await authorizeDatabaseChange\(\);[\s\S]{0,220}const migrated = await api\(\)!\.migrateDatabase\(profile\)/,
     );
