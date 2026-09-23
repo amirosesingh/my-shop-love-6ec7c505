@@ -52,8 +52,9 @@ describe("offline credentials", () => {
       fullName: "Amy",
       storeId: "s1",
       permissions: { can_view_inventory: true },
+      roleSlug: "admin",
     });
-    expect(await verifyCachedPin("amy", "123456")).not.toBeNull();
+    expect(await verifyCachedPin("amy", "123456")).toMatchObject({ roleSlug: "admin" });
     expect(await verifyCachedPin("amy", "654321")).toBeNull();
     expect(await verifyCachedPin("nobody", "123456")).toBeNull();
   });
