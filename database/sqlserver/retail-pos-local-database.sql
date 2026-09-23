@@ -2985,7 +2985,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.whatsap
 
 IF OBJECT_ID(N'dbo.terminal_recovery_secrets', N'U') IS NULL BEGIN CREATE TABLE dbo.[terminal_recovery_secrets] (
 
-  [terminal_token_id] uniqueidentifier NULL,
+  [terminal_token_id] uniqueidentifier NOT NULL,
   [sealed_secret] nvarchar(max) NOT NULL,
   [fingerprint] nvarchar(max) NOT NULL,
   [platform] nvarchar(max) NOT NULL CONSTRAINT [DF_terminal_recovery_secrets_platform] DEFAULT ('unknown'),
@@ -3019,7 +3019,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.termina
 
 IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NULL BEGIN CREATE TABLE dbo.[pos_store_settings] (
 
-  [store_id] nvarchar(450) NULL,
+  [store_id] nvarchar(450) NOT NULL,
   [block_shift_close_on_hold] bit NULL,
   [require_daily_sales_for_shift_close] bit NULL,
   [require_counted_cash_on_close] bit NULL,
@@ -3439,7 +3439,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.authori
 
 IF OBJECT_ID(N'dbo.record_edits', N'U') IS NULL BEGIN CREATE TABLE dbo.[record_edits] (
 
-  [id] uniqueidentifier NULL CONSTRAINT [DF_record_edits_id] DEFAULT (NEWID()),
+  [id] uniqueidentifier NOT NULL CONSTRAINT [DF_record_edits_id] DEFAULT (NEWID()),
   [record_type] nvarchar(max) NOT NULL,
   [record_id] nvarchar(max) NOT NULL,
   [reference] nvarchar(max) NULL,
@@ -3503,7 +3503,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.record_
 
 IF OBJECT_ID(N'dbo.shift_cash_counts', N'U') IS NULL BEGIN CREATE TABLE dbo.[shift_cash_counts] (
 
-  [id] uniqueidentifier NULL CONSTRAINT [DF_shift_cash_counts_id] DEFAULT (NEWID()),
+  [id] uniqueidentifier NOT NULL CONSTRAINT [DF_shift_cash_counts_id] DEFAULT (NEWID()),
   [shift_id] uniqueidentifier NOT NULL,
   [store_id] nvarchar(max) NOT NULL,
   [terminal_id] nvarchar(max) NULL,
@@ -3555,7 +3555,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.shift_c
 
 IF OBJECT_ID(N'dbo.shift_close_events', N'U') IS NULL BEGIN CREATE TABLE dbo.[shift_close_events] (
 
-  [id] uniqueidentifier NULL CONSTRAINT [DF_shift_close_events_id] DEFAULT (NEWID()),
+  [id] uniqueidentifier NOT NULL CONSTRAINT [DF_shift_close_events_id] DEFAULT (NEWID()),
   [shift_id] uniqueidentifier NOT NULL,
   [store_id] nvarchar(max) NOT NULL,
   [terminal_id] nvarchar(max) NULL,
@@ -3601,7 +3601,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.shift_c
 
 IF OBJECT_ID(N'dbo.shift_reconciliations', N'U') IS NULL BEGIN CREATE TABLE dbo.[shift_reconciliations] (
 
-  [id] uniqueidentifier NULL CONSTRAINT [DF_shift_reconciliations_id] DEFAULT (NEWID()),
+  [id] uniqueidentifier NOT NULL CONSTRAINT [DF_shift_reconciliations_id] DEFAULT (NEWID()),
   [shift_id] uniqueidentifier NOT NULL,
   [store_id] nvarchar(max) NOT NULL,
   [count_id] uniqueidentifier NULL,
@@ -3659,7 +3659,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.shift_r
 
 IF OBJECT_ID(N'dbo.shift_variance_alerts', N'U') IS NULL BEGIN CREATE TABLE dbo.[shift_variance_alerts] (
 
-  [id] uniqueidentifier NULL CONSTRAINT [DF_shift_variance_alerts_id] DEFAULT (NEWID()),
+  [id] uniqueidentifier NOT NULL CONSTRAINT [DF_shift_variance_alerts_id] DEFAULT (NEWID()),
   [shift_id] uniqueidentifier NOT NULL,
   [store_id] nvarchar(max) NOT NULL,
   [reconciliation_id] uniqueidentifier NULL,
@@ -3719,7 +3719,7 @@ IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.shift_v
 
 IF OBJECT_ID(N'dbo.entity_status_history', N'U') IS NULL BEGIN CREATE TABLE dbo.[entity_status_history] (
 
-  [id] uniqueidentifier NULL CONSTRAINT [DF_entity_status_history_id] DEFAULT (NEWID()),
+  [id] uniqueidentifier NOT NULL CONSTRAINT [DF_entity_status_history_id] DEFAULT (NEWID()),
   [entity_type] nvarchar(max) NOT NULL,
   [entity_id] nvarchar(max) NOT NULL,
   [status_kind] nvarchar(max) NOT NULL CONSTRAINT [DF_entity_status_history_status_kind] DEFAULT ('status'),
