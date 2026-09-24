@@ -4,11 +4,18 @@
  */
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { ACTION_CATEGORIES, REGISTER_ACTIONS } from "@/lib/register-actions";
+import { boundedInputNumber } from "@/lib/number-input";
 import {
   DEFAULT_PAD,
   MAX_PAD,
@@ -28,7 +35,10 @@ export function CustomButtonDialog({
 }: {
   open: boolean;
   onOpenChange: (v: boolean) => void;
-  onCreate: (spec: CustomButtonSpec, opts: { tone?: ModuleTone; style?: ModuleStyle; pad?: number }) => void;
+  onCreate: (
+    spec: CustomButtonSpec,
+    opts: { tone?: ModuleTone; style?: ModuleStyle; pad?: number },
+  ) => void;
 }) {
   const [label, setLabel] = useState("");
   const [icon, setIcon] = useState("Zap");
@@ -177,7 +187,7 @@ export function CustomButtonDialog({
                 step={1}
                 value={pad}
                 className="mt-2 w-full accent-primary"
-                onChange={(e) => setPad(Number(e.target.value))}
+                onChange={(e) => setPad(boundedInputNumber(e.target.value, pad, 0, MAX_PAD, true))}
               />
             </div>
           </div>

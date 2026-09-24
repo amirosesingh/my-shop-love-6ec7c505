@@ -19,7 +19,11 @@ import {
   validateServerEndpoint,
 } from "./local-database-server";
 import { readCredentials } from "@/lib/pos-credentials";
-import { mirrorTerminalConfigToDesktop, readTerminalConfig } from "@/core/activation/terminal-tokens";
+import {
+  mirrorTerminalConfigToDesktop,
+  readTerminalConfig,
+} from "@/core/activation/terminal-tokens";
+import { boundedInputNumber } from "@/lib/number-input";
 
 type Profile = {
   host: string;
@@ -375,7 +379,12 @@ export function LocalDatabaseWizard() {
                         min={0}
                         max={65535}
                         value={profile.port}
-                        onChange={(e) => setProfile({ ...profile, port: Number(e.target.value) })}
+                        onChange={(e) =>
+                          setProfile({
+                            ...profile,
+                            port: boundedInputNumber(e.target.value, profile.port, 0, 65535, true),
+                          })
+                        }
                       />
                     </Field>
                     <Toggle
@@ -395,7 +404,16 @@ export function LocalDatabaseWizard() {
                         type="number"
                         value={profile.connectionTimeoutMs}
                         onChange={(e) =>
-                          setProfile({ ...profile, connectionTimeoutMs: Number(e.target.value) })
+                          setProfile({
+                            ...profile,
+                            connectionTimeoutMs: boundedInputNumber(
+                              e.target.value,
+                              profile.connectionTimeoutMs,
+                              1,
+                              300_000,
+                              true,
+                            ),
+                          })
                         }
                       />
                     </Field>
@@ -404,7 +422,16 @@ export function LocalDatabaseWizard() {
                         type="number"
                         value={profile.requestTimeoutMs}
                         onChange={(e) =>
-                          setProfile({ ...profile, requestTimeoutMs: Number(e.target.value) })
+                          setProfile({
+                            ...profile,
+                            requestTimeoutMs: boundedInputNumber(
+                              e.target.value,
+                              profile.requestTimeoutMs,
+                              1,
+                              300_000,
+                              true,
+                            ),
+                          })
                         }
                       />
                     </Field>
@@ -542,7 +569,16 @@ export function LocalDatabaseWizard() {
                       className="h-10 w-full rounded-md border bg-background px-3"
                       value={profile.retentionDays}
                       onChange={(e) =>
-                        setProfile({ ...profile, retentionDays: Number(e.target.value) })
+                        setProfile({
+                          ...profile,
+                          retentionDays: boundedInputNumber(
+                            e.target.value,
+                            profile.retentionDays,
+                            1,
+                            7300,
+                            true,
+                          ),
+                        })
                       }
                     >
                       <option value={30}>30 days</option>

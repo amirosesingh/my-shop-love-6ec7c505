@@ -35,6 +35,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/lib/pos-auth";
+import { boundedInputNumber } from "@/lib/number-input";
 import {
   DEFAULT_PAD,
   ASPECT_RATIO,
@@ -72,7 +73,8 @@ const TONE_CLASS: Record<ModuleTone, string> = {
   primary: "[&_button]:bg-primary [&_button]:text-primary-foreground [&_button]:border-transparent",
   success: "[&_button]:bg-success [&_button]:text-success-foreground [&_button]:border-transparent",
   warning: "[&_button]:bg-warning [&_button]:text-warning-foreground [&_button]:border-transparent",
-  destructive: "[&_button]:bg-destructive [&_button]:text-destructive-foreground [&_button]:border-transparent",
+  destructive:
+    "[&_button]:bg-destructive [&_button]:text-destructive-foreground [&_button]:border-transparent",
 };
 
 const DOT_GRID =
@@ -298,11 +300,16 @@ export function RegisterWorkspace({
                 }}
                 onLayoutChange={(next: Layout) => {
                   if (editing)
-                    layout.applyBoxes(next.map((b) => ({ i: String(b.i), x: b.x, y: b.y, w: b.w, h: b.h })));
+                    layout.applyBoxes(
+                      next.map((b) => ({ i: String(b.i), x: b.x, y: b.y, w: b.w, h: b.h })),
+                    );
                 }}
               >
                 {(layout.active?.items ?? []).map((box) => (
-                  <div key={box.i} className={`min-h-0 min-w-0 ${isGroupId(box.i) ? "z-0" : "z-10"}`}>
+                  <div
+                    key={box.i}
+                    className={`min-h-0 min-w-0 ${isGroupId(box.i) ? "z-0" : "z-10"}`}
+                  >
                     <CanvasItem
                       box={box}
                       editing={editing}
@@ -321,7 +328,9 @@ export function RegisterWorkspace({
                       onRemove={() => {
                         const spec = nodeSpec(box);
                         if (spec?.essential) {
-                          toast.warning(`${spec.label} removed — the till cannot take payment without it.`);
+                          toast.warning(
+                            `${spec.label} removed — the till cannot take payment without it.`,
+                          );
                         }
                         layout.removeModule(box.i);
                       }}
@@ -407,7 +416,8 @@ function CanvasItem({
       style={{ padding: pad, ...vars }}
       onPointerDownCapture={(e) => {
         if (!editing) return;
-        if ((e.target as HTMLElement).closest("button,[role='button'],input,select,textarea")) return;
+        if ((e.target as HTMLElement).closest("button,[role='button'],input,select,textarea"))
+          return;
         onSelect(e.ctrlKey || e.metaKey || e.shiftKey);
       }}
       className={`group relative flex h-full min-h-0 min-w-0 flex-col overflow-hidden ${
@@ -418,9 +428,7 @@ function CanvasItem({
             : ""
       } ${editing && !group ? "rounded-lg outline-2 outline-dashed outline-primary/50" : ""} ${
         editing && selected ? "ring-2 ring-primary ring-offset-1" : ""
-      } ${
-        TONE_CLASS[box.tone ?? "neutral"]
-      }`}
+      } ${TONE_CLASS[box.tone ?? "neutral"]}`}
       data-view={box.view ?? "list"}
     >
       {group && (box.title || box.label) && (
@@ -457,9 +465,7 @@ function CanvasItem({
       )}
       <div
         className={`min-h-0 flex-1 ${panel ? "overflow-auto" : "overflow-hidden"}`}
-        {...(panel && panelScale !== 1
-          ? { style: { zoom: panelScale } as CSSProperties }
-          : {})}
+        {...(panel && panelScale !== 1 ? { style: { zoom: panelScale } as CSSProperties } : {})}
       >
         <NodeOptionsProvider
           value={{
@@ -500,7 +506,9 @@ function Inspector({
         </Button>
       </PopoverTrigger>
       <PopoverContent align="end" className="w-64 space-y-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{label}</p>
+        <p className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+          {label}
+        </p>
         {supportsLabel && (
           <div>
             <p className="mb-1 text-[11px] text-muted-foreground">Custom label</p>
@@ -520,7 +528,9 @@ function Inspector({
         )}
         {supportsView && (
           <div>
-            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">View</p>
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              View
+            </p>
             <div className="flex gap-2">
               <Button
                 size="sm"
@@ -542,47 +552,55 @@ function Inspector({
           </div>
         )}
         <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Colour tone</p>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Colour tone
+          </p>
           <div className="flex flex-wrap gap-1.5">
-            {(["neutral", "primary", "success", "warning", "destructive"] as ModuleTone[]).map((t) => (
-              <Button
-                key={t}
-                size="sm"
-                variant={(box.tone ?? "neutral") === t ? "default" : "outline"}
-                className="h-7 px-2 text-[11px] capitalize"
-                onClick={() => onOptions({ tone: t })}
-              >
-                {t}
-              </Button>
-            ))}
+            {(["neutral", "primary", "success", "warning", "destructive"] as ModuleTone[]).map(
+              (t) => (
+                <Button
+                  key={t}
+                  size="sm"
+                  variant={(box.tone ?? "neutral") === t ? "default" : "outline"}
+                  className="h-7 px-2 text-[11px] capitalize"
+                  onClick={() => onOptions({ tone: t })}
+                >
+                  {t}
+                </Button>
+              ),
+            )}
           </div>
         </div>
         {supportsStyle && (
-        <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Display</p>
-          <div className="flex gap-1.5">
-            {(
-              [
-                ["both", "Icon + text"],
-                ["text", "Text only"],
-                ["icon", "Icon only"],
-              ] as [ModuleStyle, string][]
-            ).map(([v, l]) => (
-              <Button
-                key={v}
-                size="sm"
-                variant={(box.style ?? "both") === v ? "default" : "outline"}
-                className="h-7 flex-1 px-1 text-[11px]"
-                onClick={() => onOptions({ style: v })}
-              >
-                {l}
-              </Button>
-            ))}
+          <div>
+            <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              Display
+            </p>
+            <div className="flex gap-1.5">
+              {(
+                [
+                  ["both", "Icon + text"],
+                  ["text", "Text only"],
+                  ["icon", "Icon only"],
+                ] as [ModuleStyle, string][]
+              ).map(([v, l]) => (
+                <Button
+                  key={v}
+                  size="sm"
+                  variant={(box.style ?? "both") === v ? "default" : "outline"}
+                  className="h-7 flex-1 px-1 text-[11px]"
+                  onClick={() => onOptions({ style: v })}
+                >
+                  {l}
+                </Button>
+              ))}
+            </div>
           </div>
-        </div>
         )}
         <div>
-          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Font size</p>
+          <p className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Font size
+          </p>
           <div className="flex gap-1.5">
             {(["sm", "md", "lg", "xl"] as ModuleFont[]).map((f) => (
               <Button
@@ -609,7 +627,9 @@ function Inspector({
             value={pad}
             className="w-full accent-primary"
             aria-label="Inner padding"
-            onChange={(e) => onOptions({ pad: Number(e.target.value) })}
+            onChange={(e) =>
+              onOptions({ pad: boundedInputNumber(e.target.value, pad, 0, MAX_PAD, true) })
+            }
           />
         </div>
       </PopoverContent>
@@ -665,7 +685,9 @@ function CustomizeBar({
   return (
     <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-primary/40 bg-primary/10 px-3 py-1.5">
       <span className="mr-auto text-[11px] font-semibold uppercase tracking-wide text-primary">
-        {previewing ? "Live preview — tap controls to test" : "Edit mode — drag, resize, restyle or remove elements"}
+        {previewing
+          ? "Live preview — tap controls to test"
+          : "Edit mode — drag, resize, restyle or remove elements"}
       </span>
       {editing && (
         <>
@@ -680,7 +702,11 @@ function CustomizeBar({
                   value={canvas.cols}
                   className="h-8 rounded-md border border-border bg-background px-1 text-xs"
                   aria-label="Canvas columns"
-                  onChange={(e) => onCanvas({ cols: Number(e.target.value) })}
+                  onChange={(e) =>
+                    onCanvas({
+                      cols: boundedInputNumber(e.target.value, canvas.cols, 1, 64, true),
+                    })
+                  }
                 >
                   {COL_CHOICES.map((c) => (
                     <option key={c} value={c}>
@@ -698,7 +724,17 @@ function CustomizeBar({
                   value={canvas.rowHeight}
                   className="h-8 w-14 rounded-md border border-border bg-background px-2 text-xs"
                   aria-label="Canvas row height"
-                  onChange={(e) => onCanvas({ rowHeight: Number(e.target.value) })}
+                  onChange={(e) =>
+                    onCanvas({
+                      rowHeight: boundedInputNumber(
+                        e.target.value,
+                        canvas.rowHeight,
+                        MIN_ROW_HEIGHT,
+                        MAX_ROW_HEIGHT,
+                        true,
+                      ),
+                    })
+                  }
                 />
               </label>
               <label className="flex items-center gap-1 text-[11px] text-primary">
@@ -711,7 +747,17 @@ function CustomizeBar({
                   value={canvas.baseWidth}
                   className="h-8 w-20 rounded-md border border-border bg-background px-2 text-xs"
                   aria-label="Canvas design width"
-                  onChange={(e) => onCanvas({ baseWidth: Number(e.target.value) })}
+                  onChange={(e) =>
+                    onCanvas({
+                      baseWidth: boundedInputNumber(
+                        e.target.value,
+                        canvas.baseWidth,
+                        800,
+                        3840,
+                        true,
+                      ),
+                    })
+                  }
                 />
               </label>
               <label className="flex items-center gap-1 text-[11px] text-primary">
@@ -741,7 +787,9 @@ function CustomizeBar({
               defaultValue={DEFAULT_PAD}
               className="h-8 w-14 rounded-md border border-border bg-background px-2 text-xs"
               aria-label="Padding for every element"
-              onChange={(e) => onPadAll(Number(e.target.value))}
+              onChange={(e) =>
+                onPadAll(boundedInputNumber(e.target.value, DEFAULT_PAD, 0, MAX_PAD, true))
+              }
             />
           </label>
         </>
