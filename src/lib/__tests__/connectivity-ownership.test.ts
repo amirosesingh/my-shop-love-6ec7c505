@@ -44,9 +44,13 @@ describe("connectivity lifecycle ownership", () => {
     expect(store).toContain("APP_RESUME_EVENT");
   });
 
-  it("distinguishes offline, service and configuration messages", () => {
+  it("distinguishes offline, timeout, service and configuration messages", () => {
     expect(gate).toContain("No internet connection. Please check your connection and try again.");
-    expect(gate).toContain("Service temporarily unavailable");
+    expect(gate).toContain("The central service is taking too long to respond");
+    expect(gate).toContain("Central service unavailable");
+    expect(gate).toContain("Cannot reach the central service");
     expect(gate).toContain("Connection settings need attention");
+    expect(gate).toContain("Sign-in expired");
+    expect(gate).toContain("Access not permitted");
   });
 });

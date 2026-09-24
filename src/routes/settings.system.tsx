@@ -40,7 +40,7 @@ function SystemSettingsPage() {
   const meta = systemTab(tab);
 
   return (
-    <SettingsFrame wide title={meta.label} description={meta.blurb}>
+    <SettingsFrame showSaveBar={false} wide title={meta.label} description={meta.blurb}>
       <SettingsTabs
         current="/settings/system"
         activeTab={tab}

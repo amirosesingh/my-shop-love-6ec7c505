@@ -93,7 +93,17 @@ export function AppShell({ children }: { children: ReactNode }) {
     setSharedPrinterPrefs(state.settings.integrations.receiptPrinter);
     return () => setSharedPrinterPrefs(undefined);
   }, [state.settings.integrations.receiptPrinter]);
-  const { ready, user, isAdmin, isSupervisor, canSwitchStores, terminalStoreId, logout, lock, can } = useAuth();
+  const {
+    ready,
+    user,
+    isAdmin,
+    isSupervisor,
+    canSwitchStores,
+    terminalStoreId,
+    logout,
+    lock,
+    can,
+  } = useAuth();
   const [collapsed, setCollapsed] = useSidebarCollapsed();
   const [drawerOpen, setDrawerOpen] = useState(false);
   // Set when the operator chooses to carry on from the terminal's own copy
@@ -121,8 +131,9 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Synchronized terminal settings are the source of truth. The legacy POS
   // rule remains a compatibility fallback for databases upgraded in stages.
   const posRules = usePosRules();
-  const ruleLockSeconds = state.settings.integrations.autoLockTimeoutSeconds ??
-    ((posRules.source === "DATABASE" || posRules.source === "LAST_KNOWN_GOOD")
+  const ruleLockSeconds =
+    state.settings.integrations.autoLockTimeoutSeconds ??
+    (posRules.source === "DATABASE" || posRules.source === "LAST_KNOWN_GOOD"
       ? posRules.rules.auto_lock_timeout_seconds
       : undefined);
   useAutoLock(
@@ -363,16 +374,6 @@ export function AppShell({ children }: { children: ReactNode }) {
       </div>
     ) : (
       <div className="space-y-2 px-3 pb-2">
-        <Badge
-          variant="outline"
-          className={
-            activeShift
-              ? "w-full justify-center border-success/40 bg-success/10 text-success"
-              : "w-full justify-center border-destructive/40 bg-destructive/10 text-destructive"
-          }
-        >
-          {activeShift ? `Shift open · ${activeShift.cashier}` : "Shift closed"}
-        </Badge>
         <div className="rounded-md border border-border px-2 py-2">
           <p className="truncate text-xs font-medium">{user.name}</p>
           <p className="text-[11px] capitalize text-muted-foreground">{user.role}</p>
@@ -441,7 +442,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                       <Menu className="size-5" />
                     </Button>
                   </SheetTrigger>
-                  <SheetContent side="left" className="pt-safe pb-safe z-50 w-72 max-w-[calc(100vw-1rem)] bg-sidebar p-0">
+                  <SheetContent
+                    side="left"
+                    className="pt-safe pb-safe z-50 w-72 max-w-[calc(100vw-1rem)] bg-sidebar p-0"
+                  >
                     <SheetTitle className="sr-only">Navigation</SheetTitle>
                     <SidebarNav
                       canSee={canSee}
@@ -465,15 +469,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 </div>
                 {/* The branch picker lives in the side menu only; the top bar
                   just states which branch is in use. */}
-                <Badge
-                  variant="outline"
-                  className={cn(
-                    "hidden shrink-0 text-[10px] sm:inline-flex",
-                    activeShift
-                      ? "border-success/40 bg-success/10 text-success"
-                      : "border-destructive/40 bg-destructive/10 text-destructive",
-                  )}
-                >
+                <Badge variant="outline" className="hidden shrink-0 text-[10px] sm:inline-flex">
                   {currentStore.code}
                 </Badge>
                 {/* Narrow phones only get the essentials; the rest lives in the sheet. */}
@@ -481,13 +477,25 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <LiveClock compact />
                 </span>
                 <MobileStatusSheet />
-                <span className="hidden sm:inline-flex"><UpdateHeaderButton /></span>
                 <span className="hidden sm:inline-flex">
-                  <Button asChild variant="ghost" size="icon" className="shrink-0" aria-label="Settings">
-                    <Link to="/settings"><SettingsIcon className="size-4" /></Link>
+                  <UpdateHeaderButton />
+                </span>
+                <span className="hidden sm:inline-flex">
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="icon"
+                    className="shrink-0"
+                    aria-label="Settings"
+                  >
+                    <Link to="/settings">
+                      <SettingsIcon className="size-4" />
+                    </Link>
                   </Button>
                 </span>
-                <span className="hidden sm:inline-flex"><ThemeToggle /></span>
+                <span className="hidden sm:inline-flex">
+                  <ThemeToggle />
+                </span>
                 <Button
                   variant="outline"
                   size="sm"
@@ -503,11 +511,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <div className="min-w-0">
                   <p className="truncate text-sm font-medium">{user.name}</p>
                   <p className="text-[11px] capitalize text-muted-foreground">
-                    {user.staffId} · {user.metaRole ?? user.role}
+                    {user.metaRole ?? user.role}
                   </p>
                 </div>
                 <div className="ml-auto" />
-                <span className="hidden xl:inline-flex"><LiveClock /></span>
+                <span className="hidden xl:inline-flex">
+                  <LiveClock />
+                </span>
                 <ConnectionStatusButton />
                 <SystemAlertsButton />
                 <ActivityBell />
@@ -521,7 +531,9 @@ export function AppShell({ children }: { children: ReactNode }) {
                     {terminal.config.locationName || currentStore.name}
                   </Badge>
                 )}
-                <span className="hidden lg:inline-flex"><UpdateHeaderButton /></span>
+                <span className="hidden lg:inline-flex">
+                  <UpdateHeaderButton />
+                </span>
                 <Button
                   asChild
                   variant="ghost"
@@ -540,7 +552,8 @@ export function AppShell({ children }: { children: ReactNode }) {
                   className="size-8 shrink-0 px-0 text-xs xl:h-8 xl:w-auto xl:px-3"
                   onClick={() => void lock()}
                 >
-                  <Lock className="size-3.5" /> <span className="hidden xl:inline">Lock / Switch user</span>
+                  <Lock className="size-3.5" />{" "}
+                  <span className="hidden xl:inline">Lock / Switch user</span>
                 </Button>
               </header>
 
@@ -562,7 +575,11 @@ export function AppShell({ children }: { children: ReactNode }) {
                     ? isSupervisor
                     : settingsHome
                       ? isSupervisor || can("can_access_pos_settings")
-                    : required === null ? true : required === "unknown" ? isAdmin : can(required);
+                      : required === null
+                        ? true
+                        : required === "unknown"
+                          ? isAdmin
+                          : can(required);
                   if (allowed && visibleRoute(location.pathname)) return children;
                   if (allowed) return <PermissionDenied title="Hidden for your role" flag={null} />;
                   return <PermissionDenied flag={required === "unknown" ? null : required} />;

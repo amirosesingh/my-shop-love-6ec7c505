@@ -40,6 +40,7 @@ import { AUTH_ACTION_LABEL, type AuthorizationRequest } from "@/lib/authorizatio
 import { usePosOptional } from "@/lib/pos-store";
 import { useSyncSummary } from "@/lib/sync-summary";
 import { attentionCounts } from "@/lib/needs-attention";
+import { humanizeText } from "@/lib/human-readable";
 
 const POLL_MS = 45_000;
 
@@ -51,6 +52,16 @@ const when = (iso: string) => {
 export function ActivityBell({ compact }: { compact?: boolean }) {
   const { isSupervisor, user } = useAuth();
   const pos = usePosOptional();
+  const refs = useMemo(
+    () => ({
+      stores: pos?.stores,
+      products: pos?.state.products,
+      members: pos?.state.members,
+      sales: pos?.state.sales,
+    }),
+    [pos?.stores, pos?.state.products, pos?.state.members, pos?.state.sales],
+  );
+  const eventText = useCallback((value: string) => humanizeText(value, refs), [refs]);
   const sync = useSyncSummary();
   // Everyone gets the centre; only supervisors get the branch activity feed.
   const showActivity = isSupervisor;
@@ -106,9 +117,11 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
     setUnread(fresh.length);
     const critical = fresh.find((r) => r.severity === "critical");
     if (critical) {
-      toast.warning(critical.title, { description: critical.message || undefined });
+      toast.warning(eventText(critical.title), {
+        description: critical.message ? eventText(critical.message) : undefined,
+      });
     }
-  }, [meKey, showActivity]);
+  }, [eventText, meKey, showActivity]);
 
   // Live decisions, with the existing poll kept as reconciliation.
   useEffect(() => {
@@ -280,7 +293,7 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
                     >
                       {EVENT_LABELS[r.type] ? r.severity : r.type}
                     </span>
-                    <p className="min-w-0 text-xs font-medium">{r.title}</p>
+                    <p className="min-w-0 text-xs font-medium">{eventText(r.title)}</p>
                     <button
                       type="button"
                       className="ml-auto touch-manipulation text-[10px] text-muted-foreground underline disabled:cursor-wait disabled:opacity-60"
@@ -299,13 +312,15 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
                   </div>
                   {r.message && (
                     <p className="mt-1 line-clamp-2 text-[11px] text-muted-foreground">
-                      {r.message}
+                      {eventText(r.message)}
                     </p>
                   )}
                   <p className="mt-1 text-[10px] text-muted-foreground">
                     {when(r.createdAt)}
                     {r.actorName ? ` · ${r.actorName}` : ""}
-                    {r.storeId ? ` · ${r.storeId}` : ""}
+                    {r.storeId
+                      ? ` · ${pos?.stores.find((store) => store.id === r.storeId)?.name ?? "Unknown branch"}`
+                      : ""}
                     {r.whatsappStatus === "sent" ? " · WhatsApp sent" : ""}
                   </p>
                 </div>
@@ -330,7 +345,7 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
                       key={id}
                       className="flex items-center gap-2 border-b border-border/60 px-3 py-2 last:border-0"
                     >
-                      <p className="min-w-0 flex-1 truncate text-xs">{row.title}</p>
+                      <p className="min-w-0 flex-1 truncate text-xs">{eventText(row.title)}</p>
                       <button
                         type="button"
                         className="touch-manipulation text-[10px] text-primary underline disabled:cursor-wait disabled:opacity-60"

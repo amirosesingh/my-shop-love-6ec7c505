@@ -110,13 +110,26 @@ async function sendWhatsApp(to: string, body: string): Promise<string | null> {
   return null;
 }
 
-function alertText(row: EventRecord): string {
+async function branchName(id: string | null): Promise<string> {
+  if (!id) return "";
+  try {
+    const res = await serviceRest(`stores?id=eq.${encodeURIComponent(id)}&select=name&limit=1`);
+    if (!res.ok) return "Unknown branch";
+    const rows = (await res.json()) as { name?: string }[];
+    return rows[0]?.name?.trim() || "Unknown branch";
+  } catch {
+    return "Unknown branch";
+  }
+}
+
+async function alertText(row: EventRecord): Promise<string> {
+  const branch = await branchName(row.store_id);
   const parts = [
     `*${row.title}*`,
     row.message,
     row.actor_name ? `By: ${row.actor_name}${row.actor_role ? ` (${row.actor_role})` : ""}` : "",
     row.terminal_name ? `Terminal: ${row.terminal_name}` : "",
-    row.store_id ? `Branch: ${row.store_id}` : "",
+    branch ? `Branch: ${branch}` : "",
     `At: ${new Date(row.created_at).toLocaleString()}`,
   ];
   return parts.filter(Boolean).join("\n");
@@ -145,7 +158,7 @@ export async function writeActivityEvent(
     for (const to of cfg.recipients) {
       const digits = to.replace(/\D/g, "");
       if (!digits) continue;
-      const err = await sendWhatsApp(digits, alertText(full));
+      const err = await sendWhatsApp(digits, await alertText(full));
       if (err) failures.push(err);
     }
     status = failures.length ? "failed" : "sent";

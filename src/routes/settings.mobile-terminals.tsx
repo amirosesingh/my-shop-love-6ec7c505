@@ -23,6 +23,7 @@ export const Route = createFileRoute("/settings/mobile-terminals")({
   }),
   component: () => (
     <SettingsFrame
+      showSaveBar={false}
       terminalManagement
       title="Mobile terminals"
       description="Register Android phones and tablets used for sales or stock work. Give each device its own code and location. The staff member's sign-in determines what they can do. Windows counter PCs are managed under Terminal activation."

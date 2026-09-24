@@ -14,7 +14,8 @@ export const Route = createFileRoute("/settings/payment-methods")({
       { property: "og:title", content: "Payment Methods — Retail" },
       {
         property: "og:description",
-        content: "Manage the tenders cashiers can collect, including voucher and coupon redemptions.",
+        content:
+          "Manage the tenders cashiers can collect, including voucher and coupon redemptions.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -22,6 +23,7 @@ export const Route = createFileRoute("/settings/payment-methods")({
   }),
   component: () => (
     <SettingsFrame
+      showSaveBar={false}
       title="Payment methods"
       description="The tenders a cashier can collect at checkout. Changes reach every till on its next refresh."
     >
@@ -29,4 +31,3 @@ export const Route = createFileRoute("/settings/payment-methods")({
     </SettingsFrame>
   ),
 });
-

@@ -50,8 +50,7 @@ function ShiftAlertsPage() {
       .catch(() => setRecent([]));
   }, []);
 
-  const set = (patch: Partial<ShiftAlertSettings>) =>
-    setSettings((s) => ({ ...s, ...patch }));
+  const set = (patch: Partial<ShiftAlertSettings>) => setSettings((s) => ({ ...s, ...patch }));
 
   const save = () => {
     const recipients = numbers
@@ -88,6 +87,7 @@ function ShiftAlertsPage() {
 
   return (
     <SettingsFrame
+      showSaveBar={false}
       title="Shift alerts"
       description="When a shift is closed the till builds a day summary — total sales, bills, payment split, discounts, refunds and the cash count. Pick how this device receives it."
     >
