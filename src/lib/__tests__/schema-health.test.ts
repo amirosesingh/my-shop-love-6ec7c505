@@ -65,6 +65,10 @@ describe("schema health", () => {
     expect(cloud).toContain(
       "revoke all on table public.schema_migrations from public, anon, authenticated",
     );
+    expect(cloud).toContain(
+      'create policy "server-only deny client access" on public.schema_migrations',
+    );
+    expect(cloud).toContain("using (false) with check (false)");
     expect(buildLocalSql([gap({ environment: "local" })], "local_001_20260829.sql")).toContain(
       "INSERT INTO dbo.schema_migrations",
     );

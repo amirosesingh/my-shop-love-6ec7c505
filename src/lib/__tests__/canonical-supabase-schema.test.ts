@@ -61,8 +61,16 @@ describe("canonical Supabase SQL", () => {
       expect(sql).toContain(
         `REVOKE ALL ON TABLE public.${table} FROM PUBLIC, anon, authenticated`,
       );
+      expect(sql).toMatch(
+        new RegExp(
+          `CREATE POLICY "server-only deny client access" ON public\\.${table}\\s+FOR ALL TO anon, authenticated USING \\(false\\) WITH CHECK \\(false\\)`,
+        ),
+      );
     }
     expect(sql).toContain("to_regclass('public.schema_migrations')");
+    expect(sql).toContain(
+      "ALTER FUNCTION public.pos_rules_defaults()\n  SET search_path TO 'public', 'pg_temp'",
+    );
   });
 
   it("resets data transactionally and restores RLS before commit", () => {

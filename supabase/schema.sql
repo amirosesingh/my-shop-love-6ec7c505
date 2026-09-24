@@ -14295,6 +14295,22 @@ REVOKE ALL ON TABLE public.terminal_recovery_secrets FROM PUBLIC, anon, authenti
 REVOKE ALL ON TABLE public.sync_idempotency_receipts FROM PUBLIC, anon, authenticated;
 REVOKE ALL ON TABLE public.sync_change_feed FROM PUBLIC, anon, authenticated;
 
+DROP POLICY IF EXISTS "server-only deny client access" ON public.cashiers;
+CREATE POLICY "server-only deny client access" ON public.cashiers
+  FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+DROP POLICY IF EXISTS "server-only deny client access" ON public.pin_attempts;
+CREATE POLICY "server-only deny client access" ON public.pin_attempts
+  FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+DROP POLICY IF EXISTS "server-only deny client access" ON public.terminal_recovery_secrets;
+CREATE POLICY "server-only deny client access" ON public.terminal_recovery_secrets
+  FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+DROP POLICY IF EXISTS "server-only deny client access" ON public.sync_idempotency_receipts;
+CREATE POLICY "server-only deny client access" ON public.sync_idempotency_receipts
+  FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+DROP POLICY IF EXISTS "server-only deny client access" ON public.sync_change_feed;
+CREATE POLICY "server-only deny client access" ON public.sync_change_feed
+  FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
+
 COMMENT ON TABLE public.sync_idempotency_receipts IS
   'Server-only sync replay protection. Access is restricted to privileged synchronization routines.';
 COMMENT ON TABLE public.sync_change_feed IS
@@ -14307,8 +14323,15 @@ BEGIN
   IF to_regclass('public.schema_migrations') IS NOT NULL THEN
     ALTER TABLE public.schema_migrations ENABLE ROW LEVEL SECURITY;
     REVOKE ALL ON TABLE public.schema_migrations FROM PUBLIC, anon, authenticated;
+    DROP POLICY IF EXISTS "server-only deny client access" ON public.schema_migrations;
+    CREATE POLICY "server-only deny client access" ON public.schema_migrations
+      FOR ALL TO anon, authenticated USING (false) WITH CHECK (false);
     COMMENT ON TABLE public.schema_migrations IS
       'Server-only record of applied Schema Manager repairs.';
   END IF;
 END;
 $schema_migrations_hardening$;
+
+-- Keep immutable defaults independent of any caller-controlled lookup path.
+ALTER FUNCTION public.pos_rules_defaults()
+  SET search_path TO 'public', 'pg_temp';
