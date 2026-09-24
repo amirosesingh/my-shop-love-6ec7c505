@@ -2,8 +2,11 @@ import { readFileSync } from "node:fs";
 import { beforeEach, describe, expect, it, vi } from "vitest";
 
 const posFetch = vi.fn(() => Promise.resolve({ ok: true, json: async () => ({ ok: true }) }));
+const readCredentials = vi.fn<
+  () => Promise<{ sessionToken?: string; cashierToken?: string; accessToken?: string }>
+>(async () => ({ cashierToken: "signed-in" }));
 vi.mock("../server-origin", () => ({ posFetch }));
-vi.mock("../pos-credentials", () => ({ readCredentials: async () => ({ cashierToken: "signed-in" }) }));
+vi.mock("../pos-credentials", () => ({ readCredentials }));
 vi.mock("../activity-events.functions", () => ({ pushActivityEvent: vi.fn() }));
 
 const values = new Map<string, string>();
@@ -18,6 +21,8 @@ describe("per-user notification state", () => {
   beforeEach(() => {
     values.clear();
     posFetch.mockClear();
+    readCredentials.mockReset();
+    readCredentials.mockResolvedValue({ cashierToken: "signed-in" });
     Object.assign(globalThis, {
       window: { localStorage, dispatchEvent: vi.fn() },
       localStorage,
@@ -32,9 +37,12 @@ describe("per-user notification state", () => {
     expect(await activity.clearActivityEntry("manager-1", "event-1")).toBe(true);
     expect(activity.isCleared("manager-1", "event-1")).toBe(true);
     expect(activity.isCleared("manager-2", "event-1")).toBe(false);
-    expect(posFetch).toHaveBeenCalledWith("/api/v1/pos/activity-preferences", expect.objectContaining({
-      body: expect.stringContaining('"eventId":"event-1"'),
-    }));
+    expect(posFetch).toHaveBeenCalledWith(
+      "/api/v1/pos/activity-preferences",
+      expect.objectContaining({
+        body: expect.stringContaining('"eventId":"event-1"'),
+      }),
+    );
   });
 
   it("merges a dismissal made on another device", async () => {
@@ -52,6 +60,13 @@ describe("per-user notification state", () => {
     const activity = await import("../activity-events");
     expect(await activity.clearActivityEntry("manager-1", "event-2")).toBe(false);
     expect(activity.isCleared("manager-1", "event-2")).toBe(false);
+  });
+
+  it("does not call the protected endpoint without a signed-in person", async () => {
+    readCredentials.mockResolvedValueOnce({});
+    const activity = await import("../activity-events");
+    expect(await activity.listActivityEvents()).toEqual([]);
+    expect(posFetch).not.toHaveBeenCalled();
   });
 
   it("persists read markers across navigation and login cycles", async () => {

@@ -2,13 +2,26 @@ import "./lib/error-capture";
 
 import { consumeLastCapturedError } from "./lib/error-capture";
 import { renderErrorPage } from "./lib/error-page";
-import { setRuntimeEnv } from "./lib/external-supabase-config";
+import { setRuntimeEnv, supabaseConfig } from "./lib/external-supabase-config";
+import { withWebSecurityHeaders } from "./lib/web-security-headers";
 
 type ServerEntry = {
   fetch: (request: Request, env: unknown, ctx: unknown) => Promise<Response> | Response;
 };
 
 let serverEntryPromise: Promise<ServerEntry> | undefined;
+
+function configuredSupabaseUrl(): string | undefined {
+  try {
+    return supabaseConfig().url;
+  } catch {
+    return undefined;
+  }
+}
+
+function secure(response: Response): Response {
+  return withWebSecurityHeaders(response, configuredSupabaseUrl());
+}
 
 async function getServerEntry(): Promise<ServerEntry> {
   if (!serverEntryPromise) {
@@ -53,15 +66,17 @@ export default {
       setRuntimeEnv(env);
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      return secure(await normalizeCatastrophicSsrResponse(response));
     } catch (error) {
       console.error(error);
       const misconfigured =
         error instanceof Error && error.name === "SupabaseConfigError" ? error.message : undefined;
-      return new Response(renderErrorPage(misconfigured), {
-        status: 500,
-        headers: { "content-type": "text/html; charset=utf-8" },
-      });
+      return secure(
+        new Response(renderErrorPage(misconfigured), {
+          status: 500,
+          headers: { "content-type": "text/html; charset=utf-8" },
+        }),
+      );
     }
   },
 };
