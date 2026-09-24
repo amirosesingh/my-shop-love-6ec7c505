@@ -78,6 +78,8 @@
   --radius: 0.5rem;
   --motion-fast: 120ms;
   --motion-normal: 180ms;
+  --motion-ease-standard: cubic-bezier(0.2, 0, 0, 1);
+  --motion-ease-emphasized: cubic-bezier(0.16, 1, 0.3, 1);
   --background: oklch(0.98 0.004 250);
   --foreground: oklch(0.22 0.014 265);
   --surface: oklch(1 0 0);
@@ -201,6 +203,55 @@
   contain-intrinsic-size: auto 48px;
 }
 
+/* Shared motion contracts keep every Radix surface consistent. Animation
+   classes provide the keyframes; these classes provide timing and easing. */
+@utility ui-overlay-motion {
+  animation-duration: var(--motion-normal);
+  animation-timing-function: var(--motion-ease-standard);
+}
+
+@utility ui-surface-motion {
+  animation-duration: var(--motion-normal);
+  animation-timing-function: var(--motion-ease-emphasized);
+  backface-visibility: hidden;
+}
+
+@utility ui-menu-motion {
+  animation-duration: var(--motion-fast);
+  animation-timing-function: var(--motion-ease-standard);
+  backface-visibility: hidden;
+}
+
+@keyframes collapsible-down {
+  from {
+    height: 0;
+    opacity: 0;
+  }
+  to {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+}
+
+@keyframes collapsible-up {
+  from {
+    height: var(--radix-collapsible-content-height);
+    opacity: 1;
+  }
+  to {
+    height: 0;
+    opacity: 0;
+  }
+}
+
+.ui-collapsible-content[data-state="open"] {
+  animation: collapsible-down var(--motion-normal) var(--motion-ease-emphasized);
+}
+
+.ui-collapsible-content[data-state="closed"] {
+  animation: collapsible-up var(--motion-fast) var(--motion-ease-standard);
+}
+
 /* Motion never competes with scanning, checkout or background processing. */
 @media (prefers-reduced-motion: reduce) {
   html:focus-within {
@@ -210,10 +261,12 @@
   *,
   *::before,
   *::after {
-    animation-duration: 0.01ms;
-    animation-iteration-count: 1;
-    scroll-behavior: auto;
-    transition-duration: 0.01ms;
+    animation-delay: 0ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-delay: 0ms !important;
+    transition-duration: 0.01ms !important;
   }
 }
 
