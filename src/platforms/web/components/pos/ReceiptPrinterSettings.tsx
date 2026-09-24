@@ -16,6 +16,7 @@ import {
 } from "@/lib/receipt-printer";
 import { toast } from "sonner";
 import { printTestReceipt } from "@/lib/pos-print";
+import { boundedInputNumber } from "@/lib/number-input";
 
 /** Terminal-local receipt printer choice used for silent printing and the
  *  raw cash-drawer pulse. Only meaningful inside the Windows desktop shell. */
@@ -41,7 +42,9 @@ export function ReceiptPrinterSettings() {
     setSharedPrinterPrefs(shared);
     setPrefs(getPrinterPrefs());
   }, [shared]);
-  useEffect(() => { void listPrinters().then(setPrinters); }, []);
+  useEffect(() => {
+    void listPrinters().then(setPrinters);
+  }, []);
 
   const update = (next: PrinterPrefs) => {
     setPrefs(next);
@@ -107,7 +110,8 @@ export function ReceiptPrinterSettings() {
           options={[
             { value: "__default__", label: "System default printer" },
             ...(prefs.deviceName && !printers.some((printer) => printer.name === prefs.deviceName)
-              ? [{ value: prefs.deviceName, label: `${prefs.deviceName} (saved)` }] : []),
+              ? [{ value: prefs.deviceName, label: `${prefs.deviceName} (saved)` }]
+              : []),
             ...printers.map((p) => ({ value: p.name, label: p.displayName || p.name })),
           ]}
         />
@@ -131,9 +135,9 @@ export function ReceiptPrinterSettings() {
         />
         <p className="text-[11px] text-muted-foreground">
           The print dialog uses the normal Windows printing route — pick the printer and press
-          Print, exactly like any other document. Choose “Direct to printer” once printing works
-          to skip the dialog at the till. “Thermal text” sends raw ESC/POS commands instead, which
-          only some printers accept.
+          Print, exactly like any other document. Choose “Direct to printer” once printing works to
+          skip the dialog at the till. “Thermal text” sends raw ESC/POS commands instead, which only
+          some printers accept.
         </p>
       </div>
 
@@ -176,89 +180,94 @@ export function ReceiptPrinterSettings() {
 
       <details className="mt-4 rounded-md border border-border p-3">
         <summary className="cursor-pointer text-sm font-medium">Advanced paper calibration</summary>
-      <div className="mt-4 space-y-2">
-        <Label className="text-xs text-muted-foreground">Print margins (mm)</Label>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-          {(["top", "right", "bottom", "left"] as const).map((side) => (
-            <div key={side} className="space-y-1">
-              <Label className="text-[11px] capitalize text-muted-foreground">{side}</Label>
+        <div className="mt-4 space-y-2">
+          <Label className="text-xs text-muted-foreground">Print margins (mm)</Label>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+            {(["top", "right", "bottom", "left"] as const).map((side) => (
+              <div key={side} className="space-y-1">
+                <Label className="text-[11px] capitalize text-muted-foreground">{side}</Label>
+                <Input
+                  type="number"
+                  min={0}
+                  max={30}
+                  step={0.5}
+                  value={margins[side]}
+                  onChange={(e) => setMargin(side, e.target.value)}
+                  className="h-9 text-sm"
+                />
+              </div>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Applies to every printed document — receipts, reports and slips — on all paper sizes.
+            Increase the right margin if words are cut off at the edge, then use “Test receipt” to
+            check the alignment.
+          </p>
+        </div>
+
+        <div className="mt-4 space-y-2">
+          <Label className="text-xs text-muted-foreground">Print width (mm)</Label>
+          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground">30mm roll</Label>
               <Input
+                aria-label="30mm printable width"
                 type="number"
-                min={0}
+                min={20}
                 max={30}
                 step={0.5}
-                value={margins[side]}
-                onChange={(e) => setMargin(side, e.target.value)}
+                value={widths["30mm"] ?? 24}
+                onChange={(e) => setWidth("30mm", e.target.value)}
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground">58mm roll</Label>
+              <Input
+                type="number"
+                min={30}
+                max={58}
+                step={0.5}
+                value={widths["58mm"]}
+                onChange={(e) => setWidth("58mm", e.target.value)}
                 className="h-9 text-sm"
               />
             </div>
-          ))}
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground">80mm roll</Label>
+              <Input
+                type="number"
+                min={50}
+                max={80}
+                step={0.5}
+                value={widths["80mm"]}
+                onChange={(e) => setWidth("80mm", e.target.value)}
+                className="h-9 text-sm"
+              />
+            </div>
+            <div className="space-y-1">
+              <Label className="text-[11px] text-muted-foreground">Left nudge</Label>
+              <Input
+                type="number"
+                min={0}
+                max={20}
+                step={0.5}
+                value={prefs.printOffset ?? 0}
+                onChange={(e) => {
+                  update({
+                    ...prefs,
+                    printOffset: boundedInputNumber(e.target.value, prefs.printOffset ?? 0, 0, 20),
+                  });
+                }}
+                className="h-9 text-sm"
+              />
+            </div>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            A 58mm roll only prints about 48mm of its width, and an 80mm roll about 72mm. If the
+            left side of the slip is cut off, lower the print width; if it prints too far left, add
+            a small nudge. “Test receipt” prints an edge ruler — both ends must be visible.
+          </p>
         </div>
-        <p className="text-[11px] text-muted-foreground">
-          Applies to every printed document — receipts, reports and slips — on all paper sizes.
-          Increase the right margin if words are cut off at the edge, then use “Test receipt” to
-          check the alignment.
-        </p>
-      </div>
-
-      <div className="mt-4 space-y-2">
-        <Label className="text-xs text-muted-foreground">Print width (mm)</Label>
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-          <div className="space-y-1">
-            <Label className="text-[11px] text-muted-foreground">30mm roll</Label>
-            <Input aria-label="30mm printable width" type="number" min={20} max={30} step={0.5}
-              value={widths["30mm"] ?? 24} onChange={(e) => setWidth("30mm", e.target.value)} />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[11px] text-muted-foreground">58mm roll</Label>
-            <Input
-              type="number"
-              min={30}
-              max={58}
-              step={0.5}
-              value={widths["58mm"]}
-              onChange={(e) => setWidth("58mm", e.target.value)}
-              className="h-9 text-sm"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[11px] text-muted-foreground">80mm roll</Label>
-            <Input
-              type="number"
-              min={50}
-              max={80}
-              step={0.5}
-              value={widths["80mm"]}
-              onChange={(e) => setWidth("80mm", e.target.value)}
-              className="h-9 text-sm"
-            />
-          </div>
-          <div className="space-y-1">
-            <Label className="text-[11px] text-muted-foreground">Left nudge</Label>
-            <Input
-              type="number"
-              min={0}
-              max={20}
-              step={0.5}
-              value={prefs.printOffset ?? 0}
-              onChange={(e) => {
-                const n = Number(e.target.value);
-                update({
-                  ...prefs,
-                  printOffset: Number.isFinite(n) ? Math.min(20, Math.max(0, n)) : 0,
-                });
-              }}
-              className="h-9 text-sm"
-            />
-          </div>
-        </div>
-        <p className="text-[11px] text-muted-foreground">
-          A 58mm roll only prints about 48mm of its width, and an 80mm roll about 72mm. If the left
-          side of the slip is cut off, lower the print width; if it prints too far left, add a small
-          nudge. “Test receipt” prints an edge ruler — both ends must be visible.
-        </p>
-      </div>
-
       </details>
 
       <div className="mt-4 space-y-1">
@@ -277,9 +286,7 @@ export function ReceiptPrinterSettings() {
       </div>
 
       <div className="mt-4 space-y-1">
-        <Label className="text-xs text-muted-foreground">
-          Drawer share name (optional)
-        </Label>
+        <Label className="text-xs text-muted-foreground">Drawer share name (optional)</Label>
         <Input
           value={prefs.share}
           onChange={(e) => update({ ...prefs, share: e.target.value })}
@@ -287,8 +294,8 @@ export function ReceiptPrinterSettings() {
           className="h-9 text-sm"
         />
         <p className="text-[11px] text-muted-foreground">
-          Only needed as a backup route. The pulse is normally written straight to the printer
-          above through the Windows raw spooler, so no share is required.
+          Only needed as a backup route. The pulse is normally written straight to the printer above
+          through the Windows raw spooler, so no share is required.
         </p>
       </div>
 
