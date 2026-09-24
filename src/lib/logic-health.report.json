@@ -1,10 +1,10 @@
 {
-  "generatedAt": "2026-09-24T04:30:55.445Z",
-  "filesScanned": 520,
+  "generatedAt": "2026-09-24T08:03:34.931Z",
+  "filesScanned": 522,
   "counts": {
     "critical": 0,
     "warning": 0,
-    "info": 207
+    "info": 208
   },
   "findings": [
     {
@@ -737,6 +737,15 @@
       "hint": "Check that callers handle rejection. A missing local catch alone is not evidence of data loss."
     },
     {
+      "id": "src/lib/product-search.ts:104:Review failure propagation",
+      "file": "src/lib/product-search.ts",
+      "line": 104,
+      "rule": "Review failure propagation",
+      "severity": "info",
+      "detail": "lookupProductsByCodes() propagates awaited failures to its caller.",
+      "hint": "Check that callers handle rejection. A missing local catch alone is not evidence of data loss."
+    },
+    {
       "id": "src/lib/receipt-printer.ts:156:Review failure propagation",
       "file": "src/lib/receipt-printer.ts",
       "line": 156,
@@ -1304,18 +1313,9 @@
       "hint": "Check that callers handle rejection. A missing local catch alone is not evidence of data loss."
     },
     {
-      "id": "src/platforms/web/components/pos/BulkImportDialog.tsx:98:Review failure propagation",
+      "id": "src/platforms/web/components/pos/BulkImportDialog.tsx:164:Review failure propagation",
       "file": "src/platforms/web/components/pos/BulkImportDialog.tsx",
-      "line": 98,
-      "rule": "Review failure propagation",
-      "severity": "info",
-      "detail": "handleFile() propagates awaited failures to its caller.",
-      "hint": "Check that callers handle rejection. A missing local catch alone is not evidence of data loss."
-    },
-    {
-      "id": "src/platforms/web/components/pos/BulkImportDialog.tsx:140:Review failure propagation",
-      "file": "src/platforms/web/components/pos/BulkImportDialog.tsx",
-      "line": 140,
+      "line": 164,
       "rule": "Review failure propagation",
       "severity": "info",
       "detail": "run() propagates awaited failures to its caller.",
@@ -1392,6 +1392,15 @@
       "severity": "info",
       "detail": "onChange={(e) => onPadAll(Number(e.target.value))}",
       "hint": "An empty or bad entry becomes NaN."
+    },
+    {
+      "id": "src/platforms/web/components/pos/product-import-file.ts:10:Review failure propagation",
+      "file": "src/platforms/web/components/pos/product-import-file.ts",
+      "line": 10,
+      "rule": "Review failure propagation",
+      "severity": "info",
+      "detail": "parseProductImportFile() propagates awaited failures to its caller.",
+      "hint": "Check that callers handle rejection. A missing local catch alone is not evidence of data loss."
     },
     {
       "id": "src/platforms/web/components/pos/ProductSearchDialog.tsx:105:Review failure propagation",
@@ -1736,36 +1745,36 @@
       "hint": "An empty or bad entry becomes NaN."
     },
     {
-      "id": "src/routes/purchasing.tsx:226:Review failure propagation",
+      "id": "src/routes/purchasing.tsx:228:Review failure propagation",
       "file": "src/routes/purchasing.tsx",
-      "line": 226,
+      "line": 228,
       "rule": "Review failure propagation",
       "severity": "info",
       "detail": "editReceived() propagates awaited failures to its caller.",
       "hint": "Check that callers handle rejection. A missing local catch alone is not evidence of data loss."
     },
     {
-      "id": "src/routes/purchasing.tsx:246:Review failure propagation",
+      "id": "src/routes/purchasing.tsx:248:Review failure propagation",
       "file": "src/routes/purchasing.tsx",
-      "line": 246,
+      "line": 248,
       "rule": "Review failure propagation",
       "severity": "info",
       "detail": "continueEdit() propagates awaited failures to its caller.",
       "hint": "Check that callers handle rejection. A missing local catch alone is not evidence of data loss."
     },
     {
-      "id": "src/routes/purchasing.tsx:257:Review failure propagation",
+      "id": "src/routes/purchasing.tsx:259:Review failure propagation",
       "file": "src/routes/purchasing.tsx",
-      "line": 257,
+      "line": 259,
       "rule": "Review failure propagation",
       "severity": "info",
       "detail": "withdrawEdit() propagates awaited failures to its caller.",
       "hint": "Check that callers handle rejection. A missing local catch alone is not evidence of data loss."
     },
     {
-      "id": "src/routes/purchasing.tsx:408:Review failure propagation",
+      "id": "src/routes/purchasing.tsx:429:Review failure propagation",
       "file": "src/routes/purchasing.tsx",
-      "line": 408,
+      "line": 429,
       "rule": "Review failure propagation",
       "severity": "info",
       "detail": "saveDraftNow() propagates awaited failures to its caller.",

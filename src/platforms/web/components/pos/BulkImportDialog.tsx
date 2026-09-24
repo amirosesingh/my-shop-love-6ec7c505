@@ -10,6 +10,9 @@ import {
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Checkbox } from "@/components/ui/checkbox";
+import { Input } from "@/components/ui/input";
 import { Progress } from "@/components/ui/progress";
 import {
   Dialog,
@@ -26,27 +29,43 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
-import { money, usePos } from "@/lib/pos-store";
+import { usePos } from "@/lib/pos-store";
 import {
   DEFAULT_BATCH_SIZE,
   IMPORT_HEADERS,
   describeOutcome,
   outcomeReportRows,
-  planImport,
+  planImportReview,
+  resolveReviewConflict,
+  reviewRowToImport,
+  updateReviewRow,
   type ImportOutcome,
-  type ImportRow,
+  type ImportReviewRow,
+  type ImportReviewStatus,
   type RejectedRow,
 } from "@/lib/product-import";
 import { clearRun, findUnfinished, saveRun, type ImportRun } from "@/lib/import-journal";
+import { parseProductImportFile } from "./product-import-file";
+import { productCodes } from "@/lib/product-lookup";
+import { lookupProductsByCodes } from "@/lib/product-search";
+import type { Product } from "@/core/types/pos-types";
 
 const TEMPLATE_ROWS = [
-  ["8901234500011", "Colombian Whole Bean 1kg", 24, 14.5, "Coffee", 40, 2],
-  ["8901234500028", "Ceramic Pour-Over Dripper", 18.5, 9.25, "Merch", 15, 1],
-  ["8901234500035", "Cold Brew Concentrate 500ml", 9.75, 4.4, "Drinks", 60, 1],
+  ["8901234500011", "Colombian Whole Bean 1kg", 24, 14.5, "Coffee", "bag", 40, 2],
+  ["8901234500028", "Ceramic Pour-Over Dripper", 18.5, 9.25, "Merch", "each", 15, 1],
+  ["8901234500035", "Cold Brew Concentrate 500ml", 9.75, 4.4, "Drinks", "bottle", 60, 1],
 ];
 
 /** Only this many rows are drawn in the preview; a big file must not freeze it. */
 const PREVIEW_LIMIT = 100;
+
+const sourceBarcode = (row: Record<string, unknown>) => {
+  for (const [header, value] of Object.entries(row)) {
+    if (["barcode", "sku", "code"].includes(header.trim().toLowerCase().replace(/\s+/g, "_")))
+      return String(value ?? "").trim();
+  }
+  return "";
+};
 
 function templateSheet() {
   const ws = XLSX.utils.aoa_to_sheet([[...IMPORT_HEADERS], ...TEMPLATE_ROWS]);
@@ -58,30 +77,42 @@ function templateSheet() {
 export function BulkImportDialog({
   open,
   onOpenChange,
+  mode = "inventory",
+  onReceivingRows,
 }: {
   open: boolean;
   onOpenChange: (o: boolean) => void;
+  mode?: "inventory" | "receiving";
+  onReceivingRows?: (
+    rows: Array<{ product: Product; quantity: number; cost: number; price: number }>,
+  ) => void;
 }) {
   const { state, currentStore, importProducts } = usePos();
   const inputRef = useRef<HTMLInputElement>(null);
   const [progress, setProgress] = useState(0);
   const [progressLabel, setProgressLabel] = useState("");
   const [busy, setBusy] = useState<"" | "reading" | "saving">("");
-  const [rows, setRows] = useState<ImportRow[] | null>(null);
-  const [skipped, setSkipped] = useState<RejectedRow[]>([]);
+  const [rows, setRows] = useState<ImportReviewRow[] | null>(null);
   const [outcome, setOutcome] = useState<ImportOutcome | null>(null);
   const [resume, setResume] = useState<ImportRun | null>(null);
   const [dragging, setDragging] = useState(false);
   const [fileName, setFileName] = useState("");
+  const [filter, setFilter] = useState<"all" | ImportReviewStatus>("all");
+  const [selected, setSelected] = useState<number[]>([]);
+  const [bulkCategory, setBulkCategory] = useState("");
+  const [bulkUnit, setBulkUnit] = useState("");
 
   const reset = useCallback(() => {
     setRows(null);
-    setSkipped([]);
     setProgress(0);
     setProgressLabel("");
     setBusy("");
     setFileName("");
     setResume(null);
+    setFilter("all");
+    setSelected([]);
+    setBulkCategory("");
+    setBulkUnit("");
   }, []);
 
   function downloadTemplate(kind: "xlsx" | "csv") {
@@ -99,58 +130,73 @@ export function BulkImportDialog({
     setFileName(file.name);
     setBusy("reading");
     setRows(null);
-    setSkipped([]);
     setOutcome(null);
     setProgress(4);
     setProgressLabel("Reading the file…");
 
-    const records = await (async (): Promise<Record<string, unknown>[] | null> => {
-      try {
-      const buf = await file.arrayBuffer();
-      // Let the reading message paint before the parser takes the thread.
-      await new Promise((r) => setTimeout(r, 0));
-      const wb = XLSX.read(buf, { type: "array" });
-      const sheet = wb.Sheets[wb.SheetNames[0]];
-        return XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: "" });
-      } catch {
-        return null;
-      }
-    })();
+    const records = await parseProductImportFile(file, ({ percent, label }) => {
+      setProgress(percent);
+      setProgressLabel(label);
+    }).catch(() => null);
     if (!records) {
       setBusy("");
       toast.error("Could not read that file — use the .xlsx or .csv template");
       return;
     }
 
-    setProgress(60);
-    setProgressLabel(`Checking ${records.length} rows…`);
+    setProgress(92);
+    setProgressLabel(`Checking ${records.length.toLocaleString()} rows against SQL…`);
     await new Promise((r) => setTimeout(r, 0));
 
-    // One pass over the file, one pass over the catalogue — no per-row scans.
-    const plan = planImport(records, state.products);
+    const catalogue = await lookupProductsByCodes(records.map(sourceBarcode), state.products);
+    // One pass over the file and the matched catalogue — no per-row queries.
+    const plan = planImportReview(records, catalogue, {
+      quantityRequired: mode === "receiving",
+    });
 
     setProgress(100);
     setBusy("");
-    setSkipped(plan.skipped);
     setRows(plan.rows);
-    setResume(findUnfinished(file.name, currentStore.id) ?? null);
-    if (!plan.rows.length) toast.error("No usable product rows found in that file");
+    setResume(findUnfinished(`${mode}:${file.name}`, currentStore.id) ?? null);
+    if (!plan.rows.length) toast.error("No product rows found in that file");
   }
 
   async function run(continueRun: ImportRun | null) {
     if (!rows?.length) return;
+    const readyRows = rows.flatMap((row) => {
+      const ready = reviewRowToImport(row);
+      return ready ? [ready] : [];
+    });
+    const attention: RejectedRow[] = rows
+      .filter((row) => !reviewRowToImport(row))
+      .map((row) => ({
+        line: row.line,
+        barcode: row.barcode,
+        name: row.name,
+        reason:
+          row.issue ??
+          (row.status === "conflict"
+            ? `Resolve conflicting ${row.conflictFields.join(", ")}`
+            : `Complete ${row.missingFields.join(", ")}`),
+      }));
+    if (!readyRows.length) {
+      toast.error("Complete or resolve at least one row before importing");
+      return;
+    }
     const importId = continueRun?.importId ?? crypto.randomUUID();
     const startedAt = continueRun?.startedAt ?? new Date().toISOString();
     const done = new Set(continueRun?.done ?? []);
-    const total = rows.length + skipped.length;
+    const total = rows.length;
 
     setBusy("saving");
     setProgress(0);
-    setProgressLabel(`Saving ${rows.length - done.size} products…`);
+    setProgressLabel(
+      `${mode === "receiving" ? "Preparing" : "Saving"} ${readyRows.length - done.size} ready products…`,
+    );
 
     const journal: ImportRun = {
       importId,
-      fileName,
+      fileName: `${mode}:${fileName}`,
       storeId: currentStore.id,
       startedAt,
       updatedAt: startedAt,
@@ -158,16 +204,21 @@ export function BulkImportDialog({
       created: continueRun?.created ?? 0,
       restocked: continueRun?.restocked ?? 0,
       done: [...done],
-      skipped,
+      skipped: attention,
       failed: [],
       pending: [],
     };
     saveRun(journal);
 
-    const result = await importProducts(rows, {
+    const rowsToSave =
+      mode === "receiving"
+        ? readyRows.map((row) => ({ ...row, updateExisting: false }))
+        : readyRows;
+    const result = await importProducts(rowsToSave, {
       importId,
       batchSize: DEFAULT_BATCH_SIZE,
       alreadyDone: [...done],
+      applyStock: mode !== "receiving",
       onProgress: (saved, count) => {
         const pct = Math.round((saved / Math.max(1, count)) * 100);
         setProgress(pct);
@@ -190,7 +241,7 @@ export function BulkImportDialog({
       total,
       created: journal.created,
       restocked: journal.restocked,
-      skipped,
+      skipped: attention,
       failed: result.failed,
       pending: result.pending,
     };
@@ -205,6 +256,23 @@ export function BulkImportDialog({
     }
 
     setBusy("");
+    if (mode === "receiving" && onReceivingRows) {
+      const byCode = new Map<string, Product>();
+      result.savedProducts.forEach((product) =>
+        productCodes(product).forEach((code) => byCode.set(code, product)),
+      );
+      const saved = new Set(result.savedKeys);
+      onReceivingRows(
+        readyRows
+          .filter((row) => saved.has(row.key))
+          .flatMap((row) => {
+            const product = byCode.get(row.key);
+            return product
+              ? [{ product, quantity: row.stock, cost: row.cost, price: row.price }]
+              : [];
+          }),
+      );
+    }
     setOutcome(finished);
     if (result.failed.length || result.pending.length) {
       toast.error(describeOutcome(finished));
@@ -213,7 +281,34 @@ export function BulkImportDialog({
     }
   }
 
-  const preview = rows?.slice(0, PREVIEW_LIMIT) ?? [];
+  const counts = (rows ?? []).reduce<Record<ImportReviewStatus, number>>(
+    (sum, row) => ({ ...sum, [row.status]: sum[row.status] + 1 }),
+    { ready: 0, new_product: 0, missing_information: 0, conflict: 0 },
+  );
+  const filtered = (rows ?? []).filter((row) => filter === "all" || row.status === filter);
+  const preview = filtered.slice(0, PREVIEW_LIMIT);
+  const selectedSet = new Set(selected);
+
+  const patchRow = (line: number, patch: Parameters<typeof updateReviewRow>[1]) =>
+    setRows((current) =>
+      current?.map((row) => (row.line === line ? updateReviewRow(row, patch) : row)) ?? null,
+    );
+
+  const applyBulk = () => {
+    if (!selected.length) return toast.error("Select rows to update first");
+    if (!bulkCategory.trim() && !bulkUnit.trim())
+      return toast.error("Enter a category or unit to apply");
+    setRows((current) =>
+      current?.map((row) =>
+        selectedSet.has(row.line)
+          ? updateReviewRow(row, {
+              ...(bulkCategory.trim() ? { category: bulkCategory.trim() } : {}),
+              ...(bulkUnit.trim() ? { unit: bulkUnit.trim() } : {}),
+            })
+          : row,
+      ) ?? null,
+    );
+  };
 
   return (
     <>
@@ -225,11 +320,15 @@ export function BulkImportDialog({
           onOpenChange(o);
         }}
       >
-        <DialogContent className="max-w-2xl">
+        <DialogContent className="max-h-[92vh] max-w-[min(96vw,90rem)] overflow-hidden">
           <DialogHeader>
-            <DialogTitle>Bulk import from Excel / CSV</DialogTitle>
+            <DialogTitle>
+              {mode === "receiving" ? "Import receiving lines" : "Bulk import from Excel / CSV"}
+            </DialogTitle>
             <DialogDescription>
-              Rows are added to {currentStore.name}. Matching barcodes top up existing stock.
+              {mode === "receiving"
+                ? "Known products are linked to the invoice. New products are created with zero stock; quantities post only when the invoice is finalized."
+                : `Rows are added to ${currentStore.name}. Matching barcodes top up existing stock.`}
             </DialogDescription>
           </DialogHeader>
 
@@ -254,7 +353,8 @@ export function BulkImportDialog({
               >
                 <UploadCloud className="size-8 text-muted-foreground" />
                 <p className="text-sm font-medium">
-                  Drag &amp; Drop your Store Inventory spreadsheet (.xlsx, .csv) here
+                  Drag &amp; drop your {mode === "receiving" ? "supplier" : "store inventory"}{" "}
+                  spreadsheet (.xlsx, .csv) here
                 </p>
                 <p className="text-xs text-muted-foreground">or click to browse your files</p>
                 <input
@@ -304,10 +404,11 @@ export function BulkImportDialog({
           )}
 
           {rows && !busy && (
-            <div className="space-y-3">
+            <div className="min-h-0 space-y-3 overflow-hidden">
               <p className="text-xs text-muted-foreground">
-                {fileName} · {rows.length} rows ready
-                {skipped.length ? ` · ${skipped.length} rows cannot be imported` : ""}
+                {fileName} · {rows.length.toLocaleString()} product rows ·{" "}
+                {(counts.ready + counts.new_product).toLocaleString()} ready ·{" "}
+                {(counts.missing_information + counts.conflict).toLocaleString()} require attention
               </p>
 
               {resume && (
@@ -318,54 +419,244 @@ export function BulkImportDialog({
                 </div>
               )}
 
-              {skipped.length > 0 && (
-                <div className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
-                  {skipped.slice(0, 4).map((e) => (
-                    <p key={e.line}>
-                      Row {e.line}: {e.reason}
-                    </p>
-                  ))}
-                  {skipped.length > 4 && (
-                    <p>+{skipped.length - 4} more — full list in the report</p>
-                  )}
-                </div>
-              )}
+              <div className="flex flex-wrap gap-2" role="group" aria-label="Import row filters">
+                {(
+                  [
+                    ["all", "All", rows.length],
+                    ["ready", "Ready", counts.ready],
+                    ["new_product", "New products", counts.new_product],
+                    ["missing_information", "Missing information", counts.missing_information],
+                    ["conflict", "Conflicts", counts.conflict],
+                  ] as const
+                ).map(([value, label, count]) => (
+                  <Button
+                    key={value}
+                    type="button"
+                    size="sm"
+                    variant={filter === value ? "default" : "outline"}
+                    onClick={() => setFilter(value)}
+                  >
+                    {label} <span className="numeric opacity-70">{count.toLocaleString()}</span>
+                  </Button>
+                ))}
+              </div>
 
-              <div className="max-h-72 overflow-y-auto rounded-lg border border-border">
+              <div className="grid gap-2 rounded-md border border-border bg-surface-2 p-2 sm:grid-cols-[1fr_1fr_auto]">
+                <Input
+                  value={bulkCategory}
+                  onChange={(event) => setBulkCategory(event.target.value)}
+                  placeholder="Category for selected rows"
+                />
+                <Input
+                  value={bulkUnit}
+                  onChange={(event) => setBulkUnit(event.target.value)}
+                  placeholder="Unit for selected rows"
+                />
+                <Button type="button" variant="outline" onClick={applyBulk}>
+                  Apply to {selected.length || "selected"}
+                </Button>
+              </div>
+
+              <div className="max-h-[48vh] overflow-auto rounded-lg border border-border">
                 <Table>
                   <TableHeader>
                     <TableRow>
+                      <TableHead className="w-9">
+                        <Checkbox
+                          aria-label="Select visible rows"
+                          checked={preview.length > 0 && preview.every((row) => selectedSet.has(row.line))}
+                          onCheckedChange={(checked) =>
+                            setSelected((current) => {
+                              const next = new Set(current);
+                              preview.forEach((row) =>
+                                checked ? next.add(row.line) : next.delete(row.line),
+                              );
+                              return [...next];
+                            })
+                          }
+                        />
+                      </TableHead>
                       <TableHead>Barcode / SKU</TableHead>
                       <TableHead>Product name</TableHead>
                       <TableHead>Category</TableHead>
+                      <TableHead>Unit</TableHead>
                       <TableHead className="text-right">Price</TableHead>
                       <TableHead className="text-right">Cost</TableHead>
                       <TableHead className="text-right">Stock</TableHead>
-                      <TableHead className="text-right">Pts</TableHead>
-                      <TableHead className="text-right">Action</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Resolve</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
                     {preview.map((r) => (
-                      <TableRow key={`${r.key}-${r.line}`}>
-                        <TableCell className="numeric">{r.barcode}</TableCell>
-                        <TableCell className="font-medium">{r.name}</TableCell>
-                        <TableCell className="text-muted-foreground">{r.category}</TableCell>
-                        <TableCell className="numeric text-right">{money(r.price)}</TableCell>
-                        <TableCell className="numeric text-right">{money(r.cost)}</TableCell>
-                        <TableCell className="numeric text-right">+{r.stock}</TableCell>
-                        <TableCell className="numeric text-right">{r.customPoints}</TableCell>
-                        <TableCell className="text-right text-xs text-muted-foreground">
-                          {r.existing ? "restock" : "new item"}
+                      <TableRow
+                        key={`${r.key}-${r.line}`}
+                        className={`data-row-lazy ${
+                          r.status === "missing_information" || r.status === "conflict"
+                            ? "bg-warning/5"
+                            : ""
+                        }`}
+                      >
+                        <TableCell>
+                          <Checkbox
+                            aria-label={`Select row ${r.line}`}
+                            checked={selectedSet.has(r.line)}
+                            onCheckedChange={(checked) =>
+                              setSelected((current) =>
+                                checked
+                                  ? [...new Set([...current, r.line])]
+                                  : current.filter((line) => line !== r.line),
+                              )
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            className="numeric h-8 min-w-32"
+                            value={r.barcode}
+                            aria-invalid={r.missingFields.includes("barcode")}
+                            onChange={(event) => patchRow(r.line, { barcode: event.target.value })}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            className="h-8 min-w-44"
+                            value={r.name}
+                            aria-invalid={
+                              r.missingFields.includes("name") || r.conflictFields.includes("name")
+                            }
+                            onChange={(event) => patchRow(r.line, { name: event.target.value })}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            className="h-8 min-w-32"
+                            value={r.category}
+                            aria-invalid={r.conflictFields.includes("category")}
+                            onChange={(event) => patchRow(r.line, { category: event.target.value })}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            className="h-8 w-24"
+                            value={r.unit}
+                            aria-invalid={r.conflictFields.includes("unit")}
+                            onChange={(event) => patchRow(r.line, { unit: event.target.value })}
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            className="numeric h-8 w-24 text-right"
+                            inputMode="decimal"
+                            value={r.price ?? ""}
+                            aria-invalid={
+                              r.missingFields.includes("price") || r.conflictFields.includes("price")
+                            }
+                            onChange={(event) =>
+                              patchRow(r.line, {
+                                price: event.target.value === "" ? null : Number(event.target.value),
+                              })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            className="numeric h-8 w-24 text-right"
+                            inputMode="decimal"
+                            value={r.cost ?? ""}
+                            aria-invalid={
+                              r.missingFields.includes("cost") || r.conflictFields.includes("cost")
+                            }
+                            onChange={(event) =>
+                              patchRow(r.line, {
+                                cost: event.target.value === "" ? null : Number(event.target.value),
+                              })
+                            }
+                          />
+                        </TableCell>
+                        <TableCell>
+                          <Input
+                            className="numeric h-8 w-20 text-right"
+                            inputMode="numeric"
+                            value={r.stock}
+                            aria-invalid={r.missingFields.includes("stock")}
+                            onChange={(event) => patchRow(r.line, { stock: Number(event.target.value) })}
+                          />
+                        </TableCell>
+                        <TableCell className="min-w-36">
+                          <Badge
+                            variant={
+                              r.status === "ready" || r.status === "new_product"
+                                ? "outline"
+                                : "secondary"
+                            }
+                          >
+                            {r.status === "ready"
+                              ? "Validated"
+                              : r.status === "new_product"
+                                ? "New product · Ready"
+                                : r.status === "missing_information"
+                                  ? "Information required"
+                                  : "Conflict"}
+                          </Badge>
+                          {(r.issue || r.missingFields.length > 0 || r.conflictFields.length > 0) && (
+                            <p className="mt-1 max-w-52 text-[11px] text-warning">
+                              {r.issue ??
+                                (r.missingFields.length
+                                  ? `Complete: ${r.missingFields.join(", ")}`
+                                  : `Check: ${r.conflictFields.join(", ")}`)}
+                            </p>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {r.status === "conflict" && r.existingProduct ? (
+                            <div className="flex min-w-48 gap-1">
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  setRows((current) =>
+                                    current?.map((row) =>
+                                      row.line === r.line
+                                        ? resolveReviewConflict(row, "database")
+                                        : row,
+                                    ) ?? null,
+                                  )
+                                }
+                              >
+                                Use database
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                onClick={() =>
+                                  setRows((current) =>
+                                    current?.map((row) =>
+                                      row.line === r.line ? resolveReviewConflict(row, "import") : row,
+                                    ) ?? null,
+                                  )
+                                }
+                              >
+                                Use import
+                              </Button>
+                            </div>
+                          ) : (
+                            <span className="text-xs text-muted-foreground">
+                              {r.existingProductId ? "Update stock" : "Create product"}
+                            </span>
+                          )}
                         </TableCell>
                       </TableRow>
                     ))}
                   </TableBody>
                 </Table>
               </div>
-              {rows.length > PREVIEW_LIMIT && (
+              {filtered.length > PREVIEW_LIMIT && (
                 <p className="text-[11px] text-muted-foreground">
-                  Showing the first {PREVIEW_LIMIT} of {rows.length} rows. All of them are imported.
+                  Showing the first {PREVIEW_LIMIT.toLocaleString()} of {filtered.length.toLocaleString()} filtered rows.
+                  Ready rows outside the preview are still processed.
                 </p>
               )}
 
@@ -375,11 +666,15 @@ export function BulkImportDialog({
                 </Button>
                 <Button
                   className="bg-success text-background hover:bg-success/90"
-                  disabled={!rows.length}
+                  disabled={counts.ready + counts.new_product === 0}
                   onClick={() => void run(resume)}
                 >
                   <Download className="size-4" />
-                  {resume ? "Continue import" : `Import ${rows.length} items`}
+                  {resume
+                    ? "Continue import"
+                    : mode === "receiving"
+                      ? `Add ${(counts.ready + counts.new_product).toLocaleString()} ready lines`
+                      : `Import ${(counts.ready + counts.new_product).toLocaleString()} ready items`}
                 </Button>
               </div>
             </div>
@@ -411,24 +706,28 @@ export function BulkImportDialog({
               <ul className="space-y-1 text-muted-foreground">
                 <li className="numeric">Rows in the file: {outcome.total}</li>
                 <li className="numeric">New products created: {outcome.created}</li>
-                <li className="numeric">Existing products restocked: {outcome.restocked}</li>
+                <li className="numeric">
+                  Existing products {mode === "receiving" ? "matched" : "restocked"}: {outcome.restocked}
+                </li>
                 <li className="numeric">Skipped: {outcome.skipped.length}</li>
                 <li className="numeric">Failed: {outcome.failed.length}</li>
                 <li className="numeric">Still pending: {outcome.pending.length}</li>
               </ul>
 
-              {(outcome.failed.length > 0 || outcome.pending.length > 0) && (
+              {(outcome.skipped.length > 0 || outcome.failed.length > 0 || outcome.pending.length > 0) && (
                 <div className="max-h-40 space-y-1 overflow-y-auto rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-xs text-destructive">
                   <p className="flex items-center gap-1 font-semibold">
                     <AlertTriangle className="size-3.5" /> Not saved
                   </p>
-                  {[...outcome.failed, ...outcome.pending].slice(0, 8).map((e) => (
+                  {[...outcome.skipped, ...outcome.failed, ...outcome.pending].slice(0, 8).map((e) => (
                     <p key={`${e.line}-${e.reason}`}>
                       Row {e.line} ({e.barcode}): {e.reason}
                     </p>
                   ))}
-                  {outcome.failed.length + outcome.pending.length > 8 && (
-                    <p>+{outcome.failed.length + outcome.pending.length - 8} more in the report</p>
+                  {outcome.skipped.length + outcome.failed.length + outcome.pending.length > 8 && (
+                    <p>
+                      +{outcome.skipped.length + outcome.failed.length + outcome.pending.length - 8} more in the report
+                    </p>
                   )}
                 </div>
               )}

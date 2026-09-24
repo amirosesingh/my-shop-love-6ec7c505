@@ -10,6 +10,7 @@
 import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
 import { rowToProduct } from "@/core/api/pos-db";
 import type { Product } from "@/core/types/pos-types";
+import { normaliseCode, productCodes } from "@/lib/product-lookup";
 
 export type CatalogSearch = {
   products: Product[];
@@ -93,4 +94,60 @@ export async function searchCatalog(
   } catch {
     return { products: searchLocal(fallback, term, limit), remote: false };
   }
+}
+
+/**
+ * Resolve all codes from an import against SQL in bounded requests. This is
+ * the final authoritative lookup before new products are staged, and avoids
+ * assuming that a very large catalogue is fully resident in browser memory.
+ */
+export async function lookupProductsByCodes(
+  codes: string[],
+  fallback: Product[],
+  chunkSize = 500,
+): Promise<Product[]> {
+  const wanted = [...new Set(codes.map(normaliseCode).filter(Boolean))];
+  if (!wanted.length) return [];
+
+  const localByCode = new Map<string, Product>();
+  for (const product of fallback) {
+    for (const code of productCodes(product)) {
+      if (!localByCode.has(code)) localByCode.set(code, product);
+    }
+  }
+  const found = new Map<string, Product>();
+  const groups: string[][] = [];
+  const rpc = supabase as unknown as {
+    rpc: (
+      name: string,
+      args: Record<string, unknown>,
+    ) => Promise<{ data: Record<string, unknown>[] | null; error: { message: string } | null }>;
+  };
+  for (let offset = 0; offset < wanted.length; offset += chunkSize) {
+    groups.push(wanted.slice(offset, offset + chunkSize));
+  }
+
+  // Four requests keep a large import moving without flooding PostgREST.
+  for (let offset = 0; offset < groups.length; offset += 4) {
+    const settled = await Promise.allSettled(
+      groups.slice(offset, offset + 4).map((group) =>
+        rpc.rpc("product_lookup_batch", { p_codes: group }),
+      ),
+    );
+    settled.forEach((result, index) => {
+      const group = groups[offset + index] ?? [];
+      if (result.status === "fulfilled" && !result.value.error && result.value.data) {
+        for (const raw of result.value.data as Record<string, unknown>[]) {
+          const product = rowToProduct(raw);
+          found.set(product.id, product);
+        }
+      } else {
+        for (const code of group) {
+          const product = localByCode.get(code);
+          if (product) found.set(product.id, product);
+        }
+      }
+    });
+  }
+  return [...found.values()];
 }

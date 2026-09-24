@@ -73,6 +73,31 @@ describe("canonical Supabase SQL", () => {
     );
   });
 
+  it("supports indexed, duplicate-safe catalogue imports", () => {
+    const sql = read("supabase/schema.sql");
+    expect(sql).toContain("CREATE EXTENSION IF NOT EXISTS pg_trgm");
+    expect(sql).toContain("products_barcode_normalized_uidx");
+    expect(sql).toContain("products_name_trgm_idx");
+    expect(sql).toContain("purchase_orders_store_status_entry_idx");
+    expect(sql).toContain("FUNCTION public.product_lookup_batch(p_codes text[])");
+    expect(sql).toContain("SECURITY INVOKER");
+    expect(sql).toContain(
+      "REVOKE ALL ON FUNCTION public.product_lookup_batch(text[]) FROM PUBLIC, anon",
+    );
+  });
+
+  it("publishes catalogue and receiving changes for targeted live refresh", () => {
+    const sql = read("supabase/schema.sql");
+    expect(sql).toContain("'products', 'product_barcodes', 'members', 'promotions'");
+    expect(sql).toContain("'purchase_orders', 'purchase_order_items'");
+    expect(sql).toContain("ALTER PUBLICATION supabase_realtime ADD TABLE");
+  });
+
+  it("lets the database scheduler run the guarded security self-check", () => {
+    const sql = read("supabase/schema.sql");
+    expect(sql).toContain("session_user IN ('postgres', 'supabase_admin')");
+  });
+
   it("resets data transactionally and restores RLS before commit", () => {
     const sql = read("supabase/reset.sql");
     expect(sql).toMatch(/BEGIN;[\s\S]*DISABLE ROW LEVEL SECURITY/);

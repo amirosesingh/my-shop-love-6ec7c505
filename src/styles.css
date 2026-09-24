@@ -76,6 +76,8 @@
 
 :root {
   --radius: 0.5rem;
+  --motion-fast: 120ms;
+  --motion-normal: 180ms;
   --background: oklch(0.98 0.004 250);
   --foreground: oklch(0.22 0.014 265);
   --surface: oklch(1 0 0);
@@ -191,6 +193,28 @@
 @utility numeric {
   font-family: var(--font-mono);
   font-variant-numeric: tabular-nums;
+}
+
+/* Long tables keep off-screen row layout out of the critical rendering path. */
+@utility data-row-lazy {
+  content-visibility: auto;
+  contain-intrinsic-size: auto 48px;
+}
+
+/* Motion never competes with scanning, checkout or background processing. */
+@media (prefers-reduced-motion: reduce) {
+  html:focus-within {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms;
+    animation-iteration-count: 1;
+    scroll-behavior: auto;
+    transition-duration: 0.01ms;
+  }
 }
 
 /* ── Dynamic register scaling ─────────────────────────────────────────────
@@ -334,8 +358,8 @@
   padding: 0.875rem 1rem;
   min-height: 56px;
   transition:
-    background-color 150ms ease,
-    color 150ms ease;
+    background-color var(--motion-fast) ease,
+    color var(--motion-fast) ease;
 }
 
 @media (pointer: fine) {

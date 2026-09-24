@@ -25,6 +25,8 @@ SET client_min_messages = warning;
 
 CREATE EXTENSION IF NOT EXISTS pgcrypto WITH SCHEMA extensions;
 
+CREATE EXTENSION IF NOT EXISTS pg_trgm WITH SCHEMA extensions;
+
 DO $do$ BEGIN
 CREATE TYPE public.app_role AS ENUM (
     'admin',
@@ -3510,7 +3512,8 @@ CREATE OR REPLACE FUNCTION public.assert_supervisor_caller() RETURNS void
  LANGUAGE plpgsql STABLE SECURITY DEFINER SET search_path TO 'public', 'pg_temp'
 AS $$
 BEGIN
-  IF coalesce(auth.role(), '') = 'service_role' THEN RETURN; END IF;
+  IF coalesce(auth.role(), '') = 'service_role'
+     OR session_user IN ('postgres', 'supabase_admin') THEN RETURN; END IF;
   IF NOT public.is_app_supervisor() THEN
     RAISE EXCEPTION 'NOT_AUTHORISED';
   END IF;
@@ -5106,21 +5109,17 @@ CREATE INDEX IF NOT EXISTS idx_app_users_is_active ON public.app_users USING btr
 
 CREATE INDEX IF NOT EXISTS idx_app_users_role_slug ON public.app_users USING btree (role_slug);
 
-CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON public.audit_logs USING btree (created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_po_items_po_id ON public.purchase_order_items USING btree (po_id);
 
 CREATE INDEX IF NOT EXISTS idx_purchase_orders_store_entry ON public.purchase_orders USING btree (store_id, invoice_entry_date DESC);
 
-CREATE INDEX IF NOT EXISTS idx_sale_items_sale_id ON public.sale_items USING btree (sale_id);
 
-CREATE INDEX IF NOT EXISTS idx_sales_created_at ON public.sales USING btree (created_at DESC);
 
 CREATE INDEX IF NOT EXISTS idx_sales_member_id ON public.sales USING btree (member_id);
 
 CREATE INDEX IF NOT EXISTS idx_stores_location_type ON public.stores USING btree (location_type);
 
-CREATE INDEX IF NOT EXISTS idx_stores_parent_id ON public.stores USING btree (parent_id);
 
 CREATE UNIQUE INDEX IF NOT EXISTS integration_settings_provider_idx ON public.integration_settings USING btree (provider_name);
 
@@ -5160,11 +5159,24 @@ CREATE INDEX IF NOT EXISTS payment_transactions_sale_idx ON public.payment_trans
 
 CREATE INDEX IF NOT EXISTS payment_transactions_store_idx ON public.payment_transactions USING btree (store_id, created_at DESC);
 
-CREATE UNIQUE INDEX IF NOT EXISTS payment_types_code_idx ON public.payment_types USING btree (type_code);
 
 CREATE INDEX IF NOT EXISTS product_barcodes_product_idx ON public.product_barcodes USING btree (product_id);
 
 CREATE INDEX IF NOT EXISTS products_barcode_idx ON public.products USING btree (barcode);
+
+CREATE UNIQUE INDEX IF NOT EXISTS products_barcode_normalized_uidx
+  ON public.products (lower(btrim(barcode)))
+  WHERE nullif(btrim(barcode), '') IS NOT NULL;
+
+CREATE INDEX IF NOT EXISTS products_name_trgm_idx
+  ON public.products USING gin (name extensions.gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS products_barcode_trgm_idx
+  ON public.products USING gin (barcode extensions.gin_trgm_ops);
+
+CREATE INDEX IF NOT EXISTS products_sku_trgm_idx
+  ON public.products USING gin (sku extensions.gin_trgm_ops)
+  WHERE sku IS NOT NULL;
 
 CREATE INDEX IF NOT EXISTS products_category_idx ON public.products USING btree (category);
 
@@ -5182,6 +5194,9 @@ CREATE INDEX IF NOT EXISTS purchase_orders_entry_idx ON public.purchase_orders U
 
 CREATE INDEX IF NOT EXISTS purchase_orders_store_idx ON public.purchase_orders USING btree (store_id);
 
+CREATE INDEX IF NOT EXISTS purchase_orders_store_status_entry_idx
+  ON public.purchase_orders (store_id, status, invoice_entry_date DESC);
+
 CREATE INDEX IF NOT EXISTS purchase_orders_supplier_idx ON public.purchase_orders USING btree (supplier_id);
 
 CREATE INDEX IF NOT EXISTS sale_items_created_idx ON public.sale_items USING btree (created_at DESC);
@@ -5194,7 +5209,6 @@ CREATE INDEX IF NOT EXISTS sales_bill_number_idx ON public.sales USING btree (bi
 
 CREATE INDEX IF NOT EXISTS sales_cashier_id_idx ON public.sales USING btree (cashier_id);
 
-CREATE UNIQUE INDEX IF NOT EXISTS sales_client_transaction_id_key ON public.sales USING btree (client_transaction_id) WHERE (client_transaction_id IS NOT NULL);
 
 CREATE UNIQUE INDEX IF NOT EXISTS sales_client_transaction_id_uidx ON public.sales USING btree (client_transaction_id) WHERE (client_transaction_id IS NOT NULL);
 
@@ -5226,7 +5240,6 @@ CREATE INDEX IF NOT EXISTS shifts_open_by_store ON public.shifts USING btree (st
 
 CREATE INDEX IF NOT EXISTS shifts_open_by_store_idx ON public.shifts USING btree (store_id, opened_at DESC) WHERE (status = 'OPEN'::text);
 
-CREATE INDEX IF NOT EXISTS shifts_open_store_idx ON public.shifts USING btree (store_id) WHERE (closed_at IS NULL);
 
 CREATE INDEX IF NOT EXISTS sku_audit_created_idx ON public.sku_audit USING btree (created_at DESC);
 
@@ -7621,7 +7634,11 @@ GRANT EXECUTE ON FUNCTION public.pos_rules_snapshot(text) TO authenticated, serv
 DO $$
 DECLARE t text;
 BEGIN
-  FOREACH t IN ARRAY ARRAY['sales', 'sale_items', 'payment_transactions'] LOOP
+  FOREACH t IN ARRAY ARRAY[
+    'sales', 'sale_items', 'payment_transactions',
+    'products', 'product_barcodes', 'members', 'promotions',
+    'purchase_orders', 'purchase_order_items'
+  ] LOOP
     IF to_regclass('public.' || t) IS NOT NULL THEN
       EXECUTE format('ALTER TABLE public.%I REPLICA IDENTITY FULL', t);
       IF NOT EXISTS (
@@ -7830,10 +7847,7 @@ $$;
 REVOKE ALL ON FUNCTION public.product_delete_guard(uuid) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.product_delete_guard(uuid) TO authenticated, service_role;
 
-CREATE INDEX IF NOT EXISTS sale_items_product_id_idx ON public.sale_items (product_id);
-CREATE INDEX IF NOT EXISTS purchase_order_items_product_id_idx ON public.purchase_order_items (product_id);
 CREATE INDEX IF NOT EXISTS stock_transfer_items_product_id_idx ON public.stock_transfer_items (product_id);
-CREATE INDEX IF NOT EXISTS stock_adjustments_product_id_idx ON public.stock_adjustments (product_id);
 CREATE INDEX IF NOT EXISTS promotions_foc_product_id_idx ON public.promotions (foc_product_id);
 
 -- ------------------------------------------------------------------
@@ -11466,7 +11480,6 @@ ALTER TABLE public.stores
   ADD CONSTRAINT stores_group_id_fkey FOREIGN KEY (group_id)
   REFERENCES public.store_groups(id) ON UPDATE CASCADE ON DELETE SET NULL;
 
-CREATE INDEX IF NOT EXISTS stores_group_id_idx ON public.stores (group_id);
 
 -- --------------------------------------------------- cross-group approval ---
 CREATE OR REPLACE FUNCTION public.store_group_of(_store_id text)
@@ -14242,6 +14255,43 @@ GRANT EXECUTE ON FUNCTION public.pos_sync_counts(text,text,integer) TO service_r
 GRANT EXECUTE ON FUNCTION public.pos_old_receipt_lookup(text,text) TO service_role;
 
 -- SQLSERVER_SYNC_CONTRACT_END
+
+-- Resolve large spreadsheet batches against the authoritative catalogue in a
+-- single indexed call. RLS remains in force because this is SECURITY INVOKER.
+CREATE OR REPLACE FUNCTION public.product_lookup_batch(p_codes text[])
+RETURNS SETOF public.products
+LANGUAGE sql
+STABLE
+SECURITY INVOKER
+SET search_path TO 'public', 'pg_temp'
+AS $fn$
+  SELECT p.*
+  FROM public.products AS p
+  WHERE COALESCE(p.is_archived, false) = false
+    AND (
+      lower(btrim(p.barcode)) = ANY (p_codes)
+      OR lower(btrim(COALESCE(p.sku, ''))) = ANY (p_codes)
+      OR EXISTS (
+        SELECT 1
+        FROM unnest(COALESCE(p.barcode_aliases, '{}'::text[])) AS alias(code)
+        WHERE lower(btrim(alias.code)) = ANY (p_codes)
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM jsonb_array_elements(COALESCE(p.barcode_variants, '[]'::jsonb)) AS variant(value)
+        WHERE lower(btrim(variant.value->>'code')) = ANY (p_codes)
+      )
+      OR EXISTS (
+        SELECT 1
+        FROM public.product_barcodes AS indexed
+        WHERE indexed.product_id = p.id
+          AND lower(btrim(indexed.barcode)) = ANY (p_codes)
+      )
+    )
+$fn$;
+
+REVOKE ALL ON FUNCTION public.product_lookup_batch(text[]) FROM PUBLIC, anon;
+GRANT EXECUTE ON FUNCTION public.product_lookup_batch(text[]) TO authenticated, service_role;
 
 -- ===========================================================================
 -- Final public-schema privilege hardening

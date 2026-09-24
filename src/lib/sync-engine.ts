@@ -565,9 +565,20 @@ const LIVE_TABLES = [
   "sales",
   "sale_items",
   "payment_transactions",
+  "products",
+  "product_barcodes",
+  "members",
+  "promotions",
+  "purchase_orders",
+  "purchase_order_items",
 ] as const;
 
-export type LiveChange = { reason: string; table: string; storeId: string | null };
+export type LiveChange = {
+  reason: string;
+  table: string;
+  storeId: string | null;
+  entityId?: string | null;
+};
 
 /**
  * Listeners told when centrally controlled settings changed, so the running
@@ -576,6 +587,7 @@ export type LiveChange = { reason: string; table: string; storeId: string | null
  */
 const settingsListeners = new Set<(change: LiveChange) => void>();
 const salesListeners = new Set<(change: LiveChange) => void>();
+const dataListeners = new Set<(change: LiveChange) => void>();
 
 export function subscribeSettingsChange(fn: (change: LiveChange) => void): () => void {
   settingsListeners.add(fn);
@@ -585,6 +597,12 @@ export function subscribeSettingsChange(fn: (change: LiveChange) => void): () =>
 export function subscribeSalesChange(fn: (change: LiveChange) => void): () => void {
   salesListeners.add(fn);
   return () => salesListeners.delete(fn);
+}
+
+/** Subscribe to targeted catalogue/member/purchasing invalidations. */
+export function subscribeDataChange(fn: (change: LiveChange) => void): () => void {
+  dataListeners.add(fn);
+  return () => dataListeners.delete(fn);
 }
 
 function announceSettingsChange(
@@ -611,6 +629,16 @@ function announceSalesChange(table: string, storeId: string | null): void {
   }
 }
 
+function announceDataChange(change: LiveChange): void {
+  for (const fn of dataListeners) {
+    try {
+      fn(change);
+    } catch {
+      /* one bad listener must not stop the others */
+    }
+  }
+}
+
 
 
 /** Refresh the offline staff roster so a PIN sign-in works without the cloud. */
@@ -623,25 +651,24 @@ async function refreshStaffMirror(): Promise<void> {
 
 const RETRY_DELAYS_MS = [2000, 10000, 30000];
 let liveTimer: number | undefined;
-const pendingLiveChanges = new Map<string, Set<string | null>>();
+const pendingLiveChanges = new Map<string, LiveChange>();
 
 function flushLiveChanges(): void {
   liveTimer = undefined;
-  const changes = [...pendingLiveChanges.entries()];
+  const changes = [...pendingLiveChanges.values()];
   pendingLiveChanges.clear();
-  void syncNow(`live:${changes.map(([changedTable]) => changedTable).join(",")}`);
-  for (const [changedTable, changedStores] of changes) {
-    for (const changedStore of changedStores) {
-      if (["pos_settings", "pos_store_settings", "settings_overrides", "settings_locks"].includes(changedTable)) {
-        announceSettingsChange(`live:${changedTable}`, changedStore, changedTable);
-      }
-      if (
-        changedTable === "sales" ||
-        changedTable === "sale_items" ||
-        changedTable === "payment_transactions"
-      ) {
-        announceSalesChange(changedTable, changedStore);
-      }
+  // Embedded terminals need a durable offline mirror. Online-only clients can
+  // consume the changed records directly without reloading the whole dataset.
+  if (localDb()) void syncNow(`live:${[...new Set(changes.map((change) => change.table))].join(",")}`);
+  for (const change of changes) {
+    if (["pos_settings", "pos_store_settings", "settings_overrides", "settings_locks"].includes(change.table)) {
+      announceSettingsChange(change.reason, change.storeId, change.table);
+    }
+    if (["sales", "sale_items", "payment_transactions"].includes(change.table)) {
+      announceSalesChange(change.table, change.storeId);
+    }
+    if (["products", "product_barcodes", "members", "promotions", "purchase_orders", "purchase_order_items"].includes(change.table)) {
+      announceDataChange(change);
     }
   }
 }
@@ -778,9 +805,13 @@ export function startSyncEngine() {
       const changed = ((payload as { new?: Record<string, unknown>; old?: Record<string, unknown> }).new ??
         (payload as { old?: Record<string, unknown> }).old ?? {}) as Record<string, unknown>;
       const storeId = String(changed.store_id ?? changed.branch_id ?? "").trim() || null;
-      const stores = pendingLiveChanges.get(table) ?? new Set<string | null>();
-      stores.add(storeId);
-      pendingLiveChanges.set(table, stores);
+      const entityId = String(
+        table === "product_barcodes" || table === "purchase_order_items"
+          ? changed.product_id ?? changed.purchase_order_id ?? changed.id ?? ""
+          : changed.id ?? "",
+      ).trim() || null;
+      const change = { reason: `live:${table}`, table, storeId, entityId };
+      pendingLiveChanges.set(`${table}:${storeId ?? ""}:${entityId ?? ""}`, change);
       if (liveTimer) window.clearTimeout(liveTimer);
       // One catch-up for a burst of related edits.
       liveTimer = window.setTimeout(flushLiveChanges, 400);
