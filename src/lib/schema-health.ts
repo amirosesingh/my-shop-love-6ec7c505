@@ -108,6 +108,10 @@ export function buildCloudSql(gaps: SchemaGap[], filename: string, at = new Date
     `  filename text primary key,`,
     `  applied_at timestamptz not null default now()`,
     `);`,
+    `alter table public.schema_migrations enable row level security;`,
+    `revoke all on table public.schema_migrations from public, anon, authenticated;`,
+    `comment on table public.schema_migrations is`,
+    `  'Server-only record of applied Schema Manager repairs.';`,
     ``,
   ];
   for (const gap of gaps) {
