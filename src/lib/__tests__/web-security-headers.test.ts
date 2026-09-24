@@ -2,12 +2,17 @@ import { describe, expect, it } from "vitest";
 import { contentSecurityPolicy, withWebSecurityHeaders } from "../web-security-headers";
 
 describe("hosted application security headers", () => {
-  it("allows only app scripts and the configured database connection", () => {
+  it("allows app and Cloudflare Insights scripts plus required connections", () => {
     const policy = contentSecurityPolicy("https://project-ref.supabase.co/path");
-    expect(policy).toContain("script-src 'self' 'unsafe-inline'");
+    expect(policy).toContain(
+      "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
+    );
+    expect(policy).toContain(
+      "script-src-elem 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
+    );
     expect(policy).not.toContain("'unsafe-eval'");
     expect(policy).toContain(
-      "connect-src 'self' https://project-ref.supabase.co wss://project-ref.supabase.co",
+      "connect-src 'self' https://cloudflareinsights.com https://project-ref.supabase.co wss://project-ref.supabase.co",
     );
     expect(policy).toContain("frame-ancestors 'none'");
   });

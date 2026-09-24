@@ -55,6 +55,55 @@ type Entry = {
   badge?: boolean;
 };
 
+type SidebarRowProps = {
+  entry: Entry;
+  collapsed: boolean;
+  active: boolean;
+  inbound: number;
+  onNavigate?: () => void;
+};
+
+/**
+ * Keep rows as a stable component type. Defining this inside SidebarNav made
+ * React unmount and recreate every link whenever the shell refreshed, which
+ * could drop a click and visibly reset the hover state mid-interaction.
+ */
+function SidebarRow({ entry, collapsed, active, inbound, onNavigate }: SidebarRowProps) {
+  const link = (
+    <Link
+      to={entry.to}
+      hash={entry.hash}
+      search={entry.search ?? {}}
+      onClick={onNavigate}
+      aria-label={entry.label}
+      aria-current={active ? "page" : undefined}
+      className={cn(
+        "flex touch-manipulation select-none items-center gap-2 rounded-md text-sm transition-[background-color,color] duration-[var(--motion-fast)] ease-[var(--motion-ease-standard)] motion-reduce:transition-none",
+        collapsed ? "justify-center py-2.5" : "px-2 py-2",
+        active
+          ? "bg-sidebar-accent font-medium text-primary"
+          : "text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+      )}
+    >
+      <entry.icon className={collapsed ? "size-5" : "size-4 shrink-0"} />
+      {!collapsed && <span className="min-w-0 truncate">{entry.label}</span>}
+      {entry.badge && inbound > 0 && !collapsed && (
+        <Badge className="ml-auto h-5 min-w-5 shrink-0 justify-center px-1 text-[10px]">
+          {inbound}
+        </Badge>
+      )}
+    </Link>
+  );
+
+  if (!collapsed) return link;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{link}</TooltipTrigger>
+      <TooltipContent side="right">{entry.label}</TooltipContent>
+    </Tooltip>
+  );
+}
+
 export function SidebarNav({
   collapsed = false,
   onToggleCollapse,
@@ -154,38 +203,6 @@ export function SidebarNav({
     return pathname === e.to || pathname.startsWith(`${e.to}/`);
   };
 
-  const Row = ({ entry }: { entry: Entry }) => {
-    const link = (
-      <Link
-        to={entry.to}
-        hash={entry.hash}
-        search={entry.search ?? {}}
-        onClick={onNavigate}
-        aria-label={entry.label}
-        className={cn(
-          "flex touch-manipulation select-none items-center gap-2 rounded-md text-sm text-muted-foreground transition-colors duration-[var(--motion-fast)] hover:bg-sidebar-accent hover:text-foreground",
-          collapsed ? "justify-center py-2.5" : "px-2 py-2",
-          isActive(entry) && "bg-sidebar-accent font-medium text-primary",
-        )}
-      >
-        <entry.icon className={collapsed ? "size-5" : "size-4 shrink-0"} />
-        {!collapsed && <span className="min-w-0 truncate">{entry.label}</span>}
-        {entry.badge && inbound > 0 && !collapsed && (
-          <Badge className="ml-auto h-5 min-w-5 shrink-0 justify-center px-1 text-[10px]">
-            {inbound}
-          </Badge>
-        )}
-      </Link>
-    );
-    if (!collapsed) return link;
-    return (
-      <Tooltip>
-        <TooltipTrigger asChild>{link}</TooltipTrigger>
-        <TooltipContent side="right">{entry.label}</TooltipContent>
-      </Tooltip>
-    );
-  };
-
   return (
     <div className="flex h-full min-h-0 flex-col">
       {header}
@@ -213,7 +230,15 @@ export function SidebarNav({
       )}
 
       <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto px-2 pb-2">
-        {registerEntry && match(registerEntry) && <Row entry={registerEntry} />}
+        {registerEntry && match(registerEntry) && (
+          <SidebarRow
+            entry={registerEntry}
+            collapsed={collapsed}
+            active={isActive(registerEntry)}
+            inbound={inbound}
+            onNavigate={onNavigate}
+          />
+        )}
 
         {visiblePinned.length > 0 && (
           <>
@@ -223,14 +248,28 @@ export function SidebarNav({
               </p>
             )}
             {visiblePinned.map((e) => (
-              <Row key={e.key} entry={e} />
+              <SidebarRow
+                key={e.key}
+                entry={e}
+                collapsed={collapsed}
+                active={isActive(e)}
+                inbound={inbound}
+                onNavigate={onNavigate}
+              />
             ))}
             <div className="my-1 border-t border-border" />
           </>
         )}
 
         {visibleSections.map((e) => (
-          <Row key={e.key} entry={e} />
+          <SidebarRow
+            key={e.key}
+            entry={e}
+            collapsed={collapsed}
+            active={isActive(e)}
+            inbound={inbound}
+            onNavigate={onNavigate}
+          />
         ))}
 
         {visibleSections.length === 0 && visiblePinned.length === 0 && !(registerEntry && match(registerEntry)) && (
