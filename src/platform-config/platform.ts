@@ -25,6 +25,10 @@ export function isAndroid(): boolean {
   return cap()?.getPlatform?.() === "android";
 }
 
+export function isIOS(): boolean {
+  return cap()?.getPlatform?.() === "ios";
+}
+
 /** True inside the Electron desktop shell (its preload exposes `window.pos`). */
 export function isElectron(): boolean {
   return typeof window !== "undefined" && Boolean((window as { pos?: unknown }).pos);
@@ -49,8 +53,9 @@ export function hasConnection(): boolean {
 export const NEEDS_CONNECTION =
   "This needs an internet connection. The rest of the till keeps working offline.";
 /** Short label for this shell, for logs and supervisor panels. */
-export function platformName(): "android" | "electron" | "web" {
+export function platformName(): "android" | "ios" | "electron" | "web" {
   if (isAndroid()) return "android";
+  if (isIOS()) return "ios";
   if (isElectron()) return "electron";
   return "web";
 }

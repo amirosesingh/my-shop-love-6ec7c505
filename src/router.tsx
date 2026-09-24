@@ -4,7 +4,7 @@ import { routeTree } from "./routeTree.gen";
 import { isOnlineOnly } from "./lib/live-mode";
 
 export const getRouter = () => {
-  // Web and Android are live clients: nothing is served from cache, and every screen
+  // Web, Android and iOS are live clients: nothing is served from cache, and every screen
   // refetches when it is opened or the app comes back to the foreground.
   const queryClient = isOnlineOnly()
     ? new QueryClient({

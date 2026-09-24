@@ -30,8 +30,8 @@ export function setAutoLockSeconds(seconds: number) {
 }
 
 /**
- * The idle delay actually applied: the branch's register setting when it is
- * confirmed, otherwise the per-machine fallback.
+ * The idle delay actually applied: the synchronized terminal setting when it
+ * is confirmed, otherwise the per-machine compatibility fallback.
  */
 export function effectiveLockSeconds(ruleSeconds?: number): number {
   if (typeof ruleSeconds === "number" && Number.isFinite(ruleSeconds) && ruleSeconds >= 0)
@@ -61,7 +61,7 @@ export function useAutoLock(active: boolean, onLock: () => void, ruleSeconds?: n
 
     const arm = () => {
       window.clearTimeout(timer);
-      // The register settings decide when they are the confirmed source; the
+      // The synchronized settings decide when they are the confirmed source; the
       // per-machine value is only a fallback while they have not arrived.
       const seconds = effectiveLockSeconds(ruleSeconds);
       if (!seconds || stopped) return;

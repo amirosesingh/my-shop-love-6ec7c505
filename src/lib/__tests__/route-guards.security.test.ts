@@ -5,6 +5,7 @@ import { describe, expect, it } from "vitest";
 const ROUTES_DIR = join(process.cwd(), "src/routes");
 const APP_SHELL = readFileSync(join(process.cwd(), "src/platforms/web/components/pos/AppShell.tsx"), "utf8");
 const NAV = readFileSync(join(process.cwd(), "src/platforms/web/components/pos/nav-config.ts"), "utf8");
+const SUPABASE_SCHEMA = readFileSync(join(process.cwd(), "supabase/schema.sql"), "utf8");
 
 const routeFiles = readdirSync(ROUTES_DIR).filter((f) => f.endsWith(".tsx") && !f.startsWith("__"));
 
@@ -74,6 +75,28 @@ describe("route guards", () => {
     expect(APP_SHELL).not.toContain("ROUTE_PERMISSIONS");
     expect(NAV).toContain("ROUTE_PERMISSION_OVERRIDES");
     expect(NAV).toContain("NAV_ROUTE_PERMISSIONS");
+  });
+
+  it("does not hide operational modules based on the access device", () => {
+    expect(NAV).not.toContain("desktopHidden");
+    expect(APP_SHELL).not.toContain("item.desktopHidden");
+    expect(APP_SHELL).not.toContain("DESKTOP_BLOCKED");
+    expect(readFileSync(join(ROUTES_DIR, "promotions.tsx"), "utf8")).toContain('can("can_manage_promotions")');
+    expect(readFileSync(join(ROUTES_DIR, "coupons.tsx"), "utf8")).toContain('can("can_manage_promotions")');
+    expect(readFileSync(join(ROUTES_DIR, "stores.tsx"), "utf8")).toContain('can("can_manage_locations")');
+    expect(readFileSync(join(ROUTES_DIR, "audit.tsx"), "utf8")).toContain('can("can_view_audit_trail")');
+  });
+
+  it("enforces matching permissions in Supabase for opened management pages", () => {
+    for (const flag of [
+      "can_manage_promotions",
+      "can_manage_locations",
+      "can_view_audit_trail",
+      "can_manage_staff",
+      "can_access_pos_settings",
+    ]) {
+      expect(SUPABASE_SCHEMA).toContain(`public.has_perm('${flag}')`);
+    }
   });
 
   /** The two screens that change stock by hand and expose member contact

@@ -113,7 +113,7 @@ const categoryLabel = (c: string) => AUDIT_CATEGORY_LABELS[displayCategory(c)] ?
 const dayStart = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate()).getTime();
 
 function AuditPage() {
-  const { isAdmin, staff } = useAuth();
+  const { can, staff } = useAuth();
   const logs = useAuditLogs();
   const sync = useSyncState();
   const [range, setRange] = useState<RangeKey>("all");
@@ -175,15 +175,15 @@ function AuditPage() {
 
   const pager = usePagination(rows, 25);
 
-  if (!isAdmin) {
+  if (!can("can_view_audit_trail")) {
     return (
       <AppShell>
         <div className="flex min-h-screen items-center justify-center p-6">
           <div className="max-w-sm rounded-lg border border-destructive/40 bg-destructive/10 p-6 text-center">
             <ShieldAlert className="mx-auto size-6 text-destructive" />
-            <p className="mt-2 font-semibold">Admins only</p>
+            <p className="mt-2 font-semibold">Permission required</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              The activity trail contains company-wide telemetry.
+              Your role does not allow access to the company activity trail.
             </p>
           </div>
         </div>

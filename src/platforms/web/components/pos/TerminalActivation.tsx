@@ -34,7 +34,7 @@ import { subscribeConnectivity } from "@/core/activation/connection-health";
 import { CameraScanner } from "@/platforms/web/components/pos/CameraScanner";
 import { EmergencyAccessLink } from "@/components/shared/EmergencyAccessLink";
 import { useBranding } from "@/lib/branding";
-import { isAndroid } from "@/platform-config/platform";
+import { isNative } from "@/platform-config/platform";
 
 const qrDataUrl = (value: string) => {
   const qr = qrcode(0, "M");
@@ -75,7 +75,7 @@ export function TerminalActivation({
   const [online, setOnline] = useState(() => isCloudConnected());
   useEffect(() => subscribeConnectivity(() => setOnline(isCloudConnected())), []);
   const branding = useBranding();
-  const mobile = isAndroid();
+  const mobile = isNative();
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");

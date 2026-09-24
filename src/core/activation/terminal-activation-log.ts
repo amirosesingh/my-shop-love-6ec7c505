@@ -8,7 +8,7 @@
  */
 import { APP_VERSION } from "@/version";
 import { logger } from "@/lib/audit-log";
-import { isAndroid } from "@/platform-config/platform";
+import { isAndroid, isIOS } from "@/platform-config/platform";
 import { isWindowsShell, isMobileShell } from "@/platform-config/features";
 
 export type ActivationOutcome =
@@ -32,6 +32,7 @@ const OUTCOME_LABEL: Record<ActivationOutcome, string> = {
 export function activationPlatform(): string {
   if (isWindowsShell()) return "windows-desktop";
   if (isAndroid()) return "android";
+  if (isIOS()) return "ios";
   if (isMobileShell()) return "mobile";
   return "browser";
 }

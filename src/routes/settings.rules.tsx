@@ -10,6 +10,7 @@ import { SettingsShell } from "@/platforms/web/components/pos/settings/SettingsS
 import { SaveIndicator } from "@/platforms/web/components/pos/settings/SaveIndicator";
 import { SettingsSections } from "@/platforms/web/components/pos/settings/SettingsSection";
 import { AuthorizationRulesPanel } from "@/platforms/web/components/pos/settings/AuthorizationRulesPanel";
+import { ScopePanel } from "@/platforms/web/components/pos/settings/ScopeControls";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -66,7 +67,7 @@ function RulesSettings() {
   } = usePosRules();
 
 
-  const { currentStore } = usePos();
+  const { currentStore, state, updateSettings } = usePos();
   const { isAdmin, can } = useAuth();
   const mayEdit = isAdmin || can("can_access_pos_settings");
 
@@ -207,6 +208,8 @@ function RulesSettings() {
           {loading && <Loader2 className="mt-2 size-4 shrink-0 animate-spin text-muted-foreground" />}
         </header>
 
+        <ScopePanel sections={["terminalSecurity"]} />
+
         {!mayEdit && (
           <p className="rounded-md border border-border bg-card p-4 text-sm text-muted-foreground">
             These rules are managed by an administrator. You can see what is enforced, but not
@@ -303,8 +306,10 @@ function RulesSettings() {
                       onCheckedChange={(v) => set(field.key, v)}
                     />
                   ) : field.key === "auto_lock_timeout_seconds" ? (
-                    <PresetNumber label={field.label} disabled={!mayEdit} value={Number(draft[field.key])}
-                      onChange={(v) => set(field.key, v)} min={0} max={86400}
+                    <PresetNumber label={field.label} disabled={!mayEdit}
+                      value={state.settings.integrations.autoLockTimeoutSeconds ?? Number(draft[field.key])}
+                      onChange={(v) => updateSettings({ integrations: { ...state.settings.integrations, autoLockTimeoutSeconds: v } })}
+                      min={0} max={86400}
                       options={[0, 30, 60, 90, 180, 300, 600, 900, 1800, 3600].map((value) => ({ value,
                         label: value === 0 ? "Disabled" : value < 60 ? `${value} seconds` : `${value / 60} minutes` }))} />
                   ) : (

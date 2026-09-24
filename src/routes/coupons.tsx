@@ -97,7 +97,7 @@ const toCountOrNull = (v: string): number | null => {
 };
 
 function CouponsPage() {
-  const { isAdmin, user } = useAuth();
+  const { can, user } = useAuth();
   const { state } = usePos();
   const [campaigns, setCampaigns] = useState<Campaign[]>([]);
   const [vouchers, setVouchers] = useState<Voucher[]>([]);
@@ -218,13 +218,13 @@ function CouponsPage() {
     }
   };
 
-  if (!isAdmin) {
+  if (!can("can_manage_promotions")) {
     return (
       <AppShell>
         <div className="p-6">
           <h1 className="text-2xl font-semibold">Coupon campaigns</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Campaigns are managed by an administrator. Customer vouchers still scan and apply
+            You do not have permission to manage campaigns. Customer vouchers still scan and apply
             automatically at your register.
           </p>
         </div>

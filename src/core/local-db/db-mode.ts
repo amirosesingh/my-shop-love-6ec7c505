@@ -1,7 +1,7 @@
 /**
  * Where this till reads and writes: the online database, or the local one.
  *
- * Web and Android are online-only and send every change straight to the central
+ * Web, Android and iOS are online-only and send every change straight to the central
  * database. Windows remains online-only until the SQL Server release gate is
  * complete; afterward Electron's canonical connection state selects local mode.
  */

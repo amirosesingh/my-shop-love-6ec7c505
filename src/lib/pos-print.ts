@@ -142,8 +142,8 @@ export function setPreviewReceiptCfg(receipt: ReceiptSettings, tax: TaxSettings)
 }
 
 export const PAPER_LABELS: Record<PaperSize, string> = {
-  "30mm": "30mm Thermal (Narrow)",
-  "80mm": "80mm Thermal (Standard)",
+  "30mm": "TNM — 30 mm Thermal (Narrow)",
+  "80mm": "ATNF — 80 mm Thermal (Standard)",
   "58mm": "58mm Thermal (Mini)",
   a4: "A4 Sheet",
   letter: "Letter",

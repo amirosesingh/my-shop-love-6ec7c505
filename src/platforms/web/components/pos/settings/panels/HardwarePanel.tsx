@@ -1,6 +1,6 @@
 /**
- * Printer, cash drawer and device identity for THIS machine only. Nothing here
- * is copied to another till or changed remotely.
+ * Read-only identity for the current access point plus the centrally scoped
+ * printer and cash-drawer profile selected in the settings header.
  */
 import { useEffect, useState } from "react";
 import { MonitorCog } from "lucide-react";
@@ -42,7 +42,7 @@ export function HardwarePanel() {
         </dl>
         <p className="mt-4 rounded-md bg-muted p-3 text-xs text-muted-foreground">
           Printer profiles follow the selected scope. Use Terminal for a printer attached to one
-          registered till, or Branch to share the same configuration across the branch.
+          registered till, or Cluster to share it with that cluster's terminals.
         </p>
       </section>
 

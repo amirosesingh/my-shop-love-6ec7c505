@@ -106,6 +106,7 @@ import {
   saveSectionOverride,
   setSectionLock,
   SETTING_TIERS,
+  TIER_LABELS,
   type BranchSettingsState,
   type ScopeIds,
   type SettingSource,
@@ -117,6 +118,7 @@ import {
   mergePatch,
   patchPaths,
   pickSection,
+  sectionAllowsTier,
   sectionOfPath,
   setPath,
   type SettingsSectionId,
@@ -356,7 +358,7 @@ type Ctx = {
   saveConfiguredSettings: () => Promise<void>;
   /** Which settings blocks each tier overrides, and which are locked globally. */
   settingsScope: BranchSettingsState;
-  /** The cluster / branch / private ids this terminal resolves settings against. */
+  /** The cluster, branch and selected terminal ids used for configuration. */
   scopeIds: ScopeIds;
   settingsScopeLoading: boolean;
   settingsTerminalId: string;
@@ -470,7 +472,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
   // Who is acting right now — stamped on transfer approvals and receipts.
   const actorRef = useRef("Manager");
   actorRef.current = terminalUser?.name || user?.email || "Manager";
-  // Scoped overrides (cluster / branch / private) and global locks.
+  // Scoped business/terminal overrides and global locks.
   const [scope, setScope] = useState<BranchSettingsState>(emptyBranchSettings);
   const settingsWrites = useRef(new SettingsWriteQueue());
   const trackSettingsWrite = (key: string, save: () => Promise<unknown>) => settingsWrites.current.enqueue(key, save);
@@ -480,16 +482,15 @@ export function PosProvider({ children }: { children: ReactNode }) {
   const [confirmedScopeKey, setConfirmedScopeKey] = useState("");
   const scopeRef = useRef(scope);
   scopeRef.current = scope;
-  // Which cluster, branch and person this terminal resolves settings against.
+  // Which cluster, branch and terminal the settings editor is resolving.
   const scopeIds = useMemo<ScopeIds>(() => {
     const store = state.stores.find((s) => s.id === state.currentStoreId);
     return {
       CLUSTER: store?.groupId ?? "",
       BRANCH: state.currentStoreId ?? "",
       TERMINAL: settingsTerminalId || readTerminalConfig()?.tokenId || "",
-      PRIVATE: user?.staffId ?? terminalUser?.userCode ?? authUserId ?? "",
     };
-  }, [state.stores, state.currentStoreId, user?.staffId, terminalUser?.userCode, authUserId, settingsTerminalId]);
+  }, [state.stores, state.currentStoreId, settingsTerminalId]);
   const scopeIdsRef = useRef<ScopeIds>(emptyScopeIds);
   scopeIdsRef.current = scopeIds;
   const whoRef = useRef("Manager");
@@ -570,7 +571,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     if (pending) void pending.catch(() => undefined);
   }, [state, ready]);
 
-  // Overrides follow the cluster, branch and person in context.
+  // Overrides follow the cluster, branch and selected terminal in context.
   useEffect(() => {
     if (!signedIn || !state.currentStoreId) return;
     let cancelled = false;
@@ -757,7 +758,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     setState((s) => (s.currentStoreId === bound ? s : { ...s, currentStoreId: bound }));
   }, [state.stores, signedIn]);
 
-  // Web and Android hold nothing locally, so returning to the app must re-read the
+  // Web, Android and iOS hold nothing locally, so returning to the app must re-read the
   // catalogue, members, prices and shift from the backend.
   useEffect(() => {
     if (!isOnlineOnly() || !signedIn) return;
@@ -788,7 +789,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     window.addEventListener("online", resume);
     window.addEventListener("focus", resume);
     let removeNative: (() => Promise<void>) | undefined;
-    if (platformName() === "android") {
+    if (["android", "ios"].includes(platformName())) {
       void import("@capacitor/app")
         .then(({ App }) =>
           App.addListener("appStateChange", ({ isActive }) => {
@@ -2570,9 +2571,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
   }, []);
 
   /**
-   * Route each leaf of the patch to the tier that owns it: a block overridden
-   * privately is written privately, then branch, then cluster, otherwise the
-   * global record. Locked blocks always fall back to global.
+   * Route each leaf to the strongest valid organizational tier that owns its
+   * block. Locked blocks always fall back to global.
    */
   const updateSettings = useCallback(
     (patch: Partial<AppSettings>) => {
@@ -2597,7 +2597,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
         // Strongest tier that already owns this block wins the write.
         const tier =
           section && !scope.locks[section.id]
-            ? [...SETTING_TIERS].reverse().find((t) => scope.overrides[t][section.id] && ids[t])
+            ? [...SETTING_TIERS].reverse().find(
+                (t) => sectionAllowsTier(section.id, t) && scope.overrides[t][section.id] && ids[t],
+              )
             : undefined;
         if (section && tier) {
           const bag = byTier.get(tier) ?? new Map<SettingsSectionId, Record<string, unknown>>();
@@ -2645,6 +2647,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
       const target = scopeId || scopeIdsRef.current[tier];
       const def = SECTION_BY_ID[section];
       if (!def) return;
+      if (!sectionAllowsTier(section, tier))
+        throw new Error(`${def.label} cannot be stored at ${TIER_LABELS[tier]} scope`);
       if (!target) {
         toast.error(
           tier === "CLUSTER"
@@ -3097,7 +3101,8 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (!section || scope.locks[section.id]) return "GLOBAL";
       for (const tier of [...SETTING_TIERS].reverse()) {
         const patch = scope.overrides[tier][section.id];
-        if (patch && getPath(patch, path) !== undefined) return tier;
+        if (sectionAllowsTier(section.id, tier) && patch && getPath(patch, path) !== undefined)
+          return tier;
       }
       return "GLOBAL";
     },

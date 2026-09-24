@@ -1,13 +1,10 @@
 /**
  * One navigation model for the whole settings area.
  *
- * Desktop rail, mobile list and the search box all read from here, so a page
- * cannot appear in one place and be missing from another. Everything is built
- * from `SETTINGS_CARDS`, filtered by the same role, visibility and platform
- * rules the workspace has always used.
+ * Desktop rail, mobile list and the search box all read from here. Device type
+ * never limits access; role permissions and visibility decide what appears.
  */
-import { useEffect, useMemo, useState } from "react";
-import { isDesktop } from "@/lib/branding";
+import { useMemo } from "react";
 import { useVisibility } from "@/lib/ui-visibility";
 import { useAuth } from "@/lib/pos-auth";
 import { routePermissionForPath } from "@/platforms/web/components/pos/nav-config";
@@ -33,29 +30,22 @@ export function searchOf(card: SettingsCard): Record<string, string> {
 export type SettingsNav = {
   cards: SettingsCard[];
   categories: SettingsCategory[];
-  /** Windows build: cloud-only areas are managed in the web console. */
-  desktop: boolean;
 };
 
 export function useSettingsNav(): SettingsNav {
   const { visibleRoute } = useVisibility();
   const { isAdmin, isSupervisor, can } = useAuth();
-  const [desktop, setDesktop] = useState(false);
-  useEffect(() => setDesktop(isDesktop()), []);
-
   const cards = useMemo(
     () =>
       SETTINGS_CARDS.filter(
         (c) =>
-          !(c.cloudOnly && desktop) &&
-          !(c.desktopOnly && !desktop) &&
           visibleRoute(routeOf(c)) &&
           (isAdmin ||
             ((routeOf(c) === "/settings/terminals" || routeOf(c) === "/settings/mobile-terminals")
               ? isSupervisor
               : can(routePermissionForPath(routeOf(c)) ?? "can_access_pos_settings"))),
       ),
-    [desktop, visibleRoute, isAdmin, isSupervisor, can],
+    [visibleRoute, isAdmin, isSupervisor, can],
   );
 
   const categories = useMemo(
@@ -63,7 +53,7 @@ export function useSettingsNav(): SettingsNav {
     [cards],
   );
 
-  return { cards, categories, desktop };
+  return { cards, categories };
 }
 
 /** The card a settings URL is showing, matching the `?tab=` variants too. */

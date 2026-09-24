@@ -80,20 +80,6 @@ const PUBLIC_ROUTES = new Set(["/", "/display"]);
  *  protected data. */
 const SECTION_HUBS = new Set(["/sales", "/inventory-hub", "/customers", "/admin"]);
 
-/** Cloud-only admin tools. The Windows till never manages accounts, branches,
- *  messaging credentials or device activation — those stay in the web console. */
-const DESKTOP_BLOCKED = [
-  "/settings/terminals",
-  "/settings/mobile-terminals",
-  "/settings/sessions",
-  "/settings/whatsapp",
-  "/staff",
-  "/stores",
-];
-
-const isDesktopBlocked = (pathname: string) =>
-  DESKTOP_BLOCKED.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-
 /** Longest matching prefix wins so a child page can tighten its parent gate. */
 function requiredPermission(pathname: string): PermissionFlag | null | "unknown" {
   if (PUBLIC_ROUTES.has(pathname)) return null;
@@ -132,13 +118,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   useUiScale();
 
   // Idle screens return to the sign-in keypad. The shift stays open.
-  // One source of truth: the branch's register settings hold the idle limit.
-  // The per-machine value is only used while those settings are unconfirmed.
+  // Synchronized terminal settings are the source of truth. The legacy POS
+  // rule remains a compatibility fallback for databases upgraded in stages.
   const posRules = usePosRules();
-  const ruleLockSeconds =
-    posRules.source === "DATABASE" || posRules.source === "LAST_KNOWN_GOOD"
+  const ruleLockSeconds = state.settings.integrations.autoLockTimeoutSeconds ??
+    ((posRules.source === "DATABASE" || posRules.source === "LAST_KNOWN_GOOD")
       ? posRules.rules.auto_lock_timeout_seconds
-      : undefined;
+      : undefined);
   useAutoLock(
     !!user,
     () => {
@@ -315,7 +301,6 @@ export function AppShell({ children }: { children: ReactNode }) {
   // that is shown always opens, and a link that is hidden cannot be reached by
   // typing its address either.
   const canSee = (item: NavItem) => {
-    if (item.desktopHidden && isDesktop()) return false;
     if (item.flag && !can(item.flag)) return false;
     if (item.adminOnly && !isAdmin && !item.flag) return false;
     return visibleRoute(item.to);
@@ -573,21 +558,6 @@ export function AppShell({ children }: { children: ReactNode }) {
               >
                 {(() => {
                   // Decided before the page body renders: no flash of protected data.
-                  if (isDesktop() && isDesktopBlocked(location.pathname))
-                    return (
-                      <div className="flex min-h-[60vh] flex-col items-center justify-center gap-3 p-8 text-center">
-                        <Lock className="size-8 text-muted-foreground" />
-                        <h1 className="text-lg font-semibold">Managed in the web console</h1>
-                        <p className="max-w-sm text-sm text-muted-foreground">
-                          Accounts, branches, messaging credentials and device activation are
-                          handled centrally, not from a till. Open the web admin console to change
-                          them.
-                        </p>
-                        <Button asChild variant="outline" size="sm">
-                          <Link to="/">Back to the register</Link>
-                        </Button>
-                      </div>
-                    );
                   const required = requiredPermission(location.pathname);
                   const terminalManagement =
                     location.pathname === "/settings/terminals" ||

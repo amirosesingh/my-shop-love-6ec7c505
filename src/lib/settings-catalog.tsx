@@ -160,15 +160,8 @@ export type SettingsCard = {
   /**
    * True when `panel` is a bare panel rather than a settings page, so the sheet
    * has to supply the surrounding frame (save bar, shared settings context).
-   */
+  */
   raw?: boolean;
-  /** Managed in the web console only — hidden in the Windows desktop build. */
-  cloudOnly?: boolean;
-  /**
-   * Needs the local database engine — hidden on web and phone, which work
-   * live against the central database and have nothing local to inspect.
-   */
-  desktopOnly?: boolean;
   /** Extra words the search box should match. */
   keywords?: string;
 };
@@ -204,13 +197,13 @@ export const SETTINGS_CARDS: SettingsCard[] = [
   {
     id: "hardware",
     label: "Hardware & cash drawer",
-    blurb: "Printer, drawer and device identity for this machine only.",
+    blurb: "Printer, drawer and identity for the selected terminal scope.",
     icon: Printer,
     category: "terminal",
     scope: "terminal",
     to: "/settings/hardware",
     panel: page(() => import("@/routes/settings.hardware")),
-    keywords: "local only device kick pin",
+    keywords: "terminal device printer drawer kick pin",
   },
   {
     id: "terminals",
@@ -221,7 +214,6 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     scope: "company",
     to: "/settings/terminals",
     panel: page(() => import("@/routes/settings.terminals")),
-    cloudOnly: true,
     keywords: "token pair activate revoke",
   },
   {
@@ -233,7 +225,6 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     scope: "company",
     to: "/settings/mobile-terminals",
     panel: page(() => import("@/routes/settings.mobile-terminals")),
-    cloudOnly: true,
     keywords: "android tablet qr pairing",
   },
   {
@@ -245,7 +236,6 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     scope: "company",
     to: "/settings/sessions",
     panel: page(() => import("@/routes/settings.sessions")),
-    cloudOnly: true,
     keywords: "logged in kick out device",
   },
 
@@ -334,7 +324,6 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     scope: "company",
     to: "/settings/groups",
     panel: page(() => import("@/routes/settings.groups")),
-    cloudOnly: true,
     keywords: "cluster group division apparel trophy branch grouping",
   },
   {
@@ -524,7 +513,6 @@ export const SETTINGS_CARDS: SettingsCard[] = [
     scope: "company",
     to: "/settings/branch-telemetry",
     panel: page(() => import("@/routes/settings.branch-telemetry")),
-    cloudOnly: true,
   },
 
   /* ---- System health -------------------------------------------- */

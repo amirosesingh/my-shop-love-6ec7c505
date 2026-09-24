@@ -2,25 +2,19 @@
  * Landing page for a sidebar group: every option in the group as a card, so a
  * section can be opened as its own page instead of only expanding a list.
  */
-import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { ArrowLeft } from "lucide-react";
 import { AppShell } from "@/platforms/web/components/pos/AppShell";
 import { navGroups, navItemKey, type NavItem } from "@/platforms/web/components/pos/nav-config";
 import { useAuth } from "@/lib/pos-auth";
-import { isDesktop } from "@/lib/branding";
 import { PinButton } from "@/platforms/web/components/pos/PinButton";
 
 export function SectionHub({ groupId }: { groupId: string }) {
   const { can, isAdmin } = useAuth();
-  const [desktop, setDesktop] = useState(false);
-  useEffect(() => setDesktop(isDesktop()), []);
-
   const group = navGroups.find((g) => g.id === groupId);
   if (!group) return null;
 
   const canSee = (item: NavItem) => {
-    if (item.desktopHidden && desktop) return false;
     if (item.flag && !can(item.flag)) return false;
     if (item.adminOnly && !isAdmin && !item.flag) return false;
     return true;

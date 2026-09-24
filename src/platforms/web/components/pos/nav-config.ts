@@ -45,8 +45,6 @@ export type NavItem = {
   /** Which roles this entry is meant for. Defaults to the tag of `flag`. */
   tag?: PermissionTag;
   adminOnly?: boolean;
-  /** Cloud-only admin tool — hidden in the Windows desktop build. */
-  desktopHidden?: boolean;
   search?: Record<string, string>;
   /** Settings page section to expand when this item is opened. */
   section?: string;
@@ -273,7 +271,6 @@ export const navGroups: NavGroup[] = [
         to: "/staff",
         label: "Staff Management",
         icon: UserCog,
-        desktopHidden: true,
         adminOnly: true,
         flag: "can_manage_staff",
         keywords:
@@ -301,7 +298,6 @@ export const navGroups: NavGroup[] = [
         to: "/stores",
         label: "Locations / Warehouses",
         icon: Store,
-        desktopHidden: true,
         adminOnly: true,
         flag: "can_manage_locations",
         keywords: "branch store warehouse",

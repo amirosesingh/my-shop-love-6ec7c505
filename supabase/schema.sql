@@ -2715,7 +2715,6 @@ BEGIN
     ('set_app_user_profile', $sig$void$sig$),
     ('set_cashier_permissions', $sig$void$sig$),
     ('set_terminal_active', $sig$void$sig$),
-    ('settings_private_key', $sig$text$sig$),
     ('shift_active_for_branch', $sig$public.shifts$sig$),
     ('shift_open', $sig$public.shifts$sig$),
     ('shifts_sync_status', $sig$trigger$sig$),
@@ -3249,7 +3248,7 @@ CREATE OR REPLACE FUNCTION public.list_app_users() RETURNS TABLE(id uuid, auth_u
          a.role, a.role_slug, a.store_id::text, a.is_active, a.permissions,
          coalesce(a.pin_hash, '') <> '', a.pin_length, a.last_login_at, a.created_at
   FROM public.app_users a
-  WHERE public.is_app_supervisor()
+  WHERE public.has_perm('can_manage_staff')
   ORDER BY a.full_name, a.user_id
 $$;
 
@@ -3260,7 +3259,7 @@ CREATE OR REPLACE FUNCTION public.list_cashiers() RETURNS TABLE(id uuid, usernam
   SELECT c.id, c.username, c.full_name, c.store_id, c.permissions,
          c.is_active, c.last_login_at, c.created_at
   FROM public.cashiers c
-  WHERE public.is_app_supervisor()
+  WHERE public.has_perm('can_manage_staff')
   ORDER BY c.username
 $$;
 
@@ -3684,8 +3683,8 @@ CREATE OR REPLACE FUNCTION public.set_app_user_permissions(p_user_id text, p_per
     SET search_path TO 'public', 'extensions', 'pg_temp'
     AS $$
 BEGIN
-  IF NOT public.is_app_supervisor() THEN
-    RAISE EXCEPTION 'Only supervisors can change permissions';
+  IF NOT public.has_perm('can_manage_staff') THEN
+    RAISE EXCEPTION 'Staff management permission is required';
   END IF;
   UPDATE public.app_users a
      SET permissions = coalesce(a.permissions, '{}'::jsonb) || p_permissions,
@@ -3698,8 +3697,8 @@ CREATE OR REPLACE FUNCTION public.set_app_user_profile(p_user_id text, p_full_na
     SET search_path TO 'public', 'extensions', 'pg_temp'
     AS $$
 BEGIN
-  IF NOT public.is_app_supervisor() THEN
-    RAISE EXCEPTION 'Only supervisors can edit staff profiles';
+  IF NOT public.has_perm('can_manage_staff') THEN
+    RAISE EXCEPTION 'Staff management permission is required';
   END IF;
   UPDATE public.app_users a
      SET full_name  = coalesce(nullif(trim(p_full_name), ''), a.full_name),
@@ -3715,8 +3714,8 @@ CREATE OR REPLACE FUNCTION public.set_cashier_permissions(p_id uuid, p_permissio
     SET search_path TO 'public', 'extensions', 'pg_temp'
     AS $$
 BEGIN
-  IF NOT public.is_app_supervisor() THEN
-    RAISE EXCEPTION 'Only supervisors and admins can manage cashiers';
+  IF NOT public.has_perm('can_manage_staff') THEN
+    RAISE EXCEPTION 'Staff management permission is required';
   END IF;
   UPDATE public.cashiers
      SET permissions = coalesce(permissions, '{}'::jsonb) || coalesce(p_permissions, '{}'::jsonb)
@@ -3728,23 +3727,12 @@ CREATE OR REPLACE FUNCTION public.set_terminal_active(p_user_id text, p_active b
     SET search_path TO 'public', 'extensions', 'pg_temp'
     AS $$
 BEGIN
-  IF NOT public.is_app_supervisor() THEN
-    RAISE EXCEPTION 'Only supervisors can manage terminal users';
+  IF NOT public.has_perm('can_manage_staff') THEN
+    RAISE EXCEPTION 'Staff management permission is required';
   END IF;
   UPDATE public.app_users a SET is_active = p_active, updated_at = now()
    WHERE lower(a.user_id) = lower(trim(p_user_id));
 END $$;
-
-CREATE OR REPLACE FUNCTION public.settings_private_key() RETURNS text
-    LANGUAGE sql STABLE SECURITY DEFINER
-    SET search_path TO 'public'
-    AS $$
-  SELECT coalesce(
-    (SELECT au.user_id FROM public.app_users au WHERE au.auth_user_id = auth.uid() LIMIT 1),
-    auth.uid()::text,
-    ''
-  )
-$$;
 
 CREATE OR REPLACE FUNCTION public.shift_active_for_branch(p_store_id text) RETURNS public.shifts
     LANGUAGE plpgsql STABLE SECURITY DEFINER
@@ -3847,7 +3835,9 @@ CREATE OR REPLACE FUNCTION public.staff_account_adopt_legacy(p_username text) RE
     AS $$
 DECLARE c public.cashiers%rowtype;
 BEGIN
-  PERFORM public.assert_supervisor_caller();
+  IF auth.uid() IS NOT NULL AND NOT public.has_perm('can_manage_staff') THEN
+    RAISE EXCEPTION 'Staff management permission is required';
+  END IF;
   SELECT * INTO c FROM public.cashiers WHERE lower(username) = lower(trim(p_username));
   IF NOT FOUND THEN RETURN; END IF;
   INSERT INTO public.app_users
@@ -3872,8 +3862,8 @@ DECLARE
   _target public.app_users%rowtype;
   _admin_count integer;
 BEGIN
-  IF auth.uid() IS NOT NULL AND NOT public.is_app_supervisor() THEN
-    RAISE EXCEPTION 'Only supervisors can delete staff';
+  IF auth.uid() IS NOT NULL AND NOT public.has_perm('can_manage_staff') THEN
+    RAISE EXCEPTION 'Staff management permission is required';
   END IF;
   SELECT * INTO _target FROM public.app_users
   WHERE lower(user_id) = lower(trim(p_user_id)) FOR UPDATE;
@@ -3897,8 +3887,8 @@ CREATE OR REPLACE FUNCTION public.staff_account_set_active(p_user_id text, p_act
     SET search_path TO 'public', 'pg_temp'
     AS $$
 BEGIN
-  IF auth.uid() IS NOT NULL AND NOT public.is_app_supervisor() THEN
-    RAISE EXCEPTION 'Only supervisors can activate or deactivate staff';
+  IF auth.uid() IS NOT NULL AND NOT public.has_perm('can_manage_staff') THEN
+    RAISE EXCEPTION 'Staff management permission is required';
   END IF;
   UPDATE public.app_users
   SET is_active = coalesce(p_active, false), updated_at = now()
@@ -3914,7 +3904,9 @@ CREATE OR REPLACE FUNCTION public.staff_account_set_pin(p_user_id text, p_pin te
     SET search_path TO 'public', 'extensions', 'pg_temp'
     AS $$
 BEGIN
-  PERFORM public.assert_supervisor_caller();
+  IF auth.uid() IS NOT NULL AND NOT public.has_perm('can_manage_staff') THEN
+    RAISE EXCEPTION 'Staff management permission is required';
+  END IF;
   IF coalesce(p_pin, '') = '' OR length(p_pin) < 4 OR length(p_pin) > 32 THEN
     RAISE EXCEPTION 'STAFF_PIN_INVALID';
   END IF;
@@ -3938,6 +3930,9 @@ DECLARE
   _hash text := CASE WHEN coalesce(p_pin, '') = '' THEN ''
                      ELSE extensions.crypt(p_pin, extensions.gen_salt('bf', 10)) END;
 BEGIN
+  IF auth.uid() IS NOT NULL AND NOT public.has_perm('can_manage_staff') THEN
+    RAISE EXCEPTION 'Staff management permission is required';
+  END IF;
   IF _user_id = '' THEN RAISE EXCEPTION 'STAFF_USERNAME_REQUIRED'; END IF;
   IF _name = '' THEN RAISE EXCEPTION 'STAFF_NAME_REQUIRED'; END IF;
   IF _email = '' THEN RAISE EXCEPTION 'STAFF_EMAIL_REQUIRED'; END IF;
@@ -3980,8 +3975,8 @@ CREATE OR REPLACE FUNCTION public.staff_role_delete(_slug text) RETURNS void
     AS $$
 DECLARE _s text := lower(trim(_slug));
 BEGIN
-  IF NOT public.is_app_supervisor() THEN
-    RAISE EXCEPTION 'Only supervisors can manage roles';
+  IF NOT public.has_perm('can_manage_staff') THEN
+    RAISE EXCEPTION 'Staff management permission is required';
   END IF;
   IF EXISTS (SELECT 1 FROM public.staff_roles WHERE slug = _s AND is_core) THEN
     RAISE EXCEPTION 'Built-in roles cannot be removed';
@@ -4001,8 +3996,8 @@ CREATE OR REPLACE FUNCTION public.staff_role_save(_slug text, _name text, _base_
     SET search_path TO 'public', 'pg_temp'
     AS $$
 BEGIN
-  IF NOT public.is_app_supervisor() THEN
-    RAISE EXCEPTION 'Only supervisors can manage roles';
+  IF NOT public.has_perm('can_manage_staff') THEN
+    RAISE EXCEPTION 'Staff management permission is required';
   END IF;
   IF coalesce(trim(_slug), '') = '' OR coalesce(trim(_name), '') = '' THEN
     RAISE EXCEPTION 'A role needs a name';
@@ -6033,7 +6028,7 @@ CREATE POLICY "Staff can delete" ON public.products FOR DELETE TO authenticated 
 
 DROP POLICY IF EXISTS "Staff can delete" ON public.promotions;
 
-CREATE POLICY "Staff can delete" ON public.promotions FOR DELETE TO authenticated USING (( SELECT public.is_staff_now() AS is_staff_now));
+CREATE POLICY "Staff can delete" ON public.promotions FOR DELETE TO authenticated USING (public.has_perm('can_manage_promotions'));
 
 DROP POLICY IF EXISTS "Staff can delete" ON public.purchase_order_items;
 
@@ -6047,7 +6042,7 @@ CREATE POLICY "Staff can delete" ON public.purchase_orders FOR DELETE TO authent
 
 DROP POLICY IF EXISTS "Staff can delete stores" ON public.stores;
 
-CREATE POLICY "Staff can delete stores" ON public.stores FOR DELETE TO authenticated USING (( SELECT public.is_staff_now() AS is_staff_now));
+CREATE POLICY "Staff can delete stores" ON public.stores FOR DELETE TO authenticated USING (public.has_perm('can_manage_locations'));
 
 DROP POLICY IF EXISTS "Staff can delete tokens" ON public.terminal_tokens;
 
@@ -6071,7 +6066,7 @@ CREATE POLICY "Staff can insert" ON public.products FOR INSERT TO authenticated 
 
 DROP POLICY IF EXISTS "Staff can insert" ON public.promotions;
 
-CREATE POLICY "Staff can insert" ON public.promotions FOR INSERT TO authenticated WITH CHECK (( SELECT public.is_staff_now() AS is_staff_now));
+CREATE POLICY "Staff can insert" ON public.promotions FOR INSERT TO authenticated WITH CHECK (public.has_perm('can_manage_promotions'));
 
 DROP POLICY IF EXISTS "Staff can insert" ON public.purchase_order_items;
 
@@ -6085,7 +6080,7 @@ CREATE POLICY "Staff can insert" ON public.purchase_orders FOR INSERT TO authent
 
 DROP POLICY IF EXISTS "Staff can insert stores" ON public.stores;
 
-CREATE POLICY "Staff can insert stores" ON public.stores FOR INSERT TO authenticated WITH CHECK (( SELECT public.is_staff_now() AS is_staff_now));
+CREATE POLICY "Staff can insert stores" ON public.stores FOR INSERT TO authenticated WITH CHECK (public.has_perm('can_manage_locations'));
 
 DROP POLICY IF EXISTS "Staff can issue tokens" ON public.terminal_tokens;
 
@@ -6183,7 +6178,7 @@ CREATE POLICY "Staff can update" ON public.products FOR UPDATE TO authenticated 
 
 DROP POLICY IF EXISTS "Staff can update" ON public.promotions;
 
-CREATE POLICY "Staff can update" ON public.promotions FOR UPDATE TO authenticated USING (( SELECT public.is_staff_now() AS is_staff_now)) WITH CHECK (( SELECT public.is_staff_now() AS is_staff_now));
+CREATE POLICY "Staff can update" ON public.promotions FOR UPDATE TO authenticated USING (public.has_perm('can_manage_promotions')) WITH CHECK (public.has_perm('can_manage_promotions'));
 
 DROP POLICY IF EXISTS "Staff can update" ON public.purchase_order_items;
 
@@ -6199,7 +6194,7 @@ CREATE POLICY "Staff can update" ON public.purchase_orders FOR UPDATE TO authent
 
 DROP POLICY IF EXISTS "Staff can update stores" ON public.stores;
 
-CREATE POLICY "Staff can update stores" ON public.stores FOR UPDATE TO authenticated USING (( SELECT public.is_staff_now() AS is_staff_now)) WITH CHECK (( SELECT public.is_staff_now() AS is_staff_now));
+CREATE POLICY "Staff can update stores" ON public.stores FOR UPDATE TO authenticated USING (public.has_perm('can_manage_locations')) WITH CHECK (public.has_perm('can_manage_locations'));
 
 DROP POLICY IF EXISTS "Staff complete commands" ON public.terminal_commands;
 
@@ -6263,11 +6258,11 @@ CREATE POLICY "Supervisors issue commands" ON public.terminal_commands FOR INSER
 
 DROP POLICY IF EXISTS "Supervisors read activity events" ON public.activity_events;
 
-CREATE POLICY "Supervisors read activity events" ON public.activity_events FOR SELECT TO authenticated USING (public.is_app_supervisor());
+CREATE POLICY "Supervisors read activity events" ON public.activity_events FOR SELECT TO authenticated USING (public.has_perm('can_view_audit_trail'));
 
 DROP POLICY IF EXISTS "Supervisors read the audit trail" ON public.system_audit_logs;
 
-CREATE POLICY "Supervisors read the audit trail" ON public.system_audit_logs FOR SELECT TO authenticated USING (public.is_supervisor_now());
+CREATE POLICY "Supervisors read the audit trail" ON public.system_audit_logs FOR SELECT TO authenticated USING (public.has_perm('can_view_audit_trail'));
 
 DROP POLICY IF EXISTS "Users can read their own roles" ON public.user_roles;
 
@@ -6469,15 +6464,15 @@ ALTER TABLE public.settings_overrides ENABLE ROW LEVEL SECURITY;
 
 DROP POLICY IF EXISTS settings_overrides_private ON public.settings_overrides;
 
-CREATE POLICY settings_overrides_private ON public.settings_overrides TO authenticated USING (((scope = 'PRIVATE'::text) AND (scope_id = public.settings_private_key()))) WITH CHECK (((scope = 'PRIVATE'::text) AND (scope_id = public.settings_private_key())));
-
 DROP POLICY IF EXISTS settings_overrides_read ON public.settings_overrides;
 
 CREATE POLICY settings_overrides_read ON public.settings_overrides FOR SELECT USING (true);
 
 DROP POLICY IF EXISTS settings_overrides_write ON public.settings_overrides;
 
-CREATE POLICY settings_overrides_write ON public.settings_overrides TO authenticated USING (public.is_supervisor_now()) WITH CHECK (public.is_supervisor_now());
+CREATE POLICY settings_overrides_write ON public.settings_overrides TO authenticated
+USING (public.has_perm('can_access_pos_settings') AND scope = ANY (ARRAY['CLUSTER'::text, 'BRANCH'::text, 'TERMINAL'::text]))
+WITH CHECK (public.has_perm('can_access_pos_settings') AND scope = ANY (ARRAY['CLUSTER'::text, 'BRANCH'::text, 'TERMINAL'::text]));
 
 ALTER TABLE public.shift_sessions ENABLE ROW LEVEL SECURITY;
 
@@ -6697,8 +6692,6 @@ GRANT ALL ON FUNCTION public.set_cashier_permissions(p_id uuid, p_permissions js
 GRANT ALL ON FUNCTION public.set_terminal_active(p_user_id text, p_active boolean) TO service_role;
 
 GRANT ALL ON FUNCTION public.set_terminal_active(p_user_id text, p_active boolean) TO authenticated;
-
-GRANT ALL ON FUNCTION public.settings_private_key() TO service_role;
 
 GRANT ALL ON TABLE public.shifts TO anon;
 

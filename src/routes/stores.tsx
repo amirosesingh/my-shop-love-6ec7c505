@@ -96,7 +96,7 @@ function Locations() {
     state,
     updateSettings,
   } = usePos();
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
   const groups = useStoreGroups();
   const pickableGroups = useMemo(() => selectableGroups(groups), [groups]);
   const [draft, setDraft] = useState<Draft | null>(null);
@@ -106,15 +106,15 @@ function Locations() {
     [allStores],
   );
 
-  if (!isAdmin) {
+  if (!can("can_manage_locations")) {
     return (
       <AppShell>
         <div className="flex min-h-screen items-center justify-center p-6">
           <div className="max-w-sm rounded-lg border border-destructive/40 bg-destructive/10 p-6 text-center">
             <ShieldAlert className="mx-auto size-6 text-destructive" />
-            <p className="mt-2 font-semibold">Admin only</p>
+            <p className="mt-2 font-semibold">Permission required</p>
             <p className="mt-1 text-sm text-muted-foreground">
-              Location management is restricted to the admin account.
+              Your role does not allow location and warehouse management.
             </p>
           </div>
         </div>

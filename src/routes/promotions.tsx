@@ -74,7 +74,7 @@ const blank = (): Promotion => ({
 
 function Promotions() {
   const { state, upsertPromotion, removePromotion, togglePromotion } = usePos();
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
   const [draft, setDraft] = useState<Promotion | null>(null);
 
   const rules = state.promotions;
@@ -98,13 +98,13 @@ function Promotions() {
     }
   }
 
-  if (!isAdmin) {
+  if (!can("can_manage_promotions")) {
     return (
       <AppShell>
         <div className="p-6">
           <h1 className="text-2xl font-semibold">Promotions & discounts</h1>
           <p className="mt-2 text-sm text-muted-foreground">
-            Promotion rules are managed by an administrator. Active offers are applied automatically
+            You do not have permission to manage promotion rules. Active offers are applied automatically
             on your register.
           </p>
         </div>

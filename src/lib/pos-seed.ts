@@ -81,6 +81,7 @@ export const defaultTradingHours: TradingHours = {
 
 /** Public domains and operational switches, editable in System & Integrations. */
 export const defaultIntegrations: AppSettings["integrations"] = {
+  autoLockTimeoutSeconds: 90,
   memberDomain: "",
   redeemDomain: "",
   requireTransferApproval: true,

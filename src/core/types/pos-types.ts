@@ -940,6 +940,8 @@ export type IntegrationSettings = {
   displayProfile?: import("@/lib/display-profile").DisplayProfile;
   /** Printer profile resolved using the selected settings scope. */
   receiptPrinter?: import("@/lib/receipt-printer").PrinterPrefs;
+  /** Seconds before an idle signed-in terminal returns to its lock screen. */
+  autoLockTimeoutSeconds?: number;
   /** public member signup domain */
   memberDomain: string;
   /** public voucher redemption domain */

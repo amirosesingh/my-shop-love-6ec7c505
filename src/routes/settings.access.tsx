@@ -88,7 +88,7 @@ const isBuiltIn = (slug: string): slug is StaffRole =>
   slug === "cashier" || slug === "warehouse" || slug === "supervisor" || slug === "admin";
 
 function AccessSettingsPage() {
-  const { isAdmin } = useAuth();
+  const { can } = useAuth();
   const { hidden, setHidden } = useVisibility();
 
   const [roles, setRoles] = useState<RoleDef[]>([]);
@@ -153,14 +153,14 @@ function AccessSettingsPage() {
     }
   };
 
-  if (!isAdmin) {
+  if (!can("can_manage_staff")) {
     return (
       <SettingsFrame
         title="Roles & access"
         description="What each role may do, and what it can see."
       >
         <p className="text-sm text-muted-foreground">
-          Only an administrator can change what other roles may do or see.
+          Your role does not allow staff permission management.
         </p>
       </SettingsFrame>
     );

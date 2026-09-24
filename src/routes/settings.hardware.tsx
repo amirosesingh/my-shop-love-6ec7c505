@@ -9,12 +9,12 @@ export const Route = createFileRoute("/settings/hardware")({
       {
         name: "description",
         content:
-          "Printer, cash drawer and device settings that belong to this till alone and are never copied to another terminal.",
+          "Printer and cash-drawer settings resolved through Global, Cluster and Terminal scope.",
       },
       { property: "og:title", content: "Terminal Hardware — Retail" },
       {
         property: "og:description",
-        content: "Local-only printer and drawer configuration for this machine.",
+        content: "Centrally scoped printer and drawer configuration.",
       },
       { property: "og:type", content: "website" },
       { name: "twitter:card", content: "summary" },
@@ -28,7 +28,7 @@ function HardwareSettings() {
     <SettingsFrame
       title="Terminal hardware"
       scopeSections={["printer"]}
-      description="Choose Global, Cluster, Branch or Terminal to manage the shared printer and drawer profile."
+      description="Choose Global, Cluster or Terminal to manage the synchronized printer and drawer profile."
     >
       <HardwarePanel />
     </SettingsFrame>

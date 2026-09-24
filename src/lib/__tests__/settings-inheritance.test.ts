@@ -1,6 +1,6 @@
 /**
- * Settings inheritance: Private beats Branch beats Cluster beats Global, and
- * a globally locked section cannot be overridden by anyone.
+ * Settings inheritance follows the section's organizational family, and a
+ * globally locked section cannot be overridden by anyone.
  */
 import { describe, expect, it } from "vitest";
 
@@ -27,7 +27,7 @@ describe("resolveScopedSettings", () => {
   it("lets a cluster override the global record", () => {
     const out = resolveScopedSettings(
       { taxRate: 5 },
-      scope({ overrides: { CLUSTER: { tax: { taxRate: 7 } }, BRANCH: {}, PRIVATE: {} } as never }),
+      scope({ overrides: { CLUSTER: { tax: { taxRate: 7 } }, BRANCH: {}, TERMINAL: {} } }),
       merge,
     );
     expect(out.settings.taxRate).toBe(7);
@@ -38,33 +38,33 @@ describe("resolveScopedSettings", () => {
     const out = resolveScopedSettings(
       { taxRate: 5 },
       scope({
-        overrides: { CLUSTER: { tax: { taxRate: 7 } }, BRANCH: { tax: { taxRate: 9 } }, PRIVATE: {} } as never,
+        overrides: { CLUSTER: { tax: { taxRate: 7 } }, BRANCH: { tax: { taxRate: 9 } }, TERMINAL: {} },
       }),
       merge,
     );
     expect(out.settings.taxRate).toBe(9);
   });
 
-  it("lets a terminal's private override beat the branch", () => {
+  it("ignores terminal overrides for business settings", () => {
     const out = resolveScopedSettings(
       { taxRate: 5 },
       scope({
         overrides: {
           CLUSTER: { tax: { taxRate: 7 } },
           BRANCH: { tax: { taxRate: 9 } },
-          PRIVATE: { tax: { taxRate: 11 } },
-        } as never,
+          TERMINAL: { tax: { taxRate: 11 } },
+        },
       }),
       merge,
     );
-    expect(out.settings.taxRate).toBe(11);
+    expect(out.settings.taxRate).toBe(9);
   });
 
   it("ignores every tier for a locked section", () => {
     const out = resolveScopedSettings(
       { taxRate: 5 },
       scope({
-        overrides: { CLUSTER: { tax: { taxRate: 7 } }, BRANCH: { tax: { taxRate: 9 } }, PRIVATE: {} } as never,
+        overrides: { CLUSTER: { tax: { taxRate: 7 } }, BRANCH: { tax: { taxRate: 9 } }, TERMINAL: {} },
         locks: { tax: true } as never,
       }),
       merge,
@@ -79,9 +79,9 @@ describe("resolveScopedSettings", () => {
       scope({
         overrides: {
           CLUSTER: {},
-          BRANCH: { tax: { taxRate: 9 }, receipt: { receiptFooter: "Thanks" } },
-          PRIVATE: {},
-        } as never,
+          BRANCH: { tax: { taxRate: 9 }, receiptIdentity: { receiptFooter: "Thanks" } },
+          TERMINAL: {},
+        },
         locks: { tax: true } as never,
       }),
       merge,
@@ -91,11 +91,18 @@ describe("resolveScopedSettings", () => {
   });
 });
 
-it("resolves terminal profiles above branch profiles without changing sibling terminals", () => {
+it("resolves terminal settings above clusters and ignores branch settings", () => {
   const base = { printer: "global" };
-  const shared = scope({ overrides: { ...emptyBranchSettings.overrides, BRANCH: { printer: { printer: "branch" } } } });
-  const terminal = scope({ overrides: { ...shared.overrides, TERMINAL: { printer: { printer: "terminal" } } } });
+  const shared = scope({ overrides: {
+    ...emptyBranchSettings.overrides,
+    CLUSTER: { printer: { printer: "cluster" } },
+    BRANCH: { printer: { printer: "branch" } },
+  } });
+  const terminal = scope({ overrides: {
+    ...shared.overrides,
+    TERMINAL: { printer: { printer: "terminal" } },
+  } });
   expect(resolveScopedSettings(base, terminal, merge).settings.printer).toBe("terminal");
-  expect(resolveScopedSettings(base, shared, merge).settings.printer).toBe("branch");
+  expect(resolveScopedSettings(base, shared, merge).settings.printer).toBe("cluster");
   expect(base.printer).toBe("global");
 });

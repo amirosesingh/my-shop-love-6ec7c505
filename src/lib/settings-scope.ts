@@ -75,7 +75,13 @@ export const SETTING_DEFS: SettingDef[] = [
   },
   {
     key: "printer_paper_size",
-    options: ["30mm", "58mm", "80mm", "a4", "letter"].map((value) => ({ value, label: value.toUpperCase() })),
+    options: [
+      { value: "30mm", label: "TNM — 30 mm Thermal" },
+      { value: "58mm", label: "58 mm Thermal" },
+      { value: "80mm", label: "ATNF — 80 mm Thermal" },
+      { value: "a4", label: "A4 Sheet" },
+      { value: "letter", label: "Letter" },
+    ],
     label: "Paper size",
     blurb: "Paper-size reference for this branch. Set the active printing layout in Receipt elements.",
     kind: "text",

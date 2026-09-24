@@ -11,6 +11,7 @@ import type { AppSettings } from "@/core/types/pos-types";
 export type SettingsSectionId =
   | "display"
   | "printer"
+  | "terminalSecurity"
   | "tax"
   | "review"
   | "hours"
@@ -31,17 +32,25 @@ export type SettingsSectionDef = {
   paths: string[];
   /** Blocks head office normally keeps to itself. */
   lockedByDefault: boolean;
+  /**
+   * Business configuration follows Global → Cluster → Branch. Terminal
+   * configuration follows Global → Cluster → Terminal. The access device
+   * never becomes a configuration scope by itself.
+   */
+  scopeFamily: "business" | "terminal";
 };
 
 export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
-  { id: "display", label: "Display & appearance", blurb: "Theme, accent, text size, density and register zoom.", paths: ["integrations.displayProfile"], lockedByDefault: false },
-  { id: "printer", label: "Printer profile", blurb: "Printer, encoding, drawer and paper calibration.", paths: ["integrations.receiptPrinter"], lockedByDefault: false },
+  { id: "display", label: "Display & appearance", blurb: "Theme, accent, text size, density and register zoom.", paths: ["integrations.displayProfile"], lockedByDefault: false, scopeFamily: "terminal" },
+  { id: "printer", label: "Printer profile", blurb: "Printer, encoding, drawer and paper calibration.", paths: ["integrations.receiptPrinter"], lockedByDefault: false, scopeFamily: "terminal" },
+  { id: "terminalSecurity", label: "Terminal security", blurb: "Idle screen locking for the selected terminal.", paths: ["integrations.autoLockTimeoutSeconds"], lockedByDefault: false, scopeFamily: "terminal" },
   {
     id: "tax",
     label: "Tax policy",
     blurb: "Rate, inclusive/exclusive mode and whether tax is charged at all.",
     paths: ["tax"],
     lockedByDefault: true,
+    scopeFamily: "business",
   },
   {
     id: "review",
@@ -49,6 +58,7 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     blurb: "Void, refund and discount limits that flag a cashier for review.",
     paths: ["review"],
     lockedByDefault: true,
+    scopeFamily: "business",
   },
   {
     id: "visibility",
@@ -56,6 +66,7 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     blurb: "Which roles can see which elements of the till.",
     paths: ["visibility"],
     lockedByDefault: true,
+    scopeFamily: "business",
   },
   {
     id: "hours",
@@ -63,6 +74,7 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     blurb: "Day start, day end and shift length limits.",
     paths: ["hours"],
     lockedByDefault: false,
+    scopeFamily: "business",
   },
   {
     id: "receiptIdentity",
@@ -81,6 +93,7 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
       "receipt.qr",
     ],
     lockedByDefault: false,
+    scopeFamily: "business",
   },
   {
     id: "receiptLayout",
@@ -88,6 +101,7 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     blurb: "Paper size, typography and what is printed on the slip.",
     paths: ["receipt"],
     lockedByDefault: false,
+    scopeFamily: "terminal",
   },
   {
     id: "payment",
@@ -95,6 +109,7 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     blurb: "Bank, e-wallet and transfer QR shown to the customer.",
     paths: ["payment"],
     lockedByDefault: false,
+    scopeFamily: "business",
   },
   {
     id: "whatsapp",
@@ -102,6 +117,7 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     blurb: "Outbound bill and job notifications.",
     paths: ["whatsapp"],
     lockedByDefault: false,
+    scopeFamily: "business",
   },
   {
     id: "booking",
@@ -115,6 +131,7 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
       "integrations.allowCustomServiceType",
     ],
     lockedByDefault: false,
+    scopeFamily: "business",
   },
   {
     id: "categoryMap",
@@ -122,6 +139,7 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     blurb: "Which catalogue categories intake lines are booked against.",
     paths: ["integrations.categoryMap"],
     lockedByDefault: false,
+    scopeFamily: "business",
   },
   {
     id: "integrations",
@@ -129,8 +147,16 @@ export const SETTINGS_SECTIONS: SettingsSectionDef[] = [
     blurb: "Domains, approval switches, numbering and regional formats.",
     paths: ["integrations"],
     lockedByDefault: false,
+    scopeFamily: "business",
   },
 ];
+
+export type ConfigurableTier = "CLUSTER" | "BRANCH" | "TERMINAL";
+
+export function sectionAllowsTier(section: SettingsSectionId, tier: ConfigurableTier): boolean {
+  const family = SECTION_BY_ID[section]?.scopeFamily ?? "business";
+  return tier === "CLUSTER" || (family === "terminal" ? tier === "TERMINAL" : tier === "BRANCH");
+}
 
 export const SECTION_BY_ID: Record<string, SettingsSectionDef> = Object.fromEntries(
   SETTINGS_SECTIONS.map((s) => [s.id, s]),
