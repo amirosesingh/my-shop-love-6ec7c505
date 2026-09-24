@@ -63,6 +63,7 @@ function ItemSalesReport() {
   const rows = useMemo(() => {
     const bills = state.sales.filter(
       (s) =>
+        !s.refunded &&
         inRange(s.createdAt, from, to) &&
         (storeId === "all" || s.storeId === storeId) &&
         (cashier === "all" || s.cashier === cashier),

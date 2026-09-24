@@ -2,15 +2,6 @@ import * as React from "react";
 
 import { cn } from "@/lib/utils";
 
-const Table = React.forwardRef<HTMLTableElement, React.HTMLAttributes<HTMLTableElement>>(
-  ({ className, ...props }, ref) => (
-    <div className="relative w-full overflow-auto">
-      <table ref={ref} className={cn("w-full caption-bottom text-sm", className)} {...props} />
-    </div>
-  ),
-);
-Table.displayName = "Table";
-
 const TableHeader = React.forwardRef<
   HTMLTableSectionElement,
   React.HTMLAttributes<HTMLTableSectionElement>
@@ -90,5 +81,94 @@ const TableCaption = React.forwardRef<
   <caption ref={ref} className={cn("mt-4 text-sm text-muted-foreground", className)} {...props} />
 ));
 TableCaption.displayName = "TableCaption";
+
+function plainText(node: React.ReactNode): string {
+  if (typeof node === "string" || typeof node === "number") return String(node);
+  if (!React.isValidElement<{ children?: React.ReactNode }>(node)) return "";
+  return React.Children.toArray(node.props.children).map(plainText).join(" ").trim();
+}
+
+function findHeaderLabels(node: React.ReactNode): string[] {
+  if (!React.isValidElement<{ children?: React.ReactNode }>(node)) return [];
+  if (node.type === TableHeader) {
+    const labels: string[] = [];
+    const visit = (child: React.ReactNode) => {
+      if (!React.isValidElement<{ children?: React.ReactNode }>(child)) return;
+      if (child.type === TableHead) labels.push(plainText(child.props.children));
+      else React.Children.forEach(child.props.children, visit);
+    };
+    React.Children.forEach(node.props.children, visit);
+    return labels;
+  }
+  for (const child of React.Children.toArray(node.props.children)) {
+    const labels = findHeaderLabels(child);
+    if (labels.length) return labels;
+  }
+  return [];
+}
+
+function labelBodyRows(node: React.ReactNode, labels: string[]): React.ReactNode {
+  if (!React.isValidElement<{ children?: React.ReactNode }>(node)) return node;
+  if (node.type === TableRow) {
+    let column = 0;
+    const children = React.Children.map(node.props.children, (cell) => {
+      type ResponsiveCellProps = React.TdHTMLAttributes<HTMLTableCellElement> & {
+        "data-label"?: string;
+      };
+      if (!React.isValidElement<ResponsiveCellProps>(cell)) return cell;
+      if (cell.type !== TableCell) return cell;
+      const label = cell.props["data-label"] ?? labels[column] ?? "";
+      column += Number(cell.props.colSpan ?? 1);
+      return React.cloneElement(cell, { "data-label": label });
+    });
+    return React.cloneElement(node, undefined, children);
+  }
+  const children = React.Children.map(node.props.children, (child) => labelBodyRows(child, labels));
+  return React.cloneElement(node, undefined, children);
+}
+
+function labelTableBodies(node: React.ReactNode, labels: string[]): React.ReactNode {
+  if (!React.isValidElement<{ children?: React.ReactNode }>(node)) return node;
+  if (node.type === TableBody)
+    return React.cloneElement(
+      node,
+      undefined,
+      React.Children.map(node.props.children, (row) => labelBodyRows(row, labels)),
+    );
+  return React.cloneElement(
+    node,
+    undefined,
+    React.Children.map(node.props.children, (child) => labelTableBodies(child, labels)),
+  );
+}
+
+type TableProps = React.HTMLAttributes<HTMLTableElement> & {
+  /** Collapse each row into a labelled card below tablet width. */
+  mobileCards?: boolean;
+};
+
+const Table = React.forwardRef<HTMLTableElement, TableProps>(
+  ({ className, children, mobileCards = true, ...props }, ref) => {
+    let labels: string[] = [];
+    for (const child of React.Children.toArray(children)) {
+      labels = findHeaderLabels(child);
+      if (labels.length) break;
+    }
+    const content = React.Children.map(children, (child) => labelTableBodies(child, labels));
+    return (
+      <div className="responsive-table-region relative w-full max-w-full overflow-x-auto overscroll-x-contain">
+        <table
+          ref={ref}
+          data-mobile-cards={mobileCards ? "true" : "false"}
+          className={cn("responsive-table w-full caption-bottom text-sm", className)}
+          {...props}
+        >
+          {content}
+        </table>
+      </div>
+    );
+  },
+);
+Table.displayName = "Table";
 
 export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption };

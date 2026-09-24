@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/table";
 import { money, usePos } from "@/lib/pos-store";
 import { savingsOf, soldLines, sumLines } from "@/lib/sales-analytics";
+import { saleNetRevenue } from "@/core/pricing/profit";
 import { ReportHeader, StatCard, defaultRange, inRange } from "@/platforms/web/components/pos/report-kit";
 
 export const Route = createFileRoute("/reports/analytics")({
@@ -74,7 +75,7 @@ function AnalyticsBoard() {
   const [trend, setTrend] = useState<"daily" | "monthly">("daily");
 
   const bills = useMemo(
-    () => state.sales.filter((s) => inRange(s.createdAt, from, to)),
+    () => state.sales.filter((s) => inRange(s.createdAt, from, to) && !s.refunded),
     [state.sales, from, to],
   );
   const lines = useMemo(() => soldLines(bills, state.products), [bills, state.products]);
@@ -125,7 +126,7 @@ function AnalyticsBoard() {
     const by = new Map<string, number>();
     for (const s of bills) {
       const key = trend === "daily" ? s.createdAt.slice(0, 10) : monthKey(s.createdAt);
-      by.set(key, (by.get(key) ?? 0) + s.total);
+      by.set(key, (by.get(key) ?? 0) + saleNetRevenue(s));
     }
     return [...by.entries()]
       .sort((a, b) => a[0].localeCompare(b[0]))
@@ -134,7 +135,7 @@ function AnalyticsBoard() {
 
   const dayCount = new Set(bills.map((s) => s.createdAt.slice(0, 10))).size || 1;
   const monthCount = new Set(bills.map((s) => monthKey(s.createdAt))).size || 1;
-  const revenue = Math.round(bills.reduce((a, s) => a + s.total, 0) * 100) / 100;
+  const revenue = Math.round(bills.reduce((a, s) => a + saleNetRevenue(s), 0) * 100) / 100;
 
   return (
     <AppShell>

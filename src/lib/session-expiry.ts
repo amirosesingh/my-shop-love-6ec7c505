@@ -35,7 +35,7 @@ export function notifySessionExpired(): void {
 
 /** PostgREST / GoTrue codes that mean "this token is no longer valid". */
 const JWT_HINTS =
-  /(pgrst301|pgrst303|jwt expired|invalid jwt|jwt is expired|invalid claim|bad_jwt|token is expired|session_not_found|user_not_found|invalid token)/i;
+  /(pgrst301|pgrst303|jwt expired|invalid jwt|jwt is expired|invalid claim|bad_jwt|token is expired|session_not_found|user_not_found|invalid token|refresh[_ ]token.*(?:missing|not[_ ]found|already[_ ]used|invalid|expired))/i;
 
 /**
  * True when the answer proves the caller's token is missing, stale or revoked.
@@ -44,11 +44,18 @@ const JWT_HINTS =
  */
 export function isTokenRejection(status: number, body: string): boolean {
   if (status === 401) return true;
-  if (status === 403) return JWT_HINTS.test(body);
+  if (status === 400 || status === 403 || status === 422) return JWT_HINTS.test(body);
   return false;
 }
 
 let lastWarning = 0;
+
+/** Remove the shared connectivity warning after a confirmed recovery. */
+export function clearConnectivityIssue(): void {
+  lastWarning = 0;
+  if (typeof window === "undefined") return;
+  void import("sonner").then(({ toast }) => toast.dismiss("pos-connectivity"));
+}
 
 /** Temporary "we can't reach the server" note. Never signs anyone out. */
 export function noteConnectivityIssue(detail?: string): void {
@@ -72,7 +79,9 @@ export function noteConnectivityIssue(detail?: string): void {
 export async function inspectResponse(res: Response, hadBearer: boolean): Promise<void> {
   try {
     if (res.status >= 500) {
-      noteConnectivityIssue();
+      noteConnectivityIssue(
+        "The server is temporarily unavailable. The till will retry automatically.",
+      );
       return;
     }
     if (res.status !== 401 && res.status !== 403) return;

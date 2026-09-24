@@ -11,6 +11,7 @@
 import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
+import { Route as AlertsRouteImport } from './routes/alerts'
 import { Route as AllShopsRouteImport } from './routes/all-shops'
 import { Route as AnalyticsRouteImport } from './routes/analytics'
 import { Route as ApprovalsRouteImport } from './routes/approvals'
@@ -133,6 +134,11 @@ const IndexRoute = IndexRouteImport.update({
 const AdminRoute = AdminRouteImport.update({
   id: '/admin',
   path: '/admin',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const AlertsRoute = AlertsRouteImport.update({
+  id: '/alerts',
+  path: '/alerts',
   getParentRoute: () => rootRouteImport,
 } as any)
 const AllShopsRoute = AllShopsRouteImport.update({
@@ -707,6 +713,7 @@ const ApiV1PosSyncRoute = ApiV1PosSyncRouteImport.update({
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/alerts': typeof AlertsRoute
   '/all-shops': typeof AllShopsRoute
   '/analytics': typeof AnalyticsRoute
   '/approvals': typeof ApprovalsRoute
@@ -824,6 +831,7 @@ export interface FileRoutesByFullPath {
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/alerts': typeof AlertsRoute
   '/all-shops': typeof AllShopsRoute
   '/analytics': typeof AnalyticsRoute
   '/approvals': typeof ApprovalsRoute
@@ -942,6 +950,7 @@ export interface FileRoutesById {
   __root__: typeof rootRouteImport
   '/': typeof IndexRoute
   '/admin': typeof AdminRoute
+  '/alerts': typeof AlertsRoute
   '/all-shops': typeof AllShopsRoute
   '/analytics': typeof AnalyticsRoute
   '/approvals': typeof ApprovalsRoute
@@ -1061,6 +1070,7 @@ export interface FileRouteTypes {
   fullPaths:
     | '/'
     | '/admin'
+    | '/alerts'
     | '/all-shops'
     | '/analytics'
     | '/approvals'
@@ -1178,6 +1188,7 @@ export interface FileRouteTypes {
   to:
     | '/'
     | '/admin'
+    | '/alerts'
     | '/all-shops'
     | '/analytics'
     | '/approvals'
@@ -1295,6 +1306,7 @@ export interface FileRouteTypes {
     | '__root__'
     | '/'
     | '/admin'
+    | '/alerts'
     | '/all-shops'
     | '/analytics'
     | '/approvals'
@@ -1413,6 +1425,7 @@ export interface FileRouteTypes {
 export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   AdminRoute: typeof AdminRoute
+  AlertsRoute: typeof AlertsRoute
   AllShopsRoute: typeof AllShopsRoute
   AnalyticsRoute: typeof AnalyticsRoute
   ApprovalsRoute: typeof ApprovalsRoute
@@ -1539,6 +1552,13 @@ declare module '@tanstack/react-router' {
       path: '/admin'
       fullPath: '/admin'
       preLoaderRoute: typeof AdminRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/alerts': {
+      id: '/alerts'
+      path: '/alerts'
+      fullPath: '/alerts'
+      preLoaderRoute: typeof AlertsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/all-shops': {
@@ -2363,6 +2383,7 @@ const ApiPublicPosRulesRouteWithChildren =
 const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   AdminRoute: AdminRoute,
+  AlertsRoute: AlertsRoute,
   AllShopsRoute: AllShopsRoute,
   AnalyticsRoute: AnalyticsRoute,
   ApprovalsRoute: ApprovalsRoute,

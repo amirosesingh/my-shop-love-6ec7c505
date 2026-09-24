@@ -441,7 +441,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                       <Menu className="size-5" />
                     </Button>
                   </SheetTrigger>
-                  <SheetContent side="left" className="pt-safe pb-safe z-50 w-72 bg-sidebar p-0">
+                  <SheetContent side="left" className="pt-safe pb-safe z-50 w-72 max-w-[calc(100vw-1rem)] bg-sidebar p-0">
                     <SheetTitle className="sr-only">Navigation</SheetTitle>
                     <SidebarNav
                       canSee={canSee}
@@ -459,7 +459,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                     />
                   </SheetContent>
                 </Sheet>
-                <div className="flex min-w-0 items-center gap-2">
+                <div className="flex min-w-0 flex-1 items-center gap-2">
                   <ReceiptText className="size-4 shrink-0 text-primary" />
                   <span className="truncate text-sm font-semibold">{companyName}</span>
                 </div>
@@ -468,7 +468,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Badge
                   variant="outline"
                   className={cn(
-                    "ml-auto shrink-0 text-[10px]",
+                    "hidden shrink-0 text-[10px] sm:inline-flex",
                     activeShift
                       ? "border-success/40 bg-success/10 text-success"
                       : "border-destructive/40 bg-destructive/10 text-destructive",
@@ -481,26 +481,20 @@ export function AppShell({ children }: { children: ReactNode }) {
                   <LiveClock compact />
                 </span>
                 <MobileStatusSheet />
-                <UpdateHeaderButton />
-                <Button
-                  asChild
-                  variant="ghost"
-                  size="icon"
-                  className="shrink-0"
-                  aria-label="Settings"
-                >
-                  <Link to="/settings">
-                    <SettingsIcon className="size-4" />
-                  </Link>
-                </Button>
-                <ThemeToggle />
+                <span className="hidden sm:inline-flex"><UpdateHeaderButton /></span>
+                <span className="hidden sm:inline-flex">
+                  <Button asChild variant="ghost" size="icon" className="shrink-0" aria-label="Settings">
+                    <Link to="/settings"><SettingsIcon className="size-4" /></Link>
+                  </Button>
+                </span>
+                <span className="hidden sm:inline-flex"><ThemeToggle /></span>
                 <Button
                   variant="outline"
                   size="sm"
                   className="touch-target shrink-0 px-2 text-[11px]"
                   onClick={() => void lock()}
                 >
-                  <Lock className="size-3.5" /> Lock
+                  <Lock className="size-3.5" /> <span className="hidden sm:inline">Lock</span>
                 </Button>
               </header>
 
@@ -513,7 +507,7 @@ export function AppShell({ children }: { children: ReactNode }) {
                   </p>
                 </div>
                 <div className="ml-auto" />
-                <LiveClock />
+                <span className="hidden xl:inline-flex"><LiveClock /></span>
                 <ConnectionStatusButton />
                 <SystemAlertsButton />
                 <ActivityBell />
@@ -521,13 +515,13 @@ export function AppShell({ children }: { children: ReactNode }) {
                 {terminal.config && (
                   <Badge
                     variant="outline"
-                    className="shrink-0 gap-1 border-primary/40 bg-primary/10 text-[11px] text-primary"
+                    className="hidden shrink-0 gap-1 border-primary/40 bg-primary/10 text-[11px] text-primary 2xl:inline-flex"
                   >
                     <MapPin className="size-3" />
                     {terminal.config.locationName || currentStore.name}
                   </Badge>
                 )}
-                <UpdateHeaderButton />
+                <span className="hidden lg:inline-flex"><UpdateHeaderButton /></span>
                 <Button
                   asChild
                   variant="ghost"
@@ -543,10 +537,10 @@ export function AppShell({ children }: { children: ReactNode }) {
                 <Button
                   variant="outline"
                   size="sm"
-                  className="h-8 text-xs"
+                  className="size-8 shrink-0 px-0 text-xs xl:h-8 xl:w-auto xl:px-3"
                   onClick={() => void lock()}
                 >
-                  <Lock className="size-3.5" /> Lock / Switch user
+                  <Lock className="size-3.5" /> <span className="hidden xl:inline">Lock / Switch user</span>
                 </Button>
               </header>
 

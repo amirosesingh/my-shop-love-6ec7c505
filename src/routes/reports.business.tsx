@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { TablePagination, usePagination } from "@/platforms/web/components/pos/TablePagination";
 import { money, usePos } from "@/lib/pos-store";
-import { lineCost, lineRevenue } from "@/core/pricing/profit";
+import { lineCost, saleLineRevenues, saleNetRevenue } from "@/core/pricing/profit";
 import { ReportHeader, StatCard, defaultRange, downloadCsv, inRange } from "@/platforms/web/components/pos/report-kit";
 
 export const Route = createFileRoute("/reports/business")({
@@ -86,9 +86,10 @@ function BusinessReport() {
   const products = useMemo(() => {
     const map = new Map<string, ProductRow>();
     for (const s of sales) {
-      for (const l of s.lines) {
+      const revenues = saleLineRevenues(s);
+      for (const [index, l] of s.lines.entries()) {
         if (l.qty <= 0) continue;
-        const revenue = Math.max(0, lineRevenue(l));
+        const revenue = Math.max(0, revenues[index] ?? 0);
         const cost = lineCost(l, state.products);
         const row =
           map.get(l.productId) ??
@@ -137,8 +138,9 @@ function BusinessReport() {
       const row = map.get(key) ?? { name: key, bills: 0, revenue: 0, profit: 0, discount: 0, avgBill: 0 };
       const cost = s.lines.reduce((a, l) => a + lineCost(l, state.products), 0);
       row.bills += 1;
-      row.revenue += s.total;
-      row.profit += s.total - s.tax - cost;
+      const revenue = saleNetRevenue(s);
+      row.revenue += revenue;
+      row.profit += revenue - cost;
       row.discount += s.discount;
       map.set(key, row);
     }

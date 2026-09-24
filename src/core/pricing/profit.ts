@@ -8,7 +8,7 @@
  * both takings and cost; free-of-charge lines earn nothing but still cost.
  */
 import type { CartLine, Product, Sale } from "@/core/types/pos-types";
-import { lineUnitDiscount, r2 } from "@/core/types/pos-types";
+import { lineDiscountTotal, r2 } from "@/core/types/pos-types";
 
 export type ProfitTotals = {
   /** Takings excluding tax. */
@@ -31,8 +31,58 @@ export function lineCost(line: CartLine, products: Product[] = []): number {
 /** Net selling value of one line, after its own discounts, before tax. */
 export function lineRevenue(line: CartLine): number {
   if (line.foc) return 0;
-  const unit = line.price - lineUnitDiscount(line);
-  return r2(unit * line.qty - (line.couponDiscount ?? 0));
+  const gross = Math.abs(line.price * line.qty);
+  const net = r2(gross - lineDiscountTotal(line));
+  return line.qty < 0 ? -net : net;
+}
+
+/** Authoritative bill revenue after every discount and excluding tax/rounding. */
+export function saleNetRevenue(sale: Sale): number {
+  return r2(sale.total - sale.tax - (sale.roundingAdjustment ?? 0));
+}
+
+const allocate = (weights: number[], target: number): number[] => {
+  const weightTotal = r2(weights.reduce((sum, value) => sum + value, 0));
+  if (!weights.length) return [];
+  if (!weightTotal) return weights.map(() => 0);
+  const last = weights.reduce((found, value, index) => (value ? index : found), weights.length - 1);
+  let assigned = 0;
+  return weights.map((value, index) => {
+    const valueAtLine = index === last ? r2(target - assigned) : r2((target * value) / weightTotal);
+    assigned = r2(assigned + valueAtLine);
+    return valueAtLine;
+  });
+};
+
+const saleUsesInclusiveTax = (sale: Sale) => {
+  if (!sale.tax) return false;
+  const discountedTicket = r2(sale.subtotal - sale.discount);
+  const settled = r2(sale.total - (sale.roundingAdjustment ?? 0));
+  return Math.abs(settled - discountedTicket) <= 0.02;
+};
+
+/** Allocate the stored tax total using each line's taxable weight. */
+export function saleLineTaxes(sale: Sale): number[] {
+  const raw = sale.lines.map(lineRevenue);
+  const discounted = allocate(raw, r2(sale.subtotal - sale.discount));
+  return allocate(
+    discounted.map((value, index) => value * Math.max(0, sale.lines[index]?.taxRate ?? 0)),
+    sale.tax,
+  );
+}
+
+/**
+ * Allocate the stored bill revenue back to its lines. This is what reports use:
+ * it includes bill-level discounts, coupons and inclusive tax while preserving
+ * the exact stored total down to the final cent.
+ */
+export function saleLineRevenues(sale: Sale): number[] {
+  const raw = sale.lines.map(lineRevenue);
+  if (!raw.length) return [];
+  const discounted = allocate(raw, r2(sale.subtotal - sale.discount));
+  if (!saleUsesInclusiveTax(sale)) return discounted;
+  const taxes = saleLineTaxes(sale);
+  return discounted.map((value, index) => r2(value - (taxes[index] ?? 0)));
 }
 
 /** Gross profit of one line: (selling price − wholesale cost) × quantity. */
@@ -46,10 +96,8 @@ export function profitOf(sales: Sale[], products: Product[] = []): ProfitTotals 
   let cogs = 0;
   for (const sale of sales) {
     if (sale.refunded) continue;
-    for (const line of sale.lines) {
-      revenue += lineRevenue(line);
-      cogs += lineCost(line, products);
-    }
+    revenue += saleNetRevenue(sale);
+    for (const line of sale.lines) cogs += lineCost(line, products);
   }
   revenue = r2(revenue);
   cogs = r2(cogs);
@@ -71,10 +119,8 @@ export function hourlyProfit(sales: Sale[], products: Product[] = []): HourlyPro
     if (sale.refunded) continue;
     const bucket = hours[new Date(sale.createdAt).getHours()];
     if (!bucket) continue;
-    for (const line of sale.lines) {
-      bucket.revenue += lineRevenue(line);
-      bucket.cogs += lineCost(line, products);
-    }
+    bucket.revenue += saleNetRevenue(sale);
+    for (const line of sale.lines) bucket.cogs += lineCost(line, products);
   }
   return hours.map((h) => ({
     hour: h.hour,

@@ -28,7 +28,12 @@ import { activeBranchId, activeBranchName, bindTerminalBranch } from "@/lib/acti
 import { cacheCredential, verifyCachedPin } from "@/lib/offline-credentials";
 import { recordSignIn } from "@/lib/shift-attendance";
 import { endShiftSessions } from "@/lib/shift-sessions";
-import { onSessionExpired } from "@/lib/session-expiry";
+import {
+  isTokenRejection,
+  notifySessionExpired,
+  onSessionExpired,
+} from "@/lib/session-expiry";
+import { APP_RESUME_EVENT } from "@/core/activation/connection-health";
 import { bumpSessionEpoch, isCurrentEpoch, sessionEpoch } from "@/lib/session-epoch";
 import { awaitProfileHydrated } from "@/lib/connection-profile";
 import {
@@ -1040,9 +1045,38 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (typeof window === "undefined") return;
     let alive = true;
+    let checking = false;
     const check = async () => {
       if (document.visibilityState === "hidden") return;
+      if (typeof navigator !== "undefined" && navigator.onLine === false) return;
+      if (checking) return;
+      checking = true;
       try {
+        // Supabase normally refreshes in the background. Mobile operating
+        // systems suspend timers, so validate explicitly after a foreground
+        // resume; a definite token refusal expires the login, while a network
+        // or server failure leaves the user's work and session untouched.
+        let current = (await supabase.auth.getSession()).data.session;
+        if (current) {
+          const expiresAt = Number(current.expires_at ?? 0) * 1000;
+          if (expiresAt > 0 && expiresAt <= Date.now() + 90_000) {
+            const refreshed = await supabase.auth.refreshSession();
+            if (refreshed.error) {
+              const status = Number((refreshed.error as { status?: number }).status ?? 0);
+              if (isTokenRejection(status, refreshed.error.message)) notifySessionExpired();
+              return;
+            }
+            current = refreshed.data.session;
+          }
+        }
+        if (current) {
+          const { error } = await supabase.auth.getUser();
+          if (error) {
+            const status = Number((error as { status?: number }).status ?? 0);
+            if (isTokenRejection(status, error.message)) notifySessionExpired();
+            return;
+          }
+        }
         const creds = await readCredentials();
         if (!creds.cashierToken && !creds.terminalToken && !creds.accessToken) return;
         const startedAt = sessionEpoch();
@@ -1050,19 +1084,26 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         const res = await verifySession({ data: creds });
         if (!alive || res.ok || !isCurrentEpoch(startedAt)) return;
         if (res.reason === "revoked" || res.reason === "branch_missing") {
-          const { notifySessionExpired } = await import("@/lib/session-expiry");
           notifySessionExpired();
         }
       } catch {
         /* a failed check is a connectivity problem, never a sign-out */
+      } finally {
+        checking = false;
       }
     };
     void check();
     const onVisible = () => void check();
     document.addEventListener("visibilitychange", onVisible);
+    window.addEventListener("focus", onVisible);
+    window.addEventListener("online", onVisible);
+    window.addEventListener(APP_RESUME_EVENT, onVisible);
     return () => {
       alive = false;
       document.removeEventListener("visibilitychange", onVisible);
+      window.removeEventListener("focus", onVisible);
+      window.removeEventListener("online", onVisible);
+      window.removeEventListener(APP_RESUME_EVENT, onVisible);
     };
   }, [user?.staffId]);
 

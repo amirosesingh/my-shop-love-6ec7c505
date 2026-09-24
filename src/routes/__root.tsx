@@ -33,7 +33,12 @@ import { ThemeProvider, themeBootScript } from "../lib/theme";
 import { publicConfigScript } from "../lib/public-config-script";
 import { NativeBoot } from "@/platforms/mobile/components/NativeBoot";
 import { OfflineGate } from "@/platforms/mobile/components/OfflineGate";
-import { startConnectivityMonitor } from "@/core/activation/connection-health";
+import {
+  APP_RESUME_EVENT,
+  CONNECTIVITY_RESTORED_EVENT,
+  connectivity,
+  startConnectivityMonitor,
+} from "@/core/activation/connection-health";
 import { subscribeSyncConfig, syncConfig } from "@/lib/sync-config";
 import { DesktopUpdateBanner } from "@/platforms/windows/components/DesktopUpdateBanner";
 import { AndroidUpdateBanner } from "@/platforms/mobile/components/AndroidUpdateBanner";
@@ -223,6 +228,7 @@ function RootShell({ children }: { children: ReactNode }) {
 
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
+  const router = useRouter();
   usePublicHostLanding();
 
   // One long-lived owner for connectivity on every platform. Platform-specific
@@ -243,6 +249,30 @@ function RootComponent() {
       stop();
     };
   }, []);
+
+  // A confirmed reconnect or foreground resume wakes every data mechanism in
+  // one place. The current URL stays intact while active queries and route
+  // loaders refresh; queued mutations are allowed to continue automatically.
+  useEffect(() => {
+    let refreshing = false;
+    const recover = () => {
+      if (refreshing || connectivity() !== "online") return;
+      refreshing = true;
+      void Promise.all([
+        queryClient.resumePausedMutations(),
+        queryClient.refetchQueries({ type: "active" }),
+        router.invalidate(),
+      ]).finally(() => {
+        refreshing = false;
+      });
+    };
+    window.addEventListener(CONNECTIVITY_RESTORED_EVENT, recover);
+    window.addEventListener(APP_RESUME_EVENT, recover);
+    return () => {
+      window.removeEventListener(CONNECTIVITY_RESTORED_EVENT, recover);
+      window.removeEventListener(APP_RESUME_EVENT, recover);
+    };
+  }, [queryClient, router]);
 
   return (
     <QueryClientProvider client={queryClient}>

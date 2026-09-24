@@ -268,7 +268,7 @@ function ReceiptVault() {
           <div className="flex gap-2">
             <div className="relative">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
-              <Input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void searchExact(); }} placeholder="Receipt no, sale ID or transaction ID" className="w-72 pl-9" />
+              <Input value={query} onChange={(e) => setQuery(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") void searchExact(); }} placeholder="Receipt no, sale ID or transaction ID" className="w-full pl-9 sm:w-72" />
             </div>
             <Button variant="outline" disabled={findingExact || !query.trim()} onClick={() => void searchExact()}>{findingExact ? "Finding…" : "Find exact"}</Button>
           </div>

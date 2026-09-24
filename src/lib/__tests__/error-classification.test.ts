@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { classifyError, describeError } from "@/lib/notify";
+import { isTokenRejection } from "@/lib/session-expiry";
 
 describe("standard error classification", () => {
   const cases = [
@@ -28,6 +29,19 @@ describe("standard error classification", () => {
     );
     expect(classifyError(new Error("operation already running"))).toBe("already-running");
     expect(classifyError(new Error("configuration missing key"))).toBe("configuration");
+  });
+});
+
+describe("session rejection detection", () => {
+  it("expires definite authentication failures", () => {
+    expect(isTokenRejection(401, "Unauthorized")).toBe(true);
+    expect(isTokenRejection(403, "JWT expired")).toBe(true);
+    expect(isTokenRejection(400, "refresh_token_not_found")).toBe(true);
+  });
+
+  it("does not turn permissions or server failures into a logout", () => {
+    expect(isTokenRejection(403, "row-level security policy denied this action")).toBe(false);
+    expect(isTokenRejection(503, "Service unavailable")).toBe(false);
   });
 });
 

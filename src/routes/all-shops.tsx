@@ -17,6 +17,7 @@ import { TablePagination, usePagination } from "@/platforms/web/components/pos/T
 import { money, stockAt, usePos } from "@/lib/pos-store";
 import { useAuth } from "@/lib/pos-auth";
 import { privateStockStores, productVisibleAt } from "@/lib/branch-policy";
+import { profitOf, saleNetRevenue } from "@/core/pricing/profit";
 
 export const Route = createFileRoute("/all-shops")({
   head: () => ({
@@ -59,7 +60,9 @@ function AllShops() {
   );
 
   const perStore = stores.map((store) => {
-    const sales = state.sales.filter((s) => s.storeId === store.id && isToday(s.createdAt));
+    const sales = state.sales.filter(
+      (s) => s.storeId === store.id && isToday(s.createdAt) && !s.refunded,
+    );
     const shift = state.shifts.find(
       (s) => s.storeId === store.id && s.status !== "CLOSED" && !s.closedAt,
     );
@@ -67,7 +70,7 @@ function AllShops() {
     const low = state.products.filter((p) => stockAt(p, store.id) <= p.reorderLevel).length;
     return {
       store,
-      revenue: sales.reduce((a, s) => a + s.total, 0),
+      revenue: sales.reduce((a, s) => a + saleNetRevenue(s), 0),
       count: sales.length,
       shift,
       stockValue,
@@ -77,22 +80,13 @@ function AllShops() {
 
   /** Group-wide live performance — administrators only. */
   const live = useMemo(() => {
-    const todays = state.sales.filter((s) => isToday(s.createdAt));
-    const revenue = todays.reduce((a, s) => a + s.total, 0);
-    const cost = todays.reduce(
-      (a, s) =>
-        a +
-        s.lines.reduce((la, l) => {
-          const p = state.products.find((x) => x.id === l.productId);
-          return la + (p?.cost ?? 0) * l.qty;
-        }, 0),
-      0,
-    );
+    const todays = state.sales.filter((s) => isToday(s.createdAt) && !s.refunded);
+    const financial = profitOf(todays, state.products);
     return {
-      revenue,
-      profit: revenue - cost,
+      revenue: financial.revenue,
+      profit: financial.profit,
       bills: todays.length,
-      basket: todays.length ? revenue / todays.length : 0,
+      basket: todays.length ? financial.revenue / todays.length : 0,
       feed: [...todays].sort((a, b) => b.createdAt.localeCompare(a.createdAt)).slice(0, 12),
     };
   }, [state.sales, state.products]);

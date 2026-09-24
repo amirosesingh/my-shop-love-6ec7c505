@@ -11,6 +11,10 @@ const bodySchema = z.object({
   eventId: z.string().uuid().optional(),
   cleared: z.boolean().optional(),
   limit: z.number().int().min(1).max(500).optional(),
+  offset: z.number().int().min(0).max(1_000_000).optional(),
+  query: z.string().trim().max(160).optional(),
+  sortBy: z.enum(["created_at", "severity", "event_type", "store_id", "title"]).optional(),
+  sortDirection: z.enum(["asc", "desc"]).optional(),
   types: z.array(z.string().regex(/^[a-z_]{1,60}$/)).max(30).optional(),
   severities: z.array(z.enum(["info", "warning", "critical"])).max(3).optional(),
   storeId: z.string().max(64).optional(),
@@ -72,7 +76,12 @@ export const Route = createFileRoute("/api/v1/pos/activity-preferences")({
           return reply({ ok: true });
         }
 
-        const params = new URLSearchParams({ select: "*", order: "created_at.desc", limit: String(input.limit ?? 200) });
+        const params = new URLSearchParams({
+          select: "*",
+          order: `${input.sortBy ?? "created_at"}.${input.sortDirection ?? "desc"}`,
+          limit: String(input.limit ?? 200),
+          offset: String(input.offset ?? 0),
+        });
         if (input.types?.length) params.set("event_type", `in.(${input.types.join(",")})`);
         if (input.severities?.length) params.set("severity", `in.(${input.severities.join(",")})`);
         const branch = account.store_id ?? caller.storeId ?? null;
@@ -82,11 +91,22 @@ export const Route = createFileRoute("/api/v1/pos/activity-preferences")({
           params.set("store_id", `eq.${branch}`);
         } else if (input.storeId) params.set("store_id", `eq.${input.storeId}`);
         if (input.actor) params.set("actor_name", `ilike.*${input.actor.replace(/[,*()]/g, "")}*`);
+        if (input.query) {
+          const term = input.query.replace(/[,*()]/g, "");
+          if (term)
+            params.set(
+              "or",
+              `(title.ilike.*${term}*,message.ilike.*${term}*,actor_name.ilike.*${term}*,entity_id.ilike.*${term}*)`,
+            );
+        }
         if (input.from) params.set("created_at", `gte.${input.from}`);
         if (input.to) params.append("created_at", `lte.${input.to}`);
-        const response = await serviceRest(`activity_events?${params}`);
+        const response = await serviceRest(`activity_events?${params}`, { prefer: "count=exact" });
         if (!response.ok) return reply({ ok: false, error: "Could not load activity" }, 503);
-        return reply({ ok: true, rows: await response.json() });
+        const range = response.headers.get("content-range") ?? "";
+        const total = Number(range.split("/").at(-1));
+        const rows = await response.json();
+        return reply({ ok: true, rows, total: Number.isFinite(total) ? total : rows.length });
       },
       OPTIONS: async ({ request }) => corsPreflight(request),
     },

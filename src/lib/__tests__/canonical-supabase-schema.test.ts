@@ -3,7 +3,8 @@ import { resolve, relative } from "node:path";
 import { describe, expect, it } from "vitest";
 
 const root = process.cwd();
-const read = (path: string) => readFileSync(resolve(root, path), "utf8");
+// Keep assertions about SQL content identical on Windows (CRLF) and CI (LF).
+const read = (path: string) => readFileSync(resolve(root, path), "utf8").replaceAll("\r\n", "\n");
 
 function sqlFiles(directory = root): string[] {
   const files: string[] = [];
