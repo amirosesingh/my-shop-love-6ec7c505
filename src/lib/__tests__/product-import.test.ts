@@ -5,7 +5,12 @@ import {
   importFailureReason,
   outcomeReportRows,
   planImport,
+  planImportReview,
+  persistBatchWithIsolation,
   readNumber,
+  resolveReviewConflict,
+  reviewRowToImport,
+  updateReviewRow,
 } from "@/lib/product-import";
 import type { Product } from "@/core/types/pos-types";
 
@@ -112,6 +117,58 @@ describe("planImport", () => {
   });
 });
 
+describe("reviewable product imports", () => {
+  it("fills blank source fields from an existing database product", () => {
+    const review = planImportReview(
+      [row({ barcode: "111", name: "", price: "", cost: "", category: "" })],
+      [product()],
+    );
+    expect(review.rows[0]).toMatchObject({
+      existingProductId: "p1",
+      name: "Existing item",
+      price: 10,
+      cost: 5,
+      category: "Coffee",
+      status: "ready",
+    });
+  });
+
+  it("keeps incomplete new products available for inline correction", () => {
+    const staged = planImportReview([row({ name: "", price: "" })], []).rows[0];
+    expect(staged.status).toBe("missing_information");
+    expect(staged.missingFields).toEqual(["name", "price"]);
+    const fixed = updateReviewRow(staged, { name: "Tea", price: 8 });
+    expect(fixed.status).toBe("new_product");
+    expect(reviewRowToImport(fixed)).toMatchObject({ name: "Tea", price: 8, existing: false });
+  });
+
+  it("flags contradictory database values until the operator resolves them", () => {
+    const staged = planImportReview(
+      [row({ barcode: "111", name: "Different", price: "12" })],
+      [product()],
+    ).rows[0];
+    expect(staged.status).toBe("conflict");
+    expect(staged.conflictFields).toEqual(expect.arrayContaining(["name", "price"]));
+    const resolved = resolveReviewConflict(staged, "database");
+    expect(resolved).toMatchObject({ status: "ready", name: "Existing item", price: 10 });
+  });
+
+  it("retains duplicate rows as conflicts instead of silently dropping them", () => {
+    const review = planImportReview([row({ barcode: "same" }), row({ barcode: "same" })], []);
+    expect(review.rows).toHaveLength(2);
+    expect(review.rows[1].status).toBe("conflict");
+    expect(review.rows[1].issue).toContain("line 2");
+  });
+
+  it("requires a positive quantity for receiving but not catalogue imports", () => {
+    const record = row({ stock_quantity: "0" });
+    expect(planImportReview([record], []).rows[0].missingFields).not.toContain("stock");
+    const receiving = planImportReview([record], [], { quantityRequired: true }).rows[0];
+    expect(receiving.status).toBe("missing_information");
+    expect(receiving.missingFields).toContain("stock");
+  });
+});
+
 describe("batches", () => {
   it("splits into whole groups without dropping anything", () => {
     const groups = batches([1, 2, 3, 4, 5], 2);
@@ -121,6 +178,21 @@ describe("batches", () => {
 
   it("never produces a zero-sized group", () => {
     expect(batches([1, 2], 0)).toEqual([[1], [2]]);
+  });
+
+  it("isolates one rejected record while saving the rest of its batch", async () => {
+    const saved: number[] = [];
+    const failed: number[] = [];
+    await persistBatchWithIsolation(
+      [1, 2, 3, 4],
+      async (rows) => {
+        if (rows.includes(3)) throw new Error("invalid row");
+      },
+      (rows) => { saved.push(...rows); },
+      (rows) => { failed.push(...rows); },
+    );
+    expect(saved).toEqual([1, 2, 4]);
+    expect(failed).toEqual([3]);
   });
 });
 

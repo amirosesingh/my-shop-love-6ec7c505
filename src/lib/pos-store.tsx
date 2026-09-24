@@ -36,7 +36,7 @@ import type {
   TransferKind,
   TransferStatus,
 } from "@/core/types/pos-types";
-import { subscribeSalesChange, subscribeSettingsChange } from "./sync-engine";
+import { subscribeDataChange, subscribeSalesChange, subscribeSettingsChange } from "./sync-engine";
 import {
   bookingBalance,
   lineDiscountTotal,
@@ -52,6 +52,9 @@ import {
   isDuplicateBillNumber,
   loadActiveShift,
   loadCloudState,
+  loadCloudMember,
+  loadCloudProduct,
+  loadCloudPromotion,
   loadCloudSettings,
   loadSalesPage,
   openShiftOnServer,
@@ -128,6 +131,7 @@ import {
   batches,
   DEFAULT_BATCH_SIZE,
   importFailureReason,
+  persistBatchWithIsolation,
   type ImportProductsOptions,
   type ImportProductsResult,
   type ImportRow,
@@ -838,6 +842,61 @@ export function PosProvider({ children }: { children: ReactNode }) {
     };
   }, [signedIn]);
 
+  // Catalogue, member and promotion events carry the changed row identity.
+  // Pull only that row so a barcode or price edit never downloads the complete
+  // master dataset or interrupts scanning and checkout.
+  useEffect(() => {
+    if (!signedIn) return;
+    const timers = new Map<string, number>();
+    const unsubscribe = subscribeDataChange((change) => {
+      if (!change.entityId || !["products", "product_barcodes", "members", "promotions"].includes(change.table)) return;
+      const kind = change.table === "product_barcodes" ? "products" : change.table;
+      const key = `${kind}:${change.entityId}`;
+      const previous = timers.get(key);
+      if (previous) window.clearTimeout(previous);
+      timers.set(key, window.setTimeout(() => {
+        timers.delete(key);
+        const read = kind === "products"
+          ? loadCloudProduct(change.entityId!)
+          : kind === "members"
+            ? loadCloudMember(change.entityId!)
+            : loadCloudPromotion(change.entityId!);
+        void read.then((record) => {
+          setState((current) => {
+            if (kind === "products") {
+              const products = record
+                ? current.products.some((row) => row.id === record.id)
+                  ? current.products.map((row) => row.id === record.id ? record as Product : row)
+                  : [record as Product, ...current.products]
+                : current.products.filter((row) => row.id !== change.entityId);
+              return { ...current, products };
+            }
+            if (kind === "members") {
+              const members = record
+                ? current.members.some((row) => row.id === record.id)
+                  ? current.members.map((row) => row.id === record.id ? record as Member : row)
+                  : [record as Member, ...current.members]
+                : current.members.filter((row) => row.id !== change.entityId);
+              return { ...current, members };
+            }
+            const promotions = record
+              ? current.promotions.some((row) => row.id === record.id)
+                ? current.promotions.map((row) => row.id === record.id ? record as Promotion : row)
+                : [record as Promotion, ...current.promotions]
+              : current.promotions.filter((row) => row.id !== change.entityId);
+            return { ...current, promotions };
+          });
+        }).catch(() => {
+          /* the next reconnect snapshot remains the recovery path */
+        });
+      }, 150));
+    });
+    return () => {
+      for (const timer of timers.values()) window.clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [signedIn]);
+
   // A committed sale is announced by the existing shared Realtime channel.
   // The event is only a notification: always fetch the complete canonical
   // transaction graph rather than assembling a sale from a partial payload.
@@ -921,10 +980,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
     };
   }, [signedIn]);
 
-  // Pull sync: tills and desktops refresh the master data (catalogue, prices,
-  // members, branches, settings) from the cloud on a timer and whenever the
-  // connection comes back, so register search and barcode scans stay current
-  // even when the machine later goes offline again.
+  // Pull sync: embedded tills keep an offline mirror. Realtime applies normal
+  // row changes above; this snapshot runs only after reconnection, when socket
+  // events may have been missed.
   useEffect(() => {
     if (isOnlineOnly() || !signedIn) return;
     let cancelled = false;
@@ -942,11 +1000,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
           /* offline or refused — the local copy keeps the till trading */
         });
     };
-    const timer = window.setInterval(pull, 5 * 60 * 1000);
     window.addEventListener("online", pull);
     return () => {
       cancelled = true;
-      window.clearInterval(timer);
       window.removeEventListener("online", pull);
     };
   }, [signedIn]);
@@ -1995,6 +2051,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         failed: [],
         pending: [],
         savedKeys: [],
+        savedProducts: [],
       };
       if (!todo.length) return result;
 
@@ -2013,29 +2070,38 @@ export function PosProvider({ children }: { children: ReactNode }) {
 
       const newOwners: Record<string, string> = {};
       let done = 0;
+      let halted = false;
 
       for (const group of batches(todo, size)) {
-        const records: Product[] = [];
-        const createdInGroup: ImportRow[] = [];
-        const restockedInGroup: ImportRow[] = [];
+        const entries: Array<{ row: ImportRow; record: Product; existing: boolean }> = [];
 
         for (const row of group) {
-          const hit = byCode.get(row.key);
+          const hit = byCode.get(row.key) ?? row.existingProduct;
           if (hit) {
             const record: Product = {
               ...hit,
+              ...(row.updateExisting
+                ? {
+                    name: row.name,
+                    price: row.price,
+                    cost: row.cost,
+                    category: row.category,
+                    unit: row.unit || hit.unit,
+                    ecomPrice: hit.ecomPrice || row.price,
+                  }
+                : {}),
               stockByStore: {
                 ...hit.stockByStore,
-                [storeId]: (hit.stockByStore?.[storeId] ?? 0) + row.stock,
+                [storeId]:
+                  (hit.stockByStore?.[storeId] ?? 0) +
+                  (options.applyStock === false ? 0 : row.stock),
               },
               customPoints: row.customPoints || hit.customPoints,
             };
             for (const id of storeIds) {
               if (record.stockByStore[id] === undefined) record.stockByStore[id] = 0;
             }
-            records.push(record);
-            restockedInGroup.push(row);
-            byCode.set(row.key, record);
+            entries.push({ row, record, existing: true });
           } else {
             const sku = autoSku ? nextSku(skuPool) : row.barcode;
             skuPool.push(sku);
@@ -2045,84 +2111,98 @@ export function PosProvider({ children }: { children: ReactNode }) {
               sku,
               barcode: row.barcode,
               category: row.category,
+              unit: row.unit,
               price: row.price,
               cost: row.cost,
               ecomPrice: row.price,
               ecomVisible: false,
               stockByStore: Object.fromEntries(
-                storeIds.map((id) => [id, id === storeId ? row.stock : 0]),
+                storeIds.map((id) => [
+                  id,
+                  id === storeId && options.applyStock !== false ? row.stock : 0,
+                ]),
               ),
               reorderLevel: 10,
               taxRate: 0.05,
               customPoints: row.customPoints,
               ...(privateCatalogue ? { ownerStoreId: storeId } : {}),
             };
-            if (privateCatalogue) newOwners[record.id] = storeId;
-            records.push(record);
-            createdInGroup.push(row);
-            byCode.set(row.key, record);
+            entries.push({ row, record, existing: false });
           }
         }
 
-        try {
-          // Nothing on screen says "saved" until the database has it.
-          await db.commitProducts(records);
-        } catch (e) {
-          const reason = importFailureReason(e);
-          for (const row of group) {
-            result.failed.push({
+        const persist = async (
+          slice: Array<{ row: ImportRow; record: Product; existing: boolean }>,
+        ): Promise<void> => persistBatchWithIsolation(
+          slice,
+          (part) => db.commitProducts(part.map((entry) => entry.record)),
+          async (saved) => {
+            const records = saved.map((entry) => entry.record);
+            const keys = saved.map((entry) => entry.row.key);
+            const created = saved.filter((entry) => !entry.existing).length;
+            const restocked = saved.length - created;
+            result.created += created;
+            result.restocked += restocked;
+            result.savedKeys.push(...keys);
+            result.savedProducts.push(...records);
+            for (const entry of saved) {
+              byCode.set(entry.row.key, entry.record);
+              if (privateCatalogue && !entry.existing) newOwners[entry.record.id] = storeId;
+            }
+
+            logger.log("inventory_edit", "Products imported", "inventory", {
+              importId: options.importId ?? null,
+              storeId,
+              created,
+              restocked,
+              lines: `${saved[0]?.row.line}-${saved[saved.length - 1]?.row.line}`,
+              names: saved.slice(0, 5).map((entry) => entry.row.name),
+            });
+
+            const merged = new Map(records.map((product) => [product.id, product]));
+            setState((state) => {
+              const next = state.products.map((product) => merged.get(product.id) ?? product);
+              const known = new Set(state.products.map((product) => product.id));
+              const fresh = records.filter((product) => !known.has(product.id));
+              return { ...state, products: fresh.length ? [...fresh, ...next] : next };
+            });
+
+            done += saved.length;
+            options.onProgress?.(done, todo.length);
+            options.onBatchSaved?.(keys, {
+              created: result.created,
+              restocked: result.restocked,
+            });
+          },
+          async (failed, error) => {
+            const reason = importFailureReason(error);
+            for (const entry of failed) {
+              result.failed.push({
+                line: entry.row.line,
+                barcode: entry.row.barcode,
+                name: entry.row.name,
+                reason,
+              });
+            }
+            done += failed.length;
+            options.onProgress?.(done, todo.length);
+            if (options.stopOnBatchFailure) halted = true;
+          },
+          !options.stopOnBatchFailure,
+        );
+
+        await persist(entries);
+        if (halted) {
+          for (const row of todo.slice(done)) {
+            result.pending.push({
               line: row.line,
               barcode: row.barcode,
               name: row.name,
-              reason,
+              reason: "Not attempted — the import stopped after a failed batch",
             });
           }
-          done += group.length;
-          options.onProgress?.(done, todo.length);
-          if (options.stopOnBatchFailure) {
-            for (const row of todo.slice(done)) {
-              result.pending.push({
-                line: row.line,
-                barcode: row.barcode,
-                name: row.name,
-                reason: "Not attempted — the import stopped after a failed batch",
-              });
-            }
-            break;
-          }
-          continue;
+          break;
         }
-
-        result.created += createdInGroup.length;
-        result.restocked += restockedInGroup.length;
-        const keys = group.map((r) => r.key);
-        result.savedKeys.push(...keys);
-
-        // One trail entry per batch instead of one per row; the import report
-        // keeps the line-by-line detail.
-        logger.log("inventory_edit", "Products imported", "inventory", {
-          importId: options.importId ?? null,
-          storeId,
-          created: createdInGroup.length,
-          restocked: restockedInGroup.length,
-          lines: `${group[0]?.line}-${group[group.length - 1]?.line}`,
-          names: group.slice(0, 5).map((r) => r.name),
-        });
-
-        const merged = new Map(records.map((p) => [p.id, p]));
-        setState((s) => {
-          const next = s.products.map((p) => merged.get(p.id) ?? p);
-          const known = new Set(s.products.map((p) => p.id));
-          const fresh = records.filter((p) => !known.has(p.id));
-          return { ...s, products: fresh.length ? [...fresh, ...next] : next };
-        });
-
-        done += group.length;
-        options.onProgress?.(done, todo.length);
-        options.onBatchSaved?.(keys, {
-          created: result.created,
-          restocked: result.restocked,
-        });
         // Hand the screen back between batches so the window stays alive.
         await new Promise((r) => setTimeout(r, 0));
       }

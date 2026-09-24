@@ -66,6 +66,8 @@ import { centralHub, locationPath, primarySub, routingTargets } from "@/lib/loca
 import { Badge } from "@/components/ui/badge";
 import { canEditPosted, nextStockRef } from "@/lib/stock-ref";
 import { ReceivingRecordView } from "@/platforms/web/components/pos/ReceivingRecordView";
+import { BulkImportDialog } from "@/platforms/web/components/pos/BulkImportDialog";
+import { subscribeDataChange } from "@/lib/sync-engine";
 
 /** Sentinel for "no value picked" — Radix selects cannot hold an empty value. */
 const PO_NONE = "__none";
@@ -179,7 +181,7 @@ function Purchasing() {
   const catalogLists = useCategories();
   const scanRef = useRef<HTMLInputElement>(null);
   const [suppliers, setSuppliers] = useState<Supplier[]>(cachedSuppliers());
-  const fileRef = useRef<HTMLInputElement>(null);
+  const [importOpen, setImportOpen] = useState(false);
   /*
     Central-first receiving. Every delivery lands in the hub, and only a
     deliberate put-away moves it onto a shop floor or sub-warehouse, so stock
@@ -318,6 +320,25 @@ function Purchasing() {
   useEffect(() => {
     void refreshHistory();
     void refreshDrafts();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentStore.id, masterView]);
+
+  useEffect(() => {
+    let timer: number | undefined;
+    const unsubscribe = subscribeDataChange((change) => {
+      if (change.table !== "purchase_orders" && change.table !== "purchase_order_items") return;
+      if (!masterView && change.storeId && change.storeId !== currentStore.id) return;
+      if (timer) window.clearTimeout(timer);
+      timer = window.setTimeout(() => {
+        void refreshHistory();
+        void refreshDrafts();
+      }, 250);
+    });
+    return () => {
+      if (timer) window.clearTimeout(timer);
+      unsubscribe();
+    };
+    // refresh functions intentionally read the latest branch and master-view state.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentStore.id, masterView]);
 
@@ -563,73 +584,6 @@ function Purchasing() {
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, sheet, "Receiving");
     XLSX.writeFile(book, "receiving-template.xlsx");
-  }
-
-  /**
-   * Bulk receiving: an Excel or CSV file of purchased products becomes invoice
-   * lines. Known barcodes match the catalog; unknown ones are created as new
-   * products so the stock post below still balances.
-   */
-  async function importWorkbook(file: File) {
-    try {
-      const book = XLSX.read(await file.arrayBuffer(), { type: "array" });
-      const first = book.SheetNames[0];
-      const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(book.Sheets[first] ?? {});
-      if (!rows.length) return toast.error("That file has no rows");
-
-      const pick = (r: Record<string, unknown>, keys: string[]) => {
-        for (const k of Object.keys(r)) {
-          if (keys.includes(k.trim().toLowerCase())) return r[k];
-        }
-        return undefined;
-      };
-
-      let matched = 0;
-      let created = 0;
-      for (const r of rows) {
-        const barcode = String(pick(r, ["barcode", "sku", "code"]) ?? "").trim();
-        const name = String(pick(r, ["name", "product", "description"]) ?? "").trim();
-        const qty = Math.max(1, Number(pick(r, ["qty", "quantity", "received"])) || 1);
-        const cost = Number(pick(r, ["cost", "cost price", "unit cost"])) || 0;
-        const price = Number(pick(r, ["price", "selling price", "retail"])) || 0;
-        if (!barcode && !name) continue;
-
-        const hit = barcode ? findProduct(barcode) : undefined;
-        if (hit) {
-          matched++;
-          addLine({ ...hit, cost: cost || hit.cost }, qty);
-          continue;
-        }
-        const product: Product = {
-          id: crypto.randomUUID(),
-          name: name || barcode,
-          sku: barcode,
-          barcode: barcode || crypto.randomUUID().slice(0, 12),
-          category: String(pick(r, ["category"]) ?? "General"),
-          price: price || cost,
-          cost,
-          ecomPrice: price || cost,
-          ecomVisible: false,
-          stockByStore: Object.fromEntries(state.stores.map((s) => [s.id, 0])),
-          reorderLevel: 10,
-          taxRate: 0.05,
-        };
-        await upsertProduct(product);
-        addLine(product, qty);
-        created++;
-      }
-      logger.log("inventory_edit", "Receiving lines imported from file", "purchasing", {
-        file: file.name,
-        rows: rows.length,
-        matched,
-        created,
-      });
-      toast.success(`${matched + created} lines imported · ${created} new products`);
-    } catch (err) {
-      toast.error("Could not read that file", {
-        description: (err as Error)?.message ?? "Use the template as a starting point.",
-      });
-    }
   }
 
   /** Moves one received line out of the hub onto its final location. */
@@ -1002,24 +956,37 @@ function Purchasing() {
               Received a supplier spreadsheet? Import the purchased products straight into this
               invoice.
             </span>
-            <input
-              ref={fileRef}
-              type="file"
-              accept=".xlsx,.xls,.csv"
-              className="hidden"
-              onChange={(e) => {
-                const file = e.target.files?.[0];
-                if (file) void importWorkbook(file);
-                e.target.value = "";
-              }}
-            />
-            <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+            <Button variant="outline" size="sm" onClick={() => setImportOpen(true)}>
               <FileSpreadsheet className="size-4" /> Import Excel / CSV
             </Button>
             <Button variant="ghost" size="sm" onClick={downloadTemplate}>
               <Download className="size-4" /> Template
             </Button>
           </div>
+
+          <BulkImportDialog
+            open={importOpen}
+            onOpenChange={setImportOpen}
+            mode="receiving"
+            onReceivingRows={(imported) => {
+              for (const row of imported) {
+                addLine(
+                  {
+                    ...row.product,
+                    cost: row.cost || row.product.cost,
+                    price: row.price || row.product.price,
+                  },
+                  Math.max(1, row.quantity),
+                );
+              }
+              logger.log("inventory_edit", "Receiving lines imported from file", "purchasing", {
+                rows: imported.length,
+                created: imported.filter((row) => !state.products.some((p) => p.id === row.product.id))
+                  .length,
+              });
+              toast.success(`${imported.length} validated lines added to this invoice`);
+            }}
+          />
 
           <Table>
             <TableHeader>

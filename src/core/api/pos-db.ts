@@ -1054,6 +1054,42 @@ export async function loadCloudSettings(): Promise<AppSettings> {
   return rowToSettings(data as Row | null);
 }
 
+/** Fetch one changed catalogue row after a Realtime invalidation. */
+export async function loadCloudProduct(id: string): Promise<Product | null> {
+  const { data, error } = await supabase
+    .from("products")
+    .select("*")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? rowToProduct(data as Row) : null;
+}
+
+/** Fetch one changed member without re-reading the full member directory. */
+export async function loadCloudMember(id: string): Promise<Member | null> {
+  const { data, error } = await supabase
+    .from("members")
+    .select("*")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? rowToMember(data as Row, tierName) : null;
+}
+
+/** Fetch one changed promotion without re-reading the full promotion set. */
+export async function loadCloudPromotion(id: string): Promise<Promotion | null> {
+  const { data, error } = await supabase
+    .from("promotions")
+    .select("*")
+    .eq("id", id)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? rowToPromotion(data as Row) : null;
+}
+
 async function loadLocalState(cause: unknown): Promise<CloudSlice> {
   const bridge = localDb();
   if (!bridge) throw cause;
