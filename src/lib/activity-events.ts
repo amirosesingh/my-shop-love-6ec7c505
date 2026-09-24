@@ -273,12 +273,18 @@ const looksMissing = (error: { code?: string; message?: string } | null) =>
 export async function listActivityEvents(filter: ActivityFilter = {}): Promise<ActivityEvent[]> {
   if (logMissing) return [];
   try {
+    const credentials = await readCredentials();
+    // A registered terminal proves the device, not the person. The activity
+    // feed requires a current staff/cashier identity, so an offline or signed-
+    // out supervisor view must stay quiet instead of polling a guaranteed 401.
+    if (!credentials.sessionToken && !credentials.cashierToken && !credentials.accessToken)
+      return [];
     const response = await posFetch("/api/v1/pos/activity-preferences", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "list", ...filter, ...(await readCredentials()) }),
+      body: JSON.stringify({ action: "list", ...filter, ...credentials }),
     });
-    const result = await response.json() as { ok?: boolean; rows?: Row[]; error?: string };
+    const result = (await response.json()) as { ok?: boolean; rows?: Row[]; error?: string };
     if (!response.ok || !result.ok) {
       if (looksMissing({ message: result.error })) logMissing = true;
       return [];
@@ -403,20 +409,27 @@ export function mergeRemoteActivityPreferences(userId: string, rows: ActivityEve
     .filter((row) => row.clearedBy.some((id) => who(id) === key))
     .map((row) => row.id);
   const map = readClearedMap();
-  map[key] = [...new Set([...(map[key] ?? []).filter((id) => !fetched.has(id)), ...remote])].slice(-500);
+  map[key] = [...new Set([...(map[key] ?? []).filter((id) => !fetched.has(id)), ...remote])].slice(
+    -500,
+  );
   writeClearedMap(map);
 }
 
 async function syncClearedEntry(id: string, cleared: boolean): Promise<boolean> {
   try {
+    const credentials = await readCredentials();
+    if (!credentials.sessionToken && !credentials.cashierToken && !credentials.accessToken)
+      return false;
     const response = await posFetch("/api/v1/pos/activity-preferences", {
       method: "POST",
       headers: { "content-type": "application/json" },
-      body: JSON.stringify({ action: "clear", eventId: id, cleared, ...(await readCredentials()) }),
+      body: JSON.stringify({ action: "clear", eventId: id, cleared, ...credentials }),
     });
-    const result = await response.json() as { ok?: boolean };
+    const result = (await response.json()) as { ok?: boolean };
     return response.ok && result.ok === true;
-  } catch { return false; }
+  } catch {
+    return false;
+  }
 }
 
 export async function clearActivityEntry(userId: string, id: string): Promise<boolean> {
