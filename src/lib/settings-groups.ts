@@ -185,11 +185,13 @@ const SETTINGS_ROUTE_FILES = Object.keys(import.meta.glob("/src/routes/settings.
  * areas needing a card, so they are not expected to appear in the workspace.
  */
 const LEGACY_REDIRECTS = new Set([
+  "/settings/database-explorer",
   "/settings/data-sync",
   "/settings/diagnostics",
   "/settings/inheritance",
   "/settings/logic-health",
   "/settings/security-alerts",
+  "/settings/sync",
   "/settings/visibility",
 ]);
 

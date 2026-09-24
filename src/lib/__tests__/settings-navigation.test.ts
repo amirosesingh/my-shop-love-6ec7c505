@@ -14,6 +14,7 @@ import {
   initialOpenCategories,
   readOpenCategories,
 } from "@/platforms/web/components/pos/settings/SettingsNavTree";
+import { settingsCoverage } from "@/lib/settings-groups";
 import { matchSettings } from "@/platforms/web/components/pos/settings/use-settings-nav";
 
 describe("settings categories", () => {
@@ -45,6 +46,12 @@ describe("settings categories", () => {
       const hits = matchSettings(SETTINGS_CARDS, card.label);
       expect(hits.map((h) => h.id)).toContain(card.id);
     }
+  });
+
+  it("does not report compatibility redirects as missing workspace pages", () => {
+    const coverage = settingsCoverage();
+    expect(coverage.uncovered).not.toContain("/settings/database-explorer");
+    expect(coverage.uncovered).not.toContain("/settings/sync");
   });
 });
 
