@@ -1,0 +1,36 @@
+import { readFileSync } from "node:fs";
+import { describe, expect, it } from "vitest";
+
+const read = (path: string) => readFileSync(path, "utf8");
+
+describe("settings save actions", () => {
+  const independentlySaved = [
+    "settings.access.tsx",
+    "settings.branch-telemetry.tsx",
+    "settings.database.tsx",
+    "settings.mobile-terminals.tsx",
+    "settings.notifications.tsx",
+    "settings.payment-methods.tsx",
+    "settings.sessions.tsx",
+    "settings.shift-alerts.tsx",
+    "settings.sku.tsx",
+    "settings.system.tsx",
+    "settings.terminals.tsx",
+  ];
+
+  it.each(independentlySaved)("does not add an unrelated global save bar to %s", (file) => {
+    expect(read(`src/routes/${file}`)).toContain("showSaveBar={false}");
+  });
+});
+
+describe("shift status privacy", () => {
+  it("does not expose the shift opener in shared status surfaces", () => {
+    expect(read("src/platforms/web/components/pos/AppShell.tsx")).not.toContain(
+      "activeShift.cashier",
+    );
+    expect(read("src/platforms/web/components/pos/ShiftGuard.tsx")).not.toContain(
+      "Shift open · {activeShift.cashier}",
+    );
+    expect(read("src/routes/index.tsx")).not.toContain("`${activeShift.cashier} · shift open`");
+  });
+});

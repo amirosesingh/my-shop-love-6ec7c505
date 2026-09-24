@@ -90,6 +90,8 @@ type Props = {
   wide?: boolean;
   /** Device registration may also be managed by supervisors. */
   terminalManagement?: boolean;
+  /** Hide the shared save bar on read-only pages and pages with their own save action. */
+  showSaveBar?: boolean;
 };
 
 export function SettingsFrame({
@@ -101,10 +103,20 @@ export function SettingsFrame({
   scopeSections,
   wide = false,
   terminalManagement = false,
+  showSaveBar = true,
 }: Props) {
-  const { state, stores, currentStore, updateSettings, saveConfiguredSettings, settingsScopeLoading, upsertStore } = usePos();
+  const {
+    state,
+    stores,
+    currentStore,
+    updateSettings,
+    saveConfiguredSettings,
+    settingsScopeLoading,
+    upsertStore,
+  } = usePos();
   const { isAdmin, isSupervisor, can } = useAuth();
-  const canSettings = isAdmin || can("can_access_pos_settings") || (terminalManagement && isSupervisor);
+  const canSettings =
+    isAdmin || can("can_access_pos_settings") || (terminalManagement && isSupervisor);
   // Rendered inside the settings workspace sheet: no app shell, no back link.
   const embedded = useEmbeddedSettings();
 
@@ -372,32 +384,41 @@ export function SettingsFrame({
 
         {scopeSections?.length ? <ScopePanel sections={scopeSections} /> : null}
 
-        <fieldset disabled={settingsScopeLoading} className="w-full min-w-0 max-w-full space-y-4 rounded-lg border border-border bg-card p-5 disabled:opacity-60">
-          {settingsScopeLoading && <p role="status" className="text-sm text-muted-foreground">Loading settings for this scope. Editing becomes available when loading succeeds.</p>}
+        <fieldset
+          disabled={settingsScopeLoading}
+          className="w-full min-w-0 max-w-full space-y-4 rounded-lg border border-border bg-card p-5 disabled:opacity-60"
+        >
+          {settingsScopeLoading && (
+            <p role="status" className="text-sm text-muted-foreground">
+              Loading settings for this scope. Editing becomes available when loading succeeds.
+            </p>
+          )}
           {children}
         </fieldset>
 
         {/* Nothing is considered stored until this bar confirms it. */}
-        <div
-          className={`sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-border bg-background/95 py-3 backdrop-blur ${
-            embedded ? "px-1" : "-mx-6 px-6"
-          }`}
-        >
-          <SaveIndicator dirty={dirty} saving={saving} savedAt={savedAt} error={saveError} />
-          <div className="ml-auto flex gap-2">
-            <Button variant="ghost" size="sm" disabled={!dirty || saving} onClick={discard}>
-              <RotateCcw className="size-4" /> Discard changes
-            </Button>
-            <Button
-              size="sm"
-              disabled={saving || (!dirty && !saveError)}
-              onClick={() => void save()}
-            >
-              {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
-              {saving ? "Saving…" : "Save settings"}
-            </Button>
+        {showSaveBar && (
+          <div
+            className={`sticky bottom-0 flex flex-wrap items-center gap-3 border-t border-border bg-background/95 py-3 backdrop-blur ${
+              embedded ? "px-1" : "-mx-6 px-6"
+            }`}
+          >
+            <SaveIndicator dirty={dirty} saving={saving} savedAt={savedAt} error={saveError} />
+            <div className="ml-auto flex gap-2">
+              <Button variant="ghost" size="sm" disabled={!dirty || saving} onClick={discard}>
+                <RotateCcw className="size-4" /> Discard changes
+              </Button>
+              <Button
+                size="sm"
+                disabled={saving || (!dirty && !saveError)}
+                onClick={() => void save()}
+              >
+                {saving ? <Loader2 className="size-4 animate-spin" /> : <Save className="size-4" />}
+                {saving ? "Saving…" : "Save settings"}
+              </Button>
+            </div>
           </div>
-        </div>
+        )}
       </div>
     </SettingsCtx.Provider>
   );

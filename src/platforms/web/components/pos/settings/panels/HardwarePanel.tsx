@@ -5,16 +5,16 @@
 import { useEffect, useState } from "react";
 import { MonitorCog } from "lucide-react";
 import { ReceiptPrinterSettings } from "@/platforms/web/components/pos/ReceiptPrinterSettings";
-import { terminalId } from "@/lib/activity-journal";
 import { activeBranchName } from "@/lib/active-branch";
 import { ENGINE_LABEL, storageEngine } from "@/lib/telemetry";
+import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 
 export function HardwarePanel() {
   const [info, setInfo] = useState({ id: "", branch: "", engine: "" });
 
   useEffect(() => {
     setInfo({
-      id: terminalId(),
+      id: readTerminalConfig()?.deviceName || readTerminalConfig()?.locationName || "This terminal",
       branch: activeBranchName() ?? "Not bound",
       engine: ENGINE_LABEL[storageEngine()] ?? storageEngine(),
     });
@@ -28,8 +28,8 @@ export function HardwarePanel() {
         </h2>
         <dl className="mt-4 grid gap-4 sm:grid-cols-3">
           <div className="min-w-0">
-            <dt className="text-xs text-muted-foreground">Terminal ID</dt>
-            <dd className="break-all text-sm font-medium">{info.id || "—"}</dd>
+            <dt className="text-xs text-muted-foreground">Terminal</dt>
+            <dd className="break-words text-sm font-medium">{info.id}</dd>
           </div>
           <div className="min-w-0">
             <dt className="text-xs text-muted-foreground">Branch</dt>

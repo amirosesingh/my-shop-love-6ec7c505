@@ -76,8 +76,8 @@ function ActiveSessions() {
   if (offline)
     return (
       <p className="text-sm text-muted-foreground">
-        Connection is down. Signed-in terminals are only known centrally, so this list and
-        remote reset return as soon as the line is back.
+        Connection is down. Signed-in terminals are only known centrally, so this list and remote
+        reset return as soon as the line is back.
       </p>
     );
   if (error) return <p className="text-sm text-destructive">{error}</p>;
@@ -146,6 +146,7 @@ export const Route = createFileRoute("/settings/sessions")({
   }),
   component: () => (
     <SettingsFrame
+      showSaveBar={false}
       wide
       title="Active sessions"
       description="Every device signed in to the company data. A remote reset ends that session at once — the terminal returns to the sign-in screen on its next call."

@@ -106,14 +106,13 @@ export function BranchSettings() {
             </SelectContent>
           </Select>
           <p className="text-[11px] text-muted-foreground">
-            {branchName ? `${branchName} — ` : ""}
-            {branchId || "no branch chosen yet"}
+            {branchName || "No branch chosen yet"}
           </p>
         </div>
       ) : (
         <div className="grid gap-3 sm:grid-cols-2">
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Branch ID</Label>
+            <Label className="text-xs text-muted-foreground">Branch code</Label>
             <Input
               placeholder="NYC-Main-01"
               value={branchId}

@@ -39,15 +39,14 @@ export function ShiftGuard({ children }: { children: ReactNode }) {
   const mayOpen = can("can_open_shift");
   // Never hardcode a branch: the terminal's registered branch wins, then the
   // active store, then a neutral phrase while the store list is still loading.
-  const branchLabel =
-    terminalStoreName?.trim() || currentStore?.name?.trim() || "this terminal";
+  const branchLabel = terminalStoreName?.trim() || currentStore?.name?.trim() || "this terminal";
 
   if (activeShift) {
     const opened = new Date(activeShift.openedAt);
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <div className="flex flex-wrap items-center gap-x-4 gap-y-1 border-b border-success/30 bg-success/10 px-4 py-1.5 text-[11px] text-success">
-          <span className="font-semibold">Shift open · {activeShift.cashier}</span>
+          <span className="font-semibold">Shift open</span>
           <span>
             Opened {opened.toLocaleDateString()} at {opened.toLocaleTimeString()}
           </span>
@@ -167,12 +166,7 @@ export function ShiftGuard({ children }: { children: ReactNode }) {
             </div>
           )}
 
-          <Button
-            variant="outline"
-            size="sm"
-            className="mt-4 w-full"
-            onClick={() => void lock()}
-          >
+          <Button variant="outline" size="sm" className="mt-4 w-full" onClick={() => void lock()}>
             <LogOut className="size-3.5" /> Lock / switch user
           </Button>
         </div>

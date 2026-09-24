@@ -42,7 +42,6 @@ import {
   type VisibilityRole,
 } from "@/lib/ui-visibility";
 
-
 export const Route = createFileRoute("/settings/access")({
   head: () => ({
     meta: [
@@ -156,6 +155,7 @@ function AccessSettingsPage() {
   if (!can("can_manage_staff")) {
     return (
       <SettingsFrame
+        showSaveBar={false}
         title="Roles & access"
         description="What each role may do, and what it can see."
       >
@@ -188,6 +188,7 @@ function AccessSettingsPage() {
 
   return (
     <SettingsFrame
+      showSaveBar={false}
       title="Roles & access"
       description="Pick a role, then set what it may do and what it can see. Administrators always keep full access, so nothing here can lock you out."
     >
@@ -218,7 +219,12 @@ function AccessSettingsPage() {
               className="pl-8"
             />
           </div>
-          <Button variant="outline" size="sm" onClick={() => void resetToDefault()} disabled={!role || saving}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={() => void resetToDefault()}
+            disabled={!role || saving}
+          >
             <RotateCcw className="size-4" />
             Reset to role default
           </Button>
@@ -327,7 +333,6 @@ function AccessSettingsPage() {
                   </ul>
                 </div>
               ))}
-
             </section>
           </>
         )}

@@ -23,6 +23,7 @@ export const Route = createFileRoute("/settings/terminals")({
   }),
   component: () => (
     <SettingsFrame
+      showSaveBar={false}
       wide
       terminalManagement
       title="Terminal activation"

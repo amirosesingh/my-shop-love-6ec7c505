@@ -19,6 +19,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { notifyError } from "@/lib/notify";
 import { usePosOptional } from "@/lib/pos-store";
+import { humanizeText } from "@/lib/human-readable";
 import { getPosCallerAuth } from "@/lib/pos-caller-auth";
 import {
   cancelAuthorizationRequest,
@@ -216,8 +217,9 @@ function ApprovalsPage() {
                     {AUTH_ACTION_LABEL[row.actionKey] ?? row.actionKey}
                   </CardTitle>
                   <p className="text-xs text-muted-foreground">
-                    {row.requestedByName || row.requestedBy} · {row.storeId || "all branches"}
-                    {row.terminalId ? ` · ${row.terminalId}` : ""} · {ago(row.createdAt)}
+                    {row.requestedByName || "Staff member"} ·{" "}
+                    {pos?.stores.find((store) => store.id === row.storeId)?.name ?? "All branches"}{" "}
+                    · {ago(row.createdAt)}
                   </p>
                 </div>
                 <Badge className={STATUS_TONE[row.status] ?? ""} variant="secondary">
@@ -231,7 +233,14 @@ function ApprovalsPage() {
                     {payload.map(([k, v]) => (
                       <div key={k} className="contents">
                         <dt className="text-muted-foreground">{k.replace(/_/g, " ")}</dt>
-                        <dd className="font-medium">{String(v)}</dd>
+                        <dd className="font-medium">
+                          {humanizeText(String(v), {
+                            stores: pos?.stores,
+                            products: pos?.state.products,
+                            members: pos?.state.members,
+                            sales: pos?.state.sales,
+                          })}
+                        </dd>
                       </div>
                     ))}
                   </dl>
@@ -374,17 +383,14 @@ function TicketReview({ row }: { row: AuthorizationRequest }) {
         <span className="text-muted-foreground">Tax {money(t.tax)}</span>
         <span className="font-medium">Total {money(t.total)}</span>
         {typeof t.expectedTotal === "number" ? (
-          <span className="font-medium text-primary">
-            If approved {money(t.expectedTotal)}
-          </span>
+          <span className="font-medium text-primary">If approved {money(t.expectedTotal)}</span>
         ) : null}
       </div>
       {typeof row.requestedAmount === "number" ? (
         <p className="border-t border-border/60 px-3 py-2 text-xs">
           Requested{t.requestedLabel ? ` ${t.requestedLabel}` : ""}:{" "}
           <span className="font-medium">{money(row.requestedAmount)}</span>
-          {typeof row.approvedAmount === "number" &&
-          row.approvedAmount !== row.requestedAmount ? (
+          {typeof row.approvedAmount === "number" && row.approvedAmount !== row.requestedAmount ? (
             <span className="text-primary"> · granted {money(row.approvedAmount)}</span>
           ) : null}
         </p>

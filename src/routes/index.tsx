@@ -1306,7 +1306,7 @@ function Register() {
             : "border-destructive/40 bg-destructive/10 text-destructive"
         }`}
       >
-        {activeShift ? `${activeShift.cashier} · shift open` : "No shift open"}
+        {activeShift ? "Shift open" : "No shift open"}
       </span>
     </div>
   );
@@ -1356,7 +1356,7 @@ function Register() {
               : "border-destructive/40 bg-destructive/10 text-destructive"
           }`}
         >
-          {activeShift ? `${activeShift.cashier} · shift open` : "No shift open"}
+          {activeShift ? "Shift open" : "No shift open"}
         </span>
       </div>
       <div className="flex flex-wrap items-center gap-2">

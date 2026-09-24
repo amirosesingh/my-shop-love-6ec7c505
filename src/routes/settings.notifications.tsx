@@ -59,7 +59,9 @@ function NotificationSettingsPage() {
       toast.error(auth.message);
       return;
     }
-    const res = await saveNotificationSettings({ data: { accessToken: auth.token, settings: cfg } });
+    const res = await saveNotificationSettings({
+      data: { accessToken: auth.token, settings: cfg },
+    });
     setBusy(false);
     if (res.ok) toast.success("Alert settings saved");
     else toast.error(res.error ?? "Could not save");
@@ -67,6 +69,7 @@ function NotificationSettingsPage() {
 
   return (
     <SettingsFrame
+      showSaveBar={false}
       title="Notifications & alerts"
       description="Choose which events reach the admin bell and which are also sent on WhatsApp."
     >

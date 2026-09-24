@@ -6,12 +6,7 @@ import { SettingsFrame } from "@/platforms/web/components/pos/settings/SettingsF
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { usePos } from "@/lib/pos-store";
-import {
-  peekSku,
-  readSkuSettings,
-  writeSkuSettings,
-  type SkuMode,
-} from "@/lib/sku";
+import { peekSku, readSkuSettings, writeSkuSettings, type SkuMode } from "@/lib/sku";
 
 export const Route = createFileRoute("/settings/sku")({
   head: () => ({
@@ -34,6 +29,7 @@ export const Route = createFileRoute("/settings/sku")({
 function SkuSettingsPage() {
   return (
     <SettingsFrame
+      showSaveBar={false}
       title="SKU numbering"
       description="New products can take a running number automatically, so no one has to invent a code at the counter."
     >
@@ -68,7 +64,9 @@ function SkuForm() {
             type="button"
             onClick={() => save({ mode })}
             className={`rounded-lg border p-4 text-left transition-colors ${
-              cfg.mode === mode ? "border-primary bg-primary/5" : "border-border hover:border-primary/50"
+              cfg.mode === mode
+                ? "border-primary bg-primary/5"
+                : "border-border hover:border-primary/50"
             }`}
           >
             <p className="text-sm font-medium">{label}</p>
@@ -96,7 +94,10 @@ function SkuForm() {
             ariaLabel="SKU digits"
             value={String(cfg.pad)}
             onChange={(value) => save({ pad: Number(value) })}
-            options={Array.from({ length: 12 }, (_, index) => ({ value: String(index + 1), label: `${index + 1} digits` }))}
+            options={Array.from({ length: 12 }, (_, index) => ({
+              value: String(index + 1),
+              label: `${index + 1} digits`,
+            }))}
           />
         </div>
       </div>

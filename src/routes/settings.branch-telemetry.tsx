@@ -26,6 +26,7 @@ export const Route = createFileRoute("/settings/branch-telemetry")({
 function BranchTelemetry() {
   return (
     <SettingsFrame
+      showSaveBar={false}
       title="Branch telemetry centre"
       description="Read-only health of every till. Nothing here changes a terminal's own settings — the only actions available are data requests, and each one waits until that till's unsynced sales have reached the central database."
       wide

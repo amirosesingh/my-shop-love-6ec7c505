@@ -17,6 +17,8 @@ import {
 import { TablePagination, usePagination } from "@/platforms/web/components/pos/TablePagination";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/lib/pos-auth";
+import { usePos } from "@/lib/pos-store";
+import { humanizeText } from "@/lib/human-readable";
 import {
   EVENT_CATALOG,
   EVENT_LABELS,
@@ -48,6 +50,11 @@ const when = (iso: string) => {
 
 function NotificationsReport() {
   const { isSupervisor, user } = useAuth();
+  const { stores, state } = usePos();
+  const refs = useMemo(
+    () => ({ stores, products: state.products, members: state.members, sales: state.sales }),
+    [stores, state.products, state.members, state.sales],
+  );
   const [rows, setRows] = useState<ActivityEvent[]>([]);
   const [type, setType] = useState("all");
   const [severity, setSeverity] = useState("all");
@@ -116,8 +123,8 @@ function NotificationsReport() {
         {missing && (
           <p className="rounded-md border border-border bg-surface-2 p-3 text-xs text-muted-foreground">
             The activity log is not set up on this database yet. Run{" "}
-            <span className="font-medium">supabase/schema.sql</span> once
-            against your database to start recording events.
+            <span className="font-medium">supabase/schema.sql</span> once against your database to
+            start recording events.
           </p>
         )}
         <div className="flex flex-wrap items-end gap-3">
@@ -198,8 +205,10 @@ function NotificationsReport() {
                       </span>
                     </TableCell>
                     <TableCell className="text-xs">
-                      <p className="font-medium">{r.title}</p>
-                      {r.message && <p className="text-muted-foreground">{r.message}</p>}
+                      <p className="font-medium">{humanizeText(r.title, refs)}</p>
+                      {r.message && (
+                        <p className="text-muted-foreground">{humanizeText(r.message, refs)}</p>
+                      )}
                     </TableCell>
                     <TableCell className="text-xs">
                       {r.actorName || "—"}
@@ -210,7 +219,9 @@ function NotificationsReport() {
                       )}
                     </TableCell>
                     <TableCell className="text-xs">{r.terminalName || "—"}</TableCell>
-                    <TableCell className="text-xs">{r.storeId || "—"}</TableCell>
+                    <TableCell className="text-xs">
+                      {stores.find((store) => store.id === r.storeId)?.name ?? "Unknown branch"}
+                    </TableCell>
                     <TableCell className="text-xs capitalize">{r.whatsappStatus}</TableCell>
                   </TableRow>
                 ))
