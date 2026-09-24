@@ -187,7 +187,7 @@ export function SidebarNav({
   };
 
   return (
-    <TooltipProvider delayDuration={0}>
+    <TooltipProvider delayDuration={250} skipDelayDuration={100}>
     <div className="flex h-full min-h-0 flex-col">
       {header}
 

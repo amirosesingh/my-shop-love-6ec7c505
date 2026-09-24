@@ -389,7 +389,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
 
   return (
-    <TooltipProvider delayDuration={0}>
+    <TooltipProvider delayDuration={250} skipDelayDuration={100}>
       <div className="pos-scaled flex h-dvh min-h-dvh flex-col overflow-hidden bg-background text-foreground">
         <DbConnectionModal />
         <CloudSetupGate />
@@ -408,7 +408,7 @@ export function AppShell({ children }: { children: ReactNode }) {
             {/* Desktop / tablet sidebar */}
             <aside
               className={cn(
-                "hidden shrink-0 flex-col border-r border-border bg-sidebar md:flex",
+                "hidden shrink-0 flex-col overflow-hidden border-r border-border bg-sidebar transition-[width] duration-[var(--motion-normal)] ease-[var(--motion-ease-standard)] motion-reduce:transition-none md:flex",
                 collapsed ? "w-16" : "w-60",
               )}
             >
