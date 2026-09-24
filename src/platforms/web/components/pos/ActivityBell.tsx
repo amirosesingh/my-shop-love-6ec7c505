@@ -186,7 +186,7 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
           )}
         </Button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-[26rem] p-0">
+      <PopoverContent align="end" className="w-[min(26rem,calc(100vw-1rem))] p-0">
         <div className="border-b border-border px-3 py-2">
           <p className="text-sm font-medium">Approvals &amp; activity</p>
           <p className="text-[11px] text-muted-foreground">
@@ -366,7 +366,7 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
             </Link>
           </Button>
           <Button asChild size="sm" variant="outline" className="text-xs">
-            <Link to="/settings/notifications" onClick={() => setOpen(false)}>
+            <Link to="/alerts" onClick={() => setOpen(false)}>
               Alerts
             </Link>
           </Button>

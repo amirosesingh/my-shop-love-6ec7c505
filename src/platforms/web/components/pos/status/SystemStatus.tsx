@@ -98,7 +98,7 @@ export function SystemStatusBadge({
           )}
         </button>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-80 space-y-3">
+      <PopoverContent align="end" className="w-[min(20rem,calc(100vw-1rem))] space-y-3">
         <div className="flex items-center gap-2">
           <CloudStateIcon tone={status.tone} />
           <p className="text-sm font-semibold">

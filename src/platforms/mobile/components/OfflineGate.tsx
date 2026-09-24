@@ -16,6 +16,7 @@ import { EmergencyAccessLink } from "@/components/shared/EmergencyAccessLink";
 import { isOnlineOnly } from "@/lib/live-mode";
 import { isRecoveryPath, onRecoveryScreen } from "@/lib/recovery-route";
 import {
+  cloudVerdict,
   connectivity,
   heartbeat,
   subscribeConnectivity,
@@ -60,6 +61,19 @@ export function OfflineGate({ children }: { children: ReactNode }) {
 
   if (state === "online") return <>{children}</>;
 
+  const browserOffline = typeof navigator !== "undefined" && navigator.onLine === false;
+  const verdict = cloudVerdict();
+  const title = browserOffline
+    ? "No internet connection"
+    : verdict === "rejected" || verdict === "unconfigured"
+      ? "Connection settings need attention"
+      : "Service temporarily unavailable";
+  const message = browserOffline
+    ? "No internet connection. Please check your connection and try again. This screen will recover automatically when your connection returns."
+    : verdict === "rejected" || verdict === "unconfigured"
+      ? "This device could not authenticate with the central system. Review its Database & Cloud Connection settings."
+      : "Your device is online, but the central service is not responding. The app will keep retrying automatically.";
+
   const retry = () => {
     setChecking(true);
     void heartbeat().finally(() => setChecking(false));
@@ -68,10 +82,9 @@ export function OfflineGate({ children }: { children: ReactNode }) {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-8 text-center">
       <CloudOff className="size-10 text-destructive" aria-hidden />
-      <h1 className="text-lg font-semibold text-foreground">No connection</h1>
+      <h1 className="text-lg font-semibold text-foreground">{title}</h1>
       <p className="max-w-xs text-sm text-muted-foreground">
-        This app works with live data from your central system. It will continue automatically as
-        soon as the connection is back.
+        {message}
       </p>
       <div className="flex flex-wrap items-center justify-center gap-2">
         <button

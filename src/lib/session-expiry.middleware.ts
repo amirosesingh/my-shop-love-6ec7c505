@@ -17,7 +17,10 @@ export const sessionExpiryMiddleware = createMiddleware({ type: "function" }).cl
       const err = error as MaybeHttpError;
       const status = err?.status ?? err?.statusCode ?? 0;
       const message = String(err?.message ?? "");
-      if (status >= 500) noteConnectivityIssue();
+      if (status >= 500)
+        noteConnectivityIssue(
+          "The server is temporarily unavailable. The till will retry automatically.",
+        );
       else if (status && isTokenRejection(status, message)) notifySessionExpired();
       throw error;
     }

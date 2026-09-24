@@ -11,6 +11,7 @@ import {
 } from "@/components/ui/table";
 import { TablePagination, usePagination } from "@/platforms/web/components/pos/TablePagination";
 import { money, usePos } from "@/lib/pos-store";
+import { saleNetRevenue } from "@/core/pricing/profit";
 import {
   ReportHeader,
   StatCard,
@@ -52,13 +53,14 @@ function SalesReport() {
     [state.sales, from, to],
   );
 
-  const totals = rows.reduce(
+  const totals = rows.filter((sale) => !sale.refunded).reduce(
     (a, s) => ({
-      gross: a.gross + s.total,
+      net: a.net + saleNetRevenue(s),
+      collected: a.collected + s.total,
       discount: a.discount + s.discount,
       tax: a.tax + s.tax,
     }),
-    { gross: 0, discount: 0, tax: 0 },
+    { net: 0, collected: 0, discount: 0, tax: 0 },
   );
   const pager = usePagination(rows);
 
@@ -90,9 +92,10 @@ function SalesReport() {
           }
         />
 
-        <div className="grid gap-4 sm:grid-cols-4">
-          <StatCard label="Bills" value={String(rows.length)} />
-          <StatCard label="Gross sales" value={money(totals.gross)} />
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
+          <StatCard label="Completed bills" value={String(rows.filter((sale) => !sale.refunded).length)} />
+          <StatCard label="Net sales (ex tax)" value={money(totals.net)} />
+          <StatCard label="Total collected" value={money(totals.collected)} />
           <StatCard label="Discounts given" value={money(totals.discount)} />
           <StatCard label="Tax collected" value={money(totals.tax)} />
         </div>

@@ -31,6 +31,7 @@ import {
   Activity,
   TicketPercent,
   PackageSearch,
+  BellRing,
 } from "lucide-react";
 
 import type { PermissionFlag, PermissionTag } from "@/lib/permissions";
@@ -440,6 +441,14 @@ export const navGroups: NavGroup[] = [
         flag: "can_view_audit_trail",
         keywords: "notification alert whatsapp sign in shift sale drawer feed",
         blurb: "Live event feed with WhatsApp delivery status and CSV export.",
+      },
+      {
+        to: "/alerts",
+        label: "Alerts History",
+        icon: BellRing,
+        flag: "can_view_audit_trail",
+        keywords: "alerts warnings critical stock variance security history",
+        blurb: "Search, filter and open every warning and critical system alert.",
       },
       {
         to: "/reports/coupons",

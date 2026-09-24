@@ -76,6 +76,41 @@ describe("per-user notification state", () => {
     expect(activity.lastSeenAt("manager-2")).toBe("");
   });
 
+  it("requests server-side paging for large alert histories", async () => {
+    posFetch.mockResolvedValueOnce({
+      ok: true,
+      json: async () => ({
+        ok: true,
+        total: 1204,
+        rows: [
+          {
+            id: "alert-1",
+            event_type: "stock_adjust",
+            severity: "warning",
+            title: "Stock changed",
+            meta: { quantity: 4 },
+            created_at: "2026-09-24T01:00:00.000Z",
+          },
+        ],
+      }),
+    });
+    const activity = await import("../activity-events");
+    const result = await activity.listActivityEventPage({
+      limit: 25,
+      offset: 50,
+      query: "shuttle",
+      severities: ["warning", "critical"],
+    });
+    expect(result.total).toBe(1204);
+    expect(result.rows[0]?.meta).toEqual({ quantity: 4 });
+    expect(posFetch).toHaveBeenCalledWith(
+      "/api/v1/pos/activity-preferences",
+      expect.objectContaining({
+        body: expect.stringContaining('"offset":50'),
+      }),
+    );
+  });
+
   it("allows terminal shells to call the hosted preference endpoint", () => {
     const route = readFileSync("src/routes/api/v1/pos/activity-preferences.ts", "utf8");
     expect(route).toContain("withCors(Response.json");

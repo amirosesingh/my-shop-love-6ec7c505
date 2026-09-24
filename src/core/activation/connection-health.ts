@@ -13,6 +13,7 @@ import { localDb } from "@/core/local-db/local-db";
 import { hydrateTerminalConfig } from "@/core/activation/terminal-tokens";
 import { hasSupabaseConfig } from "@/lib/external-supabase-config";
 import { awaitProfileHydrated } from "@/lib/connection-profile";
+import { clearConnectivityIssue } from "@/lib/session-expiry";
 
 /**
  * Why the central database is or is not usable right now.
@@ -209,6 +210,11 @@ let minElapsed = false;
 let pendingResolved: Exclude<Connectivity, "connecting"> | null = null;
 let heartbeatTimer: ReturnType<typeof setInterval> | undefined;
 let minTimer: ReturnType<typeof setTimeout> | undefined;
+let heartbeatInflight: Promise<Connectivity> | null = null;
+
+/** Shared lifecycle events consumed by auth, queries and non-query stores. */
+export const APP_RESUME_EVENT = "pos:app-resume";
+export const CONNECTIVITY_RESTORED_EVENT = "pos:connectivity-restored";
 
 /** Connectivity as it stands right now. */
 export const connectivity = (): Connectivity => connectivityState;
@@ -222,8 +228,15 @@ export function subscribeConnectivity(listener: ConnListener) {
 
 function publish(next: Connectivity) {
   if (next === connectivityState) return;
+  const previous = connectivityState;
   connectivityState = next;
   for (const l of connListeners) l(next);
+  if (next === "online") {
+    clearConnectivityIssue();
+    if (typeof window !== "undefined" && previous !== "online") {
+      window.dispatchEvent(new CustomEvent(CONNECTIVITY_RESTORED_EVENT));
+    }
+  }
 }
 
 /**
@@ -260,15 +273,22 @@ async function probeDefinitive(): Promise<boolean> {
 
 /** Run one heartbeat now and publish the result. */
 export async function heartbeat(): Promise<Connectivity> {
-  const cloud = resolvedOnce
-    ? await withTimeout(probeCloud(), CLOUD_TIMEOUT)
-    : await probeDefinitive();
-  settleVerdict(cloud);
-  const local = await withTimeout(probeLocal(), LOCAL_TIMEOUT);
-  cached = { cloud, local, anyOnline: cloud || local, at: Date.now() };
-  for (const l of listeners) l(cached);
-  settle(cloud ? "online" : "offline");
-  return connectivityState;
+  if (heartbeatInflight) return heartbeatInflight;
+  heartbeatInflight = (async () => {
+    const cloud = resolvedOnce
+      ? await withTimeout(probeCloud(), CLOUD_TIMEOUT)
+      : await probeDefinitive();
+    settleVerdict(cloud);
+    const local = await withTimeout(probeLocal(), LOCAL_TIMEOUT);
+    cached = { cloud, local, anyOnline: cloud || local, at: Date.now() };
+    for (const l of listeners) l(cached);
+    if (cloud) clearConnectivityIssue();
+    settle(cloud ? "online" : "offline");
+    return connectivityState;
+  })().finally(() => {
+    heartbeatInflight = null;
+  });
+  return heartbeatInflight;
 }
 
 let monitoring = false;
@@ -280,18 +300,46 @@ let monitoring = false;
 export function startConnectivityMonitor(intervalMs = 20_000): () => void {
   if (typeof window === "undefined" || monitoring) return () => {};
   monitoring = true;
+  let active = true;
   startMinTimer();
   void heartbeat();
   heartbeatTimer = setInterval(() => void heartbeat(), intervalMs);
   const nudge = () => void heartbeat();
+  const resume = () => {
+    if (document.visibilityState === "hidden") return;
+    window.dispatchEvent(new CustomEvent(APP_RESUME_EVENT));
+    void heartbeat();
+  };
   window.addEventListener("online", nudge);
   window.addEventListener("offline", nudge);
+  window.addEventListener("focus", resume);
+  window.addEventListener("pageshow", resume);
+  document.addEventListener("visibilitychange", resume);
+  let removeNative: (() => Promise<void>) | undefined;
+  void import("@capacitor/app")
+    .then(({ App }) =>
+      App.addListener("appStateChange", ({ isActive }) => {
+        if (isActive) resume();
+      }),
+    )
+    .then((handle) => {
+      if (!active) void handle.remove();
+      else removeNative = () => handle.remove();
+    })
+    .catch(() => {
+      /* Browser visibility/focus remains the lifecycle fallback. */
+    });
   return () => {
+    active = false;
     monitoring = false;
     if (heartbeatTimer) clearInterval(heartbeatTimer);
     heartbeatTimer = undefined;
     window.removeEventListener("online", nudge);
     window.removeEventListener("offline", nudge);
+    window.removeEventListener("focus", resume);
+    window.removeEventListener("pageshow", resume);
+    document.removeEventListener("visibilitychange", resume);
+    if (removeNative) void removeNative();
   };
 }
 
@@ -301,6 +349,7 @@ export function resetConnectivity() {
   resolvedOnce = false;
   minElapsed = false;
   pendingResolved = null;
+  heartbeatInflight = null;
   monitoring = false;
   if (minTimer) clearTimeout(minTimer);
   minTimer = undefined;

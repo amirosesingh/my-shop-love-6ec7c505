@@ -632,7 +632,7 @@ const rowToSale = (r: Row): Sale => ({
     promoId: l.promo_id ?? undefined,
     couponCode: l.coupon_code ?? undefined,
     couponDiscount: num(l.coupon_discount) || undefined,
-    cost: num(l.unit_cost) || undefined,
+    cost: l.unit_cost === null || l.unit_cost === undefined ? undefined : num(l.unit_cost),
   })),
   subtotal: num(r.subtotal_amount),
   discount: num(r.discount_amount),

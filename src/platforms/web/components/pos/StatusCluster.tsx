@@ -200,7 +200,7 @@ export function SystemAlertsButton({ className }: { className?: string }) {
           />
         </span>
       </PopoverTrigger>
-      <PopoverContent align="end" className="w-96 p-0">
+      <PopoverContent align="end" className="w-[min(24rem,calc(100vw-1rem))] p-0">
         <div className="space-y-3 border-b border-border p-3">
           <div className="flex items-center gap-2">
             <Activity className="size-4 text-primary" />

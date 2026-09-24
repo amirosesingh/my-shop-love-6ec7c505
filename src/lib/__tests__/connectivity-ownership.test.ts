@@ -9,6 +9,9 @@ describe("connectivity lifecycle ownership", () => {
   const loader = read("src/components/shared/TillLoader.tsx");
   const gate = read("src/platforms/mobile/components/OfflineGate.tsx");
   const sync = read("src/lib/sync-engine.ts");
+  const health = read("src/core/activation/connection-health.ts");
+  const auth = read("src/lib/pos-auth.tsx");
+  const store = read("src/lib/pos-store.tsx");
 
   it("has one app-level owner and no screen-level owners", () => {
     expect(root).toContain("startConnectivityMonitor");
@@ -29,5 +32,21 @@ describe("connectivity lifecycle ownership", () => {
     expect(gate).toContain("heartbeat()");
     expect(sync).toContain('runExclusive("network")');
     expect(sync).toContain('announceSettingsChange("reconnect")');
+  });
+
+  it("recovers automatically after browser and native foreground transitions", () => {
+    expect(health).toContain('window.addEventListener("focus", resume)');
+    expect(health).toContain('document.addEventListener("visibilitychange", resume)');
+    expect(health).toContain('App.addListener("appStateChange"');
+    expect(root).toContain("CONNECTIVITY_RESTORED_EVENT");
+    expect(root).toContain('queryClient.refetchQueries({ type: "active" })');
+    expect(auth).toContain("APP_RESUME_EVENT");
+    expect(store).toContain("APP_RESUME_EVENT");
+  });
+
+  it("distinguishes offline, service and configuration messages", () => {
+    expect(gate).toContain("No internet connection. Please check your connection and try again.");
+    expect(gate).toContain("Service temporarily unavailable");
+    expect(gate).toContain("Connection settings need attention");
   });
 });

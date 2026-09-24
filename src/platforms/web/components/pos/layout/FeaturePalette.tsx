@@ -29,7 +29,7 @@ export function FeaturePalette({
         side="right"
         /* Right side and non-blocking so the whole canvas — including the far
            right edge — stays reachable while the hub is open. */
-        className="w-[340px] sm:max-w-none"
+        className="w-[min(340px,calc(100vw-2rem))] sm:max-w-none"
         onInteractOutside={(e) => e.preventDefault()}
       >
         <SheetHeader>

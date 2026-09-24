@@ -88,13 +88,13 @@ export function ReportHeader({
         )}
       </div>
       <div className="flex flex-wrap items-end gap-3 rounded-lg border border-border p-3">
-        <div className="space-y-1">
+        <div className="w-full space-y-1 sm:w-auto">
           <Label className="text-xs">From</Label>
-          <Input type="date" value={from} onChange={(e) => onFrom(e.target.value)} className="h-9 w-40" />
+          <Input type="date" value={from} onChange={(e) => onFrom(e.target.value)} className="h-9 w-full sm:w-40" />
         </div>
-        <div className="space-y-1">
+        <div className="w-full space-y-1 sm:w-auto">
           <Label className="text-xs">To</Label>
-          <Input type="date" value={to} onChange={(e) => onTo(e.target.value)} className="h-9 w-40" />
+          <Input type="date" value={to} onChange={(e) => onTo(e.target.value)} className="h-9 w-full sm:w-40" />
         </div>
         {children}
       </div>

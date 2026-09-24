@@ -63,6 +63,7 @@ import { recordActivity } from "./activity-events";
 import type { CloudSlice, CommitTarget } from "@/core/api/pos-db";
 import { isOnlineOnly } from "./live-mode";
 import { platformName } from "@/platform-config/platform";
+import { APP_RESUME_EVENT } from "@/core/activation/connection-health";
 import { useAuth } from "@/lib/pos-auth";
 import { readTerminalConfig } from "@/core/activation/terminal-tokens";
 import { reserveBillNumber } from "./bill-number";
@@ -792,6 +793,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
     document.addEventListener("visibilitychange", resume);
     window.addEventListener("online", resume);
     window.addEventListener("focus", resume);
+    window.addEventListener(APP_RESUME_EVENT, resume);
     let removeNative: (() => Promise<void>) | undefined;
     if (["android", "ios"].includes(platformName())) {
       void import("@capacitor/app")
@@ -814,6 +816,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       document.removeEventListener("visibilitychange", resume);
       window.removeEventListener("online", resume);
       window.removeEventListener("focus", resume);
+      window.removeEventListener(APP_RESUME_EVENT, resume);
       if (removeNative) void removeNative();
     };
   }, [signedIn, refreshActiveShift]);

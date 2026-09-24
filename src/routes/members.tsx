@@ -92,7 +92,7 @@ function Members() {
 
         <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
           {rows.map((m) => {
-            const visits = state.sales.filter((s) => s.memberId === m.id).length;
+            const visits = state.sales.filter((s) => s.memberId === m.id && !s.refunded).length;
             return (
               <article key={m.id} className="rounded-lg border border-border bg-card p-4">
                 <div className="flex items-start justify-between gap-2">

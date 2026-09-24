@@ -2,7 +2,8 @@
  * One shared margin engine so the item report and the analytics board can
  * never disagree on revenue, cost or profit.
  */
-import { lineUnitDiscount, r2, type CartLine, type Product, type Sale } from "@/core/types/pos-types";
+import { lineDiscountTotal, lineUnitDiscount, r2, type CartLine, type Product, type Sale } from "@/core/types/pos-types";
+import { lineCost, saleLineRevenues, saleLineTaxes } from "@/core/pricing/profit";
 
 export type SoldLine = {
   saleId: string;
@@ -37,14 +38,14 @@ const lineOf = (
   s: Sale,
   l: CartLine,
   products: Product[],
+  revenue: number,
+  tax: number,
 ): SoldLine => {
   const p = products.find((x) => x.id === l.productId);
   const unitDiscount = lineUnitDiscount(l);
-  const net = Math.max(l.price - unitDiscount, 0);
-  const revenue = r2(net * l.qty - (l.couponDiscount ?? 0));
   const estimatedCost = l.cost == null;
   const unitCost = l.cost ?? p?.cost ?? 0;
-  const cost = r2(unitCost * l.qty);
+  const cost = lineCost(l, products);
   const profit = r2(revenue - cost);
   return {
     saleId: s.id,
@@ -61,9 +62,9 @@ const lineOf = (
     qty: l.qty,
     price: l.price,
     unitDiscount,
-    discount: r2(unitDiscount * l.qty + (l.couponDiscount ?? 0)),
+    discount: lineDiscountTotal(l) * (l.qty < 0 ? -1 : 1),
     taxRate: l.taxRate ?? 0,
-    tax: r2((revenue * (l.taxRate ?? 0)) / 100),
+    tax,
     revenue,
     unitCost,
     cost,
@@ -77,7 +78,13 @@ const lineOf = (
 
 /** Flatten every bill in the window into one row per sold line. */
 export const soldLines = (sales: Sale[], products: Product[]): SoldLine[] =>
-  sales.flatMap((s) => s.lines.map((l) => lineOf(s, l, products)));
+  sales.flatMap((sale) => {
+    const revenues = saleLineRevenues(sale);
+    const taxes = saleLineTaxes(sale);
+    return sale.lines.map((line, index) =>
+      lineOf(sale, line, products, revenues[index] ?? 0, taxes[index] ?? 0),
+    );
+  });
 
 export const sumLines = (rows: SoldLine[]) => {
   const revenue = r2(rows.reduce((a, r) => a + r.revenue, 0));

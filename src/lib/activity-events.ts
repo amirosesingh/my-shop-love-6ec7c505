@@ -46,6 +46,7 @@ export type ActivityEvent = {
   entityType: string;
   entityId: string;
   amount: number | null;
+  meta: Record<string, unknown>;
   whatsappStatus: string;
   createdAt: string;
   /** Staff identifiers that cleared this entry on another signed-in device. */
@@ -235,6 +236,10 @@ function map(row: Row): ActivityEvent {
     entityType: String(row["entity_type"] ?? ""),
     entityId: String(row["entity_id"] ?? ""),
     amount: row["amount"] === null || row["amount"] === undefined ? null : Number(row["amount"]),
+    meta:
+      row["meta"] && typeof row["meta"] === "object" && !Array.isArray(row["meta"])
+        ? (row["meta"] as Record<string, unknown>)
+        : {},
     whatsappStatus: String(row["whatsapp_status"] ?? "skipped"),
     createdAt: String(row["created_at"] ?? ""),
     clearedBy: Array.isArray(row["cleared_by"])
@@ -251,7 +256,13 @@ export type ActivityFilter = {
   from?: string;
   to?: string;
   limit?: number;
+  offset?: number;
+  query?: string;
+  sortBy?: "created_at" | "severity" | "event_type" | "store_id" | "title";
+  sortDirection?: "asc" | "desc";
 };
+
+export type ActivityEventPage = { rows: ActivityEvent[]; total: number };
 
 /**
  * Older databases predate the activity feed. When the table is absent every
@@ -262,12 +273,16 @@ let logMissing = false;
 
 export const isActivityLogMissing = () => logMissing;
 
-const looksMissing = (error: { code?: string; message?: string } | null) =>
-  !!error &&
-  (error.code === "PGRST205" ||
-    error.code === "42P01" ||
-    /activity_events/i.test(error.message ?? "") ||
-    /schema cache|does not exist/i.test(error.message ?? ""));
+const looksMissing = (error: unknown) => {
+  const candidate = error as { code?: string; message?: string } | null;
+  return (
+    !!candidate &&
+    (candidate.code === "PGRST205" ||
+      candidate.code === "42P01" ||
+      /activity_events/i.test(candidate.message ?? "") ||
+      /schema cache|does not exist/i.test(candidate.message ?? ""))
+  );
+};
 
 /** Newest first. Returns [] when the caller is not an admin or supervisor. */
 export async function listActivityEvents(filter: ActivityFilter = {}): Promise<ActivityEvent[]> {
@@ -292,6 +307,43 @@ export async function listActivityEvents(filter: ActivityFilter = {}): Promise<A
     return (result.rows ?? []).map(map);
   } catch {
     return [];
+  }
+}
+
+/** Server-paged history for large audit and alert screens. */
+export async function listActivityEventPage(filter: ActivityFilter = {}): Promise<ActivityEventPage> {
+  if (logMissing) return { rows: [], total: 0 };
+  try {
+    const credentials = await readCredentials();
+    if (!credentials.sessionToken && !credentials.cashierToken && !credentials.accessToken)
+      return { rows: [], total: 0 };
+    const response = await posFetch("/api/v1/pos/activity-preferences", {
+      method: "POST",
+      headers: { "content-type": "application/json" },
+      body: JSON.stringify({ action: "list", ...filter, ...credentials }),
+    });
+    const result = (await response.json()) as {
+      ok?: boolean;
+      rows?: Row[];
+      total?: number;
+      error?: string;
+    };
+    if (!response.ok || !result.ok) {
+      if (looksMissing({ message: result.error })) {
+        logMissing = true;
+        return { rows: [], total: 0 };
+      }
+      throw Object.assign(new Error(result.error || "Could not load alerts"), {
+        status: response.status,
+      });
+    }
+    return { rows: (result.rows ?? []).map(map), total: Number(result.total ?? 0) || 0 };
+  } catch (error) {
+    if (looksMissing(error)) {
+      logMissing = true;
+      return { rows: [], total: 0 };
+    }
+    throw error;
   }
 }
 

@@ -63,6 +63,7 @@ import {
 import { checkCodeAvailable } from "@/lib/product-lookup";
 
 import { ItemActivityDrawer } from "@/platforms/web/components/pos/ItemActivityDrawer";
+import { OtherSourcesPopover } from "@/platforms/web/components/pos/OtherSourcesPopover";
 import type { Product } from "@/core/types/pos-types";
 import { nextSku, peekSku, readSkuSettings } from "@/lib/sku";
 
@@ -252,7 +253,7 @@ function Inventory() {
 
   return (
     <AppShell>
-      <div className="space-y-5 p-6">
+      <div className="space-y-5 p-3 sm:p-4 lg:p-6">
         <header className="flex flex-wrap items-end justify-between gap-3">
           <div>
             <h1 className="text-2xl font-semibold">Inventory · {currentStore.name}</h1>
@@ -266,14 +267,14 @@ function Inventory() {
               <span className="text-warning">{lowStock.length} below reorder level</span>
             </p>
           </div>
-          <div className="flex gap-2">
-            <div className="relative">
+          <div className="flex w-full flex-wrap gap-2 lg:w-auto lg:justify-end">
+            <div className="relative min-w-0 flex-1 sm:flex-none">
               <Search className="absolute left-3 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder="Search products"
-                className="w-56 pl-9"
+                className="w-full pl-9 sm:w-56"
               />
             </div>
             {canEdit && (
@@ -305,8 +306,8 @@ function Inventory() {
                     <DialogTitle>{draft?.name ? "Edit product" : "New product"}</DialogTitle>
                   </DialogHeader>
                   {draft && (
-                    <div className="grid grid-cols-2 gap-3">
-                      <Field label="Name" className="col-span-2">
+                    <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                      <Field label="Name" className="sm:col-span-2">
                         <Input
                           value={draft.name}
                           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
@@ -373,7 +374,7 @@ function Inventory() {
                           }))}
                         />
                       </Field>
-                      <Field label="Barcode variants" className="col-span-2">
+                      <Field label="Barcode variants" className="sm:col-span-2">
                         <div className="flex flex-wrap gap-1">
                           {(draft.variants ?? []).map((v) => (
                             <Badge
@@ -423,7 +424,7 @@ function Inventory() {
                             </Badge>
                           ))}
                         </div>
-                        <div className="mt-1 flex gap-2">
+                        <div className="mt-1 flex flex-col gap-2 sm:flex-row">
                           <Input
                             value={aliasDraft}
                             placeholder="Scan or type another barcode for this item"
@@ -452,7 +453,7 @@ function Inventory() {
                           <Input
                             value={variantLabel}
                             placeholder="Label (colour, size, pack)"
-                            className="w-56"
+                            className="w-full sm:w-56"
                             onChange={(e) => setVariantLabel(e.target.value)}
                           />
                         </div>
@@ -785,19 +786,8 @@ function Inventory() {
                       </Badge>
                     </div>
                   </TableCell>
-                  <TableCell>
-                    <div className="flex flex-wrap justify-center gap-1">
-                      {stores
-                        .filter((s) => s.id !== currentStore.id)
-                        .map((s) => (
-                          <span
-                            key={s.id}
-                            className="numeric rounded border border-border px-1.5 py-0.5 text-[11px] text-muted-foreground"
-                          >
-                            {s.code} {stockAt(p, s.id)}
-                          </span>
-                        ))}
-                    </div>
+                  <TableCell className="text-center">
+                    <OtherSourcesPopover product={p} stores={stores} currentStoreId={currentStore.id} />
                   </TableCell>
                   <TableCell className="text-right">
                     <Button

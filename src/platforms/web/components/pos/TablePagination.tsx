@@ -73,7 +73,7 @@ export function TablePagination({
 }: Props) {
   const fmt = (n: number) => n.toLocaleString();
   return (
-    <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
+    <div className="flex flex-col items-stretch gap-3 border-t border-border px-3 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:justify-between sm:px-4">
       <div className="flex items-center gap-2 text-sm text-muted-foreground">
         <span>Rows per page</span>
         <Select value={String(pageSize)} onValueChange={(v) => onPageSize(Number(v))}>
@@ -90,11 +90,11 @@ export function TablePagination({
         </Select>
       </div>
 
-      <p className="numeric text-sm text-muted-foreground">
+      <p className="numeric text-center text-sm text-muted-foreground">
         Showing {fmt(from)}–{fmt(to)} of {fmt(total)} {label}
       </p>
 
-      <div className="flex items-center gap-1">
+      <div className="flex items-center justify-center gap-1">
         <Button
           size="icon"
           variant="outline"

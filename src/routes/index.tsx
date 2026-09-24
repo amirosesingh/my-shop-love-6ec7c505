@@ -2267,7 +2267,7 @@ function Register() {
 
       {/* Live receipt preview overlay */}
       <Sheet open={receiptPreview} onOpenChange={setReceiptPreview}>
-        <SheetContent side="right" className="w-[420px] sm:max-w-none">
+        <SheetContent side="right" className="w-[min(420px,100vw)] sm:max-w-none">
           <SheetHeader>
             <SheetTitle>Live receipt preview</SheetTitle>
           </SheetHeader>
