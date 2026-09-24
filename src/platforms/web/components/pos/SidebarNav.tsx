@@ -13,7 +13,7 @@ import { navGroups, navItemKey, type NavItem } from "./nav-config";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useAuth } from "@/lib/pos-auth";
 import { useNavPins } from "@/lib/nav-pins";
 import { SETTINGS_CARDS } from "@/lib/settings-catalog";
@@ -163,7 +163,7 @@ export function SidebarNav({
         onClick={onNavigate}
         aria-label={entry.label}
         className={cn(
-          "flex items-center gap-2 rounded-md text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent hover:text-foreground",
+          "flex touch-manipulation select-none items-center gap-2 rounded-md text-sm text-muted-foreground transition-colors duration-[var(--motion-fast)] hover:bg-sidebar-accent hover:text-foreground",
           collapsed ? "justify-center py-2.5" : "px-2 py-2",
           isActive(entry) && "bg-sidebar-accent font-medium text-primary",
         )}
@@ -187,7 +187,6 @@ export function SidebarNav({
   };
 
   return (
-    <TooltipProvider delayDuration={250} skipDelayDuration={100}>
     <div className="flex h-full min-h-0 flex-col">
       {header}
 
@@ -256,6 +255,5 @@ export function SidebarNav({
         </div>
       )}
     </div>
-    </TooltipProvider>
   );
 }

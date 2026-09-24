@@ -2,7 +2,7 @@
  * Admin console: issue an activation code for a Windows till and disconnect a
  * machine again at any time.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Check,
   Copy,
@@ -102,6 +102,7 @@ export function TerminalTokens({
   const { stores } = usePos();
   const [tokens, setTokens] = useState<TerminalToken[]>([]);
   const [loading, setLoading] = useState(true);
+  const refreshPendingRef = useRef(false);
   const [error, setError] = useState("");
   const [locationId, setLocationId] = useState("");
   const [deviceName, setDeviceName] = useState("");
@@ -116,6 +117,8 @@ export function TerminalTokens({
   const [pendingReissue, setPendingReissue] = useState<TerminalToken | null>(null);
   const [pendingDelete, setPendingDelete] = useState<TerminalToken | null>(null);
   const [reissuing, setReissuing] = useState("");
+  const [restoring, setRestoring] = useState("");
+  const restoringRef = useRef("");
   const [reissued, setReissued] = useState<{ token: TerminalToken; code: string } | null>(null);
   const [reissueCopied, setReissueCopied] = useState(false);
   const [pairScan, setPairScan] = useState(false);
@@ -124,6 +127,8 @@ export function TerminalTokens({
   const selfTokenId = useMemo(() => readTerminalConfig()?.tokenId ?? "", []);
 
   const refresh = useCallback(async () => {
+    if (refreshPendingRef.current) return;
+    refreshPendingRef.current = true;
     setLoading(true);
     try {
       setTokens(await listTerminalTokens());
@@ -134,6 +139,7 @@ export function TerminalTokens({
           "Could not load terminal tokens. Has supabase/schema.sql been applied?",
       );
     } finally {
+      refreshPendingRef.current = false;
       setLoading(false);
     }
   }, []);
@@ -268,6 +274,9 @@ export function TerminalTokens({
   };
 
   const restore = async (token: TerminalToken) => {
+    if (restoringRef.current) return;
+    restoringRef.current = token.id;
+    setRestoring(token.id);
     try {
       await restoreTerminalToken(token.id);
       toast.success(`${token.deviceName} re-enabled`);
@@ -276,6 +285,9 @@ export function TerminalTokens({
       toast.error("Could not restore the token", {
         description: describeError(e, "Restoring the terminal"),
       });
+    } finally {
+      restoringRef.current = "";
+      setRestoring("");
     }
   };
 
@@ -485,8 +497,20 @@ export function TerminalTokens({
       <section className="rounded-xl border border-border bg-card shadow-sm">
         <div className="flex items-center justify-between border-b border-border px-5 py-3">
           <h2 className="text-sm font-semibold">Registered terminals</h2>
-          <Button variant="ghost" size="sm" className="h-8 text-xs" onClick={() => void refresh()}>
-            <RotateCcw className="size-3.5" /> Refresh
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-8 text-xs"
+            disabled={loading}
+            aria-busy={loading}
+            onClick={() => void refresh()}
+          >
+            {loading ? (
+              <Loader2 className="size-3.5 animate-spin" />
+            ) : (
+              <RotateCcw className="size-3.5" />
+            )}{" "}
+            {loading ? "Refreshing…" : "Refresh"}
           </Button>
         </div>
 
@@ -642,9 +666,16 @@ export function TerminalTokens({
                                 variant="ghost"
                                 size="sm"
                                 className="h-8 text-xs"
+                                disabled={Boolean(restoring)}
+                                aria-busy={restoring === t.id}
                                 onClick={() => void restore(t)}
                               >
-                                <RotateCcw className="size-3.5" /> Re-enable
+                                {restoring === t.id ? (
+                                  <Loader2 className="size-3.5 animate-spin" />
+                                ) : (
+                                  <RotateCcw className="size-3.5" />
+                                )}{" "}
+                                {restoring === t.id ? "Re-enabling…" : "Re-enable"}
                               </Button>
                             )}
                             {t.status === "revoked" && (
