@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useState } from "react";
-import { RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Loader2, RefreshCw, ShieldAlert, ShieldCheck } from "lucide-react";
 import { toast } from "sonner";
 import { notifyError } from "@/lib/notify";
 import { Button } from "@/components/ui/button";
@@ -26,6 +26,8 @@ export function SecurityAlertsPanel() {
   const [rows, setRows] = useState<SecurityFinding[]>([]);
   const [showResolved, setShowResolved] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [busyFinding, setBusyFinding] = useState("");
+  const busyFindingRef = useRef("");
   const [checkedAt, setCheckedAt] = useState<string>("");
 
   const load = useCallback(async () => {
@@ -40,11 +42,17 @@ export function SecurityAlertsPanel() {
   }, [load]);
 
   async function act(f: SecurityFinding, status: SecurityFinding["status"]) {
+    if (busyFindingRef.current) return;
+    busyFindingRef.current = f.id;
+    setBusyFinding(f.id);
     try {
       await setFindingStatus(f.id, status, user?.name ?? user?.staffId ?? "admin");
       await load();
     } catch (e) {
       notifyError(e);
+    } finally {
+      busyFindingRef.current = "";
+      setBusyFinding("");
     }
   }
 
@@ -63,7 +71,6 @@ export function SecurityAlertsPanel() {
   if (!isAdmin) {
     return (
       <div className="w-full max-w-full space-y-5">
-
         <p className="text-sm text-muted-foreground">
           Ask an administrator to review security findings.
         </p>
@@ -136,18 +143,39 @@ export function SecurityAlertsPanel() {
             </p>
             <div className="mt-2 flex flex-wrap gap-2">
               {f.status === "open" && (
-                <Button size="sm" variant="outline" onClick={() => void act(f, "acknowledged")}>
-                  Acknowledge
+                <Button
+                  size="sm"
+                  variant="outline"
+                  disabled={Boolean(busyFinding)}
+                  aria-busy={busyFinding === f.id}
+                  onClick={() => void act(f, "acknowledged")}
+                >
+                  {busyFinding === f.id ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                  {busyFinding === f.id ? "Saving…" : "Acknowledge"}
                 </Button>
               )}
               {f.status !== "resolved" && (
-                <Button size="sm" variant="secondary" onClick={() => void act(f, "resolved")}>
-                  Mark fixed
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  disabled={Boolean(busyFinding)}
+                  aria-busy={busyFinding === f.id}
+                  onClick={() => void act(f, "resolved")}
+                >
+                  {busyFinding === f.id ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                  {busyFinding === f.id ? "Saving…" : "Mark fixed"}
                 </Button>
               )}
               {f.status === "resolved" && (
-                <Button size="sm" variant="ghost" onClick={() => void act(f, "open")}>
-                  Reopen
+                <Button
+                  size="sm"
+                  variant="ghost"
+                  disabled={Boolean(busyFinding)}
+                  aria-busy={busyFinding === f.id}
+                  onClick={() => void act(f, "open")}
+                >
+                  {busyFinding === f.id ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                  {busyFinding === f.id ? "Saving…" : "Reopen"}
                 </Button>
               )}
             </div>
@@ -157,4 +185,3 @@ export function SecurityAlertsPanel() {
     </div>
   );
 }
-

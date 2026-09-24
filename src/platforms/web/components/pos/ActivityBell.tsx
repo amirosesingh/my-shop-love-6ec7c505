@@ -7,7 +7,7 @@
  * entry only hides it for the person who cleared it — the request, the
  * decision and the audit trail are never touched.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Bell } from "lucide-react";
 import { toast } from "sonner";
@@ -62,6 +62,26 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
   const [unread, setUnread] = useState(0);
   const [open, setOpen] = useState(false);
   const [missing, setMissing] = useState(false);
+  const [preferenceBusy, setPreferenceBusy] = useState<Set<string>>(() => new Set());
+  const preferenceBusyRef = useRef(new Set<string>());
+
+  const updatePreference = useCallback(
+    async (id: string, action: () => Promise<boolean>, failure: string) => {
+      if (preferenceBusyRef.current.has(id)) return;
+      preferenceBusyRef.current.add(id);
+      setPreferenceBusy(new Set(preferenceBusyRef.current));
+      try {
+        const saved = await action();
+        if (!saved) toast.error(failure);
+      } catch {
+        toast.error(failure);
+      } finally {
+        preferenceBusyRef.current.delete(id);
+        setPreferenceBusy(new Set(preferenceBusyRef.current));
+      }
+    },
+    [],
+  );
 
   const refreshCentre = useCallback(async () => {
     try {
@@ -263,12 +283,18 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
                     <p className="min-w-0 text-xs font-medium">{r.title}</p>
                     <button
                       type="button"
-                      className="ml-auto text-[10px] text-muted-foreground underline"
-                      onClick={() => void clearActivityEntry(meKey, r.id).then((saved) => {
-                        if (!saved) toast.error("Could not clear notification. Check the connection and try again.");
-                      })}
+                      className="ml-auto touch-manipulation text-[10px] text-muted-foreground underline disabled:cursor-wait disabled:opacity-60"
+                      disabled={preferenceBusy.has(r.id)}
+                      aria-busy={preferenceBusy.has(r.id)}
+                      onClick={() =>
+                        void updatePreference(
+                          r.id,
+                          () => clearActivityEntry(meKey, r.id),
+                          "Could not clear notification. Check the connection and try again.",
+                        )
+                      }
                     >
-                      Clear
+                      {preferenceBusy.has(r.id) ? "Saving…" : "Clear"}
                     </button>
                   </div>
                   {r.message && (
@@ -307,12 +333,18 @@ export function ActivityBell({ compact }: { compact?: boolean }) {
                       <p className="min-w-0 flex-1 truncate text-xs">{row.title}</p>
                       <button
                         type="button"
-                        className="text-[10px] text-primary underline"
-                        onClick={() => void reopenActivityEntry(meKey, id).then((saved) => {
-                          if (!saved) toast.error("Could not reopen notification. Check the connection and try again.");
-                        })}
+                        className="touch-manipulation text-[10px] text-primary underline disabled:cursor-wait disabled:opacity-60"
+                        disabled={preferenceBusy.has(id)}
+                        aria-busy={preferenceBusy.has(id)}
+                        onClick={() =>
+                          void updatePreference(
+                            id,
+                            () => reopenActivityEntry(meKey, id),
+                            "Could not reopen notification. Check the connection and try again.",
+                          )
+                        }
                       >
-                        Reopen
+                        {preferenceBusy.has(id) ? "Saving…" : "Reopen"}
                       </button>
                     </div>
                   );

@@ -1,6 +1,6 @@
 import { useRef, useState, type ComponentProps, type ReactNode } from "react";
 import { Button } from "@/components/ui/button";
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { useNodeOptions } from "@/platforms/web/components/pos/layout/node-options";
 
@@ -55,38 +55,36 @@ export function ActionButton({
   };
   const tip = props.disabled && disabledReason ? `${label} — ${disabledReason}` : label;
   return (
-    <TooltipProvider delayDuration={200}>
-      <Tooltip {...(held ? { open: true } : {})} onOpenChange={(o) => !o && cancelHold()}>
-        <TooltipTrigger asChild>
-          <div className="min-w-0">
-            <Button
-              aria-label={label}
-              title={tip}
-              onTouchStart={startHold}
-              onTouchEnd={cancelHold}
-              onTouchCancel={cancelHold}
-              onTouchMove={cancelHold}
-              className={cn(
-                fill
-                  ? "h-full min-h-0 w-full min-w-0 p-0 text-[length:var(--node-font,12px)] [&_svg]:size-[var(--node-icon,16px)]"
-                  : "h-auto min-h-10 w-full min-w-0 px-2 py-2",
-                layout === "stack" && !hideText ? "flex-col gap-1" : "justify-center gap-2",
-                !fill && layout === "stack" ? "text-xs" : "",
-                className,
-              )}
-              {...props}
-            >
-              <span className="shrink-0" aria-hidden="true">
-                {icon}
-              </span>
-              {!hideText && (
-                <span className="line-clamp-2 min-w-0 leading-tight break-words">{label}</span>
-              )}
-            </Button>
-          </div>
-        </TooltipTrigger>
-        <TooltipContent side="top">{tip}</TooltipContent>
-      </Tooltip>
-    </TooltipProvider>
+    <Tooltip {...(held ? { open: true } : {})} onOpenChange={(o) => !o && cancelHold()}>
+      <TooltipTrigger asChild>
+        <div className="min-w-0">
+          <Button
+            aria-label={label}
+            title={tip}
+            onTouchStart={startHold}
+            onTouchEnd={cancelHold}
+            onTouchCancel={cancelHold}
+            onTouchMove={cancelHold}
+            className={cn(
+              fill
+                ? "h-full min-h-0 w-full min-w-0 p-0 text-[length:var(--node-font,12px)] [&_svg]:size-[var(--node-icon,16px)]"
+                : "h-auto min-h-10 w-full min-w-0 px-2 py-2",
+              layout === "stack" && !hideText ? "flex-col gap-1" : "justify-center gap-2",
+              !fill && layout === "stack" ? "text-xs" : "",
+              className,
+            )}
+            {...props}
+          >
+            <span className="shrink-0" aria-hidden="true">
+              {icon}
+            </span>
+            {!hideText && (
+              <span className="line-clamp-2 min-w-0 leading-tight break-words">{label}</span>
+            )}
+          </Button>
+        </div>
+      </TooltipTrigger>
+      <TooltipContent side="top">{tip}</TooltipContent>
+    </Tooltip>
   );
 }

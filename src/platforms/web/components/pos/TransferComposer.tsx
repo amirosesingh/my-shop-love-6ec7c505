@@ -6,8 +6,8 @@
  * and the direction flip on `kind` while the picking, the spreadsheet import
  * and the stock figures stay identical.
  */
-import { useMemo, useState } from "react";
-import { FileSpreadsheet, Trash2, Upload } from "lucide-react";
+import { useMemo, useRef, useState } from "react";
+import { FileSpreadsheet, Loader2, Trash2, Upload } from "lucide-react";
 import { toast } from "sonner";
 import * as XLSX from "xlsx";
 import { Button } from "@/components/ui/button";
@@ -70,6 +70,8 @@ export function TransferComposer({
     (initialProductIds ?? []).map((productId) => ({ productId, qty: 1 })),
   );
   const [note, setNote] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const submittingRef = useRef(false);
 
   const otherStore = stores.find((s) => s.id === otherStoreId);
   const productOf = (id: string) => state.products.find((p) => p.id === id) ?? null;
@@ -157,6 +159,7 @@ export function TransferComposer({
   }
 
   async function submit() {
+    if (submittingRef.current) return;
     const clean = items
       .map((i) => ({ productId: i.productId, qty: Math.floor(Number(i.qty) || 0) }))
       .filter((i) => i.qty > 0);
@@ -164,6 +167,8 @@ export function TransferComposer({
       toast.error("Add at least one product with a quantity, and pick a store");
       return;
     }
+    submittingRef.current = true;
+    setSubmitting(true);
     try {
       if (kind === "transfer") {
         // With sub-warehouse levels the check — and the pick — spans every level.
@@ -195,6 +200,9 @@ export function TransferComposer({
       toast.error(
         error instanceof Error ? error.message : "The stock movement could not be saved.",
       );
+    } finally {
+      submittingRef.current = false;
+      setSubmitting(false);
     }
   }
 
@@ -383,8 +391,14 @@ export function TransferComposer({
           </Table>
 
           <div className="flex justify-end pt-5">
-            <Button onClick={submit} disabled={!items.length || !otherStoreId}>
-              {submitLabel} · <span className="numeric">{totalUnits}</span>
+            <Button
+              onClick={() => void submit()}
+              disabled={submitting || !items.length || !otherStoreId}
+              aria-busy={submitting}
+            >
+              {submitting ? <Loader2 className="size-4 animate-spin" /> : null}
+              {submitting ? "Submitting…" : submitLabel} ·{" "}
+              <span className="numeric">{totalUnits}</span>
             </Button>
           </div>
         </Panel>

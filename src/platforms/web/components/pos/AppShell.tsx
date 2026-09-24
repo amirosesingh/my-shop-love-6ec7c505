@@ -389,7 +389,7 @@ export function AppShell({ children }: { children: ReactNode }) {
     );
 
   return (
-    <TooltipProvider delayDuration={250} skipDelayDuration={100}>
+    <TooltipProvider delayDuration={250} skipDelayDuration={100} disableHoverableContent>
       <div className="pos-scaled flex h-dvh min-h-dvh flex-col overflow-hidden bg-background text-foreground">
         <DbConnectionModal />
         <CloudSetupGate />
