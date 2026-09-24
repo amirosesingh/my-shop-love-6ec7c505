@@ -40,6 +40,31 @@ describe("canonical Supabase SQL", () => {
     expect(sql).toContain("FUNCTION public.pos_sale_commit");
   });
 
+  it("closes server-only tables and privileged routines after every definition", () => {
+    const sql = read("supabase/schema.sql");
+    const hardening = sql.indexOf("-- Final public-schema privilege hardening");
+    expect(hardening).toBeGreaterThan(sql.lastIndexOf("CREATE OR REPLACE FUNCTION"));
+    expect(sql).toContain(
+      "REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated",
+    );
+    expect(sql).toMatch(
+      /WHERE n\.nspname = 'public'[\s\S]*p\.prosecdef[\s\S]*REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon/,
+    );
+
+    for (const table of [
+      "cashiers",
+      "pin_attempts",
+      "terminal_recovery_secrets",
+      "sync_idempotency_receipts",
+      "sync_change_feed",
+    ]) {
+      expect(sql).toContain(
+        `REVOKE ALL ON TABLE public.${table} FROM PUBLIC, anon, authenticated`,
+      );
+    }
+    expect(sql).toContain("to_regclass('public.schema_migrations')");
+  });
+
   it("resets data transactionally and restores RLS before commit", () => {
     const sql = read("supabase/reset.sql");
     expect(sql).toMatch(/BEGIN;[\s\S]*DISABLE ROW LEVEL SECURITY/);

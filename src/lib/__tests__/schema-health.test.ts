@@ -57,8 +57,13 @@ describe("schema health", () => {
   });
 
   it("records itself in a schema_migrations table in each database", () => {
-    expect(buildCloudSql([gap()], "supabase_001_20260829.sql")).toContain(
+    const cloud = buildCloudSql([gap()], "supabase_001_20260829.sql");
+    expect(cloud).toContain(
       "insert into public.schema_migrations",
+    );
+    expect(cloud).toContain("alter table public.schema_migrations enable row level security");
+    expect(cloud).toContain(
+      "revoke all on table public.schema_migrations from public, anon, authenticated",
     );
     expect(buildLocalSql([gap({ environment: "local" })], "local_001_20260829.sql")).toContain(
       "INSERT INTO dbo.schema_migrations",

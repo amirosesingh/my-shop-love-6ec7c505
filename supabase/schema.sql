@@ -14242,3 +14242,73 @@ GRANT EXECUTE ON FUNCTION public.pos_sync_counts(text,text,integer) TO service_r
 GRANT EXECUTE ON FUNCTION public.pos_old_receipt_lookup(text,text) TO service_role;
 
 -- SQLSERVER_SYNC_CONTRACT_END
+
+-- ===========================================================================
+-- Final public-schema privilege hardening
+--
+-- PostgreSQL gives PUBLIC execute permission on new routines unless it is
+-- explicitly revoked.  Because anon and authenticated inherit from PUBLIC,
+-- every SECURITY DEFINER routine must be closed after all routine definitions
+-- have been installed.  Exact pre-login endpoints are granted back below.
+-- ===========================================================================
+ALTER DEFAULT PRIVILEGES IN SCHEMA public
+  REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated;
+
+DO $privilege_hardening$
+DECLARE
+  routine record;
+BEGIN
+  FOR routine IN
+    SELECT p.oid::regprocedure AS signature
+    FROM pg_proc AS p
+    JOIN pg_namespace AS n ON n.oid = p.pronamespace
+    WHERE n.nspname = 'public'
+      AND p.prosecdef
+  LOOP
+    EXECUTE format(
+      'REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon',
+      routine.signature
+    );
+  END LOOP;
+END;
+$privilege_hardening$;
+
+-- These calls occur before a staff Supabase session exists.  Each routine or
+-- its signed server endpoint performs narrow token, PIN, campaign, or ingest
+-- validation.
+GRANT EXECUTE ON FUNCTION public.coupon_claim(text, text, text, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.member_welcome_claim(text, text, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.voucher_by_token(text) TO anon;
+GRANT EXECUTE ON FUNCTION public.verify_cashier_pin(text, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.verify_terminal_pin(text, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.terminal_token_status(uuid) TO anon;
+GRANT EXECUTE ON FUNCTION public.terminal_token_claim(uuid, text, text, text, text) TO anon;
+GRANT EXECUTE ON FUNCTION public.terminal_token_heartbeat(uuid, boolean, text, boolean) TO anon;
+GRANT EXECUTE ON FUNCTION public.security_report_findings(text, text, jsonb) TO anon;
+
+-- These tables are implementation details behind privileged routines.  RLS
+-- remains enabled as defence in depth, while client roles have no table-level
+-- path that can produce the self-check's policy-less-table warning.
+REVOKE ALL ON TABLE public.cashiers FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.pin_attempts FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.terminal_recovery_secrets FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.sync_idempotency_receipts FROM PUBLIC, anon, authenticated;
+REVOKE ALL ON TABLE public.sync_change_feed FROM PUBLIC, anon, authenticated;
+
+COMMENT ON TABLE public.sync_idempotency_receipts IS
+  'Server-only sync replay protection. Access is restricted to privileged synchronization routines.';
+COMMENT ON TABLE public.sync_change_feed IS
+  'Server-only synchronization feed. Access is restricted to privileged synchronization routines.';
+
+-- Schema Manager creates this table only when it emits a repair.  Harden an
+-- existing copy without making the optional table part of fresh installs.
+DO $schema_migrations_hardening$
+BEGIN
+  IF to_regclass('public.schema_migrations') IS NOT NULL THEN
+    ALTER TABLE public.schema_migrations ENABLE ROW LEVEL SECURITY;
+    REVOKE ALL ON TABLE public.schema_migrations FROM PUBLIC, anon, authenticated;
+    COMMENT ON TABLE public.schema_migrations IS
+      'Server-only record of applied Schema Manager repairs.';
+  END IF;
+END;
+$schema_migrations_hardening$;
