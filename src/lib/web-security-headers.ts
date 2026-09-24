@@ -7,7 +7,7 @@
  * Supabase project.
  */
 export function contentSecurityPolicy(supabaseUrl?: string): string {
-  const connections = new Set(["'self'"]);
+  const connections = new Set(["'self'", "https://cloudflareinsights.com"]);
   if (supabaseUrl) {
     try {
       const origin = new URL(supabaseUrl).origin;
@@ -27,7 +27,8 @@ export function contentSecurityPolicy(supabaseUrl?: string): string {
     "object-src 'none'",
     "frame-ancestors 'none'",
     "form-action 'self'",
-    "script-src 'self' 'unsafe-inline'",
+    "script-src 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
+    "script-src-elem 'self' 'unsafe-inline' https://static.cloudflareinsights.com",
     "script-src-attr 'none'",
     "style-src 'self' 'unsafe-inline'",
     "img-src 'self' data: blob: https:",
