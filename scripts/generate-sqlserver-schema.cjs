@@ -71,6 +71,10 @@ function defaultRule(declaration, type) {
   return null;
 }
 
+function unicodeSqlLiteral(statement) {
+  return `N'${statement.replaceAll("'", "''")}'`;
+}
+
 const tables = report.tables.map((table, tableIndex) => ({
   cloudTable: table.name,
   sqlServerTable: table.name,
@@ -210,8 +214,9 @@ for (const table of tables) {
 ) ALTER TABLE dbo.[${table.sqlServerTable}] ADD CONSTRAINT [DF_${table.sqlServerTable}_${column.sqlServerColumn}] DEFAULT (${column.defaultRule}) FOR [${column.sqlServerColumn}];`);
     }
     if (!column.nullable && column.defaultRule) {
+      const backfillStatement = `UPDATE dbo.[${table.sqlServerTable}] SET [${column.sqlServerColumn}]=${column.defaultRule} WHERE [${column.sqlServerColumn}] IS NULL;`;
       lines.push(`IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'${column.sqlServerColumn}' AND is_nullable=1) BEGIN
-  UPDATE dbo.[${table.sqlServerTable}] SET [${column.sqlServerColumn}]=${column.defaultRule} WHERE [${column.sqlServerColumn}] IS NULL;
+  EXEC sys.sp_executesql ${unicodeSqlLiteral(backfillStatement)};
   ALTER TABLE dbo.[${table.sqlServerTable}] ALTER COLUMN [${column.sqlServerColumn}] ${column.sqlServerType} NOT NULL;
 END;`);
     }

@@ -103,6 +103,13 @@ describe("SQL Server schema registry", () => {
     expect(sql).toContain("EXEC sys.sp_executesql @legacy_requested_amount_default_sql");
   });
 
+  it("defers new-column backfills until SQL Server has added the column", () => {
+    expect(sql).toContain(
+      "EXEC sys.sp_executesql N'UPDATE dbo.[booking_payments] SET [change_given]=0 WHERE [change_given] IS NULL;'",
+    );
+    expect(sql).not.toMatch(/^\s+UPDATE dbo\.\[/m);
+  });
+
   it("ships one complete re-runnable local database script", () => {
     const initial = readFileSync("database/sqlserver/migrations/001_initial.sql", "utf8").trim();
     const pipeline = readFileSync(
