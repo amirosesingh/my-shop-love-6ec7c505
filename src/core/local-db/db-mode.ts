@@ -2,8 +2,8 @@
  * Where this till reads and writes: the online database, or the local one.
  *
  * Web, Android and iOS are online-only and send every change straight to the central
- * database. Windows remains online-only until the SQL Server release gate is
- * complete; afterward Electron's canonical connection state selects local mode.
+ * database. Windows is local-first and Electron's canonical connection state
+ * selects the durable SQL Server path.
  */
 import { isOnlineOnly } from "@/lib/live-mode";
 import { hasFeature } from "@/platform-config/features";

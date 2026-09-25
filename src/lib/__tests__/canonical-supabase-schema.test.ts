@@ -18,10 +18,12 @@ function sqlFiles(directory = root): string[] {
 }
 
 describe("canonical Supabase SQL", () => {
-  it("keeps only the online installer and deliberate reset", () => {
+  it("keeps one manual upgrade, its CLI migration, the installer and deliberate reset", () => {
     expect(sqlFiles().filter((file) => file.startsWith("supabase/"))).toEqual([
+      "supabase/migrations/20260925102835_fix_payment_transaction_idempotency.sql",
       "supabase/reset.sql",
       "supabase/schema.sql",
+      "supabase/sql/payment_commit_upgrade.sql",
     ]);
   });
 

@@ -59,8 +59,8 @@ export const platformFeatures = {
     sealedSecrets: true,
   },
   windows: {
-    localDb: false,
-    offlineFirst: false,
+    localDb: true,
+    offlineFirst: true,
     cashierPin: true,
     terminalActivation: true,
     emergencyRecovery: true,

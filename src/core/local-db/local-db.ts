@@ -526,6 +526,7 @@ export type PosBridge = {
     members?: LocalSaleRow[];
     stores?: LocalSaleRow[];
     shifts?: LocalSaleRow[];
+    sales?: LocalSaleRow[];
     promotions?: LocalSaleRow[];
     tiers?: LocalSaleRow[];
     settings?: LocalSaleRow | null;

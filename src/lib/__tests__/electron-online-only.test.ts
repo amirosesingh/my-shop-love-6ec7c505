@@ -4,10 +4,10 @@ import { platformFeatures } from "@/platform-config/features";
 
 const read = (path: string) => readFileSync(path, "utf8");
 
-describe("Electron online-only contract", () => {
-  it("does not advertise local storage or offline-first writes", () => {
-    expect(platformFeatures.windows.localDb).toBe(false);
-    expect(platformFeatures.windows.offlineFirst).toBe(false);
+describe("Electron offline-first contract", () => {
+  it("advertises local storage and offline-first writes", () => {
+    expect(platformFeatures.windows.localDb).toBe(true);
+    expect(platformFeatures.windows.offlineFirst).toBe(true);
   });
 
   it("exposes no database, migration or sync-worker IPC", () => {

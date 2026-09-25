@@ -661,7 +661,9 @@ export async function verifyRelayCaller(input: {
   if (!identity)
     throw new Error("This till could not prove who it is — sign in again or re-activate it.");
 
-  // Whoever is acting, the device's registered branch is the fallback.
-  if (!identity.storeId && terminalStore) identity = { ...identity, storeId: terminalStore };
+  // A physical terminal's activation is the branch authority. A cashier or
+  // administrator signed into that device may change permissions, but cannot
+  // make the till read or write another branch's operational data.
+  if (terminalStore) identity = { ...identity, storeId: terminalStore };
   return identity;
 }

@@ -928,6 +928,11 @@ export async function importSampleData() {
 /** Load every cloud-backed slice of the POS state. */
 export async function loadCloudState(storeId?: string | null): Promise<CloudSlice> {
   await hydrateTerminalConfig();
+  // A Windows till with no network must not wait for a cloud timeout before
+  // loading its durable SQL Server snapshot. Browser and mobile clients have
+  // no local bridge, so they continue through the normal online path.
+  if (typeof navigator !== "undefined" && !navigator.onLine && localDb())
+    return loadLocalState(new Error("Central database is offline."));
   // These reads are independent. Start membership tiers alongside the other
   // slices so a full network round trip is not added to every sign-in.
   const [tiers, products, members, sales, promotions, settings, stores, shifts] = await Promise.all([
@@ -1105,7 +1110,7 @@ async function loadLocalState(cause: unknown): Promise<CloudSlice> {
   return {
     products: (result.products ?? []).map(rowToProduct),
     members: (result.members ?? []).map((row) => rowToMember(row, tierName)),
-    sales: [],
+    sales: (result.sales ?? []).map(rowToSale),
     promotions: (result.promotions ?? []).map(rowToPromotion),
     settings: rowToSettings((result.settings as Row | null) ?? null),
     stores: (result.stores ?? []).map(rowToStore),

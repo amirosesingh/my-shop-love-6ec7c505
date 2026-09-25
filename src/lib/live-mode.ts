@@ -1,10 +1,8 @@
 /**
- * Every supported client runs live-only.
+ * Whether the shell uses a live cloud-backed application experience.
  *
- * The phone build is a thin client of the cloud: it never keeps business data
- * on the device, never queues writes and never opens a local database. Web and
- * the Windows till keep their offline-first behaviour untouched — every caller
- * of `isLiveOnly()` falls through to the existing path when it returns false.
+ * This legacy helper describes the user experience, not storage routing. Use
+ * `isOnlineOnly()` when deciding whether a write may use the local database.
  */
 import { hasFeature } from "@/platform-config/features";
 
@@ -13,8 +11,8 @@ export function isLiveOnly(): boolean {
 }
 
 /**
- * True on every build. Web, Android and Electron all write directly to the
- * central database and never queue business data on the device.
+ * True for web and Android. The activated Windows till is offline-first and
+ * writes through its local SQL Server bridge before background cloud sync.
  */
 export function isOnlineOnly(): boolean {
   return !hasFeature("offlineFirst");

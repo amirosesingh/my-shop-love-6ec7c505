@@ -55,6 +55,28 @@ describe("SQL Server checkpoints 13 through 15", () => {
     expect(endpoint).toMatch(/body\.oldReceipt[\s\S]+permissions\.can_process_refund/);
     expect(endpoint).toContain('code:"PERMISSION_DENIED"');
     expect(endpoint).toMatch(/branchId !== scope\.storeId/);
+    expect(endpoint).toContain("terminalBound || !mayManageOtherBranches");
+  });
+
+  it("pins desktop synchronization and local snapshots to the activated branch", () => {
+    const caller = readFileSync("src/core/api/pos-relay.server.ts", "utf8");
+    const cloud = readFileSync("electron/sync/cloud-client.cjs", "utf8");
+    const operations = readFileSync("electron/db/repositories/operations.cjs", "utf8");
+    const main = readFileSync("electron/main.cjs", "utf8");
+
+    expect(caller).toContain("if (terminalStore) identity = { ...identity, storeId: terminalStore }");
+    expect(cloud).toContain("JSON.stringify({ ...payload, terminalToken })");
+    expect(main).toContain("operationsRepository.snapshot(localBranchId())");
+    expect(operations).toContain("FROM dbo.shifts WHERE store_id=@branch");
+    expect(operations).toContain("FROM dbo.sales WHERE store_id=@branch");
+  });
+
+  it("publishes every synced table and pulls only branch or shared rows", () => {
+    const schema = readFileSync("supabase/schema.sql", "utf8");
+    expect(schema.match(/CREATE TRIGGER sync_feed_change AFTER INSERT OR UPDATE OR DELETE/g)).toHaveLength(67);
+    expect(schema).toContain("f.branch_id IN (p_branch_id,'global')");
+    expect(schema).toContain("x.store_id::text=p_branch_id");
+    expect(schema).toContain("p_branch_id IN (x.from_store_id::text,x.to_store_id::text)");
   });
 
   it("publishes Windows SQL Server health and signed-in presence through the authenticated relay", async () => {

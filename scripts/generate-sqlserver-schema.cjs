@@ -139,11 +139,14 @@ for (const table of tables) {
     }
   }
   for (const column of table.columns.filter((item)=>item.unique)) {
-    lines.push(`IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'UX_${table.sqlServerTable}_${column.sqlServerColumn}') CREATE UNIQUE INDEX [UX_${table.sqlServerTable}_${column.sqlServerColumn}] ON dbo.[${table.sqlServerTable}]([${column.sqlServerColumn}]);`);
+    const filter = column.nullable ? ` WHERE [${column.sqlServerColumn}] IS NOT NULL` : "";
+    lines.push(`IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'UX_${table.sqlServerTable}_${column.sqlServerColumn}') CREATE UNIQUE INDEX [UX_${table.sqlServerTable}_${column.sqlServerColumn}] ON dbo.[${table.sqlServerTable}]([${column.sqlServerColumn}])${filter};`);
   }
   for(const [index,key] of (report.tables.find(item=>item.name===table.cloudTable)?.uniqueKeys??[]).entries()){
     if(key.length<2)continue;
-    lines.push(`IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'UQ_${table.sqlServerTable}_${index}') CREATE UNIQUE INDEX [UQ_${table.sqlServerTable}_${index}] ON dbo.[${table.sqlServerTable}](${key.map(name=>`[${name}]`).join(",")});`);
+    const nullableColumns = key.filter((name) => table.columns.find((column) => column.sqlServerColumn === name)?.nullable);
+    const filter = nullableColumns.length ? ` WHERE ${nullableColumns.map((name) => `[${name}] IS NOT NULL`).join(" AND ")}` : "";
+    lines.push(`IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'UQ_${table.sqlServerTable}_${index}') CREATE UNIQUE INDEX [UQ_${table.sqlServerTable}_${index}] ON dbo.[${table.sqlServerTable}](${key.map(name=>`[${name}]`).join(",")})${filter};`);
   }
   for (const column of table.columns.filter((item)=>["store_id","branch_id","organization_id","updated_at"].includes(item.sqlServerColumn))) {
     lines.push(`IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'IX_${table.sqlServerTable}_${column.sqlServerColumn}') CREATE INDEX [IX_${table.sqlServerTable}_${column.sqlServerColumn}] ON dbo.[${table.sqlServerTable}]([${column.sqlServerColumn}]);`);
@@ -199,4 +202,110 @@ fs.mkdirSync(path.join(outputDir, "migrations"), { recursive: true });
 fs.writeFileSync(path.join(outputDir, "schema-registry.json"), `${JSON.stringify(registry, null, 2)}\n`);
 fs.writeFileSync(path.join(outputDir, "schema.sql"), `${lines.join("\n\n")}\n`);
 fs.writeFileSync(path.join(outputDir, "migrations", "001_initial.sql"), `${lines.join("\n\n")}\n`);
+
+const installerHeader = `/*
+  Retail POS local Microsoft SQL Server schema
+  Generated from the migrations loaded by the POS application.
+
+  Database name: POS_Local
+
+  Run this file while connected to the local Microsoft SQL Server instance.
+  It creates POS_Local when needed, selects it, and installs or updates the
+  complete schema. The script is additive and re-runnable. It does not delete
+  tables or business data.
+*/
+
+USE [master];
+GO
+
+IF DB_ID(N'POS_Local') IS NULL
+  EXEC(N'CREATE DATABASE [POS_Local]');
+GO
+
+USE [POS_Local];
+GO`;
+const tableValues = tables.map((table) => `  (N'${table.sqlServerTable}')`).join(",\n");
+const requiredColumns = tables.flatMap((table) =>
+  table.columns.map((column) => [table.sqlServerTable, column.sqlServerColumn]),
+);
+const columnInserts = [];
+for (let index = 0; index < requiredColumns.length; index += 1_000) {
+  const values = requiredColumns
+    .slice(index, index + 1_000)
+    .map(([table, column]) => `  (N'${table}', N'${column}')`)
+    .join(",\n");
+  columnInserts.push(`INSERT INTO @RequiredColumns (table_name, column_name) VALUES\n${values};`);
+}
+const validation = `DECLARE @RequiredTables TABLE ([name] sysname NOT NULL PRIMARY KEY);
+INSERT INTO @RequiredTables ([name]) VALUES
+${tableValues};
+
+DECLARE @Required int = (SELECT COUNT(*) FROM @RequiredTables);
+DECLARE @Present int = (
+  SELECT COUNT(*)
+  FROM @RequiredTables AS required_table
+  WHERE OBJECT_ID(N'dbo.' + required_table.[name], N'U') IS NOT NULL
+);
+DECLARE @Missing int = @Required - @Present;
+
+SELECT
+  @Required AS required_tables,
+  @Present AS present_tables,
+  @Missing AS missing_tables,
+  CASE WHEN @Missing = 0 THEN N'VALID' ELSE N'INCOMPLETE' END AS schema_status;
+
+SELECT required_table.[name] AS missing_table
+FROM @RequiredTables AS required_table
+WHERE OBJECT_ID(N'dbo.' + required_table.[name], N'U') IS NULL
+ORDER BY required_table.[name];
+
+IF @Missing > 0
+  THROW 51001, 'Retail POS local database schema validation failed.', 1;
+
+DECLARE @RequiredColumns TABLE (
+  table_name sysname NOT NULL,
+  column_name sysname NOT NULL,
+  PRIMARY KEY (table_name, column_name)
+);
+${columnInserts.join("\n")}
+
+DECLARE @RequiredColumnCount int = (SELECT COUNT(*) FROM @RequiredColumns);
+DECLARE @PresentColumnCount int = (
+  SELECT COUNT(*)
+  FROM @RequiredColumns AS required_column
+  WHERE COL_LENGTH(N'dbo.' + required_column.table_name, required_column.column_name) IS NOT NULL
+);
+DECLARE @MissingColumnCount int = @RequiredColumnCount - @PresentColumnCount;
+
+SELECT
+  @RequiredColumnCount AS required_columns,
+  @PresentColumnCount AS present_columns,
+  @MissingColumnCount AS missing_columns,
+  CASE WHEN @MissingColumnCount = 0 THEN N'VALID' ELSE N'INCOMPLETE' END AS column_status;
+
+SELECT required_column.table_name AS table_name, required_column.column_name AS missing_column
+FROM @RequiredColumns AS required_column
+WHERE COL_LENGTH(N'dbo.' + required_column.table_name, required_column.column_name) IS NULL
+ORDER BY required_column.table_name, required_column.column_name;
+
+IF @MissingColumnCount > 0
+  THROW 51003, 'Retail POS local database column validation failed.', 1;
+
+IF OBJECT_ID(N'dbo.pos_schema_migrations', N'U') IS NULL
+  THROW 51002, 'Retail POS local database migration history table is missing.', 1;
+
+EXEC(N'IF NOT EXISTS (
+  SELECT 1 FROM dbo.pos_schema_migrations WHERE version = 1
+) OR NOT EXISTS (
+  SELECT 1 FROM dbo.pos_schema_migrations WHERE version = 2
+)
+  THROW 51002, ''Retail POS local database migration history is incomplete.'', 1;');
+
+EXEC(N'SELECT version, name, applied_at
+FROM dbo.pos_schema_migrations
+ORDER BY version;');
+GO`;
+const pipeline = fs.readFileSync(path.join(outputDir, "migrations", "002_sync_pipeline.sql"), "utf8").trim();
+const installer = [installerHeader, lines.join("\n\n").trim(), pipeline, validation].join("\n\n");
+fs.writeFileSync(path.join(outputDir, "retail-pos-local-database.sql"), `${installer}\n`);
 console.log(`SQL Server schema: ${tables.length} domain tables, ${tables.reduce((n,t)=>n+t.columns.length,0)} columns`);

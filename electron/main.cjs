@@ -784,7 +784,7 @@ function registerIpc() {
   ipcMain.handle("database:restore", (_e, file) => guard.guarded(async () => { const result=await backupService.restore(guard.filePath(file,{name:"backup file",extension:"bak"})); if(result.ok)await databaseService.restore(); return result; }));
   ipcMain.handle("business:write-batch", (_e, context, ops) => guard.guarded(async() => { const result=await operationsRepository.apply(guard.text(context,{name:"operation context",max:160}), guard.writeOps(ops,{max:200}));scheduleAutomaticSync(250);return result;}));
   ipcMain.handle("business:commit-aggregate", (_e, value) => guard.guarded(async() => { const aggregate=guard.aggregate(value);const result=await aggregateRepository.commit(aggregate.kind,aggregate);scheduleAutomaticSync(250);return result;}));
-  ipcMain.handle("business:snapshot", () => guard.guarded(() => operationsRepository.snapshot()));
+  ipcMain.handle("business:snapshot", () => guard.guarded(() => operationsRepository.snapshot(localBranchId())));
   ipcMain.handle("receipts:find-exact", (_e, value, branchId, proof) => guard.guarded(() => {
     const input = guard.options(proof, { name: "receipt authorization", max: 3 });
     const authorization = {
@@ -864,7 +864,7 @@ function registerIpc() {
   ipcMain.handle("health:retry", () => { health.reset(); app.relaunch(); app.exit(0); });
   ipcMain.handle("health:open-logs", () => shell.openPath(app.getPath("userData")));
   ipcMain.handle("health:collect-diagnostics", () => {
-    const result = diagnostics.writeReport({ appVersion: app.getVersion(), storage: "online-only" });
+    const result = diagnostics.writeReport({ appVersion: app.getVersion(), storage: "sqlserver-local-first" });
     if (result.ok) shell.showItemInFolder(result.file);
     return result;
   });

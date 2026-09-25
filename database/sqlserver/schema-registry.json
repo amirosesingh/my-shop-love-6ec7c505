@@ -1,7 +1,7 @@
 {
   "version": 1,
   "source": "supabase/schema.sql",
-  "generatedAt": "2026-09-21T10:32:13.862Z",
+  "generatedAt": "2026-09-25T10:31:47.818Z",
   "tables": [
     {
       "cloudTable": "coupon_campaigns",
@@ -1150,14 +1150,14 @@
           "cloudColumn": "client_event_id",
           "sqlServerColumn": "client_event_id",
           "cloudType": "text",
-          "sqlServerType": "nvarchar(max)",
+          "sqlServerType": "nvarchar(450)",
           "nullable": true,
           "defaultRule": null,
           "primaryKey": false,
           "foreignKey": false,
           "foreignKeyTarget": null,
-          "unique": false,
-          "uniqueGroup": null
+          "unique": true,
+          "uniqueGroup": "UQ_activity_events_0"
         },
         {
           "cloudColumn": "created_at",
@@ -1327,8 +1327,8 @@
           "primaryKey": false,
           "foreignKey": false,
           "foreignKeyTarget": null,
-          "unique": false,
-          "uniqueGroup": null
+          "unique": true,
+          "uniqueGroup": "UQ_app_users_1"
         },
         {
           "cloudColumn": "last_login_at",
@@ -1660,7 +1660,7 @@
             "column": "id"
           },
           "unique": false,
-          "uniqueGroup": null
+          "uniqueGroup": "UQ_booking_payments_0"
         },
         {
           "cloudColumn": "amount",
@@ -1798,14 +1798,14 @@
           "cloudColumn": "ref",
           "sqlServerColumn": "ref",
           "cloudType": "text",
-          "sqlServerType": "nvarchar(max)",
+          "sqlServerType": "nvarchar(450)",
           "nullable": false,
           "defaultRule": null,
           "primaryKey": false,
           "foreignKey": false,
           "foreignKeyTarget": null,
-          "unique": false,
-          "uniqueGroup": null
+          "unique": true,
+          "uniqueGroup": "UQ_bookings_0"
         },
         {
           "cloudColumn": "store_id",
@@ -3665,14 +3665,14 @@
           "cloudColumn": "provider_name",
           "sqlServerColumn": "provider_name",
           "cloudType": "text",
-          "sqlServerType": "nvarchar(max)",
+          "sqlServerType": "nvarchar(450)",
           "nullable": false,
           "defaultRule": null,
           "primaryKey": false,
           "foreignKey": false,
           "foreignKeyTarget": null,
-          "unique": false,
-          "uniqueGroup": null
+          "unique": true,
+          "uniqueGroup": "UQ_integration_settings_0"
         },
         {
           "cloudColumn": "api_keys_encrypted",
@@ -5016,6 +5016,19 @@
           "foreignKeyTarget": null,
           "unique": false,
           "uniqueGroup": null
+        },
+        {
+          "cloudColumn": "client_transaction_id",
+          "sqlServerColumn": "client_transaction_id",
+          "cloudType": "text",
+          "sqlServerType": "nvarchar(450)",
+          "nullable": true,
+          "defaultRule": null,
+          "primaryKey": false,
+          "foreignKey": false,
+          "foreignKeyTarget": null,
+          "unique": true,
+          "uniqueGroup": "UQ_payment_transactions_0"
         }
       ]
     },
@@ -7753,14 +7766,14 @@
           "cloudColumn": "client_transaction_id",
           "sqlServerColumn": "client_transaction_id",
           "cloudType": "text",
-          "sqlServerType": "nvarchar(max)",
+          "sqlServerType": "nvarchar(450)",
           "nullable": true,
           "defaultRule": null,
           "primaryKey": false,
           "foreignKey": false,
           "foreignKeyTarget": null,
-          "unique": false,
-          "uniqueGroup": null
+          "unique": true,
+          "uniqueGroup": "UQ_sales_1"
         },
         {
           "cloudColumn": "cashier_id",
@@ -7843,8 +7856,34 @@
         {
           "cloudColumn": "authorization_request_id",
           "sqlServerColumn": "authorization_request_id",
-          "cloudType": "uuid, ADD COLUMN IF",
+          "cloudType": "uuid",
           "sqlServerType": "uniqueidentifier",
+          "nullable": true,
+          "defaultRule": null,
+          "primaryKey": false,
+          "foreignKey": false,
+          "foreignKeyTarget": null,
+          "unique": false,
+          "uniqueGroup": null
+        },
+        {
+          "cloudColumn": "authorized_by",
+          "sqlServerColumn": "authorized_by",
+          "cloudType": "text",
+          "sqlServerType": "nvarchar(max)",
+          "nullable": true,
+          "defaultRule": null,
+          "primaryKey": false,
+          "foreignKey": false,
+          "foreignKeyTarget": null,
+          "unique": false,
+          "uniqueGroup": null
+        },
+        {
+          "cloudColumn": "authorized_at",
+          "sqlServerColumn": "authorized_at",
+          "cloudType": "timestamp with time zone",
+          "sqlServerType": "datetimeoffset(7)",
           "nullable": true,
           "defaultRule": null,
           "primaryKey": false,
@@ -7859,6 +7898,19 @@
           "cloudType": "numeric(18,4)",
           "sqlServerType": "decimal(18,4)",
           "nullable": false,
+          "defaultRule": "0",
+          "primaryKey": false,
+          "foreignKey": false,
+          "foreignKeyTarget": null,
+          "unique": false,
+          "uniqueGroup": null
+        },
+        {
+          "cloudColumn": "rounding_label",
+          "sqlServerColumn": "rounding_label",
+          "cloudType": "text",
+          "sqlServerType": "nvarchar(max)",
+          "nullable": true,
           "defaultRule": null,
           "primaryKey": false,
           "foreignKey": false,
@@ -12239,14 +12291,14 @@
           "cloudColumn": "reference",
           "sqlServerColumn": "reference",
           "cloudType": "text",
-          "sqlServerType": "nvarchar(max)",
+          "sqlServerType": "nvarchar(450)",
           "nullable": true,
           "defaultRule": null,
           "primaryKey": false,
           "foreignKey": false,
           "foreignKeyTarget": null,
-          "unique": false,
-          "uniqueGroup": null
+          "unique": true,
+          "uniqueGroup": "UQ_stock_count_drafts_0"
         },
         {
           "cloudColumn": "store_code",
@@ -12306,40 +12358,40 @@
           "cloudColumn": "action_key",
           "sqlServerColumn": "action_key",
           "cloudType": "text",
-          "sqlServerType": "nvarchar(max)",
+          "sqlServerType": "nvarchar(128)",
           "nullable": false,
           "defaultRule": null,
           "primaryKey": false,
           "foreignKey": false,
           "foreignKeyTarget": null,
           "unique": false,
-          "uniqueGroup": null
+          "uniqueGroup": "UQ_authorization_actions_0"
         },
         {
           "cloudColumn": "scope_type",
           "sqlServerColumn": "scope_type",
           "cloudType": "text",
-          "sqlServerType": "nvarchar(max)",
+          "sqlServerType": "nvarchar(128)",
           "nullable": false,
           "defaultRule": "'global'",
           "primaryKey": false,
           "foreignKey": false,
           "foreignKeyTarget": null,
           "unique": false,
-          "uniqueGroup": null
+          "uniqueGroup": "UQ_authorization_actions_0"
         },
         {
           "cloudColumn": "scope_id",
           "sqlServerColumn": "scope_id",
           "cloudType": "text",
-          "sqlServerType": "nvarchar(max)",
+          "sqlServerType": "nvarchar(128)",
           "nullable": false,
           "defaultRule": "''",
           "primaryKey": false,
           "foreignKey": false,
           "foreignKeyTarget": null,
           "unique": false,
-          "uniqueGroup": null
+          "uniqueGroup": "UQ_authorization_actions_0"
         },
         {
           "cloudColumn": "mode",
@@ -13246,8 +13298,8 @@
             "table": "shifts",
             "column": "id"
           },
-          "unique": false,
-          "uniqueGroup": null
+          "unique": true,
+          "uniqueGroup": "UQ_shift_cash_counts_0"
         },
         {
           "cloudColumn": "store_id",
@@ -13383,14 +13435,14 @@
           "cloudColumn": "client_key",
           "sqlServerColumn": "client_key",
           "cloudType": "text",
-          "sqlServerType": "nvarchar(max)",
+          "sqlServerType": "nvarchar(450)",
           "nullable": true,
           "defaultRule": null,
           "primaryKey": false,
           "foreignKey": false,
           "foreignKeyTarget": null,
-          "unique": false,
-          "uniqueGroup": null
+          "unique": true,
+          "uniqueGroup": "UQ_shift_cash_counts_1"
         },
         {
           "cloudColumn": "created_at",
@@ -13878,8 +13930,8 @@
             "table": "shift_reconciliations",
             "column": "id"
           },
-          "unique": false,
-          "uniqueGroup": null
+          "unique": true,
+          "uniqueGroup": "UQ_shift_variance_alerts_0"
         },
         {
           "cloudColumn": "variance_total",
@@ -14264,14 +14316,14 @@
           "cloudColumn": "client_event_id",
           "sqlServerColumn": "client_event_id",
           "cloudType": "TEXT",
-          "sqlServerType": "nvarchar(max)",
+          "sqlServerType": "nvarchar(450)",
           "nullable": true,
           "defaultRule": null,
           "primaryKey": false,
           "foreignKey": false,
           "foreignKeyTarget": null,
-          "unique": false,
-          "uniqueGroup": null
+          "unique": true,
+          "uniqueGroup": "UQ_entity_status_history_0"
         },
         {
           "cloudColumn": "occurred_at",

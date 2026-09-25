@@ -20,6 +20,11 @@ vi.mock("@/lib/session-guard.server", () => ({
       : Promise.resolve({ ok: false, reason: "revoked" }),
 }));
 
+vi.mock("@/lib/external-supabase-config", () => ({
+  runtimeEnvValue: () => "service-key",
+  supabaseConfig: () => ({ url: "https://example.supabase.co", key: "publishable-key" }),
+}));
+
 import { verifyRelayCaller } from "@/core/api/pos-relay.server";
 
 describe("relay caller identity", () => {
@@ -32,6 +37,34 @@ describe("relay caller identity", () => {
       });
       expect(caller).toMatchObject({ kind: "cashier", staffUserId: "shop-admin" });
       expect(fetchSpy).not.toHaveBeenCalled();
+    } finally {
+      fetchSpy.mockRestore();
+    }
+  });
+
+  it("uses the activated terminal branch even when the signed-in user has another scope", async () => {
+    const fetchSpy = vi.spyOn(globalThis, "fetch").mockResolvedValue(
+      new Response(
+        JSON.stringify([
+          {
+            id: "terminal-1",
+            status: "active",
+            location_id: "activated-branch",
+            revoked_at: null,
+          },
+        ]),
+        { status: 200, headers: { "content-type": "application/json" } },
+      ),
+    );
+    try {
+      const caller = await verifyRelayCaller({
+        sessionToken: "current-session",
+        terminalToken: "terminal-1",
+      });
+      expect(caller).toMatchObject({
+        kind: "cashier",
+        storeId: "activated-branch",
+      });
     } finally {
       fetchSpy.mockRestore();
     }

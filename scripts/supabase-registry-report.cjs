@@ -44,6 +44,16 @@ for(const match of sql.matchAll(/ALTER\s+TABLE(?:\s+ONLY)?\s+public\.([a-z0-9_]+
  if(foreign)table.foreignKeys.push({column:foreign[1].replace(/["\s]/g,""),table:foreign[2],targetColumn:foreign[3].replace(/["\s]/g,"")});
 }
 
+// PostgreSQL commonly expresses idempotency keys as partial unique indexes
+// instead of table constraints. Preserve simple column-only indexes in the
+// portable registry so the local SQL Server enforces the same uniqueness.
+for(const match of sql.matchAll(/CREATE\s+UNIQUE\s+INDEX(?:\s+IF\s+NOT\s+EXISTS)?\s+[a-z0-9_".]+\s+ON\s+(?:ONLY\s+)?public\.([a-z0-9_]+)(?:\s+USING\s+\w+)?\s*\(([^;]+?)\)(?:\s+WHERE\s+[\s\S]*?)?;/gi)){
+ const table=byName.get(match[1]);if(!table)continue;
+ const key=match[2].split(",").map(value=>value.replace(/["\s]/g,"")).filter(value=>/^[a-z_][a-z0-9_]*$/i.test(value));
+ if(!key.length||key.length!==match[2].split(",").length)continue;
+ if(!table.uniqueKeys.some(existing=>existing.length===key.length&&existing.every((value,index)=>value===key[index])))table.uniqueKeys.push(key);
+}
+
 const report = {
   source: "supabase/schema.sql",
   generatedAt: new Date().toISOString(),
