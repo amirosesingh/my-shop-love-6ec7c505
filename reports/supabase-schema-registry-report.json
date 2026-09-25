@@ -1,8 +1,8 @@
 {
   "source": "supabase/schema.sql",
-  "generatedAt": "2026-09-25T10:31:47.818Z",
+  "generatedAt": "2026-09-25T11:22:58.865Z",
   "tableCount": 67,
-  "columnCount": 1037,
+  "columnCount": 1081,
   "tables": [
     {
       "name": "coupon_campaigns",
@@ -311,9 +311,39 @@
         },
         {
           "name": "state",
-          "declaration": "text NOT NULL DEFAULT 'ACTIVE', ADD COLUMN IF NOT EXISTS close_reason text, ADD COLUMN IF NOT EXISTS closing_started_at timestamptz, ADD COLUMN IF NOT EXISTS closing_started_by text, ADD COLUMN IF NOT EXISTS final_counted_cash numeric, ADD COLUMN IF NOT EXISTS variance_status text",
+          "declaration": "text NOT NULL DEFAULT 'ACTIVE'",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "close_reason",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "closing_started_at",
+          "declaration": "timestamptz",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "closing_started_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "final_counted_cash",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "variance_status",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -565,6 +595,18 @@
           "declaration": "timestamp with time zone DEFAULT now() NOT NULL",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "previous_state",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "new_state",
+          "declaration": "TEXT",
+          "nullable": true,
+          "hasDefault": false
         },
         {
           "name": "cleared_by",
@@ -849,13 +891,55 @@
         },
         {
           "name": "status",
-          "declaration": "text NOT NULL DEFAULT 'settled', ADD COLUMN IF NOT EXISTS client_payment_id text, ADD COLUMN IF NOT EXISTS reference text, ADD COLUMN IF NOT EXISTS reversed_at timestamptz, ADD COLUMN IF NOT EXISTS reversed_by text",
+          "declaration": "text NOT NULL DEFAULT 'settled'",
           "nullable": false,
           "hasDefault": true
         },
         {
+          "name": "client_payment_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "reference",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "reversed_at",
+          "declaration": "timestamptz",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "reversed_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
           "name": "kind",
-          "declaration": "text NOT NULL DEFAULT 'payment', ADD COLUMN IF NOT EXISTS refund_reason text, ADD COLUMN IF NOT EXISTS refunds_payment_id uuid, ADD COLUMN IF NOT EXISTS change_given numeric NOT NULL DEFAULT 0",
+          "declaration": "text NOT NULL DEFAULT 'payment'",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "refund_reason",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "refunds_payment_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "change_given",
+          "declaration": "numeric NOT NULL DEFAULT 0",
           "nullable": false,
           "hasDefault": true
         }
@@ -1170,7 +1254,25 @@
         },
         {
           "name": "cancel_reason",
-          "declaration": "text, ADD COLUMN IF NOT EXISTS cancelled_by text, ADD COLUMN IF NOT EXISTS cancelled_at timestamptz, ADD COLUMN IF NOT EXISTS cancelled_terminal text",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "cancelled_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "cancelled_at",
+          "declaration": "timestamptz",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "cancelled_terminal",
+          "declaration": "text",
           "nullable": true,
           "hasDefault": false
         },
@@ -1763,9 +1865,15 @@
         },
         {
           "name": "status",
-          "declaration": "text NOT NULL DEFAULT 'held', ADD COLUMN IF NOT EXISTS pending_request_id uuid",
+          "declaration": "text NOT NULL DEFAULT 'held'",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "pending_request_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -3515,7 +3623,19 @@
         },
         {
           "name": "pending_edit_request_id",
-          "declaration": "uuid, ADD COLUMN IF NOT EXISTS pending_edit_by text, ADD COLUMN IF NOT EXISTS pending_edit_at timestamptz",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "pending_edit_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "pending_edit_at",
+          "declaration": "timestamptz",
           "nullable": true,
           "hasDefault": false
         }
@@ -4794,7 +4914,25 @@
         },
         {
           "name": "verified_by",
-          "declaration": "text, ADD COLUMN IF NOT EXISTS verified_at timestamptz, ADD COLUMN IF NOT EXISTS posted_at timestamptz, ADD COLUMN IF NOT EXISTS discrepancy_reason text",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "verified_at",
+          "declaration": "timestamptz",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "posted_at",
+          "declaration": "timestamptz",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "discrepancy_reason",
+          "declaration": "text",
           "nullable": true,
           "hasDefault": false
         }
@@ -5331,6 +5469,18 @@
         },
         {
           "name": "last_seen_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "app_version",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "last_sync_at",
           "declaration": "timestamp with time zone",
           "nullable": true,
           "hasDefault": false
@@ -5886,7 +6036,73 @@
         },
         {
           "name": "allow_offline_approvals",
-          "declaration": "boolean NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS offline_approval_requires_pin boolean NOT NULL DEFAULT true, ADD COLUMN IF NOT EXISTS online_only_void_cart boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_void_line boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_reduce_qty boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_manual_discount boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_price_override boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_stock_adjustment boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_shift_close boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_edit_tenders boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_terminal_reset boolean NOT NULL DEFAULT false, ADD COLUMN IF NOT EXISTS online_only_refund boolean NOT NULL DEFAULT false",
+          "declaration": "boolean NOT NULL DEFAULT true",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "offline_approval_requires_pin",
+          "declaration": "boolean NOT NULL DEFAULT true",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "online_only_void_cart",
+          "declaration": "boolean NOT NULL DEFAULT false",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "online_only_void_line",
+          "declaration": "boolean NOT NULL DEFAULT false",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "online_only_reduce_qty",
+          "declaration": "boolean NOT NULL DEFAULT false",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "online_only_manual_discount",
+          "declaration": "boolean NOT NULL DEFAULT false",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "online_only_price_override",
+          "declaration": "boolean NOT NULL DEFAULT false",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "online_only_stock_adjustment",
+          "declaration": "boolean NOT NULL DEFAULT false",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "online_only_shift_close",
+          "declaration": "boolean NOT NULL DEFAULT false",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "online_only_edit_tenders",
+          "declaration": "boolean NOT NULL DEFAULT false",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "online_only_terminal_reset",
+          "declaration": "boolean NOT NULL DEFAULT false",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "online_only_refund",
+          "declaration": "boolean NOT NULL DEFAULT false",
           "nullable": false,
           "hasDefault": true
         }
@@ -6062,7 +6278,19 @@
         },
         {
           "name": "pending_edit_request_id",
-          "declaration": "uuid, ADD COLUMN IF NOT EXISTS pending_edit_by text, ADD COLUMN IF NOT EXISTS pending_edit_at timestamptz",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "pending_edit_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "pending_edit_at",
+          "declaration": "timestamptz",
           "nullable": true,
           "hasDefault": false
         }
@@ -6310,9 +6538,45 @@
         },
         {
           "name": "requested_amount",
-          "declaration": "numeric, ADD COLUMN IF NOT EXISTS approved_amount numeric, ADD COLUMN IF NOT EXISTS approved_payload jsonb NOT NULL DEFAULT '{}'::jsonb, ADD COLUMN IF NOT EXISTS bill_snapshot jsonb NOT NULL DEFAULT '{}'::jsonb, ADD COLUMN IF NOT EXISTS snapshot_hash text NOT NULL DEFAULT '', ADD COLUMN IF NOT EXISTS held_order_id text, ADD COLUMN IF NOT EXISTS notified_at timestamptz",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "approved_amount",
+          "declaration": "numeric",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "approved_payload",
+          "declaration": "jsonb NOT NULL DEFAULT '{}'::jsonb",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "bill_snapshot",
+          "declaration": "jsonb NOT NULL DEFAULT '{}'::jsonb",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "snapshot_hash",
+          "declaration": "text NOT NULL DEFAULT ''",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "held_order_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "notified_at",
+          "declaration": "timestamptz",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [],

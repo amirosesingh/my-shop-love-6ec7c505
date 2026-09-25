@@ -2,47 +2,190 @@ import { describe, expect, it, vi } from "vitest";
 
 describe("SQL Server aggregate repository", () => {
   it("rolls back fully when any aggregate statement fails", async () => {
-    const rollback=vi.fn(); const commit=vi.fn();
-    class Transaction { begin=vi.fn(); rollback=rollback; commit=commit; }
-    class Request { input(){return this;} query(){return {recordset:[]};} }
-    const sql={Transaction,Request,UniqueIdentifier:"uuid",ISOLATION_LEVEL:{SERIALIZABLE:4}};
-    const { AggregateRepository }=await import("../../../electron/db/repositories/aggregates.cjs");
-    const operations={
-      pool:()=>({}), tables:new Map([["sales",{sqlServerTable:"sales",columns:[{sqlServerColumn:"id",primaryKey:true}]}]]),
-      validate:(value: unknown)=>value,
-      applyOperation:vi.fn().mockRejectedValue(new Error("injected statement failure")),
+    const rollback = vi.fn();
+    const commit = vi.fn();
+    class Transaction {
+      begin = vi.fn();
+      rollback = rollback;
+      commit = commit;
+    }
+    class Request {
+      input() {
+        return this;
+      }
+      query() {
+        return { recordset: [] };
+      }
+    }
+    const sql = {
+      Transaction,
+      Request,
+      UniqueIdentifier: "uuid",
+      ISOLATION_LEVEL: { SERIALIZABLE: 4 },
     };
-    const repository=new AggregateRepository({sql:()=>sql},operations);
-    await expect(repository.commit("sale",{operationId:"11111111-1111-4111-8111-111111111111",operations:[{kind:"insert",table:"sales",rows:[{id:"22222222-2222-4222-8222-222222222222"}]}]})).rejects.toThrow("injected");
+    const { AggregateRepository } =
+      await import("../../../electron/db/repositories/aggregates.cjs");
+    const operations = {
+      pool: () => ({}),
+      tables: new Map([
+        [
+          "sales",
+          { sqlServerTable: "sales", columns: [{ sqlServerColumn: "id", primaryKey: true }] },
+        ],
+      ]),
+      validate: (value: unknown) => value,
+      applyOperation: vi.fn().mockRejectedValue(new Error("injected statement failure")),
+    };
+    const repository = new AggregateRepository({ sql: () => sql }, operations);
+    await expect(
+      repository.commit("sale", {
+        operationId: "11111111-1111-4111-8111-111111111111",
+        operations: [
+          {
+            kind: "insert",
+            table: "sales",
+            rows: [{ id: "22222222-2222-4222-8222-222222222222" }],
+          },
+        ],
+      }),
+    ).rejects.toThrow("injected");
+    expect(rollback).toHaveBeenCalledOnce();
+    expect(commit).not.toHaveBeenCalled();
+  });
+
+  it("rolls back the sale header when a later payment row fails", async () => {
+    const rollback = vi.fn();
+    const commit = vi.fn();
+    class Transaction {
+      begin = vi.fn();
+      rollback = rollback;
+      commit = commit;
+    }
+    class Request {
+      input() {
+        return this;
+      }
+      query() {
+        return { recordset: [] };
+      }
+    }
+    const sql = {
+      Transaction,
+      Request,
+      UniqueIdentifier: "uuid",
+      ISOLATION_LEVEL: { SERIALIZABLE: 4 },
+    };
+    const tables = new Map([
+      [
+        "sales",
+        { sqlServerTable: "sales", columns: [{ sqlServerColumn: "id", primaryKey: true }] },
+      ],
+      [
+        "payment_transactions",
+        {
+          sqlServerTable: "payment_transactions",
+          columns: [{ sqlServerColumn: "id", primaryKey: true }],
+        },
+      ],
+    ]);
+    const applyOperation = vi
+      .fn()
+      .mockResolvedValueOnce(1)
+      .mockRejectedValueOnce(new Error("payment insert failed"));
+    const operations = {
+      pool: () => ({}),
+      tables,
+      validate: (value: unknown) => value,
+      applyOperation,
+    };
+    const { AggregateRepository } =
+      await import("../../../electron/db/repositories/aggregates.cjs");
+    const repository = new AggregateRepository({ sql: () => sql }, operations);
+    await expect(
+      repository.commit("sale", {
+        operationId: "11111111-1111-4111-8111-111111111111",
+        operations: [
+          {
+            kind: "upsert",
+            table: "sales",
+            rows: [{ id: "22222222-2222-4222-8222-222222222222" }],
+          },
+          {
+            kind: "upsert",
+            table: "payment_transactions",
+            rows: [{ id: "33333333-3333-4333-8333-333333333333" }],
+          },
+        ],
+      }),
+    ).rejects.toThrow("payment insert failed");
+    expect(applyOperation).toHaveBeenCalledTimes(2);
     expect(rollback).toHaveBeenCalledOnce();
     expect(commit).not.toHaveBeenCalled();
   });
 
   it("refuses arbitrary procedure names", async () => {
-    const { AggregateRepository }=await import("../../../electron/db/repositories/aggregates.cjs");
-    await expect(new AggregateRepository({},{}).commit("runSql",{operations:[]})).rejects.toThrow("Unsupported");
+    const { AggregateRepository } =
+      await import("../../../electron/db/repositories/aggregates.cjs");
+    await expect(
+      new AggregateRepository({}, {}).commit("runSql", { operations: [] }),
+    ).rejects.toThrow("Unsupported");
   });
 
   it("replays the same aggregate without applying business statements twice", async () => {
     let receipt: string | null = null;
-    class Transaction { async begin(){} async commit(){} async rollback(){} }
+    class Transaction {
+      async begin() {}
+      async commit() {}
+      async rollback() {}
+    }
     class Request {
       values: Record<string, unknown> = {};
-      input(name: string, ...args: unknown[]){ this.values[name]=args.at(-1); return this; }
-      async query(text: string){
-        if(text.startsWith("SELECT note"))return{recordset:receipt?[{note:receipt}]:[]};
-        if(text.startsWith("INSERT dbo.local_operation_receipts"))receipt=String(this.values.note);
-        return{recordset:[]};
+      input(name: string, ...args: unknown[]) {
+        this.values[name] = args.at(-1);
+        return this;
+      }
+      async query(text: string) {
+        if (text.startsWith("SELECT note"))
+          return { recordset: receipt ? [{ note: receipt }] : [] };
+        if (text.startsWith("INSERT dbo.local_operation_receipts"))
+          receipt = String(this.values.note);
+        return { recordset: [] };
       }
     }
-    const sql={Transaction,Request,UniqueIdentifier:"uuid",ISOLATION_LEVEL:{SERIALIZABLE:4}};
-    const applyOperation=vi.fn().mockResolvedValue(1);
-    const operations={pool:()=>({}),tables:new Map([["sales",{sqlServerTable:"sales",columns:[{sqlServerColumn:"id",primaryKey:true}]}]]),validate:(value:unknown)=>value,applyOperation};
-    const { AggregateRepository }=await import("../../../electron/db/repositories/aggregates.cjs");
-    const repository=new AggregateRepository({sql:()=>sql},operations);
-    const aggregate={operationId:"11111111-1111-4111-8111-111111111111",branchId:"B1",operations:[{kind:"insert",table:"sales",rows:[{id:"22222222-2222-4222-8222-222222222222",store_id:"B1"}]}]};
-    await expect(repository.commit("sale",aggregate)).resolves.toMatchObject({replayed:false});
-    await expect(repository.commit("sale",aggregate)).resolves.toMatchObject({replayed:true});
+    const sql = {
+      Transaction,
+      Request,
+      UniqueIdentifier: "uuid",
+      ISOLATION_LEVEL: { SERIALIZABLE: 4 },
+    };
+    const applyOperation = vi.fn().mockResolvedValue(1);
+    const operations = {
+      pool: () => ({}),
+      tables: new Map([
+        [
+          "sales",
+          { sqlServerTable: "sales", columns: [{ sqlServerColumn: "id", primaryKey: true }] },
+        ],
+      ]),
+      validate: (value: unknown) => value,
+      applyOperation,
+    };
+    const { AggregateRepository } =
+      await import("../../../electron/db/repositories/aggregates.cjs");
+    const repository = new AggregateRepository({ sql: () => sql }, operations);
+    const aggregate = {
+      operationId: "11111111-1111-4111-8111-111111111111",
+      branchId: "B1",
+      operations: [
+        {
+          kind: "insert",
+          table: "sales",
+          rows: [{ id: "22222222-2222-4222-8222-222222222222", store_id: "B1" }],
+        },
+      ],
+    };
+    await expect(repository.commit("sale", aggregate)).resolves.toMatchObject({ replayed: false });
+    await expect(repository.commit("sale", aggregate)).resolves.toMatchObject({ replayed: true });
     expect(applyOperation).toHaveBeenCalledOnce();
   });
 });

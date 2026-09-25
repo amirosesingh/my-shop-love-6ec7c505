@@ -8313,6 +8313,7 @@ CREATE TABLE IF NOT EXISTS public.authorization_actions (
 CREATE UNIQUE INDEX IF NOT EXISTS authorization_actions_scope_uidx
   ON public.authorization_actions (action_key, scope_type, scope_id);
 
+REVOKE ALL ON public.authorization_actions FROM anon, authenticated;
 GRANT SELECT ON public.authorization_actions TO authenticated;
 GRANT ALL ON public.authorization_actions TO service_role;
 ALTER TABLE public.authorization_actions ENABLE ROW LEVEL SECURITY;
@@ -8350,6 +8351,7 @@ CREATE INDEX IF NOT EXISTS authorization_requests_status_idx
 CREATE INDEX IF NOT EXISTS authorization_requests_store_idx
   ON public.authorization_requests (store_id, created_at DESC);
 
+REVOKE ALL ON public.authorization_requests FROM anon, authenticated;
 GRANT SELECT ON public.authorization_requests TO authenticated;
 GRANT ALL ON public.authorization_requests TO service_role;
 ALTER TABLE public.authorization_requests ENABLE ROW LEVEL SECURITY;
@@ -8380,6 +8382,7 @@ CREATE INDEX IF NOT EXISTS authorization_log_created_idx
 CREATE INDEX IF NOT EXISTS authorization_log_action_idx
   ON public.authorization_log (action_key, created_at DESC);
 
+REVOKE ALL ON public.authorization_log FROM anon, authenticated;
 GRANT SELECT ON public.authorization_log TO authenticated;
 GRANT ALL ON public.authorization_log TO service_role;
 ALTER TABLE public.authorization_log ENABLE ROW LEVEL SECURITY;
@@ -12005,13 +12008,13 @@ ALTER TABLE public.sync_idempotency_receipts ENABLE ROW LEVEL SECURITY; ALTER TA
 CREATE OR REPLACE FUNCTION public.sync_apply_coupon_campaigns(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."coupon_campaigns" ("id","name","slug","discount_type","discount_value","scope","scope_value","max_claims","max_per_member","claims_count","starts_at","expires_at","is_active","is_welcome","created_at","updated_at","row_version")
   SELECT "id","name","slug","discount_type","discount_value","scope","scope_value","max_claims","max_per_member","claims_count","starts_at","expires_at","is_active","is_welcome","created_at","updated_at","row_version" FROM jsonb_populate_recordset(NULL::public."coupon_campaigns", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "name"=EXCLUDED."name","slug"=EXCLUDED."slug","discount_type"=EXCLUDED."discount_type","discount_value"=EXCLUDED."discount_value","scope"=EXCLUDED."scope","scope_value"=EXCLUDED."scope_value","max_claims"=EXCLUDED."max_claims","max_per_member"=EXCLUDED."max_per_member","claims_count"=EXCLUDED."claims_count","starts_at"=EXCLUDED."starts_at","expires_at"=EXCLUDED."expires_at","is_active"=EXCLUDED."is_active","is_welcome"=EXCLUDED."is_welcome","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version" WHERE EXCLUDED."row_version">public."coupon_campaigns"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12034,13 +12037,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_coupon_campaigns() FROM PUBLIC, anon, au
 CREATE OR REPLACE FUNCTION public.sync_apply_shifts(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
-  INSERT INTO public."shifts" ("id","store_id","terminal_id","terminal_name","opened_by_name","opened_by_staff_id","opened_by_role","closed_by_name","closed_by_staff_id","closed_by_role","opened_at","closed_at","opening_float","counted_cash","expected_cash","note","overdue","created_at","updated_at","status","closing_float","user_id","row_version","counted_card","counted_digital","expected_card","expected_digital","variance_cash","variance_card","variance_digital","variance_total","state")
-  SELECT "id","store_id","terminal_id","terminal_name","opened_by_name","opened_by_staff_id","opened_by_role","closed_by_name","closed_by_staff_id","closed_by_role","opened_at","closed_at","opening_float","counted_cash","expected_cash","note","overdue","created_at","updated_at","status","closing_float","user_id","row_version","counted_card","counted_digital","expected_card","expected_digital","variance_cash","variance_card","variance_digital","variance_total","state" FROM jsonb_populate_recordset(NULL::public."shifts", COALESCE(p_rows,'[]'::jsonb))
-  ON CONFLICT ("id") DO UPDATE SET "store_id"=EXCLUDED."store_id","terminal_id"=EXCLUDED."terminal_id","terminal_name"=EXCLUDED."terminal_name","opened_by_name"=EXCLUDED."opened_by_name","opened_by_staff_id"=EXCLUDED."opened_by_staff_id","opened_by_role"=EXCLUDED."opened_by_role","closed_by_name"=EXCLUDED."closed_by_name","closed_by_staff_id"=EXCLUDED."closed_by_staff_id","closed_by_role"=EXCLUDED."closed_by_role","opened_at"=EXCLUDED."opened_at","closed_at"=EXCLUDED."closed_at","opening_float"=EXCLUDED."opening_float","counted_cash"=EXCLUDED."counted_cash","expected_cash"=EXCLUDED."expected_cash","note"=EXCLUDED."note","overdue"=EXCLUDED."overdue","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","status"=EXCLUDED."status","closing_float"=EXCLUDED."closing_float","user_id"=EXCLUDED."user_id","row_version"=EXCLUDED."row_version","counted_card"=EXCLUDED."counted_card","counted_digital"=EXCLUDED."counted_digital","expected_card"=EXCLUDED."expected_card","expected_digital"=EXCLUDED."expected_digital","variance_cash"=EXCLUDED."variance_cash","variance_card"=EXCLUDED."variance_card","variance_digital"=EXCLUDED."variance_digital","variance_total"=EXCLUDED."variance_total","state"=EXCLUDED."state" WHERE EXCLUDED."row_version">public."shifts"."row_version";
+
+  INSERT INTO public."shifts" ("id","store_id","terminal_id","terminal_name","opened_by_name","opened_by_staff_id","opened_by_role","closed_by_name","closed_by_staff_id","closed_by_role","opened_at","closed_at","opening_float","counted_cash","expected_cash","note","overdue","created_at","updated_at","status","closing_float","user_id","row_version","counted_card","counted_digital","expected_card","expected_digital","variance_cash","variance_card","variance_digital","variance_total","state","close_reason","closing_started_at","closing_started_by","final_counted_cash","variance_status")
+  SELECT "id","store_id","terminal_id","terminal_name","opened_by_name","opened_by_staff_id","opened_by_role","closed_by_name","closed_by_staff_id","closed_by_role","opened_at","closed_at","opening_float","counted_cash","expected_cash","note","overdue","created_at","updated_at","status","closing_float","user_id","row_version","counted_card","counted_digital","expected_card","expected_digital","variance_cash","variance_card","variance_digital","variance_total","state","close_reason","closing_started_at","closing_started_by","final_counted_cash","variance_status" FROM jsonb_populate_recordset(NULL::public."shifts", COALESCE(p_rows,'[]'::jsonb))
+  ON CONFLICT ("id") DO UPDATE SET "store_id"=EXCLUDED."store_id","terminal_id"=EXCLUDED."terminal_id","terminal_name"=EXCLUDED."terminal_name","opened_by_name"=EXCLUDED."opened_by_name","opened_by_staff_id"=EXCLUDED."opened_by_staff_id","opened_by_role"=EXCLUDED."opened_by_role","closed_by_name"=EXCLUDED."closed_by_name","closed_by_staff_id"=EXCLUDED."closed_by_staff_id","closed_by_role"=EXCLUDED."closed_by_role","opened_at"=EXCLUDED."opened_at","closed_at"=EXCLUDED."closed_at","opening_float"=EXCLUDED."opening_float","counted_cash"=EXCLUDED."counted_cash","expected_cash"=EXCLUDED."expected_cash","note"=EXCLUDED."note","overdue"=EXCLUDED."overdue","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","status"=EXCLUDED."status","closing_float"=EXCLUDED."closing_float","user_id"=EXCLUDED."user_id","row_version"=EXCLUDED."row_version","counted_card"=EXCLUDED."counted_card","counted_digital"=EXCLUDED."counted_digital","expected_card"=EXCLUDED."expected_card","expected_digital"=EXCLUDED."expected_digital","variance_cash"=EXCLUDED."variance_cash","variance_card"=EXCLUDED."variance_card","variance_digital"=EXCLUDED."variance_digital","variance_total"=EXCLUDED."variance_total","state"=EXCLUDED."state","close_reason"=EXCLUDED."close_reason","closing_started_at"=EXCLUDED."closing_started_at","closing_started_by"=EXCLUDED."closing_started_by","final_counted_cash"=EXCLUDED."final_counted_cash","variance_status"=EXCLUDED."variance_status" WHERE EXCLUDED."row_version">public."shifts"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12063,13 +12066,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_shifts() FROM PUBLIC, anon, authenticate
 CREATE OR REPLACE FUNCTION public.sync_apply_issued_vouchers(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."issued_vouchers" ("id","token_slug","campaign_id","member_id","status","issued_at","expires_at","issued_by","issued_source","redeemed_at","redeemed_by","redeemed_sale_id","disabled_at","disabled_by","disable_reason","store_id","row_version")
   SELECT "id","token_slug","campaign_id","member_id","status","issued_at","expires_at","issued_by","issued_source","redeemed_at","redeemed_by","redeemed_sale_id","disabled_at","disabled_by","disable_reason","store_id","row_version" FROM jsonb_populate_recordset(NULL::public."issued_vouchers", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "token_slug"=EXCLUDED."token_slug","campaign_id"=EXCLUDED."campaign_id","member_id"=EXCLUDED."member_id","status"=EXCLUDED."status","issued_at"=EXCLUDED."issued_at","expires_at"=EXCLUDED."expires_at","issued_by"=EXCLUDED."issued_by","issued_source"=EXCLUDED."issued_source","redeemed_at"=EXCLUDED."redeemed_at","redeemed_by"=EXCLUDED."redeemed_by","redeemed_sale_id"=EXCLUDED."redeemed_sale_id","disabled_at"=EXCLUDED."disabled_at","disabled_by"=EXCLUDED."disabled_by","disable_reason"=EXCLUDED."disable_reason","store_id"=EXCLUDED."store_id","row_version"=EXCLUDED."row_version" WHERE EXCLUDED."row_version">public."issued_vouchers"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12092,13 +12095,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_issued_vouchers() FROM PUBLIC, anon, aut
 CREATE OR REPLACE FUNCTION public.sync_apply_activity_events(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
-  INSERT INTO public."activity_events" ("id","event_type","severity","title","message","actor_id","actor_name","actor_role","terminal_id","terminal_name","store_id","entity_type","entity_id","amount","meta","whatsapp_status","whatsapp_error","client_event_id","created_at","cleared_by")
-  SELECT "id","event_type","severity","title","message","actor_id","actor_name","actor_role","terminal_id","terminal_name","store_id","entity_type","entity_id","amount","meta","whatsapp_status","whatsapp_error","client_event_id","created_at","cleared_by" FROM jsonb_populate_recordset(NULL::public."activity_events", COALESCE(p_rows,'[]'::jsonb))
+
+  INSERT INTO public."activity_events" ("id","event_type","severity","title","message","actor_id","actor_name","actor_role","terminal_id","terminal_name","store_id","entity_type","entity_id","amount","meta","whatsapp_status","whatsapp_error","client_event_id","created_at","previous_state","new_state","cleared_by")
+  SELECT "id","event_type","severity","title","message","actor_id","actor_name","actor_role","terminal_id","terminal_name","store_id","entity_type","entity_id","amount","meta","whatsapp_status","whatsapp_error","client_event_id","created_at","previous_state","new_state","cleared_by" FROM jsonb_populate_recordset(NULL::public."activity_events", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO NOTHING;
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12121,13 +12124,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_activity_events() FROM PUBLIC, anon, aut
 CREATE OR REPLACE FUNCTION public.sync_apply_app_users(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."app_users" ("id","user_id","full_name","email","role","store_id","is_active","permissions","pin_hash","auth_user_id","last_login_at","created_at","updated_at","role_slug","pin_length","row_version","pin_set_at","pin_updated_by")
   SELECT "id","user_id","full_name","email","role","store_id","is_active","permissions","pin_hash","auth_user_id","last_login_at","created_at","updated_at","role_slug","pin_length","row_version","pin_set_at","pin_updated_by" FROM jsonb_populate_recordset(NULL::public."app_users", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "user_id"=EXCLUDED."user_id","full_name"=EXCLUDED."full_name","email"=EXCLUDED."email","role"=EXCLUDED."role","store_id"=EXCLUDED."store_id","is_active"=EXCLUDED."is_active","permissions"=EXCLUDED."permissions","pin_hash"=EXCLUDED."pin_hash","auth_user_id"=EXCLUDED."auth_user_id","last_login_at"=EXCLUDED."last_login_at","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","role_slug"=EXCLUDED."role_slug","pin_length"=EXCLUDED."pin_length","row_version"=EXCLUDED."row_version","pin_set_at"=EXCLUDED."pin_set_at","pin_updated_by"=EXCLUDED."pin_updated_by" WHERE EXCLUDED."row_version">public."app_users"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12150,13 +12153,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_app_users() FROM PUBLIC, anon, authentic
 CREATE OR REPLACE FUNCTION public.sync_apply_audit_logs(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."audit_logs" ("id","user_name","action_category","action_name","target_module","details","created_at","user_id","action","entity","before_state","after_state","store_id")
   SELECT "id","user_name","action_category","action_name","target_module","details","created_at","user_id","action","entity","before_state","after_state","store_id" FROM jsonb_populate_recordset(NULL::public."audit_logs", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "user_name"=EXCLUDED."user_name","action_category"=EXCLUDED."action_category","action_name"=EXCLUDED."action_name","target_module"=EXCLUDED."target_module","details"=EXCLUDED."details","created_at"=EXCLUDED."created_at","user_id"=EXCLUDED."user_id","action"=EXCLUDED."action","entity"=EXCLUDED."entity","before_state"=EXCLUDED."before_state","after_state"=EXCLUDED."after_state","store_id"=EXCLUDED."store_id";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12179,13 +12182,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_audit_logs() FROM PUBLIC, anon, authenti
 CREATE OR REPLACE FUNCTION public.sync_apply_booking_payments(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
-  INSERT INTO public."booking_payments" ("id","booking_id","amount","method","cashier","paid_at","created_at","row_version","status","kind")
-  SELECT "id","booking_id","amount","method","cashier","paid_at","created_at","row_version","status","kind" FROM jsonb_populate_recordset(NULL::public."booking_payments", COALESCE(p_rows,'[]'::jsonb))
-  ON CONFLICT ("id") DO UPDATE SET "booking_id"=EXCLUDED."booking_id","amount"=EXCLUDED."amount","method"=EXCLUDED."method","cashier"=EXCLUDED."cashier","paid_at"=EXCLUDED."paid_at","created_at"=EXCLUDED."created_at","row_version"=EXCLUDED."row_version","status"=EXCLUDED."status","kind"=EXCLUDED."kind" WHERE EXCLUDED."row_version">public."booking_payments"."row_version";
+
+  INSERT INTO public."booking_payments" ("id","booking_id","amount","method","cashier","paid_at","created_at","row_version","status","client_payment_id","reference","reversed_at","reversed_by","kind","refund_reason","refunds_payment_id","change_given")
+  SELECT "id","booking_id","amount","method","cashier","paid_at","created_at","row_version","status","client_payment_id","reference","reversed_at","reversed_by","kind","refund_reason","refunds_payment_id","change_given" FROM jsonb_populate_recordset(NULL::public."booking_payments", COALESCE(p_rows,'[]'::jsonb))
+  ON CONFLICT ("id") DO UPDATE SET "booking_id"=EXCLUDED."booking_id","amount"=EXCLUDED."amount","method"=EXCLUDED."method","cashier"=EXCLUDED."cashier","paid_at"=EXCLUDED."paid_at","created_at"=EXCLUDED."created_at","row_version"=EXCLUDED."row_version","status"=EXCLUDED."status","client_payment_id"=EXCLUDED."client_payment_id","reference"=EXCLUDED."reference","reversed_at"=EXCLUDED."reversed_at","reversed_by"=EXCLUDED."reversed_by","kind"=EXCLUDED."kind","refund_reason"=EXCLUDED."refund_reason","refunds_payment_id"=EXCLUDED."refunds_payment_id","change_given"=EXCLUDED."change_given" WHERE EXCLUDED."row_version">public."booking_payments"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12208,13 +12211,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_booking_payments() FROM PUBLIC, anon, au
 CREATE OR REPLACE FUNCTION public.sync_apply_bookings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
-  INSERT INTO public."bookings" ("id","ref","store_id","shift_id","customer_name","customer_phone","member_id","service_type_id","service_name","service_fee","payment_timing","lines","subtotal","discount","tax","total","paid","due_date","note","cashier","status","sale_receipt_no","closed_at","racket_model","string_type","tension_main","tension_cross","tension_unit","grommet_notes","job_notes","dropped_off_at","promised_at","job_status","job_status_by","job_status_at","notify_whatsapp","created_at","updated_at","tag_id","intake_note","string_origin","string_source_product_id","grip_product_id","charges","technician","liability_accepted","incident_note","row_version","cancel_reason","cancel_money_action")
-  SELECT "id","ref","store_id","shift_id","customer_name","customer_phone","member_id","service_type_id","service_name","service_fee","payment_timing","lines","subtotal","discount","tax","total","paid","due_date","note","cashier","status","sale_receipt_no","closed_at","racket_model","string_type","tension_main","tension_cross","tension_unit","grommet_notes","job_notes","dropped_off_at","promised_at","job_status","job_status_by","job_status_at","notify_whatsapp","created_at","updated_at","tag_id","intake_note","string_origin","string_source_product_id","grip_product_id","charges","technician","liability_accepted","incident_note","row_version","cancel_reason","cancel_money_action" FROM jsonb_populate_recordset(NULL::public."bookings", COALESCE(p_rows,'[]'::jsonb))
-  ON CONFLICT ("id") DO UPDATE SET "ref"=EXCLUDED."ref","store_id"=EXCLUDED."store_id","shift_id"=EXCLUDED."shift_id","customer_name"=EXCLUDED."customer_name","customer_phone"=EXCLUDED."customer_phone","member_id"=EXCLUDED."member_id","service_type_id"=EXCLUDED."service_type_id","service_name"=EXCLUDED."service_name","service_fee"=EXCLUDED."service_fee","payment_timing"=EXCLUDED."payment_timing","lines"=EXCLUDED."lines","subtotal"=EXCLUDED."subtotal","discount"=EXCLUDED."discount","tax"=EXCLUDED."tax","total"=EXCLUDED."total","paid"=EXCLUDED."paid","due_date"=EXCLUDED."due_date","note"=EXCLUDED."note","cashier"=EXCLUDED."cashier","status"=EXCLUDED."status","sale_receipt_no"=EXCLUDED."sale_receipt_no","closed_at"=EXCLUDED."closed_at","racket_model"=EXCLUDED."racket_model","string_type"=EXCLUDED."string_type","tension_main"=EXCLUDED."tension_main","tension_cross"=EXCLUDED."tension_cross","tension_unit"=EXCLUDED."tension_unit","grommet_notes"=EXCLUDED."grommet_notes","job_notes"=EXCLUDED."job_notes","dropped_off_at"=EXCLUDED."dropped_off_at","promised_at"=EXCLUDED."promised_at","job_status"=EXCLUDED."job_status","job_status_by"=EXCLUDED."job_status_by","job_status_at"=EXCLUDED."job_status_at","notify_whatsapp"=EXCLUDED."notify_whatsapp","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","tag_id"=EXCLUDED."tag_id","intake_note"=EXCLUDED."intake_note","string_origin"=EXCLUDED."string_origin","string_source_product_id"=EXCLUDED."string_source_product_id","grip_product_id"=EXCLUDED."grip_product_id","charges"=EXCLUDED."charges","technician"=EXCLUDED."technician","liability_accepted"=EXCLUDED."liability_accepted","incident_note"=EXCLUDED."incident_note","row_version"=EXCLUDED."row_version","cancel_reason"=EXCLUDED."cancel_reason","cancel_money_action"=EXCLUDED."cancel_money_action" WHERE EXCLUDED."row_version">public."bookings"."row_version";
+
+  INSERT INTO public."bookings" ("id","ref","store_id","shift_id","customer_name","customer_phone","member_id","service_type_id","service_name","service_fee","payment_timing","lines","subtotal","discount","tax","total","paid","due_date","note","cashier","status","sale_receipt_no","closed_at","racket_model","string_type","tension_main","tension_cross","tension_unit","grommet_notes","job_notes","dropped_off_at","promised_at","job_status","job_status_by","job_status_at","notify_whatsapp","created_at","updated_at","tag_id","intake_note","string_origin","string_source_product_id","grip_product_id","charges","technician","liability_accepted","incident_note","row_version","cancel_reason","cancelled_by","cancelled_at","cancelled_terminal","cancel_money_action")
+  SELECT "id","ref","store_id","shift_id","customer_name","customer_phone","member_id","service_type_id","service_name","service_fee","payment_timing","lines","subtotal","discount","tax","total","paid","due_date","note","cashier","status","sale_receipt_no","closed_at","racket_model","string_type","tension_main","tension_cross","tension_unit","grommet_notes","job_notes","dropped_off_at","promised_at","job_status","job_status_by","job_status_at","notify_whatsapp","created_at","updated_at","tag_id","intake_note","string_origin","string_source_product_id","grip_product_id","charges","technician","liability_accepted","incident_note","row_version","cancel_reason","cancelled_by","cancelled_at","cancelled_terminal","cancel_money_action" FROM jsonb_populate_recordset(NULL::public."bookings", COALESCE(p_rows,'[]'::jsonb))
+  ON CONFLICT ("id") DO UPDATE SET "ref"=EXCLUDED."ref","store_id"=EXCLUDED."store_id","shift_id"=EXCLUDED."shift_id","customer_name"=EXCLUDED."customer_name","customer_phone"=EXCLUDED."customer_phone","member_id"=EXCLUDED."member_id","service_type_id"=EXCLUDED."service_type_id","service_name"=EXCLUDED."service_name","service_fee"=EXCLUDED."service_fee","payment_timing"=EXCLUDED."payment_timing","lines"=EXCLUDED."lines","subtotal"=EXCLUDED."subtotal","discount"=EXCLUDED."discount","tax"=EXCLUDED."tax","total"=EXCLUDED."total","paid"=EXCLUDED."paid","due_date"=EXCLUDED."due_date","note"=EXCLUDED."note","cashier"=EXCLUDED."cashier","status"=EXCLUDED."status","sale_receipt_no"=EXCLUDED."sale_receipt_no","closed_at"=EXCLUDED."closed_at","racket_model"=EXCLUDED."racket_model","string_type"=EXCLUDED."string_type","tension_main"=EXCLUDED."tension_main","tension_cross"=EXCLUDED."tension_cross","tension_unit"=EXCLUDED."tension_unit","grommet_notes"=EXCLUDED."grommet_notes","job_notes"=EXCLUDED."job_notes","dropped_off_at"=EXCLUDED."dropped_off_at","promised_at"=EXCLUDED."promised_at","job_status"=EXCLUDED."job_status","job_status_by"=EXCLUDED."job_status_by","job_status_at"=EXCLUDED."job_status_at","notify_whatsapp"=EXCLUDED."notify_whatsapp","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","tag_id"=EXCLUDED."tag_id","intake_note"=EXCLUDED."intake_note","string_origin"=EXCLUDED."string_origin","string_source_product_id"=EXCLUDED."string_source_product_id","grip_product_id"=EXCLUDED."grip_product_id","charges"=EXCLUDED."charges","technician"=EXCLUDED."technician","liability_accepted"=EXCLUDED."liability_accepted","incident_note"=EXCLUDED."incident_note","row_version"=EXCLUDED."row_version","cancel_reason"=EXCLUDED."cancel_reason","cancelled_by"=EXCLUDED."cancelled_by","cancelled_at"=EXCLUDED."cancelled_at","cancelled_terminal"=EXCLUDED."cancelled_terminal","cancel_money_action"=EXCLUDED."cancel_money_action" WHERE EXCLUDED."row_version">public."bookings"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12237,13 +12240,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_bookings() FROM PUBLIC, anon, authentica
 CREATE OR REPLACE FUNCTION public.sync_apply_branch_telemetry(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."branch_telemetry" ("terminal_id","store_id","terminal_name","staff_name","staff_role","db_mode","connection_status","storage_engine","pending_count","conflict_count","last_synced_at","app_version","platform","last_seen_at","created_at","updated_at","branch_id","pending_queue_count","last_ping","status","branch_code","session_status","sql_server_state","database_name","schema_version","failed_count","sync_phase","current_table","last_push_at","last_pull_at")
   SELECT "terminal_id","store_id","terminal_name","staff_name","staff_role","db_mode","connection_status","storage_engine","pending_count","conflict_count","last_synced_at","app_version","platform","last_seen_at","created_at","updated_at","branch_id","pending_queue_count","last_ping","status","branch_code","session_status","sql_server_state","database_name","schema_version","failed_count","sync_phase","current_table","last_push_at","last_pull_at" FROM jsonb_populate_recordset(NULL::public."branch_telemetry", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("terminal_id") DO UPDATE SET "store_id"=EXCLUDED."store_id","terminal_name"=EXCLUDED."terminal_name","staff_name"=EXCLUDED."staff_name","staff_role"=EXCLUDED."staff_role","db_mode"=EXCLUDED."db_mode","connection_status"=EXCLUDED."connection_status","storage_engine"=EXCLUDED."storage_engine","pending_count"=EXCLUDED."pending_count","conflict_count"=EXCLUDED."conflict_count","last_synced_at"=EXCLUDED."last_synced_at","app_version"=EXCLUDED."app_version","platform"=EXCLUDED."platform","last_seen_at"=EXCLUDED."last_seen_at","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","branch_id"=EXCLUDED."branch_id","pending_queue_count"=EXCLUDED."pending_queue_count","last_ping"=EXCLUDED."last_ping","status"=EXCLUDED."status","branch_code"=EXCLUDED."branch_code","session_status"=EXCLUDED."session_status","sql_server_state"=EXCLUDED."sql_server_state","database_name"=EXCLUDED."database_name","schema_version"=EXCLUDED."schema_version","failed_count"=EXCLUDED."failed_count","sync_phase"=EXCLUDED."sync_phase","current_table"=EXCLUDED."current_table","last_push_at"=EXCLUDED."last_push_at","last_pull_at"=EXCLUDED."last_pull_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12266,13 +12269,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_branch_telemetry() FROM PUBLIC, anon, au
 CREATE OR REPLACE FUNCTION public.sync_apply_cashiers(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."cashiers" ("id","username","full_name","pin_hash","store_id","permissions","is_active","last_login_at","created_at","updated_at","role_slug")
   SELECT "id","username","full_name","pin_hash","store_id","permissions","is_active","last_login_at","created_at","updated_at","role_slug" FROM jsonb_populate_recordset(NULL::public."cashiers", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "username"=EXCLUDED."username","full_name"=EXCLUDED."full_name","pin_hash"=EXCLUDED."pin_hash","store_id"=EXCLUDED."store_id","permissions"=EXCLUDED."permissions","is_active"=EXCLUDED."is_active","last_login_at"=EXCLUDED."last_login_at","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","role_slug"=EXCLUDED."role_slug";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12295,13 +12298,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_cashiers() FROM PUBLIC, anon, authentica
 CREATE OR REPLACE FUNCTION public.sync_apply_coupon_events(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."coupon_events" ("id","event_type","campaign_id","campaign_name","voucher_token","member_id","member_phone","store_id","terminal_id","staff_name","staff_role","sale_id","note","created_at")
   SELECT "id","event_type","campaign_id","campaign_name","voucher_token","member_id","member_phone","store_id","terminal_id","staff_name","staff_role","sale_id","note","created_at" FROM jsonb_populate_recordset(NULL::public."coupon_events", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "event_type"=EXCLUDED."event_type","campaign_id"=EXCLUDED."campaign_id","campaign_name"=EXCLUDED."campaign_name","voucher_token"=EXCLUDED."voucher_token","member_id"=EXCLUDED."member_id","member_phone"=EXCLUDED."member_phone","store_id"=EXCLUDED."store_id","terminal_id"=EXCLUDED."terminal_id","staff_name"=EXCLUDED."staff_name","staff_role"=EXCLUDED."staff_role","sale_id"=EXCLUDED."sale_id","note"=EXCLUDED."note","created_at"=EXCLUDED."created_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12324,13 +12327,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_coupon_events() FROM PUBLIC, anon, authe
 CREATE OR REPLACE FUNCTION public.sync_apply_drawer_events(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."drawer_events" ("id","store_id","terminal_id","shift_id","staff_id","staff_name","role","reason","note","approved_by","created_at")
   SELECT "id","store_id","terminal_id","shift_id","staff_id","staff_name","role","reason","note","approved_by","created_at" FROM jsonb_populate_recordset(NULL::public."drawer_events", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "store_id"=EXCLUDED."store_id","terminal_id"=EXCLUDED."terminal_id","shift_id"=EXCLUDED."shift_id","staff_id"=EXCLUDED."staff_id","staff_name"=EXCLUDED."staff_name","role"=EXCLUDED."role","reason"=EXCLUDED."reason","note"=EXCLUDED."note","approved_by"=EXCLUDED."approved_by","created_at"=EXCLUDED."created_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12353,13 +12356,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_drawer_events() FROM PUBLIC, anon, authe
 CREATE OR REPLACE FUNCTION public.sync_apply_held_orders(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
-  INSERT INTO public."held_orders" ("id","label","store_id","shift_id","held_by","total","lines","cart_discount","cart_discount_type","exchange_ref","member_id","member_name","coupon","note","cancelled_from","held_at","created_at","updated_at","row_version","status")
-  SELECT "id","label","store_id","shift_id","held_by","total","lines","cart_discount","cart_discount_type","exchange_ref","member_id","member_name","coupon","note","cancelled_from","held_at","created_at","updated_at","row_version","status" FROM jsonb_populate_recordset(NULL::public."held_orders", COALESCE(p_rows,'[]'::jsonb))
-  ON CONFLICT ("id") DO UPDATE SET "label"=EXCLUDED."label","store_id"=EXCLUDED."store_id","shift_id"=EXCLUDED."shift_id","held_by"=EXCLUDED."held_by","total"=EXCLUDED."total","lines"=EXCLUDED."lines","cart_discount"=EXCLUDED."cart_discount","cart_discount_type"=EXCLUDED."cart_discount_type","exchange_ref"=EXCLUDED."exchange_ref","member_id"=EXCLUDED."member_id","member_name"=EXCLUDED."member_name","coupon"=EXCLUDED."coupon","note"=EXCLUDED."note","cancelled_from"=EXCLUDED."cancelled_from","held_at"=EXCLUDED."held_at","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version","status"=EXCLUDED."status" WHERE EXCLUDED."row_version">public."held_orders"."row_version";
+
+  INSERT INTO public."held_orders" ("id","label","store_id","shift_id","held_by","total","lines","cart_discount","cart_discount_type","exchange_ref","member_id","member_name","coupon","note","cancelled_from","held_at","created_at","updated_at","row_version","status","pending_request_id")
+  SELECT "id","label","store_id","shift_id","held_by","total","lines","cart_discount","cart_discount_type","exchange_ref","member_id","member_name","coupon","note","cancelled_from","held_at","created_at","updated_at","row_version","status","pending_request_id" FROM jsonb_populate_recordset(NULL::public."held_orders", COALESCE(p_rows,'[]'::jsonb))
+  ON CONFLICT ("id") DO UPDATE SET "label"=EXCLUDED."label","store_id"=EXCLUDED."store_id","shift_id"=EXCLUDED."shift_id","held_by"=EXCLUDED."held_by","total"=EXCLUDED."total","lines"=EXCLUDED."lines","cart_discount"=EXCLUDED."cart_discount","cart_discount_type"=EXCLUDED."cart_discount_type","exchange_ref"=EXCLUDED."exchange_ref","member_id"=EXCLUDED."member_id","member_name"=EXCLUDED."member_name","coupon"=EXCLUDED."coupon","note"=EXCLUDED."note","cancelled_from"=EXCLUDED."cancelled_from","held_at"=EXCLUDED."held_at","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version","status"=EXCLUDED."status","pending_request_id"=EXCLUDED."pending_request_id" WHERE EXCLUDED."row_version">public."held_orders"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12382,13 +12385,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_held_orders() FROM PUBLIC, anon, authent
 CREATE OR REPLACE FUNCTION public.sync_apply_integration_settings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."integration_settings" ("id","provider_name","api_keys_encrypted","verification_channel","strict_verification","is_active","updated_by","created_at","updated_at")
   SELECT "id","provider_name","api_keys_encrypted","verification_channel","strict_verification","is_active","updated_by","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."integration_settings", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "provider_name"=EXCLUDED."provider_name","api_keys_encrypted"=EXCLUDED."api_keys_encrypted","verification_channel"=EXCLUDED."verification_channel","strict_verification"=EXCLUDED."strict_verification","is_active"=EXCLUDED."is_active","updated_by"=EXCLUDED."updated_by","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12411,7 +12414,7 @@ REVOKE ALL ON FUNCTION public.sync_feed_integration_settings() FROM PUBLIC, anon
 CREATE OR REPLACE FUNCTION public.sync_apply_item_activity_logs(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."item_activity_logs" ("id","product_id","product_name","sku","barcode","store_id","terminal_id","activity_type","reference","quantity_delta","stock_before","stock_after","unit_cost","staff_id","staff_name","role","note","created_at","row_version")
   SELECT "id","product_id","product_name","sku","barcode","store_id","terminal_id","activity_type","reference","quantity_delta","stock_before","stock_after","unit_cost","staff_id","staff_name","role","note","created_at","row_version" FROM jsonb_populate_recordset(NULL::public."item_activity_logs", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO NOTHING;
@@ -12421,7 +12424,7 @@ BEGIN
       PERFORM public.stock_apply_delta((v_row->>'id')::uuid,(v_row->>'product_id')::uuid,v_row->>'store_id',COALESCE((v_row->>'quantity_delta')::integer,0));
     END IF;
   END LOOP;
-  
+
   RETURN v_count;
 END $fn$;
 
@@ -12444,13 +12447,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_item_activity_logs() FROM PUBLIC, anon, 
 CREATE OR REPLACE FUNCTION public.sync_apply_member_verifications(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."member_verifications" ("id","member_id","phone","email","channel","otp_code","attempts","status","sent_by","store_id","expires_at","verified_at","created_at")
   SELECT "id","member_id","phone","email","channel","otp_code","attempts","status","sent_by","store_id","expires_at","verified_at","created_at" FROM jsonb_populate_recordset(NULL::public."member_verifications", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "member_id"=EXCLUDED."member_id","phone"=EXCLUDED."phone","email"=EXCLUDED."email","channel"=EXCLUDED."channel","otp_code"=EXCLUDED."otp_code","attempts"=EXCLUDED."attempts","status"=EXCLUDED."status","sent_by"=EXCLUDED."sent_by","store_id"=EXCLUDED."store_id","expires_at"=EXCLUDED."expires_at","verified_at"=EXCLUDED."verified_at","created_at"=EXCLUDED."created_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12473,13 +12476,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_member_verifications() FROM PUBLIC, anon
 CREATE OR REPLACE FUNCTION public.sync_apply_members(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."members" ("id","member_code","full_name","phone","email","address","date_of_birth","tier_id","loyalty_points","total_spent","created_at","updated_at","row_version","is_verified","verified_at","verified_channel")
   SELECT "id","member_code","full_name","phone","email","address","date_of_birth","tier_id","loyalty_points","total_spent","created_at","updated_at","row_version","is_verified","verified_at","verified_channel" FROM jsonb_populate_recordset(NULL::public."members", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "member_code"=EXCLUDED."member_code","full_name"=EXCLUDED."full_name","phone"=EXCLUDED."phone","email"=EXCLUDED."email","address"=EXCLUDED."address","date_of_birth"=EXCLUDED."date_of_birth","tier_id"=EXCLUDED."tier_id","loyalty_points"=EXCLUDED."loyalty_points","total_spent"=EXCLUDED."total_spent","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version","is_verified"=EXCLUDED."is_verified","verified_at"=EXCLUDED."verified_at","verified_channel"=EXCLUDED."verified_channel" WHERE EXCLUDED."row_version">public."members"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12502,13 +12505,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_members() FROM PUBLIC, anon, authenticat
 CREATE OR REPLACE FUNCTION public.sync_apply_membership_tiers(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."membership_tiers" ("id","name","discount_percentage","points_multiplier","created_at","updated_at","row_version")
   SELECT "id","name","discount_percentage","points_multiplier","created_at","updated_at","row_version" FROM jsonb_populate_recordset(NULL::public."membership_tiers", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "name"=EXCLUDED."name","discount_percentage"=EXCLUDED."discount_percentage","points_multiplier"=EXCLUDED."points_multiplier","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version" WHERE EXCLUDED."row_version">public."membership_tiers"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12531,13 +12534,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_membership_tiers() FROM PUBLIC, anon, au
 CREATE OR REPLACE FUNCTION public.sync_apply_offline_sync_audit_log(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."offline_sync_audit_log" ("id","terminal_id","store_id","direction","table_name","record_id","records","status","error_message","started_at","finished_at","created_at")
   SELECT "id","terminal_id","store_id","direction","table_name","record_id","records","status","error_message","started_at","finished_at","created_at" FROM jsonb_populate_recordset(NULL::public."offline_sync_audit_log", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "terminal_id"=EXCLUDED."terminal_id","store_id"=EXCLUDED."store_id","direction"=EXCLUDED."direction","table_name"=EXCLUDED."table_name","record_id"=EXCLUDED."record_id","records"=EXCLUDED."records","status"=EXCLUDED."status","error_message"=EXCLUDED."error_message","started_at"=EXCLUDED."started_at","finished_at"=EXCLUDED."finished_at","created_at"=EXCLUDED."created_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12560,13 +12563,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_offline_sync_audit_log() FROM PUBLIC, an
 CREATE OR REPLACE FUNCTION public.sync_apply_payment_transactions(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."payment_transactions" ("id","source_type","sale_id","booking_id","member_id","store_id","shift_id","terminal_id","amount","method","kind","reference","cashier_id","cashier_name","note","paid_at","created_at","updated_at","row_version","status","metadata","client_transaction_id")
   SELECT "id","source_type","sale_id","booking_id","member_id","store_id","shift_id","terminal_id","amount","method","kind","reference","cashier_id","cashier_name","note","paid_at","created_at","updated_at","row_version","status","metadata","client_transaction_id" FROM jsonb_populate_recordset(NULL::public."payment_transactions", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO NOTHING;
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12589,13 +12592,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_payment_transactions() FROM PUBLIC, anon
 CREATE OR REPLACE FUNCTION public.sync_apply_payment_types(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."payment_types" ("id","name","type_code","requires_reference","is_active","icon","sort_order","is_system","created_at","updated_at","row_version")
   SELECT "id","name","type_code","requires_reference","is_active","icon","sort_order","is_system","created_at","updated_at","row_version" FROM jsonb_populate_recordset(NULL::public."payment_types", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "name"=EXCLUDED."name","type_code"=EXCLUDED."type_code","requires_reference"=EXCLUDED."requires_reference","is_active"=EXCLUDED."is_active","icon"=EXCLUDED."icon","sort_order"=EXCLUDED."sort_order","is_system"=EXCLUDED."is_system","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version" WHERE EXCLUDED."row_version">public."payment_types"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12618,13 +12621,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_payment_types() FROM PUBLIC, anon, authe
 CREATE OR REPLACE FUNCTION public.sync_apply_pin_attempts(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."pin_attempts" ("key","attempts","window_started_at","locked_until","created_at","updated_at")
   SELECT "key","attempts","window_started_at","locked_until","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."pin_attempts", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("key") DO UPDATE SET "attempts"=EXCLUDED."attempts","window_started_at"=EXCLUDED."window_started_at","locked_until"=EXCLUDED."locked_until","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12647,13 +12650,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_pin_attempts() FROM PUBLIC, anon, authen
 CREATE OR REPLACE FUNCTION public.sync_apply_pos_settings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."pos_settings" ("id","tax_percentage","enable_tax","tax_mode","paper_size","header_text","footer_text","show_logo","show_points","show_barcode","show_tax_details","updated_at","company_name","tax_number","reg_number","phone","website","fonts","custom_lines","qr","review_max_voids","review_max_refunds","review_max_refund_value","review_max_nosale","review_max_discount_pct","day_start_time","day_end_time","max_shift_hours","shift_reminder_minutes","ui_visibility","integration_settings","region_country","time_zone","date_format","time_format","booking_slip","notification_settings","row_version","logo_data_url","receipt_design")
   SELECT "id","tax_percentage","enable_tax","tax_mode","paper_size","header_text","footer_text","show_logo","show_points","show_barcode","show_tax_details","updated_at","company_name","tax_number","reg_number","phone","website","fonts","custom_lines","qr","review_max_voids","review_max_refunds","review_max_refund_value","review_max_nosale","review_max_discount_pct","day_start_time","day_end_time","max_shift_hours","shift_reminder_minutes","ui_visibility","integration_settings","region_country","time_zone","date_format","time_format","booking_slip","notification_settings","row_version","logo_data_url","receipt_design" FROM jsonb_populate_recordset(NULL::public."pos_settings", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "tax_percentage"=EXCLUDED."tax_percentage","enable_tax"=EXCLUDED."enable_tax","tax_mode"=EXCLUDED."tax_mode","paper_size"=EXCLUDED."paper_size","header_text"=EXCLUDED."header_text","footer_text"=EXCLUDED."footer_text","show_logo"=EXCLUDED."show_logo","show_points"=EXCLUDED."show_points","show_barcode"=EXCLUDED."show_barcode","show_tax_details"=EXCLUDED."show_tax_details","updated_at"=EXCLUDED."updated_at","company_name"=EXCLUDED."company_name","tax_number"=EXCLUDED."tax_number","reg_number"=EXCLUDED."reg_number","phone"=EXCLUDED."phone","website"=EXCLUDED."website","fonts"=EXCLUDED."fonts","custom_lines"=EXCLUDED."custom_lines","qr"=EXCLUDED."qr","review_max_voids"=EXCLUDED."review_max_voids","review_max_refunds"=EXCLUDED."review_max_refunds","review_max_refund_value"=EXCLUDED."review_max_refund_value","review_max_nosale"=EXCLUDED."review_max_nosale","review_max_discount_pct"=EXCLUDED."review_max_discount_pct","day_start_time"=EXCLUDED."day_start_time","day_end_time"=EXCLUDED."day_end_time","max_shift_hours"=EXCLUDED."max_shift_hours","shift_reminder_minutes"=EXCLUDED."shift_reminder_minutes","ui_visibility"=EXCLUDED."ui_visibility","integration_settings"=EXCLUDED."integration_settings","region_country"=EXCLUDED."region_country","time_zone"=EXCLUDED."time_zone","date_format"=EXCLUDED."date_format","time_format"=EXCLUDED."time_format","booking_slip"=EXCLUDED."booking_slip","notification_settings"=EXCLUDED."notification_settings","row_version"=EXCLUDED."row_version","logo_data_url"=EXCLUDED."logo_data_url","receipt_design"=EXCLUDED."receipt_design" WHERE EXCLUDED."row_version">public."pos_settings"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12676,13 +12679,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_pos_settings() FROM PUBLIC, anon, authen
 CREATE OR REPLACE FUNCTION public.sync_apply_product_barcodes(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."product_barcodes" ("id","product_id","barcode","label","pack_size","is_primary","created_at","updated_at","row_version")
   SELECT "id","product_id","barcode","label","pack_size","is_primary","created_at","updated_at","row_version" FROM jsonb_populate_recordset(NULL::public."product_barcodes", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "product_id"=EXCLUDED."product_id","barcode"=EXCLUDED."barcode","label"=EXCLUDED."label","pack_size"=EXCLUDED."pack_size","is_primary"=EXCLUDED."is_primary","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version" WHERE EXCLUDED."row_version">public."product_barcodes"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12705,13 +12708,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_product_barcodes() FROM PUBLIC, anon, au
 CREATE OR REPLACE FUNCTION public.sync_apply_product_categories(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."product_categories" ("id","name","parent_id","sort","created_at","updated_at","kind","row_version","is_active")
   SELECT "id","name","parent_id","sort","created_at","updated_at","kind","row_version","is_active" FROM jsonb_populate_recordset(NULL::public."product_categories", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "name"=EXCLUDED."name","parent_id"=EXCLUDED."parent_id","sort"=EXCLUDED."sort","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","kind"=EXCLUDED."kind","row_version"=EXCLUDED."row_version","is_active"=EXCLUDED."is_active" WHERE EXCLUDED."row_version">public."product_categories"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12734,13 +12737,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_product_categories() FROM PUBLIC, anon, 
 CREATE OR REPLACE FUNCTION public.sync_apply_products(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."products" ("id","barcode","name","category","cost_price","selling_price","ecom_price","stock_quantity","custom_points","point_multiplier","created_at","sku","reorder_level","tax_rate","ecom_visible","stock_by_store","updated_at","landing_pct","sub_category","unit","packs","barcode_aliases","is_archived","archived_at","brand","product_group","barcode_variants","row_version","owner_store_id")
   SELECT "id","barcode","name","category","cost_price","selling_price","ecom_price","stock_quantity","custom_points","point_multiplier","created_at","sku","reorder_level","tax_rate","ecom_visible","stock_by_store","updated_at","landing_pct","sub_category","unit","packs","barcode_aliases","is_archived","archived_at","brand","product_group","barcode_variants","row_version","owner_store_id" FROM jsonb_populate_recordset(NULL::public."products", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "barcode"=EXCLUDED."barcode","name"=EXCLUDED."name","category"=EXCLUDED."category","cost_price"=EXCLUDED."cost_price","selling_price"=EXCLUDED."selling_price","ecom_price"=EXCLUDED."ecom_price","custom_points"=EXCLUDED."custom_points","point_multiplier"=EXCLUDED."point_multiplier","created_at"=EXCLUDED."created_at","sku"=EXCLUDED."sku","reorder_level"=EXCLUDED."reorder_level","tax_rate"=EXCLUDED."tax_rate","ecom_visible"=EXCLUDED."ecom_visible","updated_at"=EXCLUDED."updated_at","landing_pct"=EXCLUDED."landing_pct","sub_category"=EXCLUDED."sub_category","unit"=EXCLUDED."unit","packs"=EXCLUDED."packs","barcode_aliases"=EXCLUDED."barcode_aliases","is_archived"=EXCLUDED."is_archived","archived_at"=EXCLUDED."archived_at","brand"=EXCLUDED."brand","product_group"=EXCLUDED."product_group","barcode_variants"=EXCLUDED."barcode_variants","row_version"=EXCLUDED."row_version","owner_store_id"=EXCLUDED."owner_store_id" WHERE EXCLUDED."row_version">public."products"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12763,13 +12766,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_products() FROM PUBLIC, anon, authentica
 CREATE OR REPLACE FUNCTION public.sync_apply_promotions(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."promotions" ("id","title","promo_type","min_spend","discount_percent","discount_amount","foc_product_id","points_per_dollar","tier_rates","is_active","start_date","end_date","created_at","updated_at","row_version")
   SELECT "id","title","promo_type","min_spend","discount_percent","discount_amount","foc_product_id","points_per_dollar","tier_rates","is_active","start_date","end_date","created_at","updated_at","row_version" FROM jsonb_populate_recordset(NULL::public."promotions", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "title"=EXCLUDED."title","promo_type"=EXCLUDED."promo_type","min_spend"=EXCLUDED."min_spend","discount_percent"=EXCLUDED."discount_percent","discount_amount"=EXCLUDED."discount_amount","foc_product_id"=EXCLUDED."foc_product_id","points_per_dollar"=EXCLUDED."points_per_dollar","tier_rates"=EXCLUDED."tier_rates","is_active"=EXCLUDED."is_active","start_date"=EXCLUDED."start_date","end_date"=EXCLUDED."end_date","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version" WHERE EXCLUDED."row_version">public."promotions"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12792,13 +12795,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_promotions() FROM PUBLIC, anon, authenti
 CREATE OR REPLACE FUNCTION public.sync_apply_public_flags(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."public_flags" ("key","enabled","updated_at")
   SELECT "key","enabled","updated_at" FROM jsonb_populate_recordset(NULL::public."public_flags", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("key") DO UPDATE SET "enabled"=EXCLUDED."enabled","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12821,13 +12824,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_public_flags() FROM PUBLIC, anon, authen
 CREATE OR REPLACE FUNCTION public.sync_apply_purchase_order_items(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."purchase_order_items" ("id","po_id","product_id","barcode","product_name","cost_price","selling_price","quantity_received","subtotal_cost","created_at","sku","updated_at","row_version")
   SELECT "id","po_id","product_id","barcode","product_name","cost_price","selling_price","quantity_received","subtotal_cost","created_at","sku","updated_at","row_version" FROM jsonb_populate_recordset(NULL::public."purchase_order_items", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "po_id"=EXCLUDED."po_id","product_id"=EXCLUDED."product_id","barcode"=EXCLUDED."barcode","product_name"=EXCLUDED."product_name","cost_price"=EXCLUDED."cost_price","selling_price"=EXCLUDED."selling_price","quantity_received"=EXCLUDED."quantity_received","subtotal_cost"=EXCLUDED."subtotal_cost","created_at"=EXCLUDED."created_at","sku"=EXCLUDED."sku","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version" WHERE EXCLUDED."row_version">public."purchase_order_items"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12850,13 +12853,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_purchase_order_items() FROM PUBLIC, anon
 CREATE OR REPLACE FUNCTION public.sync_apply_purchase_orders(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
-  INSERT INTO public."purchase_orders" ("id","po_number","supplier_name","operator_name","total_cost","total_items_count","created_at","supplier_id","store_id","store_code","invoice_date","invoice_entry_date","updated_at","row_version","pending_edit_request_id")
-  SELECT "id","po_number","supplier_name","operator_name","total_cost","total_items_count","created_at","supplier_id","store_id","store_code","invoice_date","invoice_entry_date","updated_at","row_version","pending_edit_request_id" FROM jsonb_populate_recordset(NULL::public."purchase_orders", COALESCE(p_rows,'[]'::jsonb))
-  ON CONFLICT ("id") DO UPDATE SET "po_number"=EXCLUDED."po_number","supplier_name"=EXCLUDED."supplier_name","operator_name"=EXCLUDED."operator_name","total_cost"=EXCLUDED."total_cost","total_items_count"=EXCLUDED."total_items_count","created_at"=EXCLUDED."created_at","supplier_id"=EXCLUDED."supplier_id","store_id"=EXCLUDED."store_id","store_code"=EXCLUDED."store_code","invoice_date"=EXCLUDED."invoice_date","invoice_entry_date"=EXCLUDED."invoice_entry_date","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version","pending_edit_request_id"=EXCLUDED."pending_edit_request_id" WHERE EXCLUDED."row_version">public."purchase_orders"."row_version";
+
+  INSERT INTO public."purchase_orders" ("id","po_number","supplier_name","operator_name","total_cost","total_items_count","created_at","supplier_id","store_id","store_code","invoice_date","invoice_entry_date","updated_at","row_version","pending_edit_request_id","pending_edit_by","pending_edit_at")
+  SELECT "id","po_number","supplier_name","operator_name","total_cost","total_items_count","created_at","supplier_id","store_id","store_code","invoice_date","invoice_entry_date","updated_at","row_version","pending_edit_request_id","pending_edit_by","pending_edit_at" FROM jsonb_populate_recordset(NULL::public."purchase_orders", COALESCE(p_rows,'[]'::jsonb))
+  ON CONFLICT ("id") DO UPDATE SET "po_number"=EXCLUDED."po_number","supplier_name"=EXCLUDED."supplier_name","operator_name"=EXCLUDED."operator_name","total_cost"=EXCLUDED."total_cost","total_items_count"=EXCLUDED."total_items_count","created_at"=EXCLUDED."created_at","supplier_id"=EXCLUDED."supplier_id","store_id"=EXCLUDED."store_id","store_code"=EXCLUDED."store_code","invoice_date"=EXCLUDED."invoice_date","invoice_entry_date"=EXCLUDED."invoice_entry_date","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version","pending_edit_request_id"=EXCLUDED."pending_edit_request_id","pending_edit_by"=EXCLUDED."pending_edit_by","pending_edit_at"=EXCLUDED."pending_edit_at" WHERE EXCLUDED."row_version">public."purchase_orders"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12884,7 +12887,7 @@ BEGIN
   SELECT "id","sale_id","product_id","product_name","unit_price","quantity","discount_percent","discount_amount","is_return","created_at","tax_rate","is_foc","promo_id","coupon_code","coupon_discount","unit_cost","row_version","refunded_qty" FROM jsonb_populate_recordset(NULL::public."sale_items", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "refunded_qty"=GREATEST(public."sale_items"."refunded_qty",EXCLUDED."refunded_qty"),"row_version"=GREATEST(public."sale_items"."row_version",EXCLUDED."row_version");
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
+
   PERFORM set_config('pos.refunding','off',true);
   RETURN v_count;
 END $fn$;
@@ -12913,7 +12916,7 @@ BEGIN
   SELECT "id","bill_number","member_id","store_id","cashier_name","subtotal_amount","total_amount","discount_amount","tax_amount","payment_type","points_earned","points_redeemed","is_exchange","original_bill_number","is_refunded","created_at","shift_id","paid_amount","change_amount","exchange_credit","exchanged_to_bill_number","coupon_code","coupon_promo_id","coupon_scope","coupon_discount","payments","client_transaction_id","cashier_id","created_by","updated_by","row_version","store_name_snapshot","store_address_snapshot","authorization_request_id","authorized_by","authorized_at","rounding_adjustment","rounding_label" FROM jsonb_populate_recordset(NULL::public."sales", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "is_refunded"=(public."sales"."is_refunded" OR EXCLUDED."is_refunded"),"row_version"=GREATEST(public."sales"."row_version",EXCLUDED."row_version");
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
+
   PERFORM set_config('pos.refunding','off',true);
   RETURN v_count;
 END $fn$;
@@ -12937,13 +12940,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_sales() FROM PUBLIC, anon, authenticated
 CREATE OR REPLACE FUNCTION public.sync_apply_secure_settings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."secure_settings" ("key","ciphertext","hint","updated_by","created_at","updated_at")
   SELECT "key","ciphertext","hint","updated_by","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."secure_settings", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("key") DO UPDATE SET "ciphertext"=EXCLUDED."ciphertext","hint"=EXCLUDED."hint","updated_by"=EXCLUDED."updated_by","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12966,13 +12969,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_secure_settings() FROM PUBLIC, anon, aut
 CREATE OR REPLACE FUNCTION public.sync_apply_security_findings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."security_findings" ("id","fingerprint","source","severity","title","detail","deployment_ref","status","first_seen_at","last_seen_at","acknowledged_by","acknowledged_at","resolved_at","created_at","updated_at")
   SELECT "id","fingerprint","source","severity","title","detail","deployment_ref","status","first_seen_at","last_seen_at","acknowledged_by","acknowledged_at","resolved_at","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."security_findings", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "fingerprint"=EXCLUDED."fingerprint","source"=EXCLUDED."source","severity"=EXCLUDED."severity","title"=EXCLUDED."title","detail"=EXCLUDED."detail","deployment_ref"=EXCLUDED."deployment_ref","status"=EXCLUDED."status","first_seen_at"=EXCLUDED."first_seen_at","last_seen_at"=EXCLUDED."last_seen_at","acknowledged_by"=EXCLUDED."acknowledged_by","acknowledged_at"=EXCLUDED."acknowledged_at","resolved_at"=EXCLUDED."resolved_at","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -12995,13 +12998,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_security_findings() FROM PUBLIC, anon, a
 CREATE OR REPLACE FUNCTION public.sync_apply_settings_locks(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."settings_locks" ("section","locked","updated_by","created_at","updated_at")
   SELECT "section","locked","updated_by","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."settings_locks", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("section") DO UPDATE SET "locked"=EXCLUDED."locked","updated_by"=EXCLUDED."updated_by","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13024,13 +13027,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_settings_locks() FROM PUBLIC, anon, auth
 CREATE OR REPLACE FUNCTION public.sync_apply_settings_overrides(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."settings_overrides" ("scope","scope_id","section","patch","updated_by","created_at","updated_at")
   SELECT "scope","scope_id","section","patch","updated_by","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."settings_overrides", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("scope","scope_id","section") DO UPDATE SET "patch"=EXCLUDED."patch","updated_by"=EXCLUDED."updated_by","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13053,13 +13056,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_settings_overrides() FROM PUBLIC, anon, 
 CREATE OR REPLACE FUNCTION public.sync_apply_shift_sessions(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."shift_sessions" ("id","shift_id","store_id","terminal_id","terminal_name","staff_id","staff_name","role","signed_in_at","signed_out_at","created_at","updated_at","row_version")
   SELECT "id","shift_id","store_id","terminal_id","terminal_name","staff_id","staff_name","role","signed_in_at","signed_out_at","created_at","updated_at","row_version" FROM jsonb_populate_recordset(NULL::public."shift_sessions", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "shift_id"=EXCLUDED."shift_id","store_id"=EXCLUDED."store_id","terminal_id"=EXCLUDED."terminal_id","terminal_name"=EXCLUDED."terminal_name","staff_id"=EXCLUDED."staff_id","staff_name"=EXCLUDED."staff_name","role"=EXCLUDED."role","signed_in_at"=EXCLUDED."signed_in_at","signed_out_at"=EXCLUDED."signed_out_at","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version" WHERE EXCLUDED."row_version">public."shift_sessions"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13082,13 +13085,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_shift_sessions() FROM PUBLIC, anon, auth
 CREATE OR REPLACE FUNCTION public.sync_apply_sku_audit(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."sku_audit" ("id","sku","product_id","product_name","source","previous_sku","store_id","store_name","terminal_id","staff_id","staff_name","role","created_at")
   SELECT "id","sku","product_id","product_name","source","previous_sku","store_id","store_name","terminal_id","staff_id","staff_name","role","created_at" FROM jsonb_populate_recordset(NULL::public."sku_audit", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "sku"=EXCLUDED."sku","product_id"=EXCLUDED."product_id","product_name"=EXCLUDED."product_name","source"=EXCLUDED."source","previous_sku"=EXCLUDED."previous_sku","store_id"=EXCLUDED."store_id","store_name"=EXCLUDED."store_name","terminal_id"=EXCLUDED."terminal_id","staff_id"=EXCLUDED."staff_id","staff_name"=EXCLUDED."staff_name","role"=EXCLUDED."role","created_at"=EXCLUDED."created_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13111,13 +13114,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_sku_audit() FROM PUBLIC, anon, authentic
 CREATE OR REPLACE FUNCTION public.sync_apply_staff_roles(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."staff_roles" ("slug","name","base_level","permissions","is_core","created_at","updated_at")
   SELECT "slug","name","base_level","permissions","is_core","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."staff_roles", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("slug") DO UPDATE SET "name"=EXCLUDED."name","base_level"=EXCLUDED."base_level","permissions"=EXCLUDED."permissions","is_core"=EXCLUDED."is_core","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13140,13 +13143,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_staff_roles() FROM PUBLIC, anon, authent
 CREATE OR REPLACE FUNCTION public.sync_apply_stock_adjustments(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."stock_adjustments" ("id","product_id","product_name","sku","barcode","store_id","terminal_id","reason","note","previous_stock","updated_stock","delta","cost_impact","staff_id","staff_name","role","created_at","row_version","draft_id")
   SELECT "id","product_id","product_name","sku","barcode","store_id","terminal_id","reason","note","previous_stock","updated_stock","delta","cost_impact","staff_id","staff_name","role","created_at","row_version","draft_id" FROM jsonb_populate_recordset(NULL::public."stock_adjustments", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO NOTHING;
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13191,13 +13194,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_stock_delta_applied() FROM PUBLIC, anon,
 CREATE OR REPLACE FUNCTION public.sync_apply_stock_transfer_items(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."stock_transfer_items" ("id","transfer_id","product_id","barcode","sku","product_name","quantity","quantity_received","unit_cost","created_at","row_version","quantity_approved","quantity_dispatched","quantity_verified")
   SELECT "id","transfer_id","product_id","barcode","sku","product_name","quantity","quantity_received","unit_cost","created_at","row_version","quantity_approved","quantity_dispatched","quantity_verified" FROM jsonb_populate_recordset(NULL::public."stock_transfer_items", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "transfer_id"=EXCLUDED."transfer_id","product_id"=EXCLUDED."product_id","barcode"=EXCLUDED."barcode","sku"=EXCLUDED."sku","product_name"=EXCLUDED."product_name","quantity"=EXCLUDED."quantity","quantity_received"=EXCLUDED."quantity_received","unit_cost"=EXCLUDED."unit_cost","created_at"=EXCLUDED."created_at","row_version"=EXCLUDED."row_version","quantity_approved"=EXCLUDED."quantity_approved","quantity_dispatched"=EXCLUDED."quantity_dispatched","quantity_verified"=EXCLUDED."quantity_verified" WHERE EXCLUDED."row_version">public."stock_transfer_items"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13220,13 +13223,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_stock_transfer_items() FROM PUBLIC, anon
 CREATE OR REPLACE FUNCTION public.sync_apply_stock_transfers(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
-  INSERT INTO public."stock_transfers" ("id","ref","kind","transfer_scope","from_store_id","from_store_name","from_group_id","to_store_id","to_store_name","to_group_id","status","note","created_by","approved_by","approved_at","received_by","received_at","rejected_reason","created_at","updated_at","row_version","verified_by")
-  SELECT "id","ref","kind","transfer_scope","from_store_id","from_store_name","from_group_id","to_store_id","to_store_name","to_group_id","status","note","created_by","approved_by","approved_at","received_by","received_at","rejected_reason","created_at","updated_at","row_version","verified_by" FROM jsonb_populate_recordset(NULL::public."stock_transfers", COALESCE(p_rows,'[]'::jsonb))
-  ON CONFLICT ("id") DO UPDATE SET "ref"=EXCLUDED."ref","kind"=EXCLUDED."kind","transfer_scope"=EXCLUDED."transfer_scope","from_store_id"=EXCLUDED."from_store_id","from_store_name"=EXCLUDED."from_store_name","from_group_id"=EXCLUDED."from_group_id","to_store_id"=EXCLUDED."to_store_id","to_store_name"=EXCLUDED."to_store_name","to_group_id"=EXCLUDED."to_group_id","status"=EXCLUDED."status","note"=EXCLUDED."note","created_by"=EXCLUDED."created_by","approved_by"=EXCLUDED."approved_by","approved_at"=EXCLUDED."approved_at","received_by"=EXCLUDED."received_by","received_at"=EXCLUDED."received_at","rejected_reason"=EXCLUDED."rejected_reason","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version","verified_by"=EXCLUDED."verified_by" WHERE EXCLUDED."row_version">public."stock_transfers"."row_version";
+
+  INSERT INTO public."stock_transfers" ("id","ref","kind","transfer_scope","from_store_id","from_store_name","from_group_id","to_store_id","to_store_name","to_group_id","status","note","created_by","approved_by","approved_at","received_by","received_at","rejected_reason","created_at","updated_at","row_version","verified_by","verified_at","posted_at","discrepancy_reason")
+  SELECT "id","ref","kind","transfer_scope","from_store_id","from_store_name","from_group_id","to_store_id","to_store_name","to_group_id","status","note","created_by","approved_by","approved_at","received_by","received_at","rejected_reason","created_at","updated_at","row_version","verified_by","verified_at","posted_at","discrepancy_reason" FROM jsonb_populate_recordset(NULL::public."stock_transfers", COALESCE(p_rows,'[]'::jsonb))
+  ON CONFLICT ("id") DO UPDATE SET "ref"=EXCLUDED."ref","kind"=EXCLUDED."kind","transfer_scope"=EXCLUDED."transfer_scope","from_store_id"=EXCLUDED."from_store_id","from_store_name"=EXCLUDED."from_store_name","from_group_id"=EXCLUDED."from_group_id","to_store_id"=EXCLUDED."to_store_id","to_store_name"=EXCLUDED."to_store_name","to_group_id"=EXCLUDED."to_group_id","status"=EXCLUDED."status","note"=EXCLUDED."note","created_by"=EXCLUDED."created_by","approved_by"=EXCLUDED."approved_by","approved_at"=EXCLUDED."approved_at","received_by"=EXCLUDED."received_by","received_at"=EXCLUDED."received_at","rejected_reason"=EXCLUDED."rejected_reason","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version","verified_by"=EXCLUDED."verified_by","verified_at"=EXCLUDED."verified_at","posted_at"=EXCLUDED."posted_at","discrepancy_reason"=EXCLUDED."discrepancy_reason" WHERE EXCLUDED."row_version">public."stock_transfers"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13249,13 +13252,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_stock_transfers() FROM PUBLIC, anon, aut
 CREATE OR REPLACE FUNCTION public.sync_apply_stores(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."stores" ("id","code","name","address","phone","created_at","updated_at","group_id","row_version","location_type","parent_id","is_central","building_name","floor_label","is_active","archived_at","is_primary_sub","private_catalogue")
   SELECT "id","code","name","address","phone","created_at","updated_at","group_id","row_version","location_type","parent_id","is_central","building_name","floor_label","is_active","archived_at","is_primary_sub","private_catalogue" FROM jsonb_populate_recordset(NULL::public."stores", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "code"=EXCLUDED."code","name"=EXCLUDED."name","address"=EXCLUDED."address","phone"=EXCLUDED."phone","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","group_id"=EXCLUDED."group_id","row_version"=EXCLUDED."row_version","location_type"=EXCLUDED."location_type","parent_id"=EXCLUDED."parent_id","is_central"=EXCLUDED."is_central","building_name"=EXCLUDED."building_name","floor_label"=EXCLUDED."floor_label","is_active"=EXCLUDED."is_active","archived_at"=EXCLUDED."archived_at","is_primary_sub"=EXCLUDED."is_primary_sub","private_catalogue"=EXCLUDED."private_catalogue" WHERE EXCLUDED."row_version">public."stores"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13278,13 +13281,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_stores() FROM PUBLIC, anon, authenticate
 CREATE OR REPLACE FUNCTION public.sync_apply_suppliers(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."suppliers" ("id","name","contact_name","phone","email","address","tax_number","notes","is_active","created_at","updated_at","row_version")
   SELECT "id","name","contact_name","phone","email","address","tax_number","notes","is_active","created_at","updated_at","row_version" FROM jsonb_populate_recordset(NULL::public."suppliers", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "name"=EXCLUDED."name","contact_name"=EXCLUDED."contact_name","phone"=EXCLUDED."phone","email"=EXCLUDED."email","address"=EXCLUDED."address","tax_number"=EXCLUDED."tax_number","notes"=EXCLUDED."notes","is_active"=EXCLUDED."is_active","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version" WHERE EXCLUDED."row_version">public."suppliers"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13307,13 +13310,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_suppliers() FROM PUBLIC, anon, authentic
 CREATE OR REPLACE FUNCTION public.sync_apply_sync_metadata(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."sync_metadata" ("id","store_id","terminal_id","table_name","last_synced_at","last_pushed_at","rows_pushed","last_error","created_at","updated_at")
   SELECT "id","store_id","terminal_id","table_name","last_synced_at","last_pushed_at","rows_pushed","last_error","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."sync_metadata", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "store_id"=EXCLUDED."store_id","terminal_id"=EXCLUDED."terminal_id","table_name"=EXCLUDED."table_name","last_synced_at"=EXCLUDED."last_synced_at","last_pushed_at"=EXCLUDED."last_pushed_at","rows_pushed"=EXCLUDED."rows_pushed","last_error"=EXCLUDED."last_error","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13336,13 +13339,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_sync_metadata() FROM PUBLIC, anon, authe
 CREATE OR REPLACE FUNCTION public.sync_apply_system_audit_logs(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."system_audit_logs" ("id","actor_id","actor_name","actor_role","action_type","entity_affected","entity_id","old_value","new_value","terminal_id","ip_address","store_id","note","created_at")
   SELECT "id","actor_id","actor_name","actor_role","action_type","entity_affected","entity_id","old_value","new_value","terminal_id","ip_address","store_id","note","created_at" FROM jsonb_populate_recordset(NULL::public."system_audit_logs", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "actor_id"=EXCLUDED."actor_id","actor_name"=EXCLUDED."actor_name","actor_role"=EXCLUDED."actor_role","action_type"=EXCLUDED."action_type","entity_affected"=EXCLUDED."entity_affected","entity_id"=EXCLUDED."entity_id","old_value"=EXCLUDED."old_value","new_value"=EXCLUDED."new_value","terminal_id"=EXCLUDED."terminal_id","ip_address"=EXCLUDED."ip_address","store_id"=EXCLUDED."store_id","note"=EXCLUDED."note","created_at"=EXCLUDED."created_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13365,13 +13368,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_system_audit_logs() FROM PUBLIC, anon, a
 CREATE OR REPLACE FUNCTION public.sync_apply_terminal_commands(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."terminal_commands" ("id","terminal_id","store_id","command","status","note","result","issued_by","issued_role","picked_up_at","finished_at","created_at","updated_at")
   SELECT "id","terminal_id","store_id","command","status","note","result","issued_by","issued_role","picked_up_at","finished_at","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."terminal_commands", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "terminal_id"=EXCLUDED."terminal_id","store_id"=EXCLUDED."store_id","command"=EXCLUDED."command","status"=EXCLUDED."status","note"=EXCLUDED."note","result"=EXCLUDED."result","issued_by"=EXCLUDED."issued_by","issued_role"=EXCLUDED."issued_role","picked_up_at"=EXCLUDED."picked_up_at","finished_at"=EXCLUDED."finished_at","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13394,13 +13397,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_terminal_commands() FROM PUBLIC, anon, a
 CREATE OR REPLACE FUNCTION public.sync_apply_terminal_tokens(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
-  INSERT INTO public."terminal_tokens" ("id","location_id","location_name","device_name","status","created_at","activated_at","revoked_at","last_seen_at","reissued_at","replaced_by","claimed_by_device","claimed_at","platform","row_version")
-  SELECT "id","location_id","location_name","device_name","status","created_at","activated_at","revoked_at","last_seen_at","reissued_at","replaced_by","claimed_by_device","claimed_at","platform","row_version" FROM jsonb_populate_recordset(NULL::public."terminal_tokens", COALESCE(p_rows,'[]'::jsonb))
-  ON CONFLICT ("id") DO UPDATE SET "location_id"=EXCLUDED."location_id","location_name"=EXCLUDED."location_name","device_name"=EXCLUDED."device_name","status"=EXCLUDED."status","created_at"=EXCLUDED."created_at","activated_at"=EXCLUDED."activated_at","revoked_at"=EXCLUDED."revoked_at","last_seen_at"=EXCLUDED."last_seen_at","reissued_at"=EXCLUDED."reissued_at","replaced_by"=EXCLUDED."replaced_by","claimed_by_device"=EXCLUDED."claimed_by_device","claimed_at"=EXCLUDED."claimed_at","platform"=EXCLUDED."platform","row_version"=EXCLUDED."row_version" WHERE EXCLUDED."row_version">public."terminal_tokens"."row_version";
+
+  INSERT INTO public."terminal_tokens" ("id","location_id","location_name","device_name","status","created_at","activated_at","revoked_at","last_seen_at","app_version","last_sync_at","reissued_at","replaced_by","claimed_by_device","claimed_at","platform","row_version")
+  SELECT "id","location_id","location_name","device_name","status","created_at","activated_at","revoked_at","last_seen_at","app_version","last_sync_at","reissued_at","replaced_by","claimed_by_device","claimed_at","platform","row_version" FROM jsonb_populate_recordset(NULL::public."terminal_tokens", COALESCE(p_rows,'[]'::jsonb))
+  ON CONFLICT ("id") DO UPDATE SET "location_id"=EXCLUDED."location_id","location_name"=EXCLUDED."location_name","device_name"=EXCLUDED."device_name","status"=EXCLUDED."status","created_at"=EXCLUDED."created_at","activated_at"=EXCLUDED."activated_at","revoked_at"=EXCLUDED."revoked_at","last_seen_at"=EXCLUDED."last_seen_at","app_version"=EXCLUDED."app_version","last_sync_at"=EXCLUDED."last_sync_at","reissued_at"=EXCLUDED."reissued_at","replaced_by"=EXCLUDED."replaced_by","claimed_by_device"=EXCLUDED."claimed_by_device","claimed_at"=EXCLUDED."claimed_at","platform"=EXCLUDED."platform","row_version"=EXCLUDED."row_version" WHERE EXCLUDED."row_version">public."terminal_tokens"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13423,13 +13426,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_terminal_tokens() FROM PUBLIC, anon, aut
 CREATE OR REPLACE FUNCTION public.sync_apply_uom_units(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."uom_units" ("id","code","name","allow_decimal","sort","created_at","updated_at","row_version","is_active")
   SELECT "id","code","name","allow_decimal","sort","created_at","updated_at","row_version","is_active" FROM jsonb_populate_recordset(NULL::public."uom_units", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "code"=EXCLUDED."code","name"=EXCLUDED."name","allow_decimal"=EXCLUDED."allow_decimal","sort"=EXCLUDED."sort","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version","is_active"=EXCLUDED."is_active" WHERE EXCLUDED."row_version">public."uom_units"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13452,13 +13455,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_uom_units() FROM PUBLIC, anon, authentic
 CREATE OR REPLACE FUNCTION public.sync_apply_user_roles(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."user_roles" ("id","user_id","role","created_at")
   SELECT "id","user_id","role","created_at" FROM jsonb_populate_recordset(NULL::public."user_roles", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "user_id"=EXCLUDED."user_id","role"=EXCLUDED."role","created_at"=EXCLUDED."created_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13481,13 +13484,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_user_roles() FROM PUBLIC, anon, authenti
 CREATE OR REPLACE FUNCTION public.sync_apply_whatsapp_queue(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."whatsapp_queue" ("id","phone_number_id","recipient","body","reference","store_id","status","error","queued_at","sent_at","created_at","updated_at")
   SELECT "id","phone_number_id","recipient","body","reference","store_id","status","error","queued_at","sent_at","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."whatsapp_queue", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "phone_number_id"=EXCLUDED."phone_number_id","recipient"=EXCLUDED."recipient","body"=EXCLUDED."body","reference"=EXCLUDED."reference","store_id"=EXCLUDED."store_id","status"=EXCLUDED."status","error"=EXCLUDED."error","queued_at"=EXCLUDED."queued_at","sent_at"=EXCLUDED."sent_at","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13510,13 +13513,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_whatsapp_queue() FROM PUBLIC, anon, auth
 CREATE OR REPLACE FUNCTION public.sync_apply_terminal_recovery_secrets(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."terminal_recovery_secrets" ("terminal_token_id","sealed_secret","fingerprint","platform","device_name","utc_offset_minutes","created_at","updated_at")
   SELECT "terminal_token_id","sealed_secret","fingerprint","platform","device_name","utc_offset_minutes","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."terminal_recovery_secrets", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("terminal_token_id") DO UPDATE SET "sealed_secret"=EXCLUDED."sealed_secret","fingerprint"=EXCLUDED."fingerprint","platform"=EXCLUDED."platform","device_name"=EXCLUDED."device_name","utc_offset_minutes"=EXCLUDED."utc_offset_minutes","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13539,13 +13542,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_terminal_recovery_secrets() FROM PUBLIC,
 CREATE OR REPLACE FUNCTION public.sync_apply_pos_store_settings(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
-  INSERT INTO public."pos_store_settings" ("store_id","block_shift_close_on_hold","require_daily_sales_for_shift_close","require_counted_cash_on_close","require_opening_float_count","enable_blind_cash_count","max_drawer_cash_limit","require_reason_for_payout","allow_multiple_shifts_per_terminal","enable_cashier_x_report","show_opening_float_at_close","show_expected_totals_at_close","show_live_variance_at_close","show_itemized_tender_breakdown","require_manager_pin_on_variance","variance_pin_threshold","max_cashier_discount_percent","max_cart_discount_amount","allow_discount_stacking","require_reason_for_price_override","prevent_below_cost_sale","allow_tax_exemption","prevent_negative_stock_sale","require_receipt_for_refund","require_manager_pin_for_refund","max_refund_days_limit","track_item_voids","auto_lock_timeout_seconds","require_manager_pin_for_cash_drawer_open","enable_manager_pin_audit_log","require_pin_void_cart","require_pin_void_line","require_pin_reduce_qty","require_pin_manual_discount","require_pin_price_override","require_pin_stock_adjustment","require_pin_shift_close","require_pin_edit_tenders","require_pin_terminal_reset","row_version","updated_by","updated_at","allow_offline_approvals")
-  SELECT "store_id","block_shift_close_on_hold","require_daily_sales_for_shift_close","require_counted_cash_on_close","require_opening_float_count","enable_blind_cash_count","max_drawer_cash_limit","require_reason_for_payout","allow_multiple_shifts_per_terminal","enable_cashier_x_report","show_opening_float_at_close","show_expected_totals_at_close","show_live_variance_at_close","show_itemized_tender_breakdown","require_manager_pin_on_variance","variance_pin_threshold","max_cashier_discount_percent","max_cart_discount_amount","allow_discount_stacking","require_reason_for_price_override","prevent_below_cost_sale","allow_tax_exemption","prevent_negative_stock_sale","require_receipt_for_refund","require_manager_pin_for_refund","max_refund_days_limit","track_item_voids","auto_lock_timeout_seconds","require_manager_pin_for_cash_drawer_open","enable_manager_pin_audit_log","require_pin_void_cart","require_pin_void_line","require_pin_reduce_qty","require_pin_manual_discount","require_pin_price_override","require_pin_stock_adjustment","require_pin_shift_close","require_pin_edit_tenders","require_pin_terminal_reset","row_version","updated_by","updated_at","allow_offline_approvals" FROM jsonb_populate_recordset(NULL::public."pos_store_settings", COALESCE(p_rows,'[]'::jsonb))
-  ON CONFLICT ("store_id") DO UPDATE SET "block_shift_close_on_hold"=EXCLUDED."block_shift_close_on_hold","require_daily_sales_for_shift_close"=EXCLUDED."require_daily_sales_for_shift_close","require_counted_cash_on_close"=EXCLUDED."require_counted_cash_on_close","require_opening_float_count"=EXCLUDED."require_opening_float_count","enable_blind_cash_count"=EXCLUDED."enable_blind_cash_count","max_drawer_cash_limit"=EXCLUDED."max_drawer_cash_limit","require_reason_for_payout"=EXCLUDED."require_reason_for_payout","allow_multiple_shifts_per_terminal"=EXCLUDED."allow_multiple_shifts_per_terminal","enable_cashier_x_report"=EXCLUDED."enable_cashier_x_report","show_opening_float_at_close"=EXCLUDED."show_opening_float_at_close","show_expected_totals_at_close"=EXCLUDED."show_expected_totals_at_close","show_live_variance_at_close"=EXCLUDED."show_live_variance_at_close","show_itemized_tender_breakdown"=EXCLUDED."show_itemized_tender_breakdown","require_manager_pin_on_variance"=EXCLUDED."require_manager_pin_on_variance","variance_pin_threshold"=EXCLUDED."variance_pin_threshold","max_cashier_discount_percent"=EXCLUDED."max_cashier_discount_percent","max_cart_discount_amount"=EXCLUDED."max_cart_discount_amount","allow_discount_stacking"=EXCLUDED."allow_discount_stacking","require_reason_for_price_override"=EXCLUDED."require_reason_for_price_override","prevent_below_cost_sale"=EXCLUDED."prevent_below_cost_sale","allow_tax_exemption"=EXCLUDED."allow_tax_exemption","prevent_negative_stock_sale"=EXCLUDED."prevent_negative_stock_sale","require_receipt_for_refund"=EXCLUDED."require_receipt_for_refund","require_manager_pin_for_refund"=EXCLUDED."require_manager_pin_for_refund","max_refund_days_limit"=EXCLUDED."max_refund_days_limit","track_item_voids"=EXCLUDED."track_item_voids","auto_lock_timeout_seconds"=EXCLUDED."auto_lock_timeout_seconds","require_manager_pin_for_cash_drawer_open"=EXCLUDED."require_manager_pin_for_cash_drawer_open","enable_manager_pin_audit_log"=EXCLUDED."enable_manager_pin_audit_log","require_pin_void_cart"=EXCLUDED."require_pin_void_cart","require_pin_void_line"=EXCLUDED."require_pin_void_line","require_pin_reduce_qty"=EXCLUDED."require_pin_reduce_qty","require_pin_manual_discount"=EXCLUDED."require_pin_manual_discount","require_pin_price_override"=EXCLUDED."require_pin_price_override","require_pin_stock_adjustment"=EXCLUDED."require_pin_stock_adjustment","require_pin_shift_close"=EXCLUDED."require_pin_shift_close","require_pin_edit_tenders"=EXCLUDED."require_pin_edit_tenders","require_pin_terminal_reset"=EXCLUDED."require_pin_terminal_reset","row_version"=EXCLUDED."row_version","updated_by"=EXCLUDED."updated_by","updated_at"=EXCLUDED."updated_at","allow_offline_approvals"=EXCLUDED."allow_offline_approvals" WHERE EXCLUDED."row_version">public."pos_store_settings"."row_version";
+
+  INSERT INTO public."pos_store_settings" ("store_id","block_shift_close_on_hold","require_daily_sales_for_shift_close","require_counted_cash_on_close","require_opening_float_count","enable_blind_cash_count","max_drawer_cash_limit","require_reason_for_payout","allow_multiple_shifts_per_terminal","enable_cashier_x_report","show_opening_float_at_close","show_expected_totals_at_close","show_live_variance_at_close","show_itemized_tender_breakdown","require_manager_pin_on_variance","variance_pin_threshold","max_cashier_discount_percent","max_cart_discount_amount","allow_discount_stacking","require_reason_for_price_override","prevent_below_cost_sale","allow_tax_exemption","prevent_negative_stock_sale","require_receipt_for_refund","require_manager_pin_for_refund","max_refund_days_limit","track_item_voids","auto_lock_timeout_seconds","require_manager_pin_for_cash_drawer_open","enable_manager_pin_audit_log","require_pin_void_cart","require_pin_void_line","require_pin_reduce_qty","require_pin_manual_discount","require_pin_price_override","require_pin_stock_adjustment","require_pin_shift_close","require_pin_edit_tenders","require_pin_terminal_reset","row_version","updated_by","updated_at","allow_offline_approvals","offline_approval_requires_pin","online_only_void_cart","online_only_void_line","online_only_reduce_qty","online_only_manual_discount","online_only_price_override","online_only_stock_adjustment","online_only_shift_close","online_only_edit_tenders","online_only_terminal_reset","online_only_refund")
+  SELECT "store_id","block_shift_close_on_hold","require_daily_sales_for_shift_close","require_counted_cash_on_close","require_opening_float_count","enable_blind_cash_count","max_drawer_cash_limit","require_reason_for_payout","allow_multiple_shifts_per_terminal","enable_cashier_x_report","show_opening_float_at_close","show_expected_totals_at_close","show_live_variance_at_close","show_itemized_tender_breakdown","require_manager_pin_on_variance","variance_pin_threshold","max_cashier_discount_percent","max_cart_discount_amount","allow_discount_stacking","require_reason_for_price_override","prevent_below_cost_sale","allow_tax_exemption","prevent_negative_stock_sale","require_receipt_for_refund","require_manager_pin_for_refund","max_refund_days_limit","track_item_voids","auto_lock_timeout_seconds","require_manager_pin_for_cash_drawer_open","enable_manager_pin_audit_log","require_pin_void_cart","require_pin_void_line","require_pin_reduce_qty","require_pin_manual_discount","require_pin_price_override","require_pin_stock_adjustment","require_pin_shift_close","require_pin_edit_tenders","require_pin_terminal_reset","row_version","updated_by","updated_at","allow_offline_approvals","offline_approval_requires_pin","online_only_void_cart","online_only_void_line","online_only_reduce_qty","online_only_manual_discount","online_only_price_override","online_only_stock_adjustment","online_only_shift_close","online_only_edit_tenders","online_only_terminal_reset","online_only_refund" FROM jsonb_populate_recordset(NULL::public."pos_store_settings", COALESCE(p_rows,'[]'::jsonb))
+  ON CONFLICT ("store_id") DO UPDATE SET "block_shift_close_on_hold"=EXCLUDED."block_shift_close_on_hold","require_daily_sales_for_shift_close"=EXCLUDED."require_daily_sales_for_shift_close","require_counted_cash_on_close"=EXCLUDED."require_counted_cash_on_close","require_opening_float_count"=EXCLUDED."require_opening_float_count","enable_blind_cash_count"=EXCLUDED."enable_blind_cash_count","max_drawer_cash_limit"=EXCLUDED."max_drawer_cash_limit","require_reason_for_payout"=EXCLUDED."require_reason_for_payout","allow_multiple_shifts_per_terminal"=EXCLUDED."allow_multiple_shifts_per_terminal","enable_cashier_x_report"=EXCLUDED."enable_cashier_x_report","show_opening_float_at_close"=EXCLUDED."show_opening_float_at_close","show_expected_totals_at_close"=EXCLUDED."show_expected_totals_at_close","show_live_variance_at_close"=EXCLUDED."show_live_variance_at_close","show_itemized_tender_breakdown"=EXCLUDED."show_itemized_tender_breakdown","require_manager_pin_on_variance"=EXCLUDED."require_manager_pin_on_variance","variance_pin_threshold"=EXCLUDED."variance_pin_threshold","max_cashier_discount_percent"=EXCLUDED."max_cashier_discount_percent","max_cart_discount_amount"=EXCLUDED."max_cart_discount_amount","allow_discount_stacking"=EXCLUDED."allow_discount_stacking","require_reason_for_price_override"=EXCLUDED."require_reason_for_price_override","prevent_below_cost_sale"=EXCLUDED."prevent_below_cost_sale","allow_tax_exemption"=EXCLUDED."allow_tax_exemption","prevent_negative_stock_sale"=EXCLUDED."prevent_negative_stock_sale","require_receipt_for_refund"=EXCLUDED."require_receipt_for_refund","require_manager_pin_for_refund"=EXCLUDED."require_manager_pin_for_refund","max_refund_days_limit"=EXCLUDED."max_refund_days_limit","track_item_voids"=EXCLUDED."track_item_voids","auto_lock_timeout_seconds"=EXCLUDED."auto_lock_timeout_seconds","require_manager_pin_for_cash_drawer_open"=EXCLUDED."require_manager_pin_for_cash_drawer_open","enable_manager_pin_audit_log"=EXCLUDED."enable_manager_pin_audit_log","require_pin_void_cart"=EXCLUDED."require_pin_void_cart","require_pin_void_line"=EXCLUDED."require_pin_void_line","require_pin_reduce_qty"=EXCLUDED."require_pin_reduce_qty","require_pin_manual_discount"=EXCLUDED."require_pin_manual_discount","require_pin_price_override"=EXCLUDED."require_pin_price_override","require_pin_stock_adjustment"=EXCLUDED."require_pin_stock_adjustment","require_pin_shift_close"=EXCLUDED."require_pin_shift_close","require_pin_edit_tenders"=EXCLUDED."require_pin_edit_tenders","require_pin_terminal_reset"=EXCLUDED."require_pin_terminal_reset","row_version"=EXCLUDED."row_version","updated_by"=EXCLUDED."updated_by","updated_at"=EXCLUDED."updated_at","allow_offline_approvals"=EXCLUDED."allow_offline_approvals","offline_approval_requires_pin"=EXCLUDED."offline_approval_requires_pin","online_only_void_cart"=EXCLUDED."online_only_void_cart","online_only_void_line"=EXCLUDED."online_only_void_line","online_only_reduce_qty"=EXCLUDED."online_only_reduce_qty","online_only_manual_discount"=EXCLUDED."online_only_manual_discount","online_only_price_override"=EXCLUDED."online_only_price_override","online_only_stock_adjustment"=EXCLUDED."online_only_stock_adjustment","online_only_shift_close"=EXCLUDED."online_only_shift_close","online_only_edit_tenders"=EXCLUDED."online_only_edit_tenders","online_only_terminal_reset"=EXCLUDED."online_only_terminal_reset","online_only_refund"=EXCLUDED."online_only_refund" WHERE EXCLUDED."row_version">public."pos_store_settings"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13568,13 +13571,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_pos_store_settings() FROM PUBLIC, anon, 
 CREATE OR REPLACE FUNCTION public.sync_apply_settings_scoped(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."settings_scoped" ("scope","scope_id","key","value","is_overridden","updated_by","created_at","updated_at")
   SELECT "scope","scope_id","key","value","is_overridden","updated_by","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."settings_scoped", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("scope","scope_id","key") DO UPDATE SET "value"=EXCLUDED."value","is_overridden"=EXCLUDED."is_overridden","updated_by"=EXCLUDED."updated_by","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13597,13 +13600,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_settings_scoped() FROM PUBLIC, anon, aut
 CREATE OR REPLACE FUNCTION public.sync_apply_stock_count_drafts(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
-  INSERT INTO public."stock_count_drafts" ("id","store_id","terminal_id","staff_id","staff_name","status","reason","note","lines","line_count","total_impact","posted_at","posted_by","created_at","updated_at","reference","store_code","pending_edit_request_id")
-  SELECT "id","store_id","terminal_id","staff_id","staff_name","status","reason","note","lines","line_count","total_impact","posted_at","posted_by","created_at","updated_at","reference","store_code","pending_edit_request_id" FROM jsonb_populate_recordset(NULL::public."stock_count_drafts", COALESCE(p_rows,'[]'::jsonb))
-  ON CONFLICT ("id") DO UPDATE SET "store_id"=EXCLUDED."store_id","terminal_id"=EXCLUDED."terminal_id","staff_id"=EXCLUDED."staff_id","staff_name"=EXCLUDED."staff_name","status"=EXCLUDED."status","reason"=EXCLUDED."reason","note"=EXCLUDED."note","lines"=EXCLUDED."lines","line_count"=EXCLUDED."line_count","total_impact"=EXCLUDED."total_impact","posted_at"=EXCLUDED."posted_at","posted_by"=EXCLUDED."posted_by","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","reference"=EXCLUDED."reference","store_code"=EXCLUDED."store_code","pending_edit_request_id"=EXCLUDED."pending_edit_request_id";
+
+  INSERT INTO public."stock_count_drafts" ("id","store_id","terminal_id","staff_id","staff_name","status","reason","note","lines","line_count","total_impact","posted_at","posted_by","created_at","updated_at","reference","store_code","pending_edit_request_id","pending_edit_by","pending_edit_at")
+  SELECT "id","store_id","terminal_id","staff_id","staff_name","status","reason","note","lines","line_count","total_impact","posted_at","posted_by","created_at","updated_at","reference","store_code","pending_edit_request_id","pending_edit_by","pending_edit_at" FROM jsonb_populate_recordset(NULL::public."stock_count_drafts", COALESCE(p_rows,'[]'::jsonb))
+  ON CONFLICT ("id") DO UPDATE SET "store_id"=EXCLUDED."store_id","terminal_id"=EXCLUDED."terminal_id","staff_id"=EXCLUDED."staff_id","staff_name"=EXCLUDED."staff_name","status"=EXCLUDED."status","reason"=EXCLUDED."reason","note"=EXCLUDED."note","lines"=EXCLUDED."lines","line_count"=EXCLUDED."line_count","total_impact"=EXCLUDED."total_impact","posted_at"=EXCLUDED."posted_at","posted_by"=EXCLUDED."posted_by","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","reference"=EXCLUDED."reference","store_code"=EXCLUDED."store_code","pending_edit_request_id"=EXCLUDED."pending_edit_request_id","pending_edit_by"=EXCLUDED."pending_edit_by","pending_edit_at"=EXCLUDED."pending_edit_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13626,13 +13629,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_stock_count_drafts() FROM PUBLIC, anon, 
 CREATE OR REPLACE FUNCTION public.sync_apply_authorization_actions(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."authorization_actions" ("id","action_key","scope_type","scope_id","mode","allowed_roles","allowed_user_ids","requester_roles","requester_user_ids","authority_limits","extra_authority","absolute_ceilings","require_reason","threshold","is_enabled","created_at","updated_at")
   SELECT "id","action_key","scope_type","scope_id","mode","allowed_roles","allowed_user_ids","requester_roles","requester_user_ids","authority_limits","extra_authority","absolute_ceilings","require_reason","threshold","is_enabled","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."authorization_actions", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "action_key"=EXCLUDED."action_key","scope_type"=EXCLUDED."scope_type","scope_id"=EXCLUDED."scope_id","mode"=EXCLUDED."mode","allowed_roles"=EXCLUDED."allowed_roles","allowed_user_ids"=EXCLUDED."allowed_user_ids","requester_roles"=EXCLUDED."requester_roles","requester_user_ids"=EXCLUDED."requester_user_ids","authority_limits"=EXCLUDED."authority_limits","extra_authority"=EXCLUDED."extra_authority","absolute_ceilings"=EXCLUDED."absolute_ceilings","require_reason"=EXCLUDED."require_reason","threshold"=EXCLUDED."threshold","is_enabled"=EXCLUDED."is_enabled","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13655,13 +13658,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_authorization_actions() FROM PUBLIC, ano
 CREATE OR REPLACE FUNCTION public.sync_apply_authorization_requests(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
-  INSERT INTO public."authorization_requests" ("id","action_key","requested_by","requested_by_name","store_id","terminal_id","reason","payload","status","decided_by","decided_by_name","decided_at","decision_note","expires_at","consumed_at","requester_direct_limit","value_unit","created_at","updated_at","requested_amount")
-  SELECT "id","action_key","requested_by","requested_by_name","store_id","terminal_id","reason","payload","status","decided_by","decided_by_name","decided_at","decision_note","expires_at","consumed_at","requester_direct_limit","value_unit","created_at","updated_at","requested_amount" FROM jsonb_populate_recordset(NULL::public."authorization_requests", COALESCE(p_rows,'[]'::jsonb))
-  ON CONFLICT ("id") DO UPDATE SET "action_key"=EXCLUDED."action_key","requested_by"=EXCLUDED."requested_by","requested_by_name"=EXCLUDED."requested_by_name","store_id"=EXCLUDED."store_id","terminal_id"=EXCLUDED."terminal_id","reason"=EXCLUDED."reason","payload"=EXCLUDED."payload","status"=EXCLUDED."status","decided_by"=EXCLUDED."decided_by","decided_by_name"=EXCLUDED."decided_by_name","decided_at"=EXCLUDED."decided_at","decision_note"=EXCLUDED."decision_note","expires_at"=EXCLUDED."expires_at","consumed_at"=EXCLUDED."consumed_at","requester_direct_limit"=EXCLUDED."requester_direct_limit","value_unit"=EXCLUDED."value_unit","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","requested_amount"=EXCLUDED."requested_amount";
+
+  INSERT INTO public."authorization_requests" ("id","action_key","requested_by","requested_by_name","store_id","terminal_id","reason","payload","status","decided_by","decided_by_name","decided_at","decision_note","expires_at","consumed_at","requester_direct_limit","value_unit","created_at","updated_at","requested_amount","approved_amount","approved_payload","bill_snapshot","snapshot_hash","held_order_id","notified_at")
+  SELECT "id","action_key","requested_by","requested_by_name","store_id","terminal_id","reason","payload","status","decided_by","decided_by_name","decided_at","decision_note","expires_at","consumed_at","requester_direct_limit","value_unit","created_at","updated_at","requested_amount","approved_amount","approved_payload","bill_snapshot","snapshot_hash","held_order_id","notified_at" FROM jsonb_populate_recordset(NULL::public."authorization_requests", COALESCE(p_rows,'[]'::jsonb))
+  ON CONFLICT ("id") DO UPDATE SET "action_key"=EXCLUDED."action_key","requested_by"=EXCLUDED."requested_by","requested_by_name"=EXCLUDED."requested_by_name","store_id"=EXCLUDED."store_id","terminal_id"=EXCLUDED."terminal_id","reason"=EXCLUDED."reason","payload"=EXCLUDED."payload","status"=EXCLUDED."status","decided_by"=EXCLUDED."decided_by","decided_by_name"=EXCLUDED."decided_by_name","decided_at"=EXCLUDED."decided_at","decision_note"=EXCLUDED."decision_note","expires_at"=EXCLUDED."expires_at","consumed_at"=EXCLUDED."consumed_at","requester_direct_limit"=EXCLUDED."requester_direct_limit","value_unit"=EXCLUDED."value_unit","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","requested_amount"=EXCLUDED."requested_amount","approved_amount"=EXCLUDED."approved_amount","approved_payload"=EXCLUDED."approved_payload","bill_snapshot"=EXCLUDED."bill_snapshot","snapshot_hash"=EXCLUDED."snapshot_hash","held_order_id"=EXCLUDED."held_order_id","notified_at"=EXCLUDED."notified_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13684,13 +13687,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_authorization_requests() FROM PUBLIC, an
 CREATE OR REPLACE FUNCTION public.sync_apply_authorization_log(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."authorization_log" ("id","action_key","mode_used","request_id","requested_by","authorized_by","authorizer_role","store_id","terminal_id","outcome","detail","created_at")
   SELECT "id","action_key","mode_used","request_id","requested_by","authorized_by","authorizer_role","store_id","terminal_id","outcome","detail","created_at" FROM jsonb_populate_recordset(NULL::public."authorization_log", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "action_key"=EXCLUDED."action_key","mode_used"=EXCLUDED."mode_used","request_id"=EXCLUDED."request_id","requested_by"=EXCLUDED."requested_by","authorized_by"=EXCLUDED."authorized_by","authorizer_role"=EXCLUDED."authorizer_role","store_id"=EXCLUDED."store_id","terminal_id"=EXCLUDED."terminal_id","outcome"=EXCLUDED."outcome","detail"=EXCLUDED."detail","created_at"=EXCLUDED."created_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13713,13 +13716,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_authorization_log() FROM PUBLIC, anon, a
 CREATE OR REPLACE FUNCTION public.sync_apply_record_edits(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."record_edits" ("id","record_type","record_id","reference","store_id","terminal_id","action_key","request_id","edited_by","edited_by_name","authorized_by","authorized_by_name","mode_used","before_value","after_value","stock_deltas","note","created_at")
   SELECT "id","record_type","record_id","reference","store_id","terminal_id","action_key","request_id","edited_by","edited_by_name","authorized_by","authorized_by_name","mode_used","before_value","after_value","stock_deltas","note","created_at" FROM jsonb_populate_recordset(NULL::public."record_edits", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "record_type"=EXCLUDED."record_type","record_id"=EXCLUDED."record_id","reference"=EXCLUDED."reference","store_id"=EXCLUDED."store_id","terminal_id"=EXCLUDED."terminal_id","action_key"=EXCLUDED."action_key","request_id"=EXCLUDED."request_id","edited_by"=EXCLUDED."edited_by","edited_by_name"=EXCLUDED."edited_by_name","authorized_by"=EXCLUDED."authorized_by","authorized_by_name"=EXCLUDED."authorized_by_name","mode_used"=EXCLUDED."mode_used","before_value"=EXCLUDED."before_value","after_value"=EXCLUDED."after_value","stock_deltas"=EXCLUDED."stock_deltas","note"=EXCLUDED."note","created_at"=EXCLUDED."created_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13742,13 +13745,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_record_edits() FROM PUBLIC, anon, authen
 CREATE OR REPLACE FUNCTION public.sync_apply_shift_cash_counts(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."shift_cash_counts" ("id","shift_id","store_id","terminal_id","kind","counted_cash","counted_card","counted_digital","reason","counted_by_name","counted_by_staff_id","counted_by_user_id","client_key","created_at")
   SELECT "id","shift_id","store_id","terminal_id","kind","counted_cash","counted_card","counted_digital","reason","counted_by_name","counted_by_staff_id","counted_by_user_id","client_key","created_at" FROM jsonb_populate_recordset(NULL::public."shift_cash_counts", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "shift_id"=EXCLUDED."shift_id","store_id"=EXCLUDED."store_id","terminal_id"=EXCLUDED."terminal_id","kind"=EXCLUDED."kind","counted_cash"=EXCLUDED."counted_cash","counted_card"=EXCLUDED."counted_card","counted_digital"=EXCLUDED."counted_digital","reason"=EXCLUDED."reason","counted_by_name"=EXCLUDED."counted_by_name","counted_by_staff_id"=EXCLUDED."counted_by_staff_id","counted_by_user_id"=EXCLUDED."counted_by_user_id","client_key"=EXCLUDED."client_key","created_at"=EXCLUDED."created_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13771,13 +13774,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_shift_cash_counts() FROM PUBLIC, anon, a
 CREATE OR REPLACE FUNCTION public.sync_apply_shift_close_events(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."shift_close_events" ("id","shift_id","store_id","terminal_id","event","from_state","to_state","detail","actor_name","actor_staff_id","actor_user_id","created_at")
   SELECT "id","shift_id","store_id","terminal_id","event","from_state","to_state","detail","actor_name","actor_staff_id","actor_user_id","created_at" FROM jsonb_populate_recordset(NULL::public."shift_close_events", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "shift_id"=EXCLUDED."shift_id","store_id"=EXCLUDED."store_id","terminal_id"=EXCLUDED."terminal_id","event"=EXCLUDED."event","from_state"=EXCLUDED."from_state","to_state"=EXCLUDED."to_state","detail"=EXCLUDED."detail","actor_name"=EXCLUDED."actor_name","actor_staff_id"=EXCLUDED."actor_staff_id","actor_user_id"=EXCLUDED."actor_user_id","created_at"=EXCLUDED."created_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13800,13 +13803,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_shift_close_events() FROM PUBLIC, anon, 
 CREATE OR REPLACE FUNCTION public.sync_apply_shift_reconciliations(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."shift_reconciliations" ("id","shift_id","store_id","count_id","expected_cash","expected_card","expected_digital","counted_cash","counted_card","counted_digital","variance_cash","variance_card","variance_digital","variance_total","variance_status","created_at")
   SELECT "id","shift_id","store_id","count_id","expected_cash","expected_card","expected_digital","counted_cash","counted_card","counted_digital","variance_cash","variance_card","variance_digital","variance_total","variance_status","created_at" FROM jsonb_populate_recordset(NULL::public."shift_reconciliations", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "shift_id"=EXCLUDED."shift_id","store_id"=EXCLUDED."store_id","count_id"=EXCLUDED."count_id","expected_cash"=EXCLUDED."expected_cash","expected_card"=EXCLUDED."expected_card","expected_digital"=EXCLUDED."expected_digital","counted_cash"=EXCLUDED."counted_cash","counted_card"=EXCLUDED."counted_card","counted_digital"=EXCLUDED."counted_digital","variance_cash"=EXCLUDED."variance_cash","variance_card"=EXCLUDED."variance_card","variance_digital"=EXCLUDED."variance_digital","variance_total"=EXCLUDED."variance_total","variance_status"=EXCLUDED."variance_status","created_at"=EXCLUDED."created_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13829,13 +13832,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_shift_reconciliations() FROM PUBLIC, ano
 CREATE OR REPLACE FUNCTION public.sync_apply_shift_variance_alerts(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."shift_variance_alerts" ("id","shift_id","store_id","reconciliation_id","variance_total","variance_status","severity","message","delivery_status","attempts","last_error","last_attempt_at","acknowledged_at","acknowledged_by","created_at","updated_at")
   SELECT "id","shift_id","store_id","reconciliation_id","variance_total","variance_status","severity","message","delivery_status","attempts","last_error","last_attempt_at","acknowledged_at","acknowledged_by","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."shift_variance_alerts", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "shift_id"=EXCLUDED."shift_id","store_id"=EXCLUDED."store_id","reconciliation_id"=EXCLUDED."reconciliation_id","variance_total"=EXCLUDED."variance_total","variance_status"=EXCLUDED."variance_status","severity"=EXCLUDED."severity","message"=EXCLUDED."message","delivery_status"=EXCLUDED."delivery_status","attempts"=EXCLUDED."attempts","last_error"=EXCLUDED."last_error","last_attempt_at"=EXCLUDED."last_attempt_at","acknowledged_at"=EXCLUDED."acknowledged_at","acknowledged_by"=EXCLUDED."acknowledged_by","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13858,13 +13861,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_shift_variance_alerts() FROM PUBLIC, ano
 CREATE OR REPLACE FUNCTION public.sync_apply_entity_status_history(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."entity_status_history" ("id","entity_type","entity_id","status_kind","previous_status","new_status","reason","actor_id","actor_name","actor_role","store_id","branch_id","terminal_id","related_entity_type","related_entity_id","metadata","client_event_id","occurred_at","created_at","updated_at","row_version")
   SELECT "id","entity_type","entity_id","status_kind","previous_status","new_status","reason","actor_id","actor_name","actor_role","store_id","branch_id","terminal_id","related_entity_type","related_entity_id","metadata","client_event_id","occurred_at","created_at","updated_at","row_version" FROM jsonb_populate_recordset(NULL::public."entity_status_history", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "entity_type"=EXCLUDED."entity_type","entity_id"=EXCLUDED."entity_id","status_kind"=EXCLUDED."status_kind","previous_status"=EXCLUDED."previous_status","new_status"=EXCLUDED."new_status","reason"=EXCLUDED."reason","actor_id"=EXCLUDED."actor_id","actor_name"=EXCLUDED."actor_name","actor_role"=EXCLUDED."actor_role","store_id"=EXCLUDED."store_id","branch_id"=EXCLUDED."branch_id","terminal_id"=EXCLUDED."terminal_id","related_entity_type"=EXCLUDED."related_entity_type","related_entity_id"=EXCLUDED."related_entity_id","metadata"=EXCLUDED."metadata","client_event_id"=EXCLUDED."client_event_id","occurred_at"=EXCLUDED."occurred_at","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at","row_version"=EXCLUDED."row_version" WHERE EXCLUDED."row_version">public."entity_status_history"."row_version";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13887,13 +13890,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_entity_status_history() FROM PUBLIC, ano
 CREATE OR REPLACE FUNCTION public.sync_apply_nav_pins(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."nav_pins" ("id","owner_id","item_kind","item_key","sort_order","created_at","updated_at")
   SELECT "id","owner_id","item_kind","item_key","sort_order","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."nav_pins", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "owner_id"=EXCLUDED."owner_id","item_kind"=EXCLUDED."item_kind","item_key"=EXCLUDED."item_key","sort_order"=EXCLUDED."sort_order","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 
@@ -13916,13 +13919,13 @@ REVOKE ALL ON FUNCTION public.sync_feed_nav_pins() FROM PUBLIC, anon, authentica
 CREATE OR REPLACE FUNCTION public.sync_apply_store_groups(p_rows jsonb) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER SET search_path=public,pg_temp AS $fn$
 DECLARE v_count integer; v_row jsonb;
 BEGIN
-  
+
   INSERT INTO public."store_groups" ("id","code","name","is_active","archived_at","created_at","updated_at")
   SELECT "id","code","name","is_active","archived_at","created_at","updated_at" FROM jsonb_populate_recordset(NULL::public."store_groups", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "code"=EXCLUDED."code","name"=EXCLUDED."name","is_active"=EXCLUDED."is_active","archived_at"=EXCLUDED."archived_at","created_at"=EXCLUDED."created_at","updated_at"=EXCLUDED."updated_at";
   GET DIAGNOSTICS v_count=ROW_COUNT;
-  
-  
+
+
   RETURN v_count;
 END $fn$;
 

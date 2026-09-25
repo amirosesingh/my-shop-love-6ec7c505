@@ -8,10 +8,7 @@ const packagedRegistry = require("../../../electron/db/schema-registry.cjs");
 describe("SQL Server schema registry", () => {
   const registry = JSON.parse(readFileSync("database/sqlserver/schema-registry.json", "utf8"));
   const sql = readFileSync("database/sqlserver/schema.sql", "utf8");
-  const completeSql = readFileSync(
-    "database/sqlserver/retail-pos-local-database.sql",
-    "utf8",
-  );
+  const completeSql = readFileSync("database/sqlserver/retail-pos-local-database.sql", "utf8");
 
   it("loads through the same path used by the packaged desktop validator", () => {
     expect(packagedRegistry.loadRegistry().tables).toHaveLength(67);
@@ -22,8 +19,17 @@ describe("SQL Server schema registry", () => {
 
   it("maps every cloud domain table and column", () => {
     expect(registry.tables).toHaveLength(67);
-    expect(registry.tables.reduce((sum: number, table: { columns: unknown[] }) => sum + table.columns.length, 0)).toBeGreaterThanOrEqual(995);
-    expect(registry.tables.find((table: { cloudTable: string }) => table.cloudTable === "sale_items").columns.some((column: { cloudColumn: string }) => column.cloudColumn === "refunded_qty")).toBe(true);
+    expect(
+      registry.tables.reduce(
+        (sum: number, table: { columns: unknown[] }) => sum + table.columns.length,
+        0,
+      ),
+    ).toBeGreaterThanOrEqual(995);
+    expect(
+      registry.tables
+        .find((table: { cloudTable: string }) => table.cloudTable === "sale_items")
+        .columns.some((column: { cloudColumn: string }) => column.cloudColumn === "refunded_qty"),
+    ).toBe(true);
     for (const table of registry.tables) {
       expect(table.sqlServerTable).toBe(table.cloudTable);
       expect(table.deleteRule).toBeTruthy();
@@ -33,9 +39,7 @@ describe("SQL Server schema registry", () => {
         (candidate: { primaryKey: boolean }) => candidate.primaryKey,
       )) {
         expect(column.nullable, `${table.sqlServerTable}.${column.sqlServerColumn}`).toBe(false);
-        expect(sql).toContain(
-          `[${column.sqlServerColumn}] ${column.sqlServerType} NOT NULL`,
-        );
+        expect(sql).toContain(`[${column.sqlServerColumn}] ${column.sqlServerType} NOT NULL`);
       }
     }
   });
@@ -51,12 +55,54 @@ describe("SQL Server schema registry", () => {
     expect(sql).toContain("dbo.pos_schema_migrations");
     expect(sql).toContain("dbo.local_operation_receipts");
     expect(sql).toContain("FOREIGN KEY");
-    expect(registry.tables.some((table: { columns: Array<{ foreignKey: boolean; foreignKeyTarget?: unknown }> }) => table.columns.some((column) => column.foreignKey && column.foreignKeyTarget))).toBe(true);
+    expect(
+      registry.tables.some(
+        (table: { columns: Array<{ foreignKey: boolean; foreignKeyTarget?: unknown }> }) =>
+          table.columns.some((column) => column.foreignKey && column.foreignKeyTarget),
+      ),
+    ).toBe(true);
+  });
+
+  it("preserves every approval column from multi-column cloud upgrades", () => {
+    const approvals = registry.tables.find(
+      (table: { cloudTable: string }) => table.cloudTable === "authorization_requests",
+    );
+    const byName = new Map(
+      approvals.columns.map((column: { cloudColumn: string }) => [column.cloudColumn, column]),
+    );
+    for (const name of [
+      "requested_amount",
+      "approved_amount",
+      "approved_payload",
+      "bill_snapshot",
+      "snapshot_hash",
+      "held_order_id",
+      "notified_at",
+    ]) {
+      expect(byName.has(name), name).toBe(true);
+    }
+    expect(byName.get("requested_amount")).toMatchObject({
+      sqlServerType: "decimal(38,12)",
+      nullable: true,
+      defaultRule: null,
+    });
+    expect(byName.get("approved_payload")).toMatchObject({
+      sqlServerType: "nvarchar(max)",
+      nullable: false,
+      defaultRule: "N'{}'",
+    });
+    expect(sql).toContain(
+      "ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [requested_amount] decimal(38,12) NULL",
+    );
+    expect(sql).not.toContain("DF_authorization_requests_requested_amount] DEFAULT (N'[]')");
   });
 
   it("ships one complete re-runnable local database script", () => {
     const initial = readFileSync("database/sqlserver/migrations/001_initial.sql", "utf8").trim();
-    const pipeline = readFileSync("database/sqlserver/migrations/002_sync_pipeline.sql", "utf8").trim();
+    const pipeline = readFileSync(
+      "database/sqlserver/migrations/002_sync_pipeline.sql",
+      "utf8",
+    ).trim();
     const normalize = (value: string) => value.replaceAll("\r\n", "\n").trim();
     const normalizedCompleteSql = normalize(completeSql);
 
@@ -68,9 +114,7 @@ describe("SQL Server schema registry", () => {
     expect(completeSql).toContain("@Required AS required_tables");
     expect(completeSql).toContain("@RequiredColumnCount AS required_columns");
     expect(completeSql).toContain("@MissingColumnCount AS missing_columns");
-    expect(completeSql).toContain(
-      "Retail POS local database migration history table is missing.",
-    );
+    expect(completeSql).toContain("Retail POS local database migration history table is missing.");
     expect(completeSql).toContain("WHERE version = 2");
     const columnInserts = [
       ...completeSql.matchAll(
@@ -78,15 +122,13 @@ describe("SQL Server schema registry", () => {
       ),
     ];
     expect(columnInserts).toHaveLength(2);
-    expect(
-      columnInserts.every((match) => (match[1].match(/\(N'/g) ?? []).length <= 1_000),
-    ).toBe(true);
+    expect(columnInserts.every((match) => (match[1].match(/\(N'/g) ?? []).length <= 1_000)).toBe(
+      true,
+    );
     for (const table of registry.tables) {
       expect(completeSql).toContain(`(N'${table.sqlServerTable}')`);
       for (const column of table.columns) {
-        expect(completeSql).toContain(
-          `(N'${table.sqlServerTable}', N'${column.sqlServerColumn}')`,
-        );
+        expect(completeSql).toContain(`(N'${table.sqlServerTable}', N'${column.sqlServerColumn}')`);
       }
     }
   });
@@ -124,14 +166,12 @@ describe("SQL Server schema registry", () => {
 
     expect(
       payments.columns.find(
-        (column: { cloudColumn: string }) =>
-          column.cloudColumn === "client_transaction_id",
+        (column: { cloudColumn: string }) => column.cloudColumn === "client_transaction_id",
       ).unique,
     ).toBe(true);
     expect(
       sales.columns.find(
-        (column: { cloudColumn: string }) =>
-          column.cloudColumn === "client_transaction_id",
+        (column: { cloudColumn: string }) => column.cloudColumn === "client_transaction_id",
       ).unique,
     ).toBe(true);
     expect(sql).toContain(
@@ -143,14 +183,19 @@ describe("SQL Server schema registry", () => {
   });
 
   it("orders every foreign-key parent before its children", () => {
-    const byName = new Map(registry.tables.map((table: { cloudTable: string }) => [table.cloudTable, table]));
+    const byName = new Map(
+      registry.tables.map((table: { cloudTable: string }) => [table.cloudTable, table]),
+    );
     for (const table of registry.tables) {
-      for (const column of table.columns.filter((item: { foreignKeyTarget?: { table: string } | null }) => item.foreignKeyTarget?.table && item.foreignKeyTarget.table !== table.cloudTable)) {
-        const parent = byName.get(column.foreignKeyTarget.table) as { dependencyOrder: number } | undefined;
+      for (const column of table.columns.filter(
+        (item: { foreignKeyTarget?: { table: string } | null }) =>
+          item.foreignKeyTarget?.table && item.foreignKeyTarget.table !== table.cloudTable,
+      )) {
+        const parent = byName.get(column.foreignKeyTarget.table) as
+          { dependencyOrder: number } | undefined;
         expect(parent?.dependencyOrder).toBeLessThan(table.dependencyOrder);
         const targetTable = byName.get(column.foreignKeyTarget.table) as
-          | { columns: Array<{ sqlServerColumn: string; sqlServerType: string }> }
-          | undefined;
+          { columns: Array<{ sqlServerColumn: string; sqlServerType: string }> } | undefined;
         const targetColumn = targetTable?.columns.find(
           (candidate) => candidate.sqlServerColumn === column.foreignKeyTarget.column,
         );
