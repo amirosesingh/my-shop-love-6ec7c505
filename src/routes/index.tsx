@@ -1533,7 +1533,12 @@ function Register() {
 
   const slot_cartLines = (
     <>
-      <ScrollArea className="min-h-0 flex-1">
+      <ScrollArea
+        className="min-h-0 flex-1"
+        data-register-cart
+        tabIndex={-1}
+        aria-label="Current cart"
+      >
         <div className="divide-y divide-border">
           {lines.map((l, i) => (
             <div
@@ -2085,6 +2090,11 @@ function Register() {
    * a button from the canvas never unregisters the handler or its hotkey.
    */
   const registerActionHandlers: ActionHandlers = {
+    "cart.focus": () => {
+      const cart = document.querySelector<HTMLElement>("[data-register-cart]");
+      cart?.scrollIntoView({ block: "nearest", inline: "nearest" });
+      cart?.focus({ preventScroll: true });
+    },
     "cart.charge": () => openPayment(),
     "cart.fastCash": () => openPayment(),
     "cart.clear": () => void clearCart("clear"),

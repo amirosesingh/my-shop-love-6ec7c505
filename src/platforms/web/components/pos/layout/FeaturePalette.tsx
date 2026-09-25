@@ -11,6 +11,7 @@ export function FeaturePalette({
   modules,
   onAdd,
   onDragStart,
+  onDragEnd,
   onCreate,
   onAddGroup,
 }: {
@@ -19,6 +20,7 @@ export function FeaturePalette({
   modules: RegisterModule[];
   onAdd: (id: RegisterModuleId) => void;
   onDragStart: (id: RegisterModuleId) => void;
+  onDragEnd: () => void;
   onCreate: () => void;
   /** Drops an empty group container that other nodes can be docked into. */
   onAddGroup: () => void;
@@ -62,6 +64,7 @@ export function FeaturePalette({
                             e.dataTransfer.setData("text/plain", m.id);
                             onDragStart(m.id);
                           }}
+                          onDragEnd={onDragEnd}
                           className="flex cursor-grab items-start gap-2 rounded-lg border border-dashed border-primary/40 bg-card p-3 active:cursor-grabbing"
                         >
                           <GripVertical className="mt-0.5 size-4 shrink-0 text-muted-foreground" />

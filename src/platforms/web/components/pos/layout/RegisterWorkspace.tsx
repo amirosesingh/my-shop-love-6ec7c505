@@ -35,7 +35,13 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useAuth } from "@/lib/pos-auth";
+import { useUiScalePrefs } from "@/lib/use-ui-scale";
 import { boundedInputNumber } from "@/lib/number-input";
+import {
+  draggedCanvasPosition,
+  paletteDropCell,
+  palettePreviewOffset,
+} from "@/lib/canvas-coordinates";
 import {
   DEFAULT_PAD,
   ASPECT_RATIO,
@@ -130,6 +136,7 @@ export function RegisterWorkspace({
   classic: ReactNode;
 }) {
   const { isAdmin } = useAuth();
+  const { registerZoom } = useUiScalePrefs();
   const layout = useRegisterLayout(terminalKey);
   const [paletteOpen, setPaletteOpen] = useState(false);
   const [createOpen, setCreateOpen] = useState(false);
@@ -137,6 +144,13 @@ export function RegisterWorkspace({
   const [selected, setSelected] = useState<string[]>([]);
   const view = useViewportBox();
   const gridHostRef = useRef<HTMLDivElement | null>(null);
+
+  useEffect(() => {
+    setPaletteOpen(false);
+    setCreateOpen(false);
+    setDragging(null);
+    setSelected([]);
+  }, [terminalKey]);
 
   /**
    * Container-relative drag math.
@@ -149,14 +163,20 @@ export function RegisterWorkspace({
    * position or window size.
    */
   const containerStrategy = useCallback(
-    (scale: number) => ({
+    (scale: number, logicalWidth: number, logicalHeight: number) => ({
       ...createScaledStrategy(scale),
       calcDragPosition: (clientX: number, clientY: number, offsetX: number, offsetY: number) => {
         const rect = gridHostRef.current?.getBoundingClientRect();
-        return {
-          left: (clientX - offsetX - (rect?.left ?? 0)) / scale,
-          top: (clientY - offsetY - (rect?.top ?? 0)) / scale,
-        };
+        if (!rect) return { left: (clientX - offsetX) / scale, top: (clientY - offsetY) / scale };
+        return draggedCanvasPosition(
+          clientX,
+          clientY,
+          offsetX,
+          offsetY,
+          rect,
+          logicalWidth,
+          logicalHeight,
+        );
       },
     }),
     [],
@@ -169,6 +189,7 @@ export function RegisterWorkspace({
     () => (canvas ? canvasMetrics(canvas, { width: view.width, height: view.height }) : null),
     [canvas, view.width, view.height],
   );
+  const effectiveScale = (metrics?.scale ?? 1) * registerZoom;
 
   const boxes = useMemo<Layout>(
     () =>
@@ -190,7 +211,7 @@ export function RegisterWorkspace({
 
   return (
     <div className="relative flex h-full min-h-0 w-full min-w-0 flex-col">
-      {isAdmin && (
+      {isAdmin && layout.loaded && (
         <CustomizeBar
           editing={editing}
           previewing={layout.previewing}
@@ -205,19 +226,34 @@ export function RegisterWorkspace({
           onCancel={() => {
             layout.stopEdit();
             setPaletteOpen(false);
+            setDragging(null);
+            setSelected([]);
           }}
           onPalette={() => setPaletteOpen((v) => !v)}
           onPadAll={layout.setAllPadding}
           onPreview={layout.preview}
           onResume={layout.resumeEdit}
-          onSave={() => {
-            layout.save();
+          saving={layout.saving}
+          onSave={async () => {
+            const saved = await layout.save();
+            if (!saved) {
+              toast.error("The layout could not be saved on this terminal. Please try again.");
+              return;
+            }
             setPaletteOpen(false);
+            setDragging(null);
+            setSelected([]);
             toast.success("Layout saved for this terminal");
           }}
-          onReset={() => {
-            layout.reset();
+          onReset={async () => {
+            const reset = await layout.reset();
+            if (!reset) {
+              toast.error("The saved layout could not be cleared. Please try again.");
+              return;
+            }
             setPaletteOpen(false);
+            setDragging(null);
+            setSelected([]);
             toast.success("Restored the factory register layout");
           }}
         />
@@ -225,19 +261,26 @@ export function RegisterWorkspace({
 
       <FeaturePalette
         open={isAdmin && editing && paletteOpen}
-        onOpenChange={setPaletteOpen}
+        onOpenChange={(open) => {
+          setPaletteOpen(open);
+          if (!open) setDragging(null);
+        }}
         modules={layout.palette}
         onAdd={(id) => layout.addModule(id)}
         onDragStart={setDragging}
+        onDragEnd={() => setDragging(null)}
         onCreate={() => setCreateOpen(true)}
         onAddGroup={() => {
-          if (!selected.length) {
+          const groupable = selected.filter((id) =>
+            layout.active?.items.some((item) => item.i === id && !isGroupId(item.i)),
+          );
+          if (!groupable.length) {
             toast.warning("Please select at least one item to group.");
             return;
           }
-          layout.addGroup(selected);
+          layout.addGroup(groupable);
           setSelected([]);
-          toast.success(`Grouped ${selected.length} item${selected.length > 1 ? "s" : ""}`);
+          toast.success(`Grouped ${groupable.length} item${groupable.length > 1 ? "s" : ""}`);
         }}
       />
 
@@ -278,7 +321,11 @@ export function RegisterWorkspace({
                 autoSize={false}
                 layout={boxes}
                 compactor={noCompactor}
-                positionStrategy={containerStrategy(metrics.scale)}
+                positionStrategy={containerStrategy(
+                  effectiveScale,
+                  metrics.baseWidth,
+                  metrics.baseHeight,
+                )}
                 gridConfig={{
                   cols: canvas.cols,
                   rowHeight: canvas.rowHeight,
@@ -290,12 +337,43 @@ export function RegisterWorkspace({
                 dropConfig={{
                   enabled: editing,
                   ...(dragging
-                    ? { defaultItem: { w: MODULE_BY_ID[dragging].w, h: MODULE_BY_ID[dragging].h } }
+                    ? {
+                        defaultItem: { w: MODULE_BY_ID[dragging].w, h: MODULE_BY_ID[dragging].h },
+                        onDragOver: () => {
+                          const rect = gridHostRef.current?.getBoundingClientRect();
+                          if (!rect) return;
+                          const def = MODULE_BY_ID[dragging];
+                          const offset = palettePreviewOffset(
+                            rect,
+                            metrics.baseWidth,
+                            metrics.baseHeight,
+                            (def.w * metrics.baseWidth) / canvas.cols,
+                            def.h * canvas.rowHeight,
+                          );
+                          return { dragOffsetX: offset.x, dragOffsetY: offset.y };
+                        },
+                      }
                     : {}),
                 }}
-                onDrop={(_l, item) => {
+                onDrop={(_l, item, event) => {
                   if (!dragging) return;
-                  layout.addModule(dragging, { x: item?.x ?? 0, y: item?.y ?? 0 });
+                  const rect = gridHostRef.current?.getBoundingClientRect();
+                  const def = MODULE_BY_ID[dragging];
+                  const pointer = event as DragEvent;
+                  const position = rect
+                    ? paletteDropCell({
+                        clientX: pointer.clientX,
+                        clientY: pointer.clientY,
+                        rect,
+                        logicalWidth: metrics.baseWidth,
+                        logicalHeight: metrics.baseHeight,
+                        cols: canvas.cols,
+                        rowHeight: canvas.rowHeight,
+                        itemW: def.w,
+                        itemH: def.h,
+                      })
+                    : { x: item?.x ?? 0, y: item?.y ?? 0 };
+                  layout.addModule(dragging, position);
                   setDragging(null);
                 }}
                 onLayoutChange={(next: Layout) => {
@@ -332,6 +410,7 @@ export function RegisterWorkspace({
                             `${spec.label} removed — the till cannot take payment without it.`,
                           );
                         }
+                        setSelected((prev) => prev.filter((id) => id !== box.i));
                         layout.removeModule(box.i);
                       }}
                       onOptions={(opts) => layout.setOptions(box.i, opts)}
@@ -652,6 +731,7 @@ function CustomizeBar({
   onResume,
   onSave,
   onReset,
+  saving,
 }: {
   editing: boolean;
   previewing: boolean;
@@ -665,8 +745,9 @@ function CustomizeBar({
   onPadAll: (pad: number) => void;
   onPreview: () => void;
   onResume: () => void;
-  onSave: () => void;
-  onReset: () => void;
+  onSave: () => void | Promise<void>;
+  onReset: () => void | Promise<void>;
+  saving: boolean;
 }) {
   // Live mode keeps every pixel for the till: the entry point floats instead of
   // taking a full toolbar row.
@@ -803,13 +884,13 @@ function CustomizeBar({
           <Pencil className="size-3.5" /> Back to editing
         </Button>
       )}
-      <Button size="sm" variant="outline" className="h-8" onClick={onReset}>
+      <Button size="sm" variant="outline" className="h-8" disabled={saving} onClick={onReset}>
         <RotateCcw className="size-3.5" /> Factory default
       </Button>
-      <Button size="sm" className="h-8" onClick={onSave}>
-        <Save className="size-3.5" /> Save layout
+      <Button size="sm" className="h-8" disabled={saving} onClick={onSave}>
+        <Save className="size-3.5" /> {saving ? "Saving…" : "Save layout"}
       </Button>
-      <Button size="sm" variant="ghost" className="h-8" onClick={onCancel}>
+      <Button size="sm" variant="ghost" className="h-8" disabled={saving} onClick={onCancel}>
         Cancel
       </Button>
     </div>
