@@ -15,6 +15,11 @@ type Guard = {
   key: (v: unknown, o?: Record<string, unknown>) => string;
   filePath: (v: unknown, o?: Record<string, unknown>) => string;
   guarded: (work: () => unknown) => Promise<unknown>;
+  aggregate: (value: unknown) => {
+    kind: string;
+    branchId?: string;
+    operations: Array<Record<string, unknown>>;
+  };
 };
 
 let guard: Guard;
@@ -76,5 +81,44 @@ describe("desktop bridge arguments", () => {
     expect(result.ok).toBe(false);
     expect(result.code).toBe("EBADARG");
     expect(result.error).toContain("not allowed");
+  });
+
+  it("accepts the nested sale aggregate used by Electron checkout", () => {
+    const value = {
+      kind: "sale",
+      branchId: "branch-1",
+      operations: [
+        {
+          kind: "upsert",
+          table: "sales",
+          rows: [
+            {
+              id: "11111111-1111-4111-8111-111111111111",
+              store_id: "branch-1",
+              total_amount: 100,
+            },
+          ],
+        },
+        {
+          kind: "upsert",
+          table: "payment_transactions",
+          rows: [
+            {
+              id: "22222222-2222-4222-8222-222222222222",
+              sale_id: "11111111-1111-4111-8111-111111111111",
+              amount: 100,
+            },
+          ],
+        },
+      ],
+    };
+
+    expect(guard.aggregate(value)).toEqual(value);
+  });
+
+  it("keeps the aggregate envelope closed to unexpected fields", () => {
+    expect(() =>
+      guard.aggregate({ kind: "sale", operations: [], rawSql: "DROP TABLE sales" }),
+    ).toThrow("unexpected setting");
   });
 });
