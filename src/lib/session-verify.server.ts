@@ -36,6 +36,18 @@ export async function verifySessionServer(input: VerifyInput): Promise<VerifyRes
   if (!input.sessionToken && !input.cashierToken && !input.terminalToken && !input.accessToken)
     return { ok: false, reason: "unknown" };
 
+  // A supplied person-session is authoritative during boot/resume. A valid
+  // terminal registration or refreshable Supabase session must not hide that
+  // this person's POS idle window expired while the browser was closed.
+  if (input.sessionToken) {
+    const { touchSession } = await import("./session-guard.server");
+    const checked = await touchSession(input.sessionToken);
+    if (!checked.ok) {
+      if (checked.reason === "unavailable") return { ok: false, reason: "unavailable" };
+      return { ok: false, reason: "revoked" };
+    }
+  }
+
   let caller: Awaited<ReturnType<typeof verifyRelayCaller>>;
   try {
     caller = await verifyRelayCaller(input);

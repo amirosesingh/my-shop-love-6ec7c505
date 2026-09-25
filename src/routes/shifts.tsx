@@ -65,7 +65,8 @@ function Shifts() {
   const { rules } = usePosRules();
   const { authorize } = useManagerGate();
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
-  const [float, setFloat] = useState("150");
+  // Never carry a suggested or previous drawer count into a new shift.
+  const [float, setFloat] = useState("");
   const [closeOpen, setCloseOpen] = useState(false);
   const [signIns, setSignIns] = useState<SignInEntry[]>([]);
   const [sessions, setSessions] = useState<ShiftSession[]>([]);
@@ -260,6 +261,7 @@ function Shifts() {
                       parsePositiveAmount(float) ?? 0,
                     );
                     openCashDrawer();
+                    setFloat("");
                     toast.success(`Shift opened — ${commitLabel(target).toLowerCase()}`);
                   } catch (e) {
                     notifyError(e, "Opening the shift");

@@ -298,8 +298,12 @@ function Register() {
 
   /** True while a sale / booking is being stored — blocks a second click. */
   const [openShiftOpen, setOpenShiftOpen] = useState(false);
-  const [float, setFloat] = useState("150");
+  // Start blank so the cashier must enter the amount actually counted.
+  const [float, setFloat] = useState("");
   const [cashier, setCashier] = useState(user?.name ?? "Cashier");
+  useEffect(() => {
+    if (openShiftOpen) setFloat("");
+  }, [openShiftOpen]);
   /** Who is actually signed in right now — sales are stamped with this, not
    *  the name captured when the shift was opened (users may switch mid-shift). */
   const activeCashier = user?.name || activeShift?.cashier || cashier;
@@ -3531,6 +3535,7 @@ function Register() {
                     parsePositiveAmount(float) ?? 0,
                   );
                   openCashDrawer();
+                  setFloat("");
                   setOpenShiftOpen(false);
                   toast.success(`Shift opened — ${commitLabel(target).toLowerCase()}`);
                 } catch (e) {
