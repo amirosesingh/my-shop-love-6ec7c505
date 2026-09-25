@@ -18,9 +18,11 @@ function sqlFiles(directory = root): string[] {
 }
 
 describe("canonical Supabase SQL", () => {
-  it("keeps one manual upgrade, its CLI migration, the installer and deliberate reset", () => {
+  it("keeps one manual upgrade, its CLI migrations, the installer and deliberate reset", () => {
     expect(sqlFiles().filter((file) => file.startsWith("supabase/"))).toEqual([
       "supabase/migrations/20260925102835_fix_payment_transaction_idempotency.sql",
+      "supabase/migrations/20260925105427_fix_pos_sale_commit_stock_alias.sql",
+      "supabase/migrations/20260925105919_persist_pos_sale_payment_idempotency.sql",
       "supabase/reset.sql",
       "supabase/schema.sql",
       "supabase/sql/payment_commit_upgrade.sql",
@@ -47,9 +49,7 @@ describe("canonical Supabase SQL", () => {
     const sql = read("supabase/schema.sql");
     const hardening = sql.indexOf("-- Final public-schema privilege hardening");
     expect(hardening).toBeGreaterThan(sql.lastIndexOf("CREATE OR REPLACE FUNCTION"));
-    expect(sql).toContain(
-      "REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated",
-    );
+    expect(sql).toContain("REVOKE EXECUTE ON FUNCTIONS FROM PUBLIC, anon, authenticated");
     expect(sql).toMatch(
       /WHERE n\.nspname = 'public'[\s\S]*p\.prosecdef[\s\S]*REVOKE EXECUTE ON FUNCTION %s FROM PUBLIC, anon/,
     );
@@ -61,9 +61,7 @@ describe("canonical Supabase SQL", () => {
       "sync_idempotency_receipts",
       "sync_change_feed",
     ]) {
-      expect(sql).toContain(
-        `REVOKE ALL ON TABLE public.${table} FROM PUBLIC, anon, authenticated`,
-      );
+      expect(sql).toContain(`REVOKE ALL ON TABLE public.${table} FROM PUBLIC, anon, authenticated`);
       expect(sql).toMatch(
         new RegExp(
           `CREATE POLICY "server-only deny client access" ON public\\.${table}\\s+FOR ALL TO anon, authenticated USING \\(false\\) WITH CHECK \\(false\\)`,

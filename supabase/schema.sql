@@ -10819,7 +10819,7 @@ SET search_path = public, pg_temp
 AS $$
 DECLARE
   s jsonb := COALESCE(_sale, '{}'::jsonb);
-  r jsonb;
+  entry jsonb;
   existing_id uuid;
   movement_result record;
 BEGIN
@@ -10866,19 +10866,19 @@ BEGIN
     ) ON CONFLICT (id) DO NOTHING;
   END IF;
 
-  FOR r IN SELECT value FROM jsonb_array_elements(COALESCE(_items,'[]'::jsonb)) LOOP
+  FOR entry IN SELECT value FROM jsonb_array_elements(COALESCE(_items,'[]'::jsonb)) LOOP
     INSERT INTO public.sale_items (
       id, sale_id, product_id, product_name, unit_price, unit_cost, quantity,
       discount_percent, discount_amount, tax_rate, is_return, is_foc,
       promo_id, coupon_code, coupon_discount, created_at
     ) VALUES (
-      (r->>'id')::uuid, (s->>'id')::uuid, NULLIF(r->>'product_id','')::uuid,
-      r->>'product_name', COALESCE((r->>'unit_price')::numeric,0),
-      COALESCE((r->>'unit_cost')::numeric,0), COALESCE((r->>'quantity')::integer,1),
-      COALESCE((r->>'discount_percent')::numeric,0), COALESCE((r->>'discount_amount')::numeric,0),
-      COALESCE((r->>'tax_rate')::numeric,0), COALESCE((r->>'is_return')::boolean,false),
-      COALESCE((r->>'is_foc')::boolean,false), NULLIF(r->>'promo_id',''),
-      NULLIF(r->>'coupon_code',''), COALESCE((r->>'coupon_discount')::numeric,0), now()
+      (entry->>'id')::uuid, (s->>'id')::uuid, NULLIF(entry->>'product_id','')::uuid,
+      entry->>'product_name', COALESCE((entry->>'unit_price')::numeric,0),
+      COALESCE((entry->>'unit_cost')::numeric,0), COALESCE((entry->>'quantity')::integer,1),
+      COALESCE((entry->>'discount_percent')::numeric,0), COALESCE((entry->>'discount_amount')::numeric,0),
+      COALESCE((entry->>'tax_rate')::numeric,0), COALESCE((entry->>'is_return')::boolean,false),
+      COALESCE((entry->>'is_foc')::boolean,false), NULLIF(entry->>'promo_id',''),
+      NULLIF(entry->>'coupon_code',''), COALESCE((entry->>'coupon_discount')::numeric,0), now()
     ) ON CONFLICT (id) DO NOTHING;
   END LOOP;
 
@@ -10901,46 +10901,50 @@ BEGIN
       updated_at = now();
   END IF;
 
-  FOR r IN SELECT value FROM jsonb_array_elements(COALESCE(_payments,'[]'::jsonb)) LOOP
+  FOR entry IN SELECT value FROM jsonb_array_elements(COALESCE(_payments,'[]'::jsonb)) LOOP
     INSERT INTO public.payment_transactions (
-      id, source_type, sale_id, booking_id, member_id, store_id, shift_id,
+      id, client_transaction_id, source_type, sale_id, booking_id, member_id, store_id, shift_id,
       terminal_id, amount, method, kind, reference, cashier_id, cashier_name,
       note, paid_at, created_at, status, metadata
     ) VALUES (
-      (r->>'id')::uuid, COALESCE(NULLIF(r->>'source_type',''),'sale'),
-      (s->>'id')::uuid, NULL, NULLIF(r->>'member_id','')::uuid,
-      NULLIF(s->>'store_id',''), NULLIF(r->>'shift_id',''),
-      NULLIF(r->>'terminal_id',''), COALESCE((r->>'amount')::numeric,0),
-      COALESCE(NULLIF(r->>'method',''),'cash'), COALESCE(NULLIF(r->>'kind',''),'payment'),
-      NULLIF(r->>'reference',''), NULLIF(r->>'cashier_id',''), NULLIF(r->>'cashier_name',''),
-      COALESCE(r->>'note',''), COALESCE(NULLIF(r->>'paid_at','')::timestamptz,now()),
-      COALESCE(NULLIF(r->>'created_at','')::timestamptz,now()),
-      COALESCE(NULLIF(r->>'status',''),'completed'), COALESCE(r->'metadata','{}'::jsonb)
+      (entry->>'id')::uuid, NULLIF(entry->>'client_transaction_id',''),
+      COALESCE(NULLIF(entry->>'source_type',''),'sale'),
+      (s->>'id')::uuid, NULL, NULLIF(entry->>'member_id','')::uuid,
+      NULLIF(s->>'store_id',''), NULLIF(entry->>'shift_id',''),
+      NULLIF(entry->>'terminal_id',''), COALESCE((entry->>'amount')::numeric,0),
+      COALESCE(NULLIF(entry->>'method',''),'cash'), COALESCE(NULLIF(entry->>'kind',''),'payment'),
+      NULLIF(entry->>'reference',''), NULLIF(entry->>'cashier_id',''), NULLIF(entry->>'cashier_name',''),
+      COALESCE(entry->>'note',''), COALESCE(NULLIF(entry->>'paid_at','')::timestamptz,now()),
+      COALESCE(NULLIF(entry->>'created_at','')::timestamptz,now()),
+      COALESCE(NULLIF(entry->>'status',''),'completed'), COALESCE(entry->'metadata','{}'::jsonb)
     ) ON CONFLICT (id) DO NOTHING;
   END LOOP;
 
-  FOR r IN SELECT value FROM jsonb_array_elements(COALESCE(_movements,'[]'::jsonb)) LOOP
+  FOR entry IN SELECT value FROM jsonb_array_elements(COALESCE(_movements,'[]'::jsonb)) LOOP
     INSERT INTO public.item_activity_logs (
       id, product_id, product_name, sku, barcode, store_id, terminal_id,
       activity_type, reference, quantity_delta, stock_before, stock_after,
       unit_cost, staff_id, staff_name, role, note, created_at
     ) VALUES (
-      (r->>'id')::uuid, NULLIF(r->>'product_id','')::uuid, NULLIF(r->>'product_name',''),
-      NULLIF(r->>'sku',''), NULLIF(r->>'barcode',''), NULLIF(s->>'store_id',''),
-      NULLIF(r->>'terminal_id',''), r->>'activity_type', NULLIF(r->>'reference',''),
-      COALESCE((r->>'quantity_delta')::integer,0), NULLIF(r->>'stock_before','')::integer,
-      NULLIF(r->>'stock_after','')::integer, COALESCE((r->>'unit_cost')::numeric,0),
-      NULLIF(r->>'staff_id',''), NULLIF(r->>'staff_name',''), NULLIF(r->>'role',''),
-      COALESCE(r->>'note',''), COALESCE(NULLIF(r->>'created_at','')::timestamptz,now())
+      (entry->>'id')::uuid, NULLIF(entry->>'product_id','')::uuid, NULLIF(entry->>'product_name',''),
+      NULLIF(entry->>'sku',''), NULLIF(entry->>'barcode',''), NULLIF(s->>'store_id',''),
+      NULLIF(entry->>'terminal_id',''), entry->>'activity_type', NULLIF(entry->>'reference',''),
+      COALESCE((entry->>'quantity_delta')::integer,0), NULLIF(entry->>'stock_before','')::integer,
+      NULLIF(entry->>'stock_after','')::integer, COALESCE((entry->>'unit_cost')::numeric,0),
+      NULLIF(entry->>'staff_id',''), NULLIF(entry->>'staff_name',''), NULLIF(entry->>'role',''),
+      COALESCE(entry->>'note',''), COALESCE(NULLIF(entry->>'created_at','')::timestamptz,now())
     ) ON CONFLICT (id) DO NOTHING;
   END LOOP;
 
   FOR movement_result IN
     SELECT * FROM public.stock_apply_deltas(
       (SELECT COALESCE(jsonb_agg(jsonb_build_object(
-        'movement_id', r->>'id', 'product_id', r->>'product_id',
-        'store_id', s->>'store_id', 'delta', r->>'quantity_delta'
-      )), '[]'::jsonb) FROM jsonb_array_elements(COALESCE(_movements,'[]'::jsonb)) r)
+        'movement_id', movement_entry.value->>'id',
+        'product_id', movement_entry.value->>'product_id',
+        'store_id', s->>'store_id',
+        'delta', movement_entry.value->>'quantity_delta'
+      )), '[]'::jsonb)
+       FROM jsonb_array_elements(COALESCE(_movements,'[]'::jsonb)) AS movement_entry(value))
     )
   LOOP
     IF movement_result.status = 'refused' THEN
