@@ -97,6 +97,12 @@ describe("SQL Server schema registry", () => {
     expect(sql).not.toContain("DF_authorization_requests_requested_amount] DEFAULT (N'[]')");
   });
 
+  it("executes dynamic default-constraint repairs through SQL variables", () => {
+    expect(sql).not.toMatch(/EXEC\s*\([^;]*\bREPLACE\s*\(/i);
+    expect(sql).toContain("EXEC sys.sp_executesql @legacy_json_default_0_sql");
+    expect(sql).toContain("EXEC sys.sp_executesql @legacy_requested_amount_default_sql");
+  });
+
   it("ships one complete re-runnable local database script", () => {
     const initial = readFileSync("database/sqlserver/migrations/001_initial.sql", "utf8").trim();
     const pipeline = readFileSync(

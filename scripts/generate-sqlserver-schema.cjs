@@ -276,6 +276,7 @@ for (const table of tables) {
   for (const column of table.columns) {
     if (column.defaultRule !== "N'{}'") continue;
     const variable = `@legacy_json_default_${legacyJsonDefaultIndex++}`;
+    const commandVariable = `${variable}_sql`;
     lines.push(`IF OBJECT_ID(N'dbo.${table.sqlServerTable}', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.${table.sqlServerTable}', N'${column.sqlServerColumn}') IS NOT NULL BEGIN
   DECLARE ${variable} sysname = (
     SELECT dc.name FROM sys.default_constraints dc
@@ -285,7 +286,8 @@ for (const table of tables) {
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
   IF ${variable} IS NOT NULL BEGIN
-    EXEC(N'ALTER TABLE dbo.[${table.sqlServerTable}] DROP CONSTRAINT [' + REPLACE(${variable}, N']', N']]') + N']');
+    DECLARE ${commandVariable} nvarchar(max) = N'ALTER TABLE dbo.[${table.sqlServerTable}] DROP CONSTRAINT ' + QUOTENAME(${variable});
+    EXEC sys.sp_executesql ${commandVariable};
     ALTER TABLE dbo.[${table.sqlServerTable}] ADD CONSTRAINT [DF_${table.sqlServerTable}_${column.sqlServerColumn}] DEFAULT (N'{}') FOR [${column.sqlServerColumn}];
   END;
 END;`);
@@ -301,8 +303,10 @@ lines.push(`IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND CO
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_requests') AND c.name=N'requested_amount'
   );
-  IF @legacy_requested_amount_default IS NOT NULL
-    EXEC(N'ALTER TABLE dbo.[authorization_requests] DROP CONSTRAINT [' + REPLACE(@legacy_requested_amount_default, N']', N']]') + N']');
+  IF @legacy_requested_amount_default IS NOT NULL BEGIN
+    DECLARE @legacy_requested_amount_default_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_requests] DROP CONSTRAINT ' + QUOTENAME(@legacy_requested_amount_default);
+    EXEC sys.sp_executesql @legacy_requested_amount_default_sql;
+  END;
   ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [requested_amount] decimal(38,12) NULL;
 END;`);
 
