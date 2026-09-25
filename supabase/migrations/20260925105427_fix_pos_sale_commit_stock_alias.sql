@@ -1,36 +1,3 @@
--- Retail POS payment commit repair for an existing Supabase database.
--- Use this file only for a manual SQL Editor deployment. Supabase CLI users
--- should deploy the matching migration instead.
-BEGIN;
-
-ALTER TABLE public.payment_transactions
-  ADD COLUMN IF NOT EXISTS client_transaction_id text;
-
-ALTER TABLE public.sales
-  ADD COLUMN IF NOT EXISTS authorization_request_id uuid,
-  ADD COLUMN IF NOT EXISTS authorized_by text,
-  ADD COLUMN IF NOT EXISTS authorized_at timestamp with time zone,
-  ADD COLUMN IF NOT EXISTS rounding_adjustment numeric(18,4) DEFAULT 0,
-  ADD COLUMN IF NOT EXISTS rounding_label text;
-
-UPDATE public.sales
-SET rounding_adjustment = 0
-WHERE rounding_adjustment IS NULL;
-
-ALTER TABLE public.sales
-  ALTER COLUMN rounding_adjustment SET DEFAULT 0,
-  ALTER COLUMN rounding_adjustment SET NOT NULL;
-
-DROP INDEX IF EXISTS public.payment_transactions_client_txn_idx;
-
-CREATE UNIQUE INDEX payment_transactions_client_txn_idx
-  ON public.payment_transactions (client_transaction_id)
-  WHERE client_transaction_id IS NOT NULL;
-
-COMMIT;
-
-BEGIN;
-
 -- Fix checkout failure SQLSTATE 42702: the PL/pgSQL row variable and the
 -- stock-delta query both used the identifier "r", making every sale with
 -- inventory movements fail and roll back its payment.
@@ -134,12 +101,11 @@ BEGIN
 
   FOR entry IN SELECT value FROM jsonb_array_elements(COALESCE(_payments,'[]'::jsonb)) LOOP
     INSERT INTO public.payment_transactions (
-      id, client_transaction_id, source_type, sale_id, booking_id, member_id, store_id, shift_id,
+      id, source_type, sale_id, booking_id, member_id, store_id, shift_id,
       terminal_id, amount, method, kind, reference, cashier_id, cashier_name,
       note, paid_at, created_at, status, metadata
     ) VALUES (
-      (entry->>'id')::uuid, NULLIF(entry->>'client_transaction_id',''),
-      COALESCE(NULLIF(entry->>'source_type',''),'sale'),
+      (entry->>'id')::uuid, COALESCE(NULLIF(entry->>'source_type',''),'sale'),
       (s->>'id')::uuid, NULL, NULLIF(entry->>'member_id','')::uuid,
       NULLIF(s->>'store_id',''), NULLIF(entry->>'shift_id',''),
       NULLIF(entry->>'terminal_id',''), COALESCE((entry->>'amount')::numeric,0),
@@ -195,5 +161,3 @@ $$;
 
 REVOKE ALL ON FUNCTION public.pos_sale_commit(jsonb,jsonb,jsonb,jsonb,jsonb,text) FROM PUBLIC, anon;
 GRANT EXECUTE ON FUNCTION public.pos_sale_commit(jsonb,jsonb,jsonb,jsonb,jsonb,text) TO authenticated, service_role;
-
-COMMIT;

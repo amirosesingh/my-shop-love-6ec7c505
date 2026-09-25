@@ -6,12 +6,24 @@ const read = (file: string) => readFileSync(file, "utf8");
 describe("atomic central sale contract", () => {
   it("commits the financial graph and stock deltas inside one database function", () => {
     const migration = read("supabase/schema.sql");
+    const hotfix = read("supabase/migrations/20260925105427_fix_pos_sale_commit_stock_alias.sql");
+    const idempotency = read(
+      "supabase/migrations/20260925105919_persist_pos_sale_payment_idempotency.sql",
+    );
     expect(migration).toContain("FUNCTION public.pos_sale_commit");
     expect(migration).toContain("INSERT INTO public.sales");
     expect(migration).toContain("INSERT INTO public.sale_items");
     expect(migration).toContain("INSERT INTO public.payment_transactions");
+    expect(migration).toContain("id, client_transaction_id, source_type, sale_id");
     expect(migration).toContain("INSERT INTO public.item_activity_logs");
     expect(migration).toContain("public.stock_apply_deltas");
+    expect(migration).toContain("AS movement_entry(value)");
+    expect(migration).not.toContain(
+      "FROM jsonb_array_elements(COALESCE(_movements,'[]'::jsonb)) r)",
+    );
+    expect(hotfix).toContain("AS movement_entry(value)");
+    expect(hotfix).not.toContain("DECLARE\n  s jsonb := COALESCE(_sale, '{}'::jsonb);\n  r jsonb;");
+    expect(idempotency).toContain("id, client_transaction_id, source_type, sale_id");
     expect(migration).toContain("SECURITY INVOKER");
   });
 
