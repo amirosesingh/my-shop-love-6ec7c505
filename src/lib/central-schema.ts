@@ -74,7 +74,6 @@ export type CentralTableSchema = {
   rowSecurity?: boolean;
 };
 
-
 export const CENTRAL_SCHEMA: CentralTableSchema[] = [
   {
     table: "stores",
@@ -415,7 +414,6 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
     ],
   },
   {
-
     table: "drawer_events",
     label: "Drawer events",
     primaryKey: "id",
@@ -835,6 +833,15 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
       { name: "decision_note", pgType: "text" },
       { name: "expires_at", pgType: "timestamptz" },
       { name: "consumed_at", pgType: "timestamptz" },
+      { name: "requested_amount", pgType: "numeric" },
+      { name: "approved_amount", pgType: "numeric" },
+      { name: "approved_payload", pgType: "jsonb" },
+      { name: "bill_snapshot", pgType: "jsonb" },
+      { name: "snapshot_hash", pgType: "text" },
+      { name: "held_order_id", pgType: "text" },
+      { name: "notified_at", pgType: "timestamptz" },
+      { name: "requester_direct_limit", pgType: "numeric" },
+      { name: "value_unit", pgType: "text" },
       { name: "created_at", pgType: "timestamptz" },
       { name: "updated_at", pgType: "timestamptz" },
     ],
@@ -932,9 +939,7 @@ export const CENTRAL_SCHEMA: CentralTableSchema[] = [
     table: "pos_settings",
     label: "POS settings",
     primaryKey: "id",
-    columns: [
-      { name: "receipt_css", pgType: "text not null default ''" },
-    ],
+    columns: [{ name: "receipt_css", pgType: "text not null default ''" }],
   },
   {
     table: "pos_store_settings",

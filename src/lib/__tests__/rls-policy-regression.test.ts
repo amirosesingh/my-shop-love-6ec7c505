@@ -45,4 +45,12 @@ describe("row-rule regression", () => {
     expect(sql).toContain("REVOKE ALL ON public.cashiers FROM anon, authenticated");
     expect(sql).not.toMatch(/GRANT[^;]*ON public\.(pin_attempts|cashiers) TO (anon|authenticated)/);
   });
+
+  it("keeps approval decisions server-owned while allowing signed-in reads", () => {
+    for (const table of ["authorization_actions", "authorization_requests", "authorization_log"]) {
+      expect(schema).toContain(`REVOKE ALL ON public.${table} FROM anon, authenticated`);
+      expect(schema).toContain(`GRANT SELECT ON public.${table} TO authenticated`);
+      expect(schema).not.toContain(`GRANT ALL ON public.${table} TO authenticated`);
+    }
+  });
 });

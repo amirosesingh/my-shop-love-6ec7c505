@@ -2,15 +2,36 @@ const fs = require("node:fs");
 const path = require("node:path");
 
 const root = path.resolve(__dirname, "..");
-const report = JSON.parse(fs.readFileSync(path.join(root, "reports", "supabase-schema-registry-report.json"), "utf8"));
+const report = JSON.parse(
+  fs.readFileSync(path.join(root, "reports", "supabase-schema-registry-report.json"), "utf8"),
+);
 const outputDir = path.join(root, "database", "sqlserver");
 const PRIMARY_KEYS = Object.freeze({
-  branch_telemetry: ["terminal_id"], pin_attempts: ["key"], public_flags: ["key"], secure_settings: ["key"],
-  settings_locks: ["section"], settings_overrides: ["scope","scope_id","section"], staff_roles: ["slug"],
-  stock_delta_applied: ["movement_id"], terminal_recovery_secrets: ["terminal_token_id"], pos_store_settings: ["store_id"],
-  settings_scoped: ["scope","scope_id","key"],
+  branch_telemetry: ["terminal_id"],
+  pin_attempts: ["key"],
+  public_flags: ["key"],
+  secure_settings: ["key"],
+  settings_locks: ["section"],
+  settings_overrides: ["scope", "scope_id", "section"],
+  staff_roles: ["slug"],
+  stock_delta_applied: ["movement_id"],
+  terminal_recovery_secrets: ["terminal_token_id"],
+  pos_store_settings: ["store_id"],
+  settings_scoped: ["scope", "scope_id", "key"],
 });
-const PULL_ONLY = new Set(["app_users","cashiers","staff_roles","user_roles","authorization_actions","secure_settings","settings_locks","public_flags","terminal_tokens","terminal_recovery_secrets","security_findings"]);
+const PULL_ONLY = new Set([
+  "app_users",
+  "cashiers",
+  "staff_roles",
+  "user_roles",
+  "authorization_actions",
+  "secure_settings",
+  "settings_locks",
+  "public_flags",
+  "terminal_tokens",
+  "terminal_recovery_secrets",
+  "security_findings",
+]);
 
 function sqlType(declaration) {
   const d = declaration.toLowerCase();
@@ -27,7 +48,8 @@ function sqlType(declaration) {
   if (/^date\b/.test(d)) return "date";
   if (/^time\b/.test(d)) return "time(7)";
   if (/^bytea\b/.test(d)) return "varbinary(max)";
-  if (/^character varying\b|^varchar\b/.test(d)) return `nvarchar(${sized("(?:character varying|varchar)", "max")})`;
+  if (/^character varying\b|^varchar\b/.test(d))
+    return `nvarchar(${sized("(?:character varying|varchar)", "max")})`;
   if (/^character\b|^char\b/.test(d)) return `nchar(${sized("(?:character|char)", "1")})`;
   return "nvarchar(max)";
 }
@@ -35,9 +57,12 @@ function sqlType(declaration) {
 function defaultRule(declaration, type) {
   const found = /\bDEFAULT\s+(.+?)(?=\s+NOT NULL\b|\s+NULL\b|$)/i.exec(declaration)?.[1]?.trim();
   if (!found) return null;
+  const json = /^'((?:''|[^'])*)'::jsonb$/i.exec(found.replace(/^\((.*)\)$/s, "$1"));
+  if (json) return `N'${json[1]}'`;
   const clean = found.replace(/::[a-z ]+(?:\[\])?/gi, "").replace(/^\((.*)\)$/s, "$1");
   if (/^gen_random_uuid\(\)$/i.test(clean)) return "NEWID()";
-  if (/^(?:now\(\)|CURRENT_TIMESTAMP)$/i.test(clean)) return type.startsWith("datetimeoffset") ? "SYSDATETIMEOFFSET()" : "SYSUTCDATETIME()";
+  if (/^(?:now\(\)|CURRENT_TIMESTAMP)$/i.test(clean))
+    return type.startsWith("datetimeoffset") ? "SYSDATETIMEOFFSET()" : "SYSUTCDATETIME()";
   if (/^true$/i.test(clean)) return "1";
   if (/^false$/i.test(clean)) return "0";
   if (/^nextval\(/i.test(clean)) return null;
@@ -49,9 +74,16 @@ function defaultRule(declaration, type) {
 const tables = report.tables.map((table, tableIndex) => ({
   cloudTable: table.name,
   sqlServerTable: table.name,
-  scope: /^(?:stores|store_groups|coupon_campaigns|payment_types|staff_roles)$/.test(table.name) ? "organization" : "branch",
+  scope: /^(?:stores|store_groups|coupon_campaigns|payment_types|staff_roles)$/.test(table.name)
+    ? "organization"
+    : "branch",
   direction: PULL_ONLY.has(table.name) ? "pull" : "bidirectional",
-  retentionClass: /^(?:sales|sale_items|payment_transactions|refunds|audit_logs|item_activity_logs)/.test(table.name) ? "historical" : "current",
+  retentionClass:
+    /^(?:sales|sale_items|payment_transactions|refunds|audit_logs|item_activity_logs)/.test(
+      table.name,
+    )
+      ? "historical"
+      : "current",
   insertRule: "idempotent_upsert",
   updateRule: "versioned",
   deleteRule: "tombstone",
@@ -64,20 +96,32 @@ const tables = report.tables.map((table, tableIndex) => ({
   testName: `registry_${table.name}`,
   columns: table.columns.map((column) => {
     let type = sqlType(column.declaration);
-    const primaryNames = table.primaryKey?.length ? table.primaryKey : (PRIMARY_KEYS[table.name] ?? ["id"]);
+    const primaryNames = table.primaryKey?.length
+      ? table.primaryKey
+      : (PRIMARY_KEYS[table.name] ?? ["id"]);
     const primary = primaryNames.includes(column.name);
-    const uniqueGroup=(table.uniqueKeys??[]).findIndex(key=>key.includes(column.name));
-    const unique = /\bUNIQUE\b/i.test(column.declaration) || (uniqueGroup>=0&&(table.uniqueKeys[uniqueGroup]?.length===1));
+    const uniqueGroup = (table.uniqueKeys ?? []).findIndex((key) => key.includes(column.name));
+    const unique =
+      /\bUNIQUE\b/i.test(column.declaration) ||
+      (uniqueGroup >= 0 && table.uniqueKeys[uniqueGroup]?.length === 1);
     const keyGroups = [primaryNames, ...(table.uniqueKeys ?? [])];
     const compositeKey = keyGroups.some((key) => key.length > 1 && key.includes(column.name));
-    const indexed = primary || uniqueGroup >= 0 || ["store_id","branch_id","organization_id","updated_at"].includes(column.name);
-    if (indexed && type === "nvarchar(max)") type = compositeKey ? "nvarchar(128)" : "nvarchar(450)";
-    const reference = /\bREFERENCES\s+(?:public\.)?([a-z_][a-z0-9_]*)\s*\(([^)]+)\)/i.exec(column.declaration);
-    const tableReference=table.foreignKeys?.find(item=>item.column===column.name);
+    const indexed =
+      primary ||
+      uniqueGroup >= 0 ||
+      ["store_id", "branch_id", "organization_id", "updated_at"].includes(column.name);
+    if (indexed && type === "nvarchar(max)")
+      type = compositeKey ? "nvarchar(128)" : "nvarchar(450)";
+    const reference = /\bREFERENCES\s+(?:public\.)?([a-z_][a-z0-9_]*)\s*\(([^)]+)\)/i.exec(
+      column.declaration,
+    );
+    const tableReference = table.foreignKeys?.find((item) => item.column === column.name);
     return {
       cloudColumn: column.name,
       sqlServerColumn: column.name,
-      cloudType: column.declaration.split(/\s+(?:DEFAULT|NOT|NULL|CONSTRAINT|PRIMARY|REFERENCES|CHECK)\b/i)[0].trim(),
+      cloudType: column.declaration
+        .split(/\s+(?:DEFAULT|NOT|NULL|CONSTRAINT|PRIMARY|REFERENCES|CHECK)\b/i)[0]
+        .trim(),
       sqlServerType: type,
       // SQL Server forbids nullable columns in a PRIMARY KEY. Some legacy
       // cloud declarations are nullable even though the registry supplies a
@@ -85,10 +129,14 @@ const tables = report.tables.map((table, tableIndex) => ({
       nullable: primary ? false : column.nullable,
       defaultRule: defaultRule(column.declaration, type),
       primaryKey: primary,
-      foreignKey: Boolean(reference||tableReference),
-      foreignKeyTarget: reference ? { table: reference[1], column: reference[2].replace(/['"\s]/g,"") } : tableReference ? {table:tableReference.table,column:tableReference.targetColumn}:null,
+      foreignKey: Boolean(reference || tableReference),
+      foreignKeyTarget: reference
+        ? { table: reference[1], column: reference[2].replace(/['"\s]/g, "") }
+        : tableReference
+          ? { table: tableReference.table, column: tableReference.targetColumn }
+          : null,
       unique,
-      uniqueGroup: uniqueGroup>=0?`UQ_${table.name}_${uniqueGroup}`:null,
+      uniqueGroup: uniqueGroup >= 0 ? `UQ_${table.name}_${uniqueGroup}` : null,
     };
   }),
 }));
@@ -109,12 +157,21 @@ for (const table of tables) {
 function dependencyDepth(table, visiting = new Set()) {
   if (visiting.has(table.cloudTable)) return 0;
   const next = new Set(visiting).add(table.cloudTable);
-  const parents = table.columns.map((column) => column.foreignKeyTarget?.table).filter((name) => name && name !== table.cloudTable && tableByName.has(name));
-  return parents.length ? 1 + Math.max(...parents.map((name) => dependencyDepth(tableByName.get(name), next))) : 0;
+  const parents = table.columns
+    .map((column) => column.foreignKeyTarget?.table)
+    .filter((name) => name && name !== table.cloudTable && tableByName.has(name));
+  return parents.length
+    ? 1 + Math.max(...parents.map((name) => dependencyDepth(tableByName.get(name), next)))
+    : 0;
 }
 for (const table of tables) table.dependencyOrder = dependencyDepth(table);
 
-const registry = { version: 1, source: "supabase/schema.sql", generatedAt: report.generatedAt, tables };
+const registry = {
+  version: 1,
+  source: "supabase/schema.sql",
+  generatedAt: report.generatedAt,
+  tables,
+};
 const lines = [
   "-- Generated from supabase/schema.sql. Re-runnable and additive.",
   "SET XACT_ABORT ON;",
@@ -122,42 +179,132 @@ const lines = [
   "GO",
 ];
 for (const table of tables) {
-  lines.push(`IF OBJECT_ID(N'dbo.${table.sqlServerTable}', N'U') IS NULL BEGIN CREATE TABLE dbo.[${table.sqlServerTable}] (`);
+  lines.push(
+    `IF OBJECT_ID(N'dbo.${table.sqlServerTable}', N'U') IS NULL BEGIN CREATE TABLE dbo.[${table.sqlServerTable}] (`,
+  );
   const columns = table.columns.map((column) => {
-    const fallbackDefault = column.defaultRule ? ` CONSTRAINT [DF_${table.sqlServerTable}_${column.sqlServerColumn}] DEFAULT (${column.defaultRule})` : "";
+    const fallbackDefault = column.defaultRule
+      ? ` CONSTRAINT [DF_${table.sqlServerTable}_${column.sqlServerColumn}] DEFAULT (${column.defaultRule})`
+      : "";
     return `  [${column.sqlServerColumn}] ${column.sqlServerType}${column.nullable ? " NULL" : " NOT NULL"}${fallbackDefault}`;
   });
-  const primary = table.columns.filter((column) => column.primaryKey).map((column) => `[${column.sqlServerColumn}]`);
-  if (primary.length) columns.push(`  CONSTRAINT [PK_${table.sqlServerTable}] PRIMARY KEY (${primary.join(", ")})`);
-  lines.push(columns.join(",\n"), "); END;", `IF OBJECT_ID(N'dbo.${table.sqlServerTable}', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}')) ALTER TABLE dbo.[${table.sqlServerTable}] ENABLE CHANGE_TRACKING;`);
+  const primary = table.columns
+    .filter((column) => column.primaryKey)
+    .map((column) => `[${column.sqlServerColumn}]`);
+  if (primary.length)
+    columns.push(`  CONSTRAINT [PK_${table.sqlServerTable}] PRIMARY KEY (${primary.join(", ")})`);
+  lines.push(
+    columns.join(",\n"),
+    "); END;",
+    `IF OBJECT_ID(N'dbo.${table.sqlServerTable}', N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.change_tracking_tables WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}')) ALTER TABLE dbo.[${table.sqlServerTable}] ENABLE CHANGE_TRACKING;`,
+  );
   for (const column of table.columns) {
-    lines.push(`IF COL_LENGTH(N'dbo.${table.sqlServerTable}', N'${column.sqlServerColumn}') IS NULL ALTER TABLE dbo.[${table.sqlServerTable}] ADD [${column.sqlServerColumn}] ${column.sqlServerType} NULL;`);
-    if (column.sqlServerType !== "nvarchar(max)" &&
-        (["store_id","branch_id","organization_id","updated_at"].includes(column.sqlServerColumn) ||
-         column.primaryKey || column.unique || column.uniqueGroup || column.foreignKey)) {
-      lines.push(`IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND c.name=N'${column.sqlServerColumn}' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[${table.sqlServerTable}] ALTER COLUMN [${column.sqlServerColumn}] ${column.sqlServerType}${column.nullable ? " NULL" : " NOT NULL"};`);
+    lines.push(
+      `IF COL_LENGTH(N'dbo.${table.sqlServerTable}', N'${column.sqlServerColumn}') IS NULL ALTER TABLE dbo.[${table.sqlServerTable}] ADD [${column.sqlServerColumn}] ${column.sqlServerType} NULL;`,
+    );
+    if (column.defaultRule) {
+      lines.push(`IF OBJECT_ID(N'dbo.${table.sqlServerTable}', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.${table.sqlServerTable}', N'${column.sqlServerColumn}') IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM sys.default_constraints dc
+  JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
+  WHERE dc.parent_object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND c.name=N'${column.sqlServerColumn}'
+) ALTER TABLE dbo.[${table.sqlServerTable}] ADD CONSTRAINT [DF_${table.sqlServerTable}_${column.sqlServerColumn}] DEFAULT (${column.defaultRule}) FOR [${column.sqlServerColumn}];`);
+    }
+    if (!column.nullable && column.defaultRule) {
+      lines.push(`IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'${column.sqlServerColumn}' AND is_nullable=1) BEGIN
+  UPDATE dbo.[${table.sqlServerTable}] SET [${column.sqlServerColumn}]=${column.defaultRule} WHERE [${column.sqlServerColumn}] IS NULL;
+  ALTER TABLE dbo.[${table.sqlServerTable}] ALTER COLUMN [${column.sqlServerColumn}] ${column.sqlServerType} NOT NULL;
+END;`);
+    }
+    if (
+      column.sqlServerType !== "nvarchar(max)" &&
+      (["store_id", "branch_id", "organization_id", "updated_at"].includes(
+        column.sqlServerColumn,
+      ) ||
+        column.primaryKey ||
+        column.unique ||
+        column.uniqueGroup ||
+        column.foreignKey)
+    ) {
+      lines.push(
+        `IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND c.name=N'${column.sqlServerColumn}' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[${table.sqlServerTable}] ALTER COLUMN [${column.sqlServerColumn}] ${column.sqlServerType}${column.nullable ? " NULL" : " NOT NULL"};`,
+      );
     }
   }
-  for (const column of table.columns.filter((item)=>item.unique)) {
+  for (const column of table.columns.filter((item) => item.unique)) {
     const filter = column.nullable ? ` WHERE [${column.sqlServerColumn}] IS NOT NULL` : "";
-    lines.push(`IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'UX_${table.sqlServerTable}_${column.sqlServerColumn}') CREATE UNIQUE INDEX [UX_${table.sqlServerTable}_${column.sqlServerColumn}] ON dbo.[${table.sqlServerTable}]([${column.sqlServerColumn}])${filter};`);
+    lines.push(
+      `IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'UX_${table.sqlServerTable}_${column.sqlServerColumn}') CREATE UNIQUE INDEX [UX_${table.sqlServerTable}_${column.sqlServerColumn}] ON dbo.[${table.sqlServerTable}]([${column.sqlServerColumn}])${filter};`,
+    );
   }
-  for(const [index,key] of (report.tables.find(item=>item.name===table.cloudTable)?.uniqueKeys??[]).entries()){
-    if(key.length<2)continue;
-    const nullableColumns = key.filter((name) => table.columns.find((column) => column.sqlServerColumn === name)?.nullable);
-    const filter = nullableColumns.length ? ` WHERE ${nullableColumns.map((name) => `[${name}] IS NOT NULL`).join(" AND ")}` : "";
-    lines.push(`IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'UQ_${table.sqlServerTable}_${index}') CREATE UNIQUE INDEX [UQ_${table.sqlServerTable}_${index}] ON dbo.[${table.sqlServerTable}](${key.map(name=>`[${name}]`).join(",")})${filter};`);
+  for (const [index, key] of (
+    report.tables.find((item) => item.name === table.cloudTable)?.uniqueKeys ?? []
+  ).entries()) {
+    if (key.length < 2) continue;
+    const nullableColumns = key.filter(
+      (name) => table.columns.find((column) => column.sqlServerColumn === name)?.nullable,
+    );
+    const filter = nullableColumns.length
+      ? ` WHERE ${nullableColumns.map((name) => `[${name}] IS NOT NULL`).join(" AND ")}`
+      : "";
+    lines.push(
+      `IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'UQ_${table.sqlServerTable}_${index}') CREATE UNIQUE INDEX [UQ_${table.sqlServerTable}_${index}] ON dbo.[${table.sqlServerTable}](${key.map((name) => `[${name}]`).join(",")})${filter};`,
+    );
   }
-  for (const column of table.columns.filter((item)=>["store_id","branch_id","organization_id","updated_at"].includes(item.sqlServerColumn))) {
-    lines.push(`IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'IX_${table.sqlServerTable}_${column.sqlServerColumn}') CREATE INDEX [IX_${table.sqlServerTable}_${column.sqlServerColumn}] ON dbo.[${table.sqlServerTable}]([${column.sqlServerColumn}]);`);
+  for (const column of table.columns.filter((item) =>
+    ["store_id", "branch_id", "organization_id", "updated_at"].includes(item.sqlServerColumn),
+  )) {
+    lines.push(
+      `IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'IX_${table.sqlServerTable}_${column.sqlServerColumn}') CREATE INDEX [IX_${table.sqlServerTable}_${column.sqlServerColumn}] ON dbo.[${table.sqlServerTable}]([${column.sqlServerColumn}]);`,
+    );
   }
 }
 for (const table of tables) {
-  for (const column of table.columns.filter((item)=>item.foreignKey&&item.foreignKeyTarget)) {
-    const target=column.foreignKeyTarget;
-    lines.push(`IF OBJECT_ID(N'dbo.${target.table}',N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'FK_${table.sqlServerTable}_${column.sqlServerColumn}') ALTER TABLE dbo.[${table.sqlServerTable}] ADD CONSTRAINT [FK_${table.sqlServerTable}_${column.sqlServerColumn}] FOREIGN KEY ([${column.sqlServerColumn}]) REFERENCES dbo.[${target.table}]([${target.column}]);`);
+  for (const column of table.columns.filter((item) => item.foreignKey && item.foreignKeyTarget)) {
+    const target = column.foreignKeyTarget;
+    lines.push(
+      `IF OBJECT_ID(N'dbo.${target.table}',N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}') AND name=N'FK_${table.sqlServerTable}_${column.sqlServerColumn}') ALTER TABLE dbo.[${table.sqlServerTable}] ADD CONSTRAINT [FK_${table.sqlServerTable}_${column.sqlServerColumn}] FOREIGN KEY ([${column.sqlServerColumn}]) REFERENCES dbo.[${target.table}]([${target.column}]);`,
+    );
   }
 }
+
+// Older generators interpreted a JSON object default (`{}'::jsonb`) as a
+// PostgreSQL array and installed N'[]'. Correct only that known legacy value;
+// user-defined defaults are left untouched. Each variable name is unique
+// because the generated schema is one SQL Server batch.
+let legacyJsonDefaultIndex = 0;
+for (const table of tables) {
+  for (const column of table.columns) {
+    if (column.defaultRule !== "N'{}'") continue;
+    const variable = `@legacy_json_default_${legacyJsonDefaultIndex++}`;
+    lines.push(`IF OBJECT_ID(N'dbo.${table.sqlServerTable}', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.${table.sqlServerTable}', N'${column.sqlServerColumn}') IS NOT NULL BEGIN
+  DECLARE ${variable} sysname = (
+    SELECT dc.name FROM sys.default_constraints dc
+    JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
+    WHERE dc.parent_object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}')
+      AND c.name=N'${column.sqlServerColumn}'
+      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+  );
+  IF ${variable} IS NOT NULL BEGIN
+    EXEC(N'ALTER TABLE dbo.[${table.sqlServerTable}] DROP CONSTRAINT [' + REPLACE(${variable}, N']', N']]') + N']');
+    ALTER TABLE dbo.[${table.sqlServerTable}] ADD CONSTRAINT [DF_${table.sqlServerTable}_${column.sqlServerColumn}] DEFAULT (N'{}') FOR [${column.sqlServerColumn}];
+  END;
+END;`);
+  }
+}
+
+// A malformed multi-column ALTER used to turn this nullable number into a
+// required JSON-valued column. Remove that generated default and restore the
+// cloud-compatible nullable shape without changing any stored value.
+lines.push(`IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.authorization_requests', N'requested_amount') IS NOT NULL BEGIN
+  DECLARE @legacy_requested_amount_default sysname = (
+    SELECT dc.name FROM sys.default_constraints dc
+    JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
+    WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_requests') AND c.name=N'requested_amount'
+  );
+  IF @legacy_requested_amount_default IS NOT NULL
+    EXEC(N'ALTER TABLE dbo.[authorization_requests] DROP CONSTRAINT [' + REPLACE(@legacy_requested_amount_default, N']', N']]') + N']');
+  ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [requested_amount] decimal(38,12) NULL;
+END;`);
 
 lines.push(`IF OBJECT_ID(N'dbo.pos_jobs', N'U') IS NULL CREATE TABLE dbo.pos_jobs (
  job_id uniqueidentifier NOT NULL PRIMARY KEY, job_type nvarchar(40) NOT NULL, status nvarchar(20) NOT NULL,
@@ -199,7 +346,10 @@ lines.push(`IF OBJECT_ID(N'dbo.pos_schema_migrations', N'U') IS NULL CREATE TABL
 IF NOT EXISTS(SELECT 1 FROM dbo.pos_schema_migrations WHERE version=1) INSERT dbo.pos_schema_migrations(version,name) VALUES(1,N'initial_sqlserver_parity');`);
 
 fs.mkdirSync(path.join(outputDir, "migrations"), { recursive: true });
-fs.writeFileSync(path.join(outputDir, "schema-registry.json"), `${JSON.stringify(registry, null, 2)}\n`);
+fs.writeFileSync(
+  path.join(outputDir, "schema-registry.json"),
+  `${JSON.stringify(registry, null, 2)}\n`,
+);
 fs.writeFileSync(path.join(outputDir, "schema.sql"), `${lines.join("\n\n")}\n`);
 fs.writeFileSync(path.join(outputDir, "migrations", "001_initial.sql"), `${lines.join("\n\n")}\n`);
 
@@ -305,7 +455,11 @@ EXEC(N'SELECT version, name, applied_at
 FROM dbo.pos_schema_migrations
 ORDER BY version;');
 GO`;
-const pipeline = fs.readFileSync(path.join(outputDir, "migrations", "002_sync_pipeline.sql"), "utf8").trim();
+const pipeline = fs
+  .readFileSync(path.join(outputDir, "migrations", "002_sync_pipeline.sql"), "utf8")
+  .trim();
 const installer = [installerHeader, lines.join("\n\n").trim(), pipeline, validation].join("\n\n");
 fs.writeFileSync(path.join(outputDir, "retail-pos-local-database.sql"), `${installer}\n`);
-console.log(`SQL Server schema: ${tables.length} domain tables, ${tables.reduce((n,t)=>n+t.columns.length,0)} columns`);
+console.log(
+  `SQL Server schema: ${tables.length} domain tables, ${tables.reduce((n, t) => n + t.columns.length, 0)} columns`,
+);
