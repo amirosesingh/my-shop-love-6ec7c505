@@ -37,8 +37,7 @@ describe("SQL Server aggregate repository", () => {
       applyOperation: vi.fn().mockRejectedValue(new Error("injected statement failure")),
     };
     const repository = new AggregateRepository({ sql: () => sql }, operations);
-    await expect(
-      repository.commit("sale", {
+    const committed = repository.commit("sale", {
         operationId: "11111111-1111-4111-8111-111111111111",
         operations: [
           {
@@ -47,8 +46,12 @@ describe("SQL Server aggregate repository", () => {
             rows: [{ id: "22222222-2222-4222-8222-222222222222" }],
           },
         ],
-      }),
-    ).rejects.toThrow("injected");
+      });
+    await expect(committed).rejects.toMatchObject({
+      code: "ESQLSERVER_WRITE",
+      table: "sales",
+      message: "Local SQL Server sale commit failed while writing sales.",
+    });
     expect(rollback).toHaveBeenCalledOnce();
     expect(commit).not.toHaveBeenCalled();
   });
@@ -101,8 +104,7 @@ describe("SQL Server aggregate repository", () => {
     const { AggregateRepository } =
       await import("../../../electron/db/repositories/aggregates.cjs");
     const repository = new AggregateRepository({ sql: () => sql }, operations);
-    await expect(
-      repository.commit("sale", {
+    const committed = repository.commit("sale", {
         operationId: "11111111-1111-4111-8111-111111111111",
         operations: [
           {
@@ -116,8 +118,12 @@ describe("SQL Server aggregate repository", () => {
             rows: [{ id: "33333333-3333-4333-8333-333333333333" }],
           },
         ],
-      }),
-    ).rejects.toThrow("payment insert failed");
+      });
+    await expect(committed).rejects.toMatchObject({
+      code: "ESQLSERVER_WRITE",
+      table: "payment_transactions",
+      message: "Local SQL Server sale commit failed while writing payment_transactions.",
+    });
     expect(applyOperation).toHaveBeenCalledTimes(2);
     expect(rollback).toHaveBeenCalledOnce();
     expect(commit).not.toHaveBeenCalled();

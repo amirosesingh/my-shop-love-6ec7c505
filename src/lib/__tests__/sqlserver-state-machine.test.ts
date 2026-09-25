@@ -16,12 +16,14 @@ describe("SQL Server persistent state machine", () => {
       open: vi.fn(async function (this: { pool?: object }) { this.pool = {}; }),
       close: vi.fn(),
     };
-    const service = new DatabaseService({ secureConfig, manager });
+    const validator = vi.fn().mockResolvedValue({ ok: true, ready: true });
+    const service = new DatabaseService({ secureConfig, manager, validator });
     await service.restore();
     expect(service.snapshot().state).toBe("disabled");
     expect(manager.open).not.toHaveBeenCalled();
     await service.setEnabled(true);
     expect(manager.open).toHaveBeenCalledOnce();
+    expect(validator).toHaveBeenCalledOnce();
     expect(service.snapshot().state).toBe("enabled_bootstrapping");
     expect(service.snapshot().connected).toBe(true);
     expect(service.snapshot().tradingReady).toBe(true);
@@ -36,5 +38,33 @@ describe("SQL Server persistent state machine", () => {
       manager: { open: vi.fn(), close: vi.fn() },
     });
     expect((await service.restore()).state).toBe("enabled_unconfigured");
+  });
+
+  it("does not mark an incomplete restored schema as trading ready", async () => {
+    const { DatabaseService } = await import("../../../electron/db/service.cjs");
+    const manager = { pool: undefined, open: vi.fn(), close: vi.fn(async () => undefined) };
+    const validation = {
+      ok: true,
+      ready: false,
+      status: "migration_required",
+      incompatibleColumns: ["sales.change_given:missing"],
+    };
+    const service = new DatabaseService({
+      secureConfig: {
+        enabled: () => true,
+        profile: () => ({ host: "db", database: "POS" }),
+        credentials: () => ({ host: "db", database: "POS" }),
+      },
+      manager,
+      validator: vi.fn().mockResolvedValue(validation),
+    });
+
+    await expect(service.restore()).resolves.toMatchObject({
+      state: "enabled_error",
+      connected: false,
+      tradingReady: false,
+      detail: validation,
+    });
+    expect(manager.open).not.toHaveBeenCalled();
   });
 });

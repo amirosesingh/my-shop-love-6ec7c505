@@ -46,7 +46,7 @@ import {
   type ReceivingInvoice,
 } from "@/core/api/pos-db";
 import { setPreferredDatabaseMode } from "@/core/local-db/db-mode";
-import type { Member, Sale } from "@/core/types/pos-types";
+import type { Member, Product, Sale } from "@/core/types/pos-types";
 
 const sale = (over: Partial<Sale> = {}): Sale =>
   ({
@@ -90,6 +90,7 @@ describe("checkout commit", () => {
     live.mockReset();
     localWrite.mockReset();
     localAggregate.mockReset();
+    attemptRows.mockClear();
     attemptRows.mockReturnValue({ data: [], error: null });
     live.mockResolvedValue(undefined);
     localWrite.mockResolvedValue({ ok: true });
@@ -173,6 +174,18 @@ describe("checkout commit", () => {
       totalSpend: 500,
       joinedAt: "2026-01-01T00:00:00.000Z",
     };
+    const product: Product = {
+      id: "p1",
+      name: "Racket",
+      sku: "RACKET-1",
+      barcode: "10001",
+      category: "Sports",
+      price: 100,
+      cost: 60,
+      stockByStore: { "store-1": 9 },
+      reorderLevel: 2,
+      taxRate: 0,
+    };
     const target = await db.commitSale(
       sale({
         memberId: member.id,
@@ -183,12 +196,13 @@ describe("checkout commit", () => {
         roundingAdjustment: 0,
         roundingLabel: "No rounding",
       } as never),
-      [],
+      [product],
       member,
     );
 
     expect(target).toBe("local");
     expect(live).not.toHaveBeenCalled();
+    expect(attemptRows).not.toHaveBeenCalled();
     expect(localAggregate).toHaveBeenCalledOnce();
     const aggregate = localAggregate.mock.calls[0][0] as {
       kind: string;
@@ -209,6 +223,10 @@ describe("checkout commit", () => {
       "txn-1:pay:1",
     ]);
     expect(memberRow).toMatchObject({ id: member.id, loyalty_points: 25, total_spent: 500 });
+    const tableOrder = aggregate.operations.map((operation) => operation.table);
+    expect(tableOrder.indexOf("products")).toBeLessThan(tableOrder.indexOf("sale_items"));
+    expect(tableOrder.indexOf("members")).toBeLessThan(tableOrder.indexOf("sales"));
+    expect(tableOrder.indexOf("sales")).toBeLessThan(tableOrder.indexOf("payment_transactions"));
 
     const registry = JSON.parse(
       readFileSync("database/sqlserver/schema-registry.json", "utf8"),
@@ -233,9 +251,17 @@ describe("checkout commit", () => {
 
   it("refuses checkout when the Electron SQL transaction does not commit", async () => {
     platform.offlineFirst = true;
-    localAggregate.mockResolvedValueOnce({ ok: false, error: "payment insert failed" });
+    localAggregate.mockResolvedValueOnce({
+      ok: false,
+      code: "ESQLSERVER_WRITE",
+      error: "Local SQL Server sale commit failed while writing payment_transactions.",
+      table: "payment_transactions",
+    });
 
-    await expect(db.commitSale(sale(), [], null)).rejects.toThrow("payment insert failed");
+    await expect(db.commitSale(sale(), [], null)).rejects.toMatchObject({
+      code: "ESQLSERVER_WRITE",
+      table: "payment_transactions",
+    });
     expect(localAggregate).toHaveBeenCalledOnce();
     expect(live).not.toHaveBeenCalled();
   });

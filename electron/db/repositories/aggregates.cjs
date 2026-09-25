@@ -48,6 +48,8 @@ class AggregateRepository {
     const sql = this.connectionManager.sql();
     const transaction = new sql.Transaction(this.operationsRepository.pool());
     await transaction.begin(sql.ISOLATION_LEVEL?.SERIALIZABLE);
+    let stage = "operation receipt";
+    let tableName = null;
     try {
       const prior = await new sql.Request(transaction).input("operation_id", sql.UniqueIdentifier, operationId)
         .query("SELECT note FROM dbo.local_operation_receipts WITH (UPDLOCK,HOLDLOCK) WHERE operation_id=@operation_id;");
@@ -60,6 +62,8 @@ class AggregateRepository {
 
       let affected = 0;
       for (const operation of operations) {
+        stage = "business rows";
+        tableName = operation.table;
         if (this.operationsRepository.tables.get(operation.table)?.direction === "pull")
           throw new Error(`${operation.table} is centrally managed and cannot be changed by the local database.`);
         affected += await this.operationsRepository.applyOperation(transaction, operation);
@@ -77,6 +81,8 @@ class AggregateRepository {
             VALUES(@entity_type,@entity_id,@operation,@branch_id,@entity_version,@aggregate_id);`);
         }
       }
+      stage = "operation receipt";
+      tableName = "local_operation_receipts";
       await new sql.Request(transaction)
         .input("operation_id", sql.UniqueIdentifier, operationId)
         .input("operation_type", kind)
@@ -87,7 +93,14 @@ class AggregateRepository {
       return { ok: true, operationId, replayed: false, affected };
     } catch (error) {
       await Promise.resolve(transaction.rollback()).catch(() => undefined);
-      throw error;
+      if (error?.code === "EIDEMPOTENCY") throw error;
+      const target = tableName ? ` while writing ${tableName}` : "";
+      const sqlNumber = Number.isFinite(Number(error?.number)) ? Number(error.number) : null;
+      const suffix = sqlNumber == null ? "" : ` (SQL Server ${sqlNumber})`;
+      throw Object.assign(
+        new Error(`Local SQL Server ${kind} commit failed${target}${suffix}.`),
+        { code: "ESQLSERVER_WRITE", stage, table: tableName, sqlNumber, cause: error },
+      );
     }
   }
 }

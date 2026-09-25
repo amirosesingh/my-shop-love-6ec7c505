@@ -10846,6 +10846,27 @@ BEGIN
       USING ERRCODE = '23505';
   END IF;
 
+  -- A sale and its tender rows both reference the attached member. Upsert the
+  -- parent first so a member created on this device can be used immediately.
+  IF _member IS NOT NULL AND NULLIF(_member->>'id','') IS NOT NULL THEN
+    INSERT INTO public.members (
+      id, member_code, full_name, phone, email, address, date_of_birth,
+      tier_id, loyalty_points, total_spent, updated_at
+    ) VALUES (
+      (_member->>'id')::uuid, _member->>'member_code', _member->>'full_name',
+      COALESCE(_member->>'phone',''), NULLIF(_member->>'email',''),
+      NULLIF(_member->>'address',''), NULLIF(_member->>'date_of_birth','')::date,
+      NULLIF(_member->>'tier_id','')::uuid, COALESCE((_member->>'loyalty_points')::numeric,0),
+      COALESCE((_member->>'total_spent')::numeric,0), now()
+    ) ON CONFLICT (id) DO UPDATE SET
+      member_code = EXCLUDED.member_code, full_name = EXCLUDED.full_name,
+      phone = EXCLUDED.phone, email = EXCLUDED.email, address = EXCLUDED.address,
+      date_of_birth = EXCLUDED.date_of_birth, tier_id = EXCLUDED.tier_id,
+      loyalty_points = EXCLUDED.loyalty_points, total_spent = EXCLUDED.total_spent,
+      row_version = members.row_version,
+      updated_at = now();
+  END IF;
+
   IF existing_id IS NULL THEN
     INSERT INTO public.sales (
     id, bill_number, member_id, store_id, shift_id, cashier_name,
@@ -10890,25 +10911,6 @@ BEGIN
       NULLIF(entry->>'coupon_code',''), COALESCE((entry->>'coupon_discount')::numeric,0), now()
     ) ON CONFLICT (id) DO NOTHING;
   END LOOP;
-
-  IF _member IS NOT NULL AND NULLIF(_member->>'id','') IS NOT NULL THEN
-    INSERT INTO public.members (
-      id, member_code, full_name, phone, email, address, date_of_birth,
-      tier_id, loyalty_points, total_spent, updated_at
-    ) VALUES (
-      (_member->>'id')::uuid, _member->>'member_code', _member->>'full_name',
-      COALESCE(_member->>'phone',''), NULLIF(_member->>'email',''),
-      NULLIF(_member->>'address',''), NULLIF(_member->>'date_of_birth','')::date,
-      NULLIF(_member->>'tier_id','')::uuid, COALESCE((_member->>'loyalty_points')::numeric,0),
-      COALESCE((_member->>'total_spent')::numeric,0), now()
-    ) ON CONFLICT (id) DO UPDATE SET
-      member_code = EXCLUDED.member_code, full_name = EXCLUDED.full_name,
-      phone = EXCLUDED.phone, email = EXCLUDED.email, address = EXCLUDED.address,
-      date_of_birth = EXCLUDED.date_of_birth, tier_id = EXCLUDED.tier_id,
-      loyalty_points = EXCLUDED.loyalty_points, total_spent = EXCLUDED.total_spent,
-      row_version = members.row_version,
-      updated_at = now();
-  END IF;
 
   FOR entry IN SELECT value FROM jsonb_array_elements(COALESCE(_payments,'[]'::jsonb)) LOOP
     INSERT INTO public.payment_transactions (

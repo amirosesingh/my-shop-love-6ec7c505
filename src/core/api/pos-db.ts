@@ -1547,7 +1547,7 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
   const local = localDb();
   if (local?.writeBatch) {
     const state = await local.database?.getState?.().catch(() => null);
-    if (state?.enabled && state?.connected) {
+    if (state?.enabled && state?.connected && (state.tradingReady ?? state.connected)) {
       const refund = ops.length === 1 && ops[0].kind === "rpc" && ops[0].fn === "sale_refund" ? ops[0] : null;
       const aggregateKind = /sale/i.test(context) ? "sale"
         : /payment|tender/i.test(context) ? "payment"
@@ -1570,8 +1570,18 @@ export async function commitOps(context: string, ops: SyncOp[]): Promise<CommitT
         : local.commitAggregate
           ? await local.commitAggregate({ kind: aggregateKind, branchId: branchId || undefined, operations: ops })
           : await local.writeBatch(context, ops);
-      if (!stored.ok) throw new Error(stored.error ?? `${context} was not committed locally.`);
+      if (!stored.ok) {
+        throw Object.assign(new Error(stored.error ?? `${context} was not committed locally.`), {
+          code: stored.code,
+          stage: stored.stage,
+          table: stored.table,
+          sqlNumber: stored.sqlNumber,
+        });
+      }
       return noteCommitTarget("local");
+    }
+    if (state?.enabled && state?.connected && state.tradingReady === false) {
+      throw new Error("Local SQL Server is connected, but its POS schema is not ready. Open Database & Cloud Connection and apply the current local database update before taking payment.");
     }
   }
 
@@ -1950,21 +1960,26 @@ export const db = {
   async commitSale(sale: Sale, products: Product[], member: Member | null): Promise<CommitTarget> {
     // A retry may find the header already committed. Reuse its real id and
     // reconcile every required child rather than mistaking a partial sale for completion.
-    const storedId = sale.clientTxnId ? await db.saleAttemptId(sale.clientTxnId) : null;
+    const onlineOnly = isOnlineOnly();
+    const storedId = onlineOnly && sale.clientTxnId ? await db.saleAttemptId(sale.clientTxnId) : null;
     if (storedId) sale.id = storedId;
-    const ops: SyncOp[] = [
+    // SQL Server enforces these foreign keys immediately. Materialize parent
+    // records before the sale graph so a newly synced member or product cannot
+    // make the otherwise atomic local transaction fail.
+    const ops: SyncOp[] = [];
+    if (products.length)
+      ops.push({ kind: "upsert", table: "products", rows: products.map(productToRow) });
+    if (member) ops.push({ kind: "upsert", table: "members", rows: [memberToRow(member, tierId)] });
+    ops.push(
       { kind: "upsert", table: "sales", rows: [saleToRow(sale)], onConflict: "id" },
       { kind: "upsert", table: "sale_items", rows: saleItemRows(sale), onConflict: "id" },
-    ];
+    );
     const tenders = salePaymentRows(sale);
     if (tenders.length)
       ops.push({ kind: "upsert", table: "payment_transactions", rows: tenders, onConflict: "id" });
     const movements = saleActivityRows(sale);
     if (movements.length)
       ops.push({ kind: "upsert", table: "item_activity_logs", rows: movements, onConflict: "id" });
-    if (products.length)
-      ops.push({ kind: "upsert", table: "products", rows: products.map(productToRow) });
-    if (member) ops.push({ kind: "upsert", table: "members", rows: [memberToRow(member, tierId)] });
     if (sale.exchangeOfReceiptNo)
       ops.push({
         kind: "update",
@@ -1972,7 +1987,7 @@ export const db = {
         values: { exchanged_to_bill_number: sale.receiptNo },
         match: { bill_number: sale.exchangeOfReceiptNo },
       });
-    if (isOnlineOnly()) {
+    if (onlineOnly) {
       // One central transaction owns the immutable financial graph, member
       // effect and stock deltas. Product rows remain a separate projection,
       // with absolute stock stripped before they are sent.
