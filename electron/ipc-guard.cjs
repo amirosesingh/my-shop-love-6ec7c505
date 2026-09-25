@@ -129,7 +129,15 @@ function writeOps(value, { max = 500 } = {}) {
 }
 
 function aggregate(value) {
-  const input = options(value, { name: "business aggregate", max: 4 });
+  // Aggregate commits deliberately contain nested operation objects. The
+  // generic `options()` validator is for flat scalar settings and rejects
+  // those rows before they can reach SQL Server, so validate this envelope
+  // explicitly and leave every nested write to `writeOps()` below.
+  const input = plainObject(value, { name: "business aggregate" });
+  const allowed = new Set(["kind", "operationId", "branchId", "operations"]);
+  const fields = Object.keys(input);
+  if (fields.length > allowed.size || fields.some((field) => !allowed.has(field)))
+    throw new BadArg("The business aggregate contains an unexpected setting.");
   const kind = text(input.kind, { name: "aggregate kind", max: 32 });
   if (
     ![

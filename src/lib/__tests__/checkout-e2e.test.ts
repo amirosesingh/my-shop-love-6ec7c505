@@ -194,6 +194,8 @@ describe("checkout commit", () => {
       kind: string;
       operations: Array<{ table: string; rows?: Array<Record<string, unknown>> }>;
     };
+    const ipcGuard = await import("../../../electron/ipc-guard.cjs");
+    expect(() => ipcGuard.aggregate(aggregate)).not.toThrow();
     expect(aggregate.kind).toBe("sale");
     const saleRow = aggregate.operations.find((op) => op.table === "sales")?.rows?.[0];
     const paymentRows =
