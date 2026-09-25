@@ -32,7 +32,8 @@ export function ShiftGuard({ children }: { children: ReactNode }) {
   const { user, lock, can, terminalStoreName } = useAuth();
   // The cashier is whoever is signed in — never typed in by hand.
   const cashier = user?.name ?? "Cashier";
-  const [float, setFloat] = useState("150");
+  // A fresh shift starts with no assumed cash count; the hint stays visible.
+  const [float, setFloat] = useState("");
   const [opening, setOpening] = useState(false);
 
   const bypass = can("can_bypass_shift_lock");
@@ -152,6 +153,7 @@ export function ShiftGuard({ children }: { children: ReactNode }) {
                   setOpening(true);
                   try {
                     const target = await openShift(cashier.trim() || "Cashier", amount);
+                    setFloat("");
                     // Only announced once the shift is confirmed stored.
                     toast.success(`Shift opened — ${commitLabel(target).toLowerCase()}`);
                   } catch (e) {

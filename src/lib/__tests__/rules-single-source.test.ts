@@ -6,7 +6,12 @@
 import { describe, it, expect, beforeEach } from "vitest";
 
 import { blocksOutOfStockSale } from "@/lib/register/stock-guard";
-import { effectiveLockSeconds, DEFAULT_AUTO_LOCK_SECONDS, setAutoLockSeconds } from "@/lib/auto-lock";
+import {
+  effectiveLockSeconds,
+  DEFAULT_AUTO_LOCK_SECONDS,
+  remainingAutoLockMs,
+  setAutoLockSeconds,
+} from "@/lib/auto-lock";
 import { DEFAULT_POS_RULES, requiresManagerPin, GATE_RULE_KEY } from "@/lib/pos-rules";
 
 describe("prevent negative stock sale", () => {
@@ -45,6 +50,14 @@ describe("idle auto-lock", () => {
   });
   it("falls back to the shipped default with nothing saved", () => {
     expect(effectiveLockSeconds(undefined)).toBe(DEFAULT_AUTO_LOCK_SECONDS);
+  });
+  it("does not grant a fresh idle window after reopening the app", () => {
+    const lastActivity = Date.UTC(2026, 8, 24, 8, 0, 0);
+    expect(remainingAutoLockMs(180, lastActivity, lastActivity + 86_400_000)).toBe(0);
+  });
+  it("preserves only the unused part of the idle window", () => {
+    const lastActivity = 1_000_000;
+    expect(remainingAutoLockMs(180, lastActivity, lastActivity + 60_000)).toBe(120_000);
   });
 });
 

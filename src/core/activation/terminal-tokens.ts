@@ -573,7 +573,7 @@ export async function unpairTerminal(): Promise<void> {
   clearPairingRequest();
   clearDeviceSecret("terminal-account");
   try {
-    await supabaseExternal.auth.signOut();
+    await supabaseExternal.auth.signOut({ scope: "local" });
   } catch {
     /* nothing else to clean up */
   }

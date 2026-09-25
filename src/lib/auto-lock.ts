@@ -9,7 +9,9 @@
 import { useEffect, useRef } from "react";
 
 const KEY = "pos.autoLock.seconds";
+const LAST_ACTIVITY_KEY = "pos.autoLock.lastActivityAt";
 export const DEFAULT_AUTO_LOCK_SECONDS = 180;
+const ACTIVITY_WRITE_THROTTLE_MS = 5_000;
 
 const listeners = new Set<() => void>();
 
@@ -44,6 +46,35 @@ export function subscribeAutoLock(cb: () => void) {
   return () => listeners.delete(cb);
 }
 
+/** Remaining idle allowance for a login that may have survived a reload. */
+export function remainingAutoLockMs(
+  seconds: number,
+  lastActivityAt: number,
+  now = Date.now(),
+): number {
+  if (!seconds) return Number.POSITIVE_INFINITY;
+  if (!Number.isFinite(lastActivityAt) || lastActivityAt <= 0) return seconds * 1000;
+  return Math.max(0, seconds * 1000 - Math.max(0, now - lastActivityAt));
+}
+
+function storedActivityAt(): number {
+  if (typeof window === "undefined") return 0;
+  const value = Number(window.localStorage.getItem(LAST_ACTIVITY_KEY));
+  return Number.isFinite(value) && value > 0 ? value : 0;
+}
+
+/** A successful interactive sign-in starts a fresh idle window. */
+export function markAutoLockActivity(at = Date.now()): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(LAST_ACTIVITY_KEY, String(at));
+}
+
+/** Explicit logout/lock removes the previous person's activity marker. */
+export function clearAutoLockActivity(): void {
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(LAST_ACTIVITY_KEY);
+}
+
 const EVENTS = ["pointerdown", "keydown", "wheel", "touchstart", "mousemove"] as const;
 
 /**
@@ -58,11 +89,30 @@ export function useAutoLock(active: boolean, onLock: () => void, ruleSeconds?: n
     if (!active || typeof window === "undefined") return;
     let timer = 0;
     let stopped = false;
+    let lastWrittenAt = storedActivityAt();
 
-    const arm = () => {
+    const schedule = () => {
       window.clearTimeout(timer);
       // The synchronized settings decide when they are the confirmed source; the
       // per-machine value is only a fallback while they have not arrived.
+      const seconds = effectiveLockSeconds(ruleSeconds);
+      if (!seconds || stopped) return;
+      const remaining = remainingAutoLockMs(seconds, storedActivityAt());
+      timer = window.setTimeout(() => {
+        stopped = true;
+        lockRef.current();
+      }, remaining);
+    };
+
+    const activity = () => {
+      const now = Date.now();
+      // Mouse movement is noisy. Reset the live timer immediately but write
+      // the durable marker at a bounded rate.
+      if (now - lastWrittenAt >= ACTIVITY_WRITE_THROTTLE_MS) {
+        markAutoLockActivity(now);
+        lastWrittenAt = now;
+      }
+      window.clearTimeout(timer);
       const seconds = effectiveLockSeconds(ruleSeconds);
       if (!seconds || stopped) return;
       timer = window.setTimeout(() => {
@@ -71,14 +121,20 @@ export function useAutoLock(active: boolean, onLock: () => void, ruleSeconds?: n
       }, seconds * 1000);
     };
 
-    for (const e of EVENTS) window.addEventListener(e, arm, { passive: true });
-    const offSetting = subscribeAutoLock(arm);
-    arm();
+    // No marker means a fresh sign-in. A restored login keeps its previous
+    // marker and locks immediately if the idle allowance elapsed while away.
+    if (!lastWrittenAt) {
+      markAutoLockActivity();
+      lastWrittenAt = storedActivityAt();
+    }
+    for (const e of EVENTS) window.addEventListener(e, activity, { passive: true });
+    const offSetting = subscribeAutoLock(schedule);
+    schedule();
 
     return () => {
       stopped = true;
       window.clearTimeout(timer);
-      for (const e of EVENTS) window.removeEventListener(e, arm);
+      for (const e of EVENTS) window.removeEventListener(e, activity);
       offSetting();
     };
   }, [active, ruleSeconds]);

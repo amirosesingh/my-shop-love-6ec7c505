@@ -34,6 +34,7 @@ import {
   onSessionExpired,
 } from "@/lib/session-expiry";
 import { APP_RESUME_EVENT } from "@/core/activation/connection-health";
+import { clearAutoLockActivity, markAutoLockActivity } from "@/lib/auto-lock";
 import { bumpSessionEpoch, isCurrentEpoch, sessionEpoch } from "@/lib/session-epoch";
 import { awaitProfileHydrated } from "@/lib/connection-profile";
 import {
@@ -423,6 +424,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           code: configFailure,
           error: loginFailureMessage(configFailure),
         };
+      // This is an interactive sign-in, not a restored browser session.
+      // Start its idle allowance before Auth publishes SIGNED_IN so the old
+      // user's timestamp cannot race the new account onto the lock screen.
+      markAutoLockActivity();
       // Check the account after authentication. A pre-login app_users read
       // sends an old bearer token (or no user token) to a protected table and
       // produces a noisy 401 before the password is even submitted.
@@ -445,7 +450,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           | Record<string, unknown>
           | null;
         if (profileError || !profile) {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: "local" });
           return {
             ok: false,
             code: "permission-denied" as const,
@@ -453,7 +458,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           };
         }
         if (profile["is_active"] === false) {
-          await supabase.auth.signOut();
+          await supabase.auth.signOut({ scope: "local" });
           return {
             ok: false,
             code: "account-inactive" as const,
@@ -461,7 +466,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           };
         }
       } catch {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: "local" });
         return {
           ok: false,
           code: "permission-denied" as const,
@@ -508,7 +513,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         | Record<string, unknown>
         | null;
       if (profile && profile["is_active"] === false) {
-        await supabase.auth.signOut();
+        await supabase.auth.signOut({ scope: "local" });
         return { ok: false, error: "Account deactivated. Please contact an administrator." };
       }
       const dbRole = String(profile?.["role"] ?? "staff");
@@ -584,6 +589,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         code: configFailure,
         error: loginFailureMessage(configFailure),
       };
+    markAutoLockActivity();
 
     let offline = false;
     if (typeof navigator !== "undefined" && !navigator.onLine) offline = true;
@@ -844,7 +850,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         /* offline — the local purge below still applies */
       }
       if (!isCurrentEpoch(startedAt)) return;
-      await supabase.auth.signOut();
+      await supabase.auth.signOut({ scope: "local" });
       // Signing out fires an auth change; anything newer than this teardown
       // wins and the rest is skipped.
       if (!isCurrentEpoch(startedAt)) return;
@@ -857,6 +863,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       } catch {
         /* ignore */
       }
+      clearAutoLockActivity();
       try {
         await window.sqlAdmin?.lockAdmin?.();
       } catch {
