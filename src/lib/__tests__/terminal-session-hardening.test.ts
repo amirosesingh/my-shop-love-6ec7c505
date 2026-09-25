@@ -50,6 +50,15 @@ describe("activation contract in the canonical schema", () => {
     expect(defs.length).toBe(1);
   });
 
+  it("installs every column written by the check-in routine", () => {
+    expect(schema).toContain(
+      "ALTER TABLE public.terminal_tokens ADD COLUMN IF NOT EXISTS app_version text;",
+    );
+    expect(schema).toContain(
+      "ALTER TABLE public.terminal_tokens ADD COLUMN IF NOT EXISTS last_sync_at timestamp with time zone;",
+    );
+  });
+
   it("drops any older check-in routine before replacing it", () => {
     expect(schema).toMatch(/DROP FUNCTION IF EXISTS public\.terminal_token_heartbeat/);
   });
