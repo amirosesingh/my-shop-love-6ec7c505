@@ -938,6 +938,8 @@ CREATE TABLE IF NOT EXISTS public.terminal_tokens (
     activated_at timestamp with time zone,
     revoked_at timestamp with time zone,
     last_seen_at timestamp with time zone,
+    app_version text,
+    last_sync_at timestamp with time zone,
     reissued_at timestamp with time zone,
     replaced_by uuid,
     claimed_by_device text,
@@ -2599,6 +2601,10 @@ ALTER TABLE public.terminal_tokens ADD COLUMN IF NOT EXISTS activated_at timesta
 ALTER TABLE public.terminal_tokens ADD COLUMN IF NOT EXISTS revoked_at timestamp with time zone;
 
 ALTER TABLE public.terminal_tokens ADD COLUMN IF NOT EXISTS last_seen_at timestamp with time zone;
+
+ALTER TABLE public.terminal_tokens ADD COLUMN IF NOT EXISTS app_version text;
+
+ALTER TABLE public.terminal_tokens ADD COLUMN IF NOT EXISTS last_sync_at timestamp with time zone;
 
 ALTER TABLE public.terminal_tokens ADD COLUMN IF NOT EXISTS reissued_at timestamp with time zone;
 

@@ -23,6 +23,7 @@ describe("canonical Supabase SQL", () => {
       "supabase/migrations/20260925102835_fix_payment_transaction_idempotency.sql",
       "supabase/migrations/20260925105427_fix_pos_sale_commit_stock_alias.sql",
       "supabase/migrations/20260925105919_persist_pos_sale_payment_idempotency.sql",
+      "supabase/migrations/20260925111049_repair_terminal_heartbeat_columns.sql",
       "supabase/reset.sql",
       "supabase/schema.sql",
       "supabase/sql/payment_commit_upgrade.sql",

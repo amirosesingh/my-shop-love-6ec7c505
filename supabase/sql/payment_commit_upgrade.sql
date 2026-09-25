@@ -31,6 +31,11 @@ COMMIT;
 
 BEGIN;
 
+-- Keep terminal activation heartbeats compatible with the current routine.
+ALTER TABLE public.terminal_tokens
+  ADD COLUMN IF NOT EXISTS app_version text,
+  ADD COLUMN IF NOT EXISTS last_sync_at timestamp with time zone;
+
 -- Fix checkout failure SQLSTATE 42702: the PL/pgSQL row variable and the
 -- stock-delta query both used the identifier "r", making every sale with
 -- inventory movements fail and roll back its payment.
