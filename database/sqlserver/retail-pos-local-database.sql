@@ -62,7 +62,7 @@ IF OBJECT_ID(N'dbo.coupon_campaigns', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cou
 ) ALTER TABLE dbo.[coupon_campaigns] ADD CONSTRAINT [DF_coupon_campaigns_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.coupon_campaigns') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[coupon_campaigns] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[coupon_campaigns] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[coupon_campaigns] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -83,7 +83,7 @@ IF OBJECT_ID(N'dbo.coupon_campaigns', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cou
 ) ALTER TABLE dbo.[coupon_campaigns] ADD CONSTRAINT [DF_coupon_campaigns_discount_type] DEFAULT ('PERCENTAGE') FOR [discount_type];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.coupon_campaigns') AND name=N'discount_type' AND is_nullable=1) BEGIN
-  UPDATE dbo.[coupon_campaigns] SET [discount_type]='PERCENTAGE' WHERE [discount_type] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[coupon_campaigns] SET [discount_type]=''PERCENTAGE'' WHERE [discount_type] IS NULL;';
   ALTER TABLE dbo.[coupon_campaigns] ALTER COLUMN [discount_type] nvarchar(max) NOT NULL;
 END;
 
@@ -96,7 +96,7 @@ IF OBJECT_ID(N'dbo.coupon_campaigns', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cou
 ) ALTER TABLE dbo.[coupon_campaigns] ADD CONSTRAINT [DF_coupon_campaigns_discount_value] DEFAULT (0) FOR [discount_value];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.coupon_campaigns') AND name=N'discount_value' AND is_nullable=1) BEGIN
-  UPDATE dbo.[coupon_campaigns] SET [discount_value]=0 WHERE [discount_value] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[coupon_campaigns] SET [discount_value]=0 WHERE [discount_value] IS NULL;';
   ALTER TABLE dbo.[coupon_campaigns] ALTER COLUMN [discount_value] decimal(38,12) NOT NULL;
 END;
 
@@ -109,7 +109,7 @@ IF OBJECT_ID(N'dbo.coupon_campaigns', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cou
 ) ALTER TABLE dbo.[coupon_campaigns] ADD CONSTRAINT [DF_coupon_campaigns_scope] DEFAULT ('BILL') FOR [scope];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.coupon_campaigns') AND name=N'scope' AND is_nullable=1) BEGIN
-  UPDATE dbo.[coupon_campaigns] SET [scope]='BILL' WHERE [scope] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[coupon_campaigns] SET [scope]=''BILL'' WHERE [scope] IS NULL;';
   ALTER TABLE dbo.[coupon_campaigns] ALTER COLUMN [scope] nvarchar(max) NOT NULL;
 END;
 
@@ -134,7 +134,7 @@ IF OBJECT_ID(N'dbo.coupon_campaigns', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cou
 ) ALTER TABLE dbo.[coupon_campaigns] ADD CONSTRAINT [DF_coupon_campaigns_claims_count] DEFAULT (0) FOR [claims_count];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.coupon_campaigns') AND name=N'claims_count' AND is_nullable=1) BEGIN
-  UPDATE dbo.[coupon_campaigns] SET [claims_count]=0 WHERE [claims_count] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[coupon_campaigns] SET [claims_count]=0 WHERE [claims_count] IS NULL;';
   ALTER TABLE dbo.[coupon_campaigns] ALTER COLUMN [claims_count] int NOT NULL;
 END;
 
@@ -151,7 +151,7 @@ IF OBJECT_ID(N'dbo.coupon_campaigns', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cou
 ) ALTER TABLE dbo.[coupon_campaigns] ADD CONSTRAINT [DF_coupon_campaigns_is_active] DEFAULT (1) FOR [is_active];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.coupon_campaigns') AND name=N'is_active' AND is_nullable=1) BEGIN
-  UPDATE dbo.[coupon_campaigns] SET [is_active]=1 WHERE [is_active] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[coupon_campaigns] SET [is_active]=1 WHERE [is_active] IS NULL;';
   ALTER TABLE dbo.[coupon_campaigns] ALTER COLUMN [is_active] bit NOT NULL;
 END;
 
@@ -164,7 +164,7 @@ IF OBJECT_ID(N'dbo.coupon_campaigns', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cou
 ) ALTER TABLE dbo.[coupon_campaigns] ADD CONSTRAINT [DF_coupon_campaigns_is_welcome] DEFAULT (0) FOR [is_welcome];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.coupon_campaigns') AND name=N'is_welcome' AND is_nullable=1) BEGIN
-  UPDATE dbo.[coupon_campaigns] SET [is_welcome]=0 WHERE [is_welcome] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[coupon_campaigns] SET [is_welcome]=0 WHERE [is_welcome] IS NULL;';
   ALTER TABLE dbo.[coupon_campaigns] ALTER COLUMN [is_welcome] bit NOT NULL;
 END;
 
@@ -177,7 +177,7 @@ IF OBJECT_ID(N'dbo.coupon_campaigns', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cou
 ) ALTER TABLE dbo.[coupon_campaigns] ADD CONSTRAINT [DF_coupon_campaigns_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.coupon_campaigns') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[coupon_campaigns] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[coupon_campaigns] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[coupon_campaigns] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -190,7 +190,7 @@ IF OBJECT_ID(N'dbo.coupon_campaigns', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cou
 ) ALTER TABLE dbo.[coupon_campaigns] ADD CONSTRAINT [DF_coupon_campaigns_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.coupon_campaigns') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[coupon_campaigns] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[coupon_campaigns] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[coupon_campaigns] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -205,7 +205,7 @@ IF OBJECT_ID(N'dbo.coupon_campaigns', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cou
 ) ALTER TABLE dbo.[coupon_campaigns] ADD CONSTRAINT [DF_coupon_campaigns_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.coupon_campaigns') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[coupon_campaigns] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[coupon_campaigns] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[coupon_campaigns] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -267,7 +267,7 @@ IF OBJECT_ID(N'dbo.shifts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shifts', N'id
 ) ALTER TABLE dbo.[shifts] ADD CONSTRAINT [DF_shifts_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shifts') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shifts] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shifts] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[shifts] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -290,7 +290,7 @@ IF OBJECT_ID(N'dbo.shifts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shifts', N'op
 ) ALTER TABLE dbo.[shifts] ADD CONSTRAINT [DF_shifts_opened_by_name] DEFAULT ('Cashier') FOR [opened_by_name];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shifts') AND name=N'opened_by_name' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shifts] SET [opened_by_name]='Cashier' WHERE [opened_by_name] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shifts] SET [opened_by_name]=''Cashier'' WHERE [opened_by_name] IS NULL;';
   ALTER TABLE dbo.[shifts] ALTER COLUMN [opened_by_name] nvarchar(max) NOT NULL;
 END;
 
@@ -313,7 +313,7 @@ IF OBJECT_ID(N'dbo.shifts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shifts', N'op
 ) ALTER TABLE dbo.[shifts] ADD CONSTRAINT [DF_shifts_opened_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [opened_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shifts') AND name=N'opened_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shifts] SET [opened_at]=SYSDATETIMEOFFSET() WHERE [opened_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shifts] SET [opened_at]=SYSDATETIMEOFFSET() WHERE [opened_at] IS NULL;';
   ALTER TABLE dbo.[shifts] ALTER COLUMN [opened_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -328,7 +328,7 @@ IF OBJECT_ID(N'dbo.shifts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shifts', N'op
 ) ALTER TABLE dbo.[shifts] ADD CONSTRAINT [DF_shifts_opening_float] DEFAULT (0) FOR [opening_float];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shifts') AND name=N'opening_float' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shifts] SET [opening_float]=0 WHERE [opening_float] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shifts] SET [opening_float]=0 WHERE [opening_float] IS NULL;';
   ALTER TABLE dbo.[shifts] ALTER COLUMN [opening_float] decimal(38,12) NOT NULL;
 END;
 
@@ -345,7 +345,7 @@ IF OBJECT_ID(N'dbo.shifts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shifts', N'no
 ) ALTER TABLE dbo.[shifts] ADD CONSTRAINT [DF_shifts_note] DEFAULT ('') FOR [note];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shifts') AND name=N'note' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shifts] SET [note]='' WHERE [note] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shifts] SET [note]='''' WHERE [note] IS NULL;';
   ALTER TABLE dbo.[shifts] ALTER COLUMN [note] nvarchar(max) NOT NULL;
 END;
 
@@ -358,7 +358,7 @@ IF OBJECT_ID(N'dbo.shifts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shifts', N'ov
 ) ALTER TABLE dbo.[shifts] ADD CONSTRAINT [DF_shifts_overdue] DEFAULT (0) FOR [overdue];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shifts') AND name=N'overdue' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shifts] SET [overdue]=0 WHERE [overdue] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shifts] SET [overdue]=0 WHERE [overdue] IS NULL;';
   ALTER TABLE dbo.[shifts] ALTER COLUMN [overdue] bit NOT NULL;
 END;
 
@@ -371,7 +371,7 @@ IF OBJECT_ID(N'dbo.shifts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shifts', N'cr
 ) ALTER TABLE dbo.[shifts] ADD CONSTRAINT [DF_shifts_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shifts') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shifts] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shifts] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[shifts] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -384,7 +384,7 @@ IF OBJECT_ID(N'dbo.shifts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shifts', N'up
 ) ALTER TABLE dbo.[shifts] ADD CONSTRAINT [DF_shifts_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shifts') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shifts] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shifts] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[shifts] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -399,7 +399,7 @@ IF OBJECT_ID(N'dbo.shifts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shifts', N'st
 ) ALTER TABLE dbo.[shifts] ADD CONSTRAINT [DF_shifts_status] DEFAULT ('OPEN') FOR [status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shifts') AND name=N'status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shifts] SET [status]='OPEN' WHERE [status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shifts] SET [status]=''OPEN'' WHERE [status] IS NULL;';
   ALTER TABLE dbo.[shifts] ALTER COLUMN [status] nvarchar(max) NOT NULL;
 END;
 
@@ -416,7 +416,7 @@ IF OBJECT_ID(N'dbo.shifts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shifts', N'ro
 ) ALTER TABLE dbo.[shifts] ADD CONSTRAINT [DF_shifts_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shifts') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shifts] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shifts] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[shifts] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -445,7 +445,7 @@ IF OBJECT_ID(N'dbo.shifts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shifts', N'st
 ) ALTER TABLE dbo.[shifts] ADD CONSTRAINT [DF_shifts_state] DEFAULT ('ACTIVE') FOR [state];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shifts') AND name=N'state' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shifts] SET [state]='ACTIVE' WHERE [state] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shifts] SET [state]=''ACTIVE'' WHERE [state] IS NULL;';
   ALTER TABLE dbo.[shifts] ALTER COLUMN [state] nvarchar(max) NOT NULL;
 END;
 
@@ -497,7 +497,7 @@ IF OBJECT_ID(N'dbo.issued_vouchers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.issu
 ) ALTER TABLE dbo.[issued_vouchers] ADD CONSTRAINT [DF_issued_vouchers_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.issued_vouchers') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[issued_vouchers] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[issued_vouchers] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[issued_vouchers] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -524,7 +524,7 @@ IF OBJECT_ID(N'dbo.issued_vouchers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.issu
 ) ALTER TABLE dbo.[issued_vouchers] ADD CONSTRAINT [DF_issued_vouchers_status] DEFAULT ('ISSUED') FOR [status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.issued_vouchers') AND name=N'status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[issued_vouchers] SET [status]='ISSUED' WHERE [status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[issued_vouchers] SET [status]=''ISSUED'' WHERE [status] IS NULL;';
   ALTER TABLE dbo.[issued_vouchers] ALTER COLUMN [status] nvarchar(max) NOT NULL;
 END;
 
@@ -537,7 +537,7 @@ IF OBJECT_ID(N'dbo.issued_vouchers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.issu
 ) ALTER TABLE dbo.[issued_vouchers] ADD CONSTRAINT [DF_issued_vouchers_issued_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [issued_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.issued_vouchers') AND name=N'issued_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[issued_vouchers] SET [issued_at]=SYSDATETIMEOFFSET() WHERE [issued_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[issued_vouchers] SET [issued_at]=SYSDATETIMEOFFSET() WHERE [issued_at] IS NULL;';
   ALTER TABLE dbo.[issued_vouchers] ALTER COLUMN [issued_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -554,7 +554,7 @@ IF OBJECT_ID(N'dbo.issued_vouchers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.issu
 ) ALTER TABLE dbo.[issued_vouchers] ADD CONSTRAINT [DF_issued_vouchers_issued_source] DEFAULT ('PUBLIC') FOR [issued_source];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.issued_vouchers') AND name=N'issued_source' AND is_nullable=1) BEGIN
-  UPDATE dbo.[issued_vouchers] SET [issued_source]='PUBLIC' WHERE [issued_source] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[issued_vouchers] SET [issued_source]=''PUBLIC'' WHERE [issued_source] IS NULL;';
   ALTER TABLE dbo.[issued_vouchers] ALTER COLUMN [issued_source] nvarchar(max) NOT NULL;
 END;
 
@@ -583,7 +583,7 @@ IF OBJECT_ID(N'dbo.issued_vouchers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.issu
 ) ALTER TABLE dbo.[issued_vouchers] ADD CONSTRAINT [DF_issued_vouchers_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.issued_vouchers') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[issued_vouchers] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[issued_vouchers] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[issued_vouchers] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -630,7 +630,7 @@ IF OBJECT_ID(N'dbo.activity_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.acti
 ) ALTER TABLE dbo.[activity_events] ADD CONSTRAINT [DF_activity_events_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.activity_events') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[activity_events] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[activity_events] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[activity_events] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -647,7 +647,7 @@ IF OBJECT_ID(N'dbo.activity_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.acti
 ) ALTER TABLE dbo.[activity_events] ADD CONSTRAINT [DF_activity_events_severity] DEFAULT ('info') FOR [severity];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.activity_events') AND name=N'severity' AND is_nullable=1) BEGIN
-  UPDATE dbo.[activity_events] SET [severity]='info' WHERE [severity] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[activity_events] SET [severity]=''info'' WHERE [severity] IS NULL;';
   ALTER TABLE dbo.[activity_events] ALTER COLUMN [severity] nvarchar(max) NOT NULL;
 END;
 
@@ -662,7 +662,7 @@ IF OBJECT_ID(N'dbo.activity_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.acti
 ) ALTER TABLE dbo.[activity_events] ADD CONSTRAINT [DF_activity_events_message] DEFAULT ('') FOR [message];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.activity_events') AND name=N'message' AND is_nullable=1) BEGIN
-  UPDATE dbo.[activity_events] SET [message]='' WHERE [message] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[activity_events] SET [message]='''' WHERE [message] IS NULL;';
   ALTER TABLE dbo.[activity_events] ALTER COLUMN [message] nvarchar(max) NOT NULL;
 END;
 
@@ -695,7 +695,7 @@ IF OBJECT_ID(N'dbo.activity_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.acti
 ) ALTER TABLE dbo.[activity_events] ADD CONSTRAINT [DF_activity_events_meta] DEFAULT (N'{}') FOR [meta];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.activity_events') AND name=N'meta' AND is_nullable=1) BEGIN
-  UPDATE dbo.[activity_events] SET [meta]=N'{}' WHERE [meta] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[activity_events] SET [meta]=N''{}'' WHERE [meta] IS NULL;';
   ALTER TABLE dbo.[activity_events] ALTER COLUMN [meta] nvarchar(max) NOT NULL;
 END;
 
@@ -708,7 +708,7 @@ IF OBJECT_ID(N'dbo.activity_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.acti
 ) ALTER TABLE dbo.[activity_events] ADD CONSTRAINT [DF_activity_events_whatsapp_status] DEFAULT ('skipped') FOR [whatsapp_status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.activity_events') AND name=N'whatsapp_status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[activity_events] SET [whatsapp_status]='skipped' WHERE [whatsapp_status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[activity_events] SET [whatsapp_status]=''skipped'' WHERE [whatsapp_status] IS NULL;';
   ALTER TABLE dbo.[activity_events] ALTER COLUMN [whatsapp_status] nvarchar(max) NOT NULL;
 END;
 
@@ -727,7 +727,7 @@ IF OBJECT_ID(N'dbo.activity_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.acti
 ) ALTER TABLE dbo.[activity_events] ADD CONSTRAINT [DF_activity_events_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.activity_events') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[activity_events] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[activity_events] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[activity_events] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -744,7 +744,7 @@ IF OBJECT_ID(N'dbo.activity_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.acti
 ) ALTER TABLE dbo.[activity_events] ADD CONSTRAINT [DF_activity_events_cleared_by] DEFAULT (N'[]') FOR [cleared_by];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.activity_events') AND name=N'cleared_by' AND is_nullable=1) BEGIN
-  UPDATE dbo.[activity_events] SET [cleared_by]=N'[]' WHERE [cleared_by] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[activity_events] SET [cleared_by]=N''[]'' WHERE [cleared_by] IS NULL;';
   ALTER TABLE dbo.[activity_events] ALTER COLUMN [cleared_by] nvarchar(max) NOT NULL;
 END;
 
@@ -787,7 +787,7 @@ IF OBJECT_ID(N'dbo.app_users', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.app_users'
 ) ALTER TABLE dbo.[app_users] ADD CONSTRAINT [DF_app_users_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.app_users') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[app_users] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[app_users] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[app_users] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -816,7 +816,7 @@ IF OBJECT_ID(N'dbo.app_users', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.app_users'
 ) ALTER TABLE dbo.[app_users] ADD CONSTRAINT [DF_app_users_is_active] DEFAULT (1) FOR [is_active];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.app_users') AND name=N'is_active' AND is_nullable=1) BEGIN
-  UPDATE dbo.[app_users] SET [is_active]=1 WHERE [is_active] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[app_users] SET [is_active]=1 WHERE [is_active] IS NULL;';
   ALTER TABLE dbo.[app_users] ALTER COLUMN [is_active] bit NOT NULL;
 END;
 
@@ -831,7 +831,7 @@ IF OBJECT_ID(N'dbo.app_users', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.app_users'
 ) ALTER TABLE dbo.[app_users] ADD CONSTRAINT [DF_app_users_pin_hash] DEFAULT ('') FOR [pin_hash];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.app_users') AND name=N'pin_hash' AND is_nullable=1) BEGIN
-  UPDATE dbo.[app_users] SET [pin_hash]='' WHERE [pin_hash] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[app_users] SET [pin_hash]='''' WHERE [pin_hash] IS NULL;';
   ALTER TABLE dbo.[app_users] ALTER COLUMN [pin_hash] nvarchar(max) NOT NULL;
 END;
 
@@ -850,7 +850,7 @@ IF OBJECT_ID(N'dbo.app_users', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.app_users'
 ) ALTER TABLE dbo.[app_users] ADD CONSTRAINT [DF_app_users_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.app_users') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[app_users] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[app_users] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[app_users] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -863,7 +863,7 @@ IF OBJECT_ID(N'dbo.app_users', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.app_users'
 ) ALTER TABLE dbo.[app_users] ADD CONSTRAINT [DF_app_users_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.app_users') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[app_users] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[app_users] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[app_users] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -880,7 +880,7 @@ IF OBJECT_ID(N'dbo.app_users', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.app_users'
 ) ALTER TABLE dbo.[app_users] ADD CONSTRAINT [DF_app_users_pin_length] DEFAULT (6) FOR [pin_length];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.app_users') AND name=N'pin_length' AND is_nullable=1) BEGIN
-  UPDATE dbo.[app_users] SET [pin_length]=6 WHERE [pin_length] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[app_users] SET [pin_length]=6 WHERE [pin_length] IS NULL;';
   ALTER TABLE dbo.[app_users] ALTER COLUMN [pin_length] smallint NOT NULL;
 END;
 
@@ -893,7 +893,7 @@ IF OBJECT_ID(N'dbo.app_users', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.app_users'
 ) ALTER TABLE dbo.[app_users] ADD CONSTRAINT [DF_app_users_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.app_users') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[app_users] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[app_users] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[app_users] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -939,7 +939,7 @@ IF OBJECT_ID(N'dbo.audit_logs', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.audit_log
 ) ALTER TABLE dbo.[audit_logs] ADD CONSTRAINT [DF_audit_logs_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.audit_logs') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[audit_logs] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[audit_logs] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[audit_logs] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -964,7 +964,7 @@ IF OBJECT_ID(N'dbo.audit_logs', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.audit_log
 ) ALTER TABLE dbo.[audit_logs] ADD CONSTRAINT [DF_audit_logs_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.audit_logs') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[audit_logs] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[audit_logs] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[audit_logs] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -1018,7 +1018,7 @@ IF OBJECT_ID(N'dbo.booking_payments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.boo
 ) ALTER TABLE dbo.[booking_payments] ADD CONSTRAINT [DF_booking_payments_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.booking_payments') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[booking_payments] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[booking_payments] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[booking_payments] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -1037,7 +1037,7 @@ IF OBJECT_ID(N'dbo.booking_payments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.boo
 ) ALTER TABLE dbo.[booking_payments] ADD CONSTRAINT [DF_booking_payments_amount] DEFAULT (0) FOR [amount];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.booking_payments') AND name=N'amount' AND is_nullable=1) BEGIN
-  UPDATE dbo.[booking_payments] SET [amount]=0 WHERE [amount] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[booking_payments] SET [amount]=0 WHERE [amount] IS NULL;';
   ALTER TABLE dbo.[booking_payments] ALTER COLUMN [amount] decimal(38,12) NOT NULL;
 END;
 
@@ -1050,7 +1050,7 @@ IF OBJECT_ID(N'dbo.booking_payments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.boo
 ) ALTER TABLE dbo.[booking_payments] ADD CONSTRAINT [DF_booking_payments_method] DEFAULT ('cash') FOR [method];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.booking_payments') AND name=N'method' AND is_nullable=1) BEGIN
-  UPDATE dbo.[booking_payments] SET [method]='cash' WHERE [method] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[booking_payments] SET [method]=''cash'' WHERE [method] IS NULL;';
   ALTER TABLE dbo.[booking_payments] ALTER COLUMN [method] nvarchar(max) NOT NULL;
 END;
 
@@ -1065,7 +1065,7 @@ IF OBJECT_ID(N'dbo.booking_payments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.boo
 ) ALTER TABLE dbo.[booking_payments] ADD CONSTRAINT [DF_booking_payments_paid_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [paid_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.booking_payments') AND name=N'paid_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[booking_payments] SET [paid_at]=SYSDATETIMEOFFSET() WHERE [paid_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[booking_payments] SET [paid_at]=SYSDATETIMEOFFSET() WHERE [paid_at] IS NULL;';
   ALTER TABLE dbo.[booking_payments] ALTER COLUMN [paid_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -1078,7 +1078,7 @@ IF OBJECT_ID(N'dbo.booking_payments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.boo
 ) ALTER TABLE dbo.[booking_payments] ADD CONSTRAINT [DF_booking_payments_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.booking_payments') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[booking_payments] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[booking_payments] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[booking_payments] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -1091,7 +1091,7 @@ IF OBJECT_ID(N'dbo.booking_payments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.boo
 ) ALTER TABLE dbo.[booking_payments] ADD CONSTRAINT [DF_booking_payments_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.booking_payments') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[booking_payments] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[booking_payments] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[booking_payments] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -1104,7 +1104,7 @@ IF OBJECT_ID(N'dbo.booking_payments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.boo
 ) ALTER TABLE dbo.[booking_payments] ADD CONSTRAINT [DF_booking_payments_status] DEFAULT ('settled') FOR [status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.booking_payments') AND name=N'status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[booking_payments] SET [status]='settled' WHERE [status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[booking_payments] SET [status]=''settled'' WHERE [status] IS NULL;';
   ALTER TABLE dbo.[booking_payments] ALTER COLUMN [status] nvarchar(max) NOT NULL;
 END;
 
@@ -1127,7 +1127,7 @@ IF OBJECT_ID(N'dbo.booking_payments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.boo
 ) ALTER TABLE dbo.[booking_payments] ADD CONSTRAINT [DF_booking_payments_kind] DEFAULT ('payment') FOR [kind];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.booking_payments') AND name=N'kind' AND is_nullable=1) BEGIN
-  UPDATE dbo.[booking_payments] SET [kind]='payment' WHERE [kind] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[booking_payments] SET [kind]=''payment'' WHERE [kind] IS NULL;';
   ALTER TABLE dbo.[booking_payments] ALTER COLUMN [kind] nvarchar(max) NOT NULL;
 END;
 
@@ -1144,7 +1144,7 @@ IF OBJECT_ID(N'dbo.booking_payments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.boo
 ) ALTER TABLE dbo.[booking_payments] ADD CONSTRAINT [DF_booking_payments_change_given] DEFAULT (0) FOR [change_given];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.booking_payments') AND name=N'change_given' AND is_nullable=1) BEGIN
-  UPDATE dbo.[booking_payments] SET [change_given]=0 WHERE [change_given] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[booking_payments] SET [change_given]=0 WHERE [change_given] IS NULL;';
   ALTER TABLE dbo.[booking_payments] ALTER COLUMN [change_given] decimal(38,12) NOT NULL;
 END;
 
@@ -1220,7 +1220,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -1245,7 +1245,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_customer_name] DEFAULT ('') FOR [customer_name];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'customer_name' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [customer_name]='' WHERE [customer_name] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [customer_name]='''' WHERE [customer_name] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [customer_name] nvarchar(max) NOT NULL;
 END;
 
@@ -1258,7 +1258,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_customer_phone] DEFAULT ('') FOR [customer_phone];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'customer_phone' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [customer_phone]='' WHERE [customer_phone] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [customer_phone]='''' WHERE [customer_phone] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [customer_phone] nvarchar(max) NOT NULL;
 END;
 
@@ -1279,7 +1279,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_service_fee] DEFAULT (0) FOR [service_fee];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'service_fee' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [service_fee]=0 WHERE [service_fee] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [service_fee]=0 WHERE [service_fee] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [service_fee] decimal(38,12) NOT NULL;
 END;
 
@@ -1294,7 +1294,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_lines] DEFAULT (N'[]') FOR [lines];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'lines' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [lines]=N'[]' WHERE [lines] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [lines]=N''[]'' WHERE [lines] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [lines] nvarchar(max) NOT NULL;
 END;
 
@@ -1307,7 +1307,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_subtotal] DEFAULT (0) FOR [subtotal];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'subtotal' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [subtotal]=0 WHERE [subtotal] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [subtotal]=0 WHERE [subtotal] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [subtotal] decimal(38,12) NOT NULL;
 END;
 
@@ -1320,7 +1320,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_discount] DEFAULT (0) FOR [discount];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'discount' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [discount]=0 WHERE [discount] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [discount]=0 WHERE [discount] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [discount] decimal(38,12) NOT NULL;
 END;
 
@@ -1333,7 +1333,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_tax] DEFAULT (0) FOR [tax];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'tax' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [tax]=0 WHERE [tax] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [tax]=0 WHERE [tax] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [tax] decimal(38,12) NOT NULL;
 END;
 
@@ -1346,7 +1346,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_total] DEFAULT (0) FOR [total];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'total' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [total]=0 WHERE [total] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [total]=0 WHERE [total] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [total] decimal(38,12) NOT NULL;
 END;
 
@@ -1359,7 +1359,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_paid] DEFAULT (0) FOR [paid];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'paid' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [paid]=0 WHERE [paid] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [paid]=0 WHERE [paid] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [paid] decimal(38,12) NOT NULL;
 END;
 
@@ -1374,7 +1374,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_note] DEFAULT ('') FOR [note];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'note' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [note]='' WHERE [note] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [note]='''' WHERE [note] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [note] nvarchar(max) NOT NULL;
 END;
 
@@ -1389,7 +1389,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_status] DEFAULT ('active') FOR [status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [status]='active' WHERE [status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [status]=''active'' WHERE [status] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [status] nvarchar(max) NOT NULL;
 END;
 
@@ -1414,7 +1414,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_tension_unit] DEFAULT ('lb') FOR [tension_unit];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'tension_unit' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [tension_unit]='lb' WHERE [tension_unit] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [tension_unit]=''lb'' WHERE [tension_unit] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [tension_unit] nvarchar(max) NOT NULL;
 END;
 
@@ -1435,7 +1435,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_job_status] DEFAULT ('received') FOR [job_status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'job_status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [job_status]='received' WHERE [job_status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [job_status]=''received'' WHERE [job_status] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [job_status] nvarchar(max) NOT NULL;
 END;
 
@@ -1452,7 +1452,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_notify_whatsapp] DEFAULT (0) FOR [notify_whatsapp];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'notify_whatsapp' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [notify_whatsapp]=0 WHERE [notify_whatsapp] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [notify_whatsapp]=0 WHERE [notify_whatsapp] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [notify_whatsapp] bit NOT NULL;
 END;
 
@@ -1465,7 +1465,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -1478,7 +1478,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -1503,7 +1503,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_charges] DEFAULT (N'{}') FOR [charges];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'charges' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [charges]=N'{}' WHERE [charges] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [charges]=N''{}'' WHERE [charges] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [charges] nvarchar(max) NOT NULL;
 END;
 
@@ -1518,7 +1518,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_liability_accepted] DEFAULT (0) FOR [liability_accepted];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'liability_accepted' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [liability_accepted]=0 WHERE [liability_accepted] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [liability_accepted]=0 WHERE [liability_accepted] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [liability_accepted] bit NOT NULL;
 END;
 
@@ -1533,7 +1533,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
 ) ALTER TABLE dbo.[bookings] ADD CONSTRAINT [DF_bookings_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[bookings] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[bookings] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[bookings] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -1614,7 +1614,7 @@ IF OBJECT_ID(N'dbo.branch_telemetry', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bra
 ) ALTER TABLE dbo.[branch_telemetry] ADD CONSTRAINT [DF_branch_telemetry_db_mode] DEFAULT ('online') FOR [db_mode];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.branch_telemetry') AND name=N'db_mode' AND is_nullable=1) BEGIN
-  UPDATE dbo.[branch_telemetry] SET [db_mode]='online' WHERE [db_mode] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[branch_telemetry] SET [db_mode]=''online'' WHERE [db_mode] IS NULL;';
   ALTER TABLE dbo.[branch_telemetry] ALTER COLUMN [db_mode] nvarchar(max) NOT NULL;
 END;
 
@@ -1627,7 +1627,7 @@ IF OBJECT_ID(N'dbo.branch_telemetry', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bra
 ) ALTER TABLE dbo.[branch_telemetry] ADD CONSTRAINT [DF_branch_telemetry_connection_status] DEFAULT ('online') FOR [connection_status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.branch_telemetry') AND name=N'connection_status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[branch_telemetry] SET [connection_status]='online' WHERE [connection_status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[branch_telemetry] SET [connection_status]=''online'' WHERE [connection_status] IS NULL;';
   ALTER TABLE dbo.[branch_telemetry] ALTER COLUMN [connection_status] nvarchar(max) NOT NULL;
 END;
 
@@ -1640,7 +1640,7 @@ IF OBJECT_ID(N'dbo.branch_telemetry', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bra
 ) ALTER TABLE dbo.[branch_telemetry] ADD CONSTRAINT [DF_branch_telemetry_storage_engine] DEFAULT ('cloud') FOR [storage_engine];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.branch_telemetry') AND name=N'storage_engine' AND is_nullable=1) BEGIN
-  UPDATE dbo.[branch_telemetry] SET [storage_engine]='cloud' WHERE [storage_engine] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[branch_telemetry] SET [storage_engine]=''cloud'' WHERE [storage_engine] IS NULL;';
   ALTER TABLE dbo.[branch_telemetry] ALTER COLUMN [storage_engine] nvarchar(max) NOT NULL;
 END;
 
@@ -1653,7 +1653,7 @@ IF OBJECT_ID(N'dbo.branch_telemetry', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bra
 ) ALTER TABLE dbo.[branch_telemetry] ADD CONSTRAINT [DF_branch_telemetry_pending_count] DEFAULT (0) FOR [pending_count];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.branch_telemetry') AND name=N'pending_count' AND is_nullable=1) BEGIN
-  UPDATE dbo.[branch_telemetry] SET [pending_count]=0 WHERE [pending_count] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[branch_telemetry] SET [pending_count]=0 WHERE [pending_count] IS NULL;';
   ALTER TABLE dbo.[branch_telemetry] ALTER COLUMN [pending_count] int NOT NULL;
 END;
 
@@ -1666,7 +1666,7 @@ IF OBJECT_ID(N'dbo.branch_telemetry', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bra
 ) ALTER TABLE dbo.[branch_telemetry] ADD CONSTRAINT [DF_branch_telemetry_conflict_count] DEFAULT (0) FOR [conflict_count];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.branch_telemetry') AND name=N'conflict_count' AND is_nullable=1) BEGIN
-  UPDATE dbo.[branch_telemetry] SET [conflict_count]=0 WHERE [conflict_count] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[branch_telemetry] SET [conflict_count]=0 WHERE [conflict_count] IS NULL;';
   ALTER TABLE dbo.[branch_telemetry] ALTER COLUMN [conflict_count] int NOT NULL;
 END;
 
@@ -1685,7 +1685,7 @@ IF OBJECT_ID(N'dbo.branch_telemetry', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bra
 ) ALTER TABLE dbo.[branch_telemetry] ADD CONSTRAINT [DF_branch_telemetry_last_seen_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [last_seen_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.branch_telemetry') AND name=N'last_seen_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[branch_telemetry] SET [last_seen_at]=SYSDATETIMEOFFSET() WHERE [last_seen_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[branch_telemetry] SET [last_seen_at]=SYSDATETIMEOFFSET() WHERE [last_seen_at] IS NULL;';
   ALTER TABLE dbo.[branch_telemetry] ALTER COLUMN [last_seen_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -1698,7 +1698,7 @@ IF OBJECT_ID(N'dbo.branch_telemetry', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bra
 ) ALTER TABLE dbo.[branch_telemetry] ADD CONSTRAINT [DF_branch_telemetry_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.branch_telemetry') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[branch_telemetry] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[branch_telemetry] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[branch_telemetry] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -1711,7 +1711,7 @@ IF OBJECT_ID(N'dbo.branch_telemetry', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bra
 ) ALTER TABLE dbo.[branch_telemetry] ADD CONSTRAINT [DF_branch_telemetry_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.branch_telemetry') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[branch_telemetry] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[branch_telemetry] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[branch_telemetry] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -1746,7 +1746,7 @@ IF OBJECT_ID(N'dbo.branch_telemetry', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bra
 ) ALTER TABLE dbo.[branch_telemetry] ADD CONSTRAINT [DF_branch_telemetry_failed_count] DEFAULT (0) FOR [failed_count];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.branch_telemetry') AND name=N'failed_count' AND is_nullable=1) BEGIN
-  UPDATE dbo.[branch_telemetry] SET [failed_count]=0 WHERE [failed_count] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[branch_telemetry] SET [failed_count]=0 WHERE [failed_count] IS NULL;';
   ALTER TABLE dbo.[branch_telemetry] ALTER COLUMN [failed_count] int NOT NULL;
 END;
 
@@ -1792,7 +1792,7 @@ IF OBJECT_ID(N'dbo.cashiers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cashiers', 
 ) ALTER TABLE dbo.[cashiers] ADD CONSTRAINT [DF_cashiers_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.cashiers') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[cashiers] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[cashiers] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[cashiers] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -1809,7 +1809,7 @@ IF OBJECT_ID(N'dbo.cashiers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cashiers', 
 ) ALTER TABLE dbo.[cashiers] ADD CONSTRAINT [DF_cashiers_full_name] DEFAULT ('') FOR [full_name];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.cashiers') AND name=N'full_name' AND is_nullable=1) BEGIN
-  UPDATE dbo.[cashiers] SET [full_name]='' WHERE [full_name] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[cashiers] SET [full_name]='''' WHERE [full_name] IS NULL;';
   ALTER TABLE dbo.[cashiers] ALTER COLUMN [full_name] nvarchar(max) NOT NULL;
 END;
 
@@ -1828,7 +1828,7 @@ IF OBJECT_ID(N'dbo.cashiers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cashiers', 
 ) ALTER TABLE dbo.[cashiers] ADD CONSTRAINT [DF_cashiers_permissions] DEFAULT (N'{}') FOR [permissions];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.cashiers') AND name=N'permissions' AND is_nullable=1) BEGIN
-  UPDATE dbo.[cashiers] SET [permissions]=N'{}' WHERE [permissions] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[cashiers] SET [permissions]=N''{}'' WHERE [permissions] IS NULL;';
   ALTER TABLE dbo.[cashiers] ALTER COLUMN [permissions] nvarchar(max) NOT NULL;
 END;
 
@@ -1841,7 +1841,7 @@ IF OBJECT_ID(N'dbo.cashiers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cashiers', 
 ) ALTER TABLE dbo.[cashiers] ADD CONSTRAINT [DF_cashiers_is_active] DEFAULT (1) FOR [is_active];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.cashiers') AND name=N'is_active' AND is_nullable=1) BEGIN
-  UPDATE dbo.[cashiers] SET [is_active]=1 WHERE [is_active] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[cashiers] SET [is_active]=1 WHERE [is_active] IS NULL;';
   ALTER TABLE dbo.[cashiers] ALTER COLUMN [is_active] bit NOT NULL;
 END;
 
@@ -1856,7 +1856,7 @@ IF OBJECT_ID(N'dbo.cashiers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cashiers', 
 ) ALTER TABLE dbo.[cashiers] ADD CONSTRAINT [DF_cashiers_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.cashiers') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[cashiers] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[cashiers] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[cashiers] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -1869,7 +1869,7 @@ IF OBJECT_ID(N'dbo.cashiers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cashiers', 
 ) ALTER TABLE dbo.[cashiers] ADD CONSTRAINT [DF_cashiers_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.cashiers') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[cashiers] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[cashiers] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[cashiers] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -1912,7 +1912,7 @@ IF OBJECT_ID(N'dbo.coupon_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.coupon
 ) ALTER TABLE dbo.[coupon_events] ADD CONSTRAINT [DF_coupon_events_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.coupon_events') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[coupon_events] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[coupon_events] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[coupon_events] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -1957,7 +1957,7 @@ IF OBJECT_ID(N'dbo.coupon_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.coupon
 ) ALTER TABLE dbo.[coupon_events] ADD CONSTRAINT [DF_coupon_events_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.coupon_events') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[coupon_events] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[coupon_events] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[coupon_events] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -1991,7 +1991,7 @@ IF OBJECT_ID(N'dbo.drawer_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.drawer
 ) ALTER TABLE dbo.[drawer_events] ADD CONSTRAINT [DF_drawer_events_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.drawer_events') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[drawer_events] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[drawer_events] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[drawer_events] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -2026,7 +2026,7 @@ IF OBJECT_ID(N'dbo.drawer_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.drawer
 ) ALTER TABLE dbo.[drawer_events] ADD CONSTRAINT [DF_drawer_events_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.drawer_events') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[drawer_events] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[drawer_events] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[drawer_events] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -2070,7 +2070,7 @@ IF OBJECT_ID(N'dbo.held_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.held_ord
 ) ALTER TABLE dbo.[held_orders] ADD CONSTRAINT [DF_held_orders_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.held_orders') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[held_orders] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[held_orders] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[held_orders] ALTER COLUMN [id] nvarchar(450) NOT NULL;
 END;
 
@@ -2085,7 +2085,7 @@ IF OBJECT_ID(N'dbo.held_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.held_ord
 ) ALTER TABLE dbo.[held_orders] ADD CONSTRAINT [DF_held_orders_label] DEFAULT ('') FOR [label];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.held_orders') AND name=N'label' AND is_nullable=1) BEGIN
-  UPDATE dbo.[held_orders] SET [label]='' WHERE [label] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[held_orders] SET [label]='''' WHERE [label] IS NULL;';
   ALTER TABLE dbo.[held_orders] ALTER COLUMN [label] nvarchar(max) NOT NULL;
 END;
 
@@ -2106,7 +2106,7 @@ IF OBJECT_ID(N'dbo.held_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.held_ord
 ) ALTER TABLE dbo.[held_orders] ADD CONSTRAINT [DF_held_orders_total] DEFAULT (0) FOR [total];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.held_orders') AND name=N'total' AND is_nullable=1) BEGIN
-  UPDATE dbo.[held_orders] SET [total]=0 WHERE [total] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[held_orders] SET [total]=0 WHERE [total] IS NULL;';
   ALTER TABLE dbo.[held_orders] ALTER COLUMN [total] decimal(38,12) NOT NULL;
 END;
 
@@ -2119,7 +2119,7 @@ IF OBJECT_ID(N'dbo.held_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.held_ord
 ) ALTER TABLE dbo.[held_orders] ADD CONSTRAINT [DF_held_orders_lines] DEFAULT (N'[]') FOR [lines];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.held_orders') AND name=N'lines' AND is_nullable=1) BEGIN
-  UPDATE dbo.[held_orders] SET [lines]=N'[]' WHERE [lines] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[held_orders] SET [lines]=N''[]'' WHERE [lines] IS NULL;';
   ALTER TABLE dbo.[held_orders] ALTER COLUMN [lines] nvarchar(max) NOT NULL;
 END;
 
@@ -2132,7 +2132,7 @@ IF OBJECT_ID(N'dbo.held_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.held_ord
 ) ALTER TABLE dbo.[held_orders] ADD CONSTRAINT [DF_held_orders_cart_discount] DEFAULT (0) FOR [cart_discount];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.held_orders') AND name=N'cart_discount' AND is_nullable=1) BEGIN
-  UPDATE dbo.[held_orders] SET [cart_discount]=0 WHERE [cart_discount] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[held_orders] SET [cart_discount]=0 WHERE [cart_discount] IS NULL;';
   ALTER TABLE dbo.[held_orders] ALTER COLUMN [cart_discount] decimal(38,12) NOT NULL;
 END;
 
@@ -2145,7 +2145,7 @@ IF OBJECT_ID(N'dbo.held_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.held_ord
 ) ALTER TABLE dbo.[held_orders] ADD CONSTRAINT [DF_held_orders_cart_discount_type] DEFAULT ('amount') FOR [cart_discount_type];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.held_orders') AND name=N'cart_discount_type' AND is_nullable=1) BEGIN
-  UPDATE dbo.[held_orders] SET [cart_discount_type]='amount' WHERE [cart_discount_type] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[held_orders] SET [cart_discount_type]=''amount'' WHERE [cart_discount_type] IS NULL;';
   ALTER TABLE dbo.[held_orders] ALTER COLUMN [cart_discount_type] nvarchar(max) NOT NULL;
 END;
 
@@ -2166,7 +2166,7 @@ IF OBJECT_ID(N'dbo.held_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.held_ord
 ) ALTER TABLE dbo.[held_orders] ADD CONSTRAINT [DF_held_orders_note] DEFAULT ('') FOR [note];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.held_orders') AND name=N'note' AND is_nullable=1) BEGIN
-  UPDATE dbo.[held_orders] SET [note]='' WHERE [note] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[held_orders] SET [note]='''' WHERE [note] IS NULL;';
   ALTER TABLE dbo.[held_orders] ALTER COLUMN [note] nvarchar(max) NOT NULL;
 END;
 
@@ -2181,7 +2181,7 @@ IF OBJECT_ID(N'dbo.held_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.held_ord
 ) ALTER TABLE dbo.[held_orders] ADD CONSTRAINT [DF_held_orders_held_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [held_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.held_orders') AND name=N'held_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[held_orders] SET [held_at]=SYSDATETIMEOFFSET() WHERE [held_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[held_orders] SET [held_at]=SYSDATETIMEOFFSET() WHERE [held_at] IS NULL;';
   ALTER TABLE dbo.[held_orders] ALTER COLUMN [held_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -2194,7 +2194,7 @@ IF OBJECT_ID(N'dbo.held_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.held_ord
 ) ALTER TABLE dbo.[held_orders] ADD CONSTRAINT [DF_held_orders_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.held_orders') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[held_orders] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[held_orders] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[held_orders] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -2207,7 +2207,7 @@ IF OBJECT_ID(N'dbo.held_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.held_ord
 ) ALTER TABLE dbo.[held_orders] ADD CONSTRAINT [DF_held_orders_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.held_orders') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[held_orders] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[held_orders] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[held_orders] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -2222,7 +2222,7 @@ IF OBJECT_ID(N'dbo.held_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.held_ord
 ) ALTER TABLE dbo.[held_orders] ADD CONSTRAINT [DF_held_orders_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.held_orders') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[held_orders] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[held_orders] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[held_orders] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -2235,7 +2235,7 @@ IF OBJECT_ID(N'dbo.held_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.held_ord
 ) ALTER TABLE dbo.[held_orders] ADD CONSTRAINT [DF_held_orders_status] DEFAULT ('held') FOR [status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.held_orders') AND name=N'status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[held_orders] SET [status]='held' WHERE [status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[held_orders] SET [status]=''held'' WHERE [status] IS NULL;';
   ALTER TABLE dbo.[held_orders] ALTER COLUMN [status] nvarchar(max) NOT NULL;
 END;
 
@@ -2271,7 +2271,7 @@ IF OBJECT_ID(N'dbo.integration_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[integration_settings] ADD CONSTRAINT [DF_integration_settings_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.integration_settings') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[integration_settings] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[integration_settings] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[integration_settings] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -2290,7 +2290,7 @@ IF OBJECT_ID(N'dbo.integration_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[integration_settings] ADD CONSTRAINT [DF_integration_settings_api_keys_encrypted] DEFAULT (N'{}') FOR [api_keys_encrypted];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.integration_settings') AND name=N'api_keys_encrypted' AND is_nullable=1) BEGIN
-  UPDATE dbo.[integration_settings] SET [api_keys_encrypted]=N'{}' WHERE [api_keys_encrypted] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[integration_settings] SET [api_keys_encrypted]=N''{}'' WHERE [api_keys_encrypted] IS NULL;';
   ALTER TABLE dbo.[integration_settings] ALTER COLUMN [api_keys_encrypted] nvarchar(max) NOT NULL;
 END;
 
@@ -2303,7 +2303,7 @@ IF OBJECT_ID(N'dbo.integration_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[integration_settings] ADD CONSTRAINT [DF_integration_settings_verification_channel] DEFAULT ('whatsapp') FOR [verification_channel];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.integration_settings') AND name=N'verification_channel' AND is_nullable=1) BEGIN
-  UPDATE dbo.[integration_settings] SET [verification_channel]='whatsapp' WHERE [verification_channel] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[integration_settings] SET [verification_channel]=''whatsapp'' WHERE [verification_channel] IS NULL;';
   ALTER TABLE dbo.[integration_settings] ALTER COLUMN [verification_channel] nvarchar(max) NOT NULL;
 END;
 
@@ -2316,7 +2316,7 @@ IF OBJECT_ID(N'dbo.integration_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[integration_settings] ADD CONSTRAINT [DF_integration_settings_strict_verification] DEFAULT (0) FOR [strict_verification];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.integration_settings') AND name=N'strict_verification' AND is_nullable=1) BEGIN
-  UPDATE dbo.[integration_settings] SET [strict_verification]=0 WHERE [strict_verification] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[integration_settings] SET [strict_verification]=0 WHERE [strict_verification] IS NULL;';
   ALTER TABLE dbo.[integration_settings] ALTER COLUMN [strict_verification] bit NOT NULL;
 END;
 
@@ -2329,7 +2329,7 @@ IF OBJECT_ID(N'dbo.integration_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[integration_settings] ADD CONSTRAINT [DF_integration_settings_is_active] DEFAULT (1) FOR [is_active];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.integration_settings') AND name=N'is_active' AND is_nullable=1) BEGIN
-  UPDATE dbo.[integration_settings] SET [is_active]=1 WHERE [is_active] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[integration_settings] SET [is_active]=1 WHERE [is_active] IS NULL;';
   ALTER TABLE dbo.[integration_settings] ALTER COLUMN [is_active] bit NOT NULL;
 END;
 
@@ -2344,7 +2344,7 @@ IF OBJECT_ID(N'dbo.integration_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[integration_settings] ADD CONSTRAINT [DF_integration_settings_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.integration_settings') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[integration_settings] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[integration_settings] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[integration_settings] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -2357,7 +2357,7 @@ IF OBJECT_ID(N'dbo.integration_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[integration_settings] ADD CONSTRAINT [DF_integration_settings_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.integration_settings') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[integration_settings] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[integration_settings] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[integration_settings] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -2403,7 +2403,7 @@ IF OBJECT_ID(N'dbo.item_activity_logs', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.i
 ) ALTER TABLE dbo.[item_activity_logs] ADD CONSTRAINT [DF_item_activity_logs_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.item_activity_logs') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[item_activity_logs] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[item_activity_logs] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[item_activity_logs] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -2438,7 +2438,7 @@ IF OBJECT_ID(N'dbo.item_activity_logs', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.i
 ) ALTER TABLE dbo.[item_activity_logs] ADD CONSTRAINT [DF_item_activity_logs_quantity_delta] DEFAULT (0) FOR [quantity_delta];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.item_activity_logs') AND name=N'quantity_delta' AND is_nullable=1) BEGIN
-  UPDATE dbo.[item_activity_logs] SET [quantity_delta]=0 WHERE [quantity_delta] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[item_activity_logs] SET [quantity_delta]=0 WHERE [quantity_delta] IS NULL;';
   ALTER TABLE dbo.[item_activity_logs] ALTER COLUMN [quantity_delta] int NOT NULL;
 END;
 
@@ -2455,7 +2455,7 @@ IF OBJECT_ID(N'dbo.item_activity_logs', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.i
 ) ALTER TABLE dbo.[item_activity_logs] ADD CONSTRAINT [DF_item_activity_logs_unit_cost] DEFAULT (0) FOR [unit_cost];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.item_activity_logs') AND name=N'unit_cost' AND is_nullable=1) BEGIN
-  UPDATE dbo.[item_activity_logs] SET [unit_cost]=0 WHERE [unit_cost] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[item_activity_logs] SET [unit_cost]=0 WHERE [unit_cost] IS NULL;';
   ALTER TABLE dbo.[item_activity_logs] ALTER COLUMN [unit_cost] decimal(38,12) NOT NULL;
 END;
 
@@ -2474,7 +2474,7 @@ IF OBJECT_ID(N'dbo.item_activity_logs', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.i
 ) ALTER TABLE dbo.[item_activity_logs] ADD CONSTRAINT [DF_item_activity_logs_note] DEFAULT ('') FOR [note];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.item_activity_logs') AND name=N'note' AND is_nullable=1) BEGIN
-  UPDATE dbo.[item_activity_logs] SET [note]='' WHERE [note] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[item_activity_logs] SET [note]='''' WHERE [note] IS NULL;';
   ALTER TABLE dbo.[item_activity_logs] ALTER COLUMN [note] nvarchar(max) NOT NULL;
 END;
 
@@ -2487,7 +2487,7 @@ IF OBJECT_ID(N'dbo.item_activity_logs', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.i
 ) ALTER TABLE dbo.[item_activity_logs] ADD CONSTRAINT [DF_item_activity_logs_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.item_activity_logs') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[item_activity_logs] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[item_activity_logs] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[item_activity_logs] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -2500,7 +2500,7 @@ IF OBJECT_ID(N'dbo.item_activity_logs', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.i
 ) ALTER TABLE dbo.[item_activity_logs] ADD CONSTRAINT [DF_item_activity_logs_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.item_activity_logs') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[item_activity_logs] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[item_activity_logs] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[item_activity_logs] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -2536,7 +2536,7 @@ IF OBJECT_ID(N'dbo.member_verifications', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[member_verifications] ADD CONSTRAINT [DF_member_verifications_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.member_verifications') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[member_verifications] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[member_verifications] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[member_verifications] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -2559,7 +2559,7 @@ IF OBJECT_ID(N'dbo.member_verifications', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[member_verifications] ADD CONSTRAINT [DF_member_verifications_channel] DEFAULT ('whatsapp') FOR [channel];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.member_verifications') AND name=N'channel' AND is_nullable=1) BEGIN
-  UPDATE dbo.[member_verifications] SET [channel]='whatsapp' WHERE [channel] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[member_verifications] SET [channel]=''whatsapp'' WHERE [channel] IS NULL;';
   ALTER TABLE dbo.[member_verifications] ALTER COLUMN [channel] nvarchar(max) NOT NULL;
 END;
 
@@ -2574,7 +2574,7 @@ IF OBJECT_ID(N'dbo.member_verifications', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[member_verifications] ADD CONSTRAINT [DF_member_verifications_attempts] DEFAULT (0) FOR [attempts];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.member_verifications') AND name=N'attempts' AND is_nullable=1) BEGIN
-  UPDATE dbo.[member_verifications] SET [attempts]=0 WHERE [attempts] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[member_verifications] SET [attempts]=0 WHERE [attempts] IS NULL;';
   ALTER TABLE dbo.[member_verifications] ALTER COLUMN [attempts] int NOT NULL;
 END;
 
@@ -2587,7 +2587,7 @@ IF OBJECT_ID(N'dbo.member_verifications', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[member_verifications] ADD CONSTRAINT [DF_member_verifications_status] DEFAULT ('pending') FOR [status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.member_verifications') AND name=N'status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[member_verifications] SET [status]='pending' WHERE [status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[member_verifications] SET [status]=''pending'' WHERE [status] IS NULL;';
   ALTER TABLE dbo.[member_verifications] ALTER COLUMN [status] nvarchar(max) NOT NULL;
 END;
 
@@ -2610,7 +2610,7 @@ IF OBJECT_ID(N'dbo.member_verifications', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[member_verifications] ADD CONSTRAINT [DF_member_verifications_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.member_verifications') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[member_verifications] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[member_verifications] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[member_verifications] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -2649,7 +2649,7 @@ IF OBJECT_ID(N'dbo.members', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.members', N'
 ) ALTER TABLE dbo.[members] ADD CONSTRAINT [DF_members_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.members') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[members] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[members] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[members] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -2684,7 +2684,7 @@ IF OBJECT_ID(N'dbo.members', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.members', N'
 ) ALTER TABLE dbo.[members] ADD CONSTRAINT [DF_members_loyalty_points] DEFAULT (0) FOR [loyalty_points];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.members') AND name=N'loyalty_points' AND is_nullable=1) BEGIN
-  UPDATE dbo.[members] SET [loyalty_points]=0 WHERE [loyalty_points] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[members] SET [loyalty_points]=0 WHERE [loyalty_points] IS NULL;';
   ALTER TABLE dbo.[members] ALTER COLUMN [loyalty_points] decimal(38,12) NOT NULL;
 END;
 
@@ -2697,7 +2697,7 @@ IF OBJECT_ID(N'dbo.members', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.members', N'
 ) ALTER TABLE dbo.[members] ADD CONSTRAINT [DF_members_total_spent] DEFAULT (0) FOR [total_spent];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.members') AND name=N'total_spent' AND is_nullable=1) BEGIN
-  UPDATE dbo.[members] SET [total_spent]=0 WHERE [total_spent] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[members] SET [total_spent]=0 WHERE [total_spent] IS NULL;';
   ALTER TABLE dbo.[members] ALTER COLUMN [total_spent] decimal(38,12) NOT NULL;
 END;
 
@@ -2710,7 +2710,7 @@ IF OBJECT_ID(N'dbo.members', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.members', N'
 ) ALTER TABLE dbo.[members] ADD CONSTRAINT [DF_members_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.members') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[members] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[members] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[members] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -2723,7 +2723,7 @@ IF OBJECT_ID(N'dbo.members', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.members', N'
 ) ALTER TABLE dbo.[members] ADD CONSTRAINT [DF_members_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.members') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[members] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[members] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[members] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -2738,7 +2738,7 @@ IF OBJECT_ID(N'dbo.members', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.members', N'
 ) ALTER TABLE dbo.[members] ADD CONSTRAINT [DF_members_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.members') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[members] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[members] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[members] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -2751,7 +2751,7 @@ IF OBJECT_ID(N'dbo.members', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.members', N'
 ) ALTER TABLE dbo.[members] ADD CONSTRAINT [DF_members_is_verified] DEFAULT (0) FOR [is_verified];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.members') AND name=N'is_verified' AND is_nullable=1) BEGIN
-  UPDATE dbo.[members] SET [is_verified]=0 WHERE [is_verified] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[members] SET [is_verified]=0 WHERE [is_verified] IS NULL;';
   ALTER TABLE dbo.[members] ALTER COLUMN [is_verified] bit NOT NULL;
 END;
 
@@ -2789,7 +2789,7 @@ IF OBJECT_ID(N'dbo.membership_tiers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.mem
 ) ALTER TABLE dbo.[membership_tiers] ADD CONSTRAINT [DF_membership_tiers_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.membership_tiers') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[membership_tiers] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[membership_tiers] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[membership_tiers] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -2808,7 +2808,7 @@ IF OBJECT_ID(N'dbo.membership_tiers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.mem
 ) ALTER TABLE dbo.[membership_tiers] ADD CONSTRAINT [DF_membership_tiers_discount_percentage] DEFAULT (0) FOR [discount_percentage];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.membership_tiers') AND name=N'discount_percentage' AND is_nullable=1) BEGIN
-  UPDATE dbo.[membership_tiers] SET [discount_percentage]=0 WHERE [discount_percentage] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[membership_tiers] SET [discount_percentage]=0 WHERE [discount_percentage] IS NULL;';
   ALTER TABLE dbo.[membership_tiers] ALTER COLUMN [discount_percentage] decimal(38,12) NOT NULL;
 END;
 
@@ -2821,7 +2821,7 @@ IF OBJECT_ID(N'dbo.membership_tiers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.mem
 ) ALTER TABLE dbo.[membership_tiers] ADD CONSTRAINT [DF_membership_tiers_points_multiplier] DEFAULT (1.0) FOR [points_multiplier];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.membership_tiers') AND name=N'points_multiplier' AND is_nullable=1) BEGIN
-  UPDATE dbo.[membership_tiers] SET [points_multiplier]=1.0 WHERE [points_multiplier] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[membership_tiers] SET [points_multiplier]=1.0 WHERE [points_multiplier] IS NULL;';
   ALTER TABLE dbo.[membership_tiers] ALTER COLUMN [points_multiplier] decimal(38,12) NOT NULL;
 END;
 
@@ -2834,7 +2834,7 @@ IF OBJECT_ID(N'dbo.membership_tiers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.mem
 ) ALTER TABLE dbo.[membership_tiers] ADD CONSTRAINT [DF_membership_tiers_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.membership_tiers') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[membership_tiers] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[membership_tiers] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[membership_tiers] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -2847,7 +2847,7 @@ IF OBJECT_ID(N'dbo.membership_tiers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.mem
 ) ALTER TABLE dbo.[membership_tiers] ADD CONSTRAINT [DF_membership_tiers_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.membership_tiers') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[membership_tiers] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[membership_tiers] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[membership_tiers] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -2862,7 +2862,7 @@ IF OBJECT_ID(N'dbo.membership_tiers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.mem
 ) ALTER TABLE dbo.[membership_tiers] ADD CONSTRAINT [DF_membership_tiers_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.membership_tiers') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[membership_tiers] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[membership_tiers] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[membership_tiers] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -2899,7 +2899,7 @@ IF OBJECT_ID(N'dbo.offline_sync_audit_log', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[offline_sync_audit_log] ADD CONSTRAINT [DF_offline_sync_audit_log_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.offline_sync_audit_log') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[offline_sync_audit_log] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[offline_sync_audit_log] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[offline_sync_audit_log] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -2926,7 +2926,7 @@ IF OBJECT_ID(N'dbo.offline_sync_audit_log', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[offline_sync_audit_log] ADD CONSTRAINT [DF_offline_sync_audit_log_records] DEFAULT (0) FOR [records];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.offline_sync_audit_log') AND name=N'records' AND is_nullable=1) BEGIN
-  UPDATE dbo.[offline_sync_audit_log] SET [records]=0 WHERE [records] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[offline_sync_audit_log] SET [records]=0 WHERE [records] IS NULL;';
   ALTER TABLE dbo.[offline_sync_audit_log] ALTER COLUMN [records] int NOT NULL;
 END;
 
@@ -2939,7 +2939,7 @@ IF OBJECT_ID(N'dbo.offline_sync_audit_log', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[offline_sync_audit_log] ADD CONSTRAINT [DF_offline_sync_audit_log_status] DEFAULT ('ok') FOR [status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.offline_sync_audit_log') AND name=N'status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[offline_sync_audit_log] SET [status]='ok' WHERE [status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[offline_sync_audit_log] SET [status]=''ok'' WHERE [status] IS NULL;';
   ALTER TABLE dbo.[offline_sync_audit_log] ALTER COLUMN [status] nvarchar(max) NOT NULL;
 END;
 
@@ -2954,7 +2954,7 @@ IF OBJECT_ID(N'dbo.offline_sync_audit_log', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[offline_sync_audit_log] ADD CONSTRAINT [DF_offline_sync_audit_log_started_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [started_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.offline_sync_audit_log') AND name=N'started_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[offline_sync_audit_log] SET [started_at]=SYSDATETIMEOFFSET() WHERE [started_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[offline_sync_audit_log] SET [started_at]=SYSDATETIMEOFFSET() WHERE [started_at] IS NULL;';
   ALTER TABLE dbo.[offline_sync_audit_log] ALTER COLUMN [started_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -2969,7 +2969,7 @@ IF OBJECT_ID(N'dbo.offline_sync_audit_log', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[offline_sync_audit_log] ADD CONSTRAINT [DF_offline_sync_audit_log_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.offline_sync_audit_log') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[offline_sync_audit_log] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[offline_sync_audit_log] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[offline_sync_audit_log] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -3014,7 +3014,7 @@ IF OBJECT_ID(N'dbo.payment_transactions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[payment_transactions] ADD CONSTRAINT [DF_payment_transactions_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_transactions') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_transactions] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_transactions] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -3051,7 +3051,7 @@ IF OBJECT_ID(N'dbo.payment_transactions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[payment_transactions] ADD CONSTRAINT [DF_payment_transactions_amount] DEFAULT (0) FOR [amount];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_transactions') AND name=N'amount' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_transactions] SET [amount]=0 WHERE [amount] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_transactions] SET [amount]=0 WHERE [amount] IS NULL;';
   ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [amount] decimal(38,12) NOT NULL;
 END;
 
@@ -3064,7 +3064,7 @@ IF OBJECT_ID(N'dbo.payment_transactions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[payment_transactions] ADD CONSTRAINT [DF_payment_transactions_method] DEFAULT ('cash') FOR [method];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_transactions') AND name=N'method' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_transactions] SET [method]='cash' WHERE [method] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_transactions] SET [method]=''cash'' WHERE [method] IS NULL;';
   ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [method] nvarchar(max) NOT NULL;
 END;
 
@@ -3077,7 +3077,7 @@ IF OBJECT_ID(N'dbo.payment_transactions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[payment_transactions] ADD CONSTRAINT [DF_payment_transactions_kind] DEFAULT ('payment') FOR [kind];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_transactions') AND name=N'kind' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_transactions] SET [kind]='payment' WHERE [kind] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_transactions] SET [kind]=''payment'' WHERE [kind] IS NULL;';
   ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [kind] nvarchar(max) NOT NULL;
 END;
 
@@ -3096,7 +3096,7 @@ IF OBJECT_ID(N'dbo.payment_transactions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[payment_transactions] ADD CONSTRAINT [DF_payment_transactions_note] DEFAULT ('') FOR [note];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_transactions') AND name=N'note' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_transactions] SET [note]='' WHERE [note] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_transactions] SET [note]='''' WHERE [note] IS NULL;';
   ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [note] nvarchar(max) NOT NULL;
 END;
 
@@ -3109,7 +3109,7 @@ IF OBJECT_ID(N'dbo.payment_transactions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[payment_transactions] ADD CONSTRAINT [DF_payment_transactions_paid_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [paid_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_transactions') AND name=N'paid_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_transactions] SET [paid_at]=SYSDATETIMEOFFSET() WHERE [paid_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_transactions] SET [paid_at]=SYSDATETIMEOFFSET() WHERE [paid_at] IS NULL;';
   ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [paid_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -3122,7 +3122,7 @@ IF OBJECT_ID(N'dbo.payment_transactions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[payment_transactions] ADD CONSTRAINT [DF_payment_transactions_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_transactions') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_transactions] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_transactions] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -3135,7 +3135,7 @@ IF OBJECT_ID(N'dbo.payment_transactions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[payment_transactions] ADD CONSTRAINT [DF_payment_transactions_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_transactions') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_transactions] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_transactions] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -3150,7 +3150,7 @@ IF OBJECT_ID(N'dbo.payment_transactions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[payment_transactions] ADD CONSTRAINT [DF_payment_transactions_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_transactions') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_transactions] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_transactions] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -3208,7 +3208,7 @@ IF OBJECT_ID(N'dbo.payment_types', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.paymen
 ) ALTER TABLE dbo.[payment_types] ADD CONSTRAINT [DF_payment_types_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_types') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_types] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_types] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[payment_types] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -3229,7 +3229,7 @@ IF OBJECT_ID(N'dbo.payment_types', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.paymen
 ) ALTER TABLE dbo.[payment_types] ADD CONSTRAINT [DF_payment_types_requires_reference] DEFAULT (0) FOR [requires_reference];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_types') AND name=N'requires_reference' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_types] SET [requires_reference]=0 WHERE [requires_reference] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_types] SET [requires_reference]=0 WHERE [requires_reference] IS NULL;';
   ALTER TABLE dbo.[payment_types] ALTER COLUMN [requires_reference] bit NOT NULL;
 END;
 
@@ -3242,7 +3242,7 @@ IF OBJECT_ID(N'dbo.payment_types', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.paymen
 ) ALTER TABLE dbo.[payment_types] ADD CONSTRAINT [DF_payment_types_is_active] DEFAULT (1) FOR [is_active];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_types') AND name=N'is_active' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_types] SET [is_active]=1 WHERE [is_active] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_types] SET [is_active]=1 WHERE [is_active] IS NULL;';
   ALTER TABLE dbo.[payment_types] ALTER COLUMN [is_active] bit NOT NULL;
 END;
 
@@ -3255,7 +3255,7 @@ IF OBJECT_ID(N'dbo.payment_types', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.paymen
 ) ALTER TABLE dbo.[payment_types] ADD CONSTRAINT [DF_payment_types_icon] DEFAULT ('Wallet') FOR [icon];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_types') AND name=N'icon' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_types] SET [icon]='Wallet' WHERE [icon] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_types] SET [icon]=''Wallet'' WHERE [icon] IS NULL;';
   ALTER TABLE dbo.[payment_types] ALTER COLUMN [icon] nvarchar(max) NOT NULL;
 END;
 
@@ -3268,7 +3268,7 @@ IF OBJECT_ID(N'dbo.payment_types', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.paymen
 ) ALTER TABLE dbo.[payment_types] ADD CONSTRAINT [DF_payment_types_sort_order] DEFAULT (0) FOR [sort_order];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_types') AND name=N'sort_order' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_types] SET [sort_order]=0 WHERE [sort_order] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_types] SET [sort_order]=0 WHERE [sort_order] IS NULL;';
   ALTER TABLE dbo.[payment_types] ALTER COLUMN [sort_order] int NOT NULL;
 END;
 
@@ -3281,7 +3281,7 @@ IF OBJECT_ID(N'dbo.payment_types', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.paymen
 ) ALTER TABLE dbo.[payment_types] ADD CONSTRAINT [DF_payment_types_is_system] DEFAULT (0) FOR [is_system];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_types') AND name=N'is_system' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_types] SET [is_system]=0 WHERE [is_system] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_types] SET [is_system]=0 WHERE [is_system] IS NULL;';
   ALTER TABLE dbo.[payment_types] ALTER COLUMN [is_system] bit NOT NULL;
 END;
 
@@ -3294,7 +3294,7 @@ IF OBJECT_ID(N'dbo.payment_types', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.paymen
 ) ALTER TABLE dbo.[payment_types] ADD CONSTRAINT [DF_payment_types_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_types') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_types] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_types] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[payment_types] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -3307,7 +3307,7 @@ IF OBJECT_ID(N'dbo.payment_types', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.paymen
 ) ALTER TABLE dbo.[payment_types] ADD CONSTRAINT [DF_payment_types_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_types') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_types] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_types] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[payment_types] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -3322,7 +3322,7 @@ IF OBJECT_ID(N'dbo.payment_types', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.paymen
 ) ALTER TABLE dbo.[payment_types] ADD CONSTRAINT [DF_payment_types_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.payment_types') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[payment_types] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[payment_types] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[payment_types] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -3357,7 +3357,7 @@ IF OBJECT_ID(N'dbo.pin_attempts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pin_att
 ) ALTER TABLE dbo.[pin_attempts] ADD CONSTRAINT [DF_pin_attempts_attempts] DEFAULT (0) FOR [attempts];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pin_attempts') AND name=N'attempts' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pin_attempts] SET [attempts]=0 WHERE [attempts] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pin_attempts] SET [attempts]=0 WHERE [attempts] IS NULL;';
   ALTER TABLE dbo.[pin_attempts] ALTER COLUMN [attempts] int NOT NULL;
 END;
 
@@ -3370,7 +3370,7 @@ IF OBJECT_ID(N'dbo.pin_attempts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pin_att
 ) ALTER TABLE dbo.[pin_attempts] ADD CONSTRAINT [DF_pin_attempts_window_started_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [window_started_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pin_attempts') AND name=N'window_started_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pin_attempts] SET [window_started_at]=SYSDATETIMEOFFSET() WHERE [window_started_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pin_attempts] SET [window_started_at]=SYSDATETIMEOFFSET() WHERE [window_started_at] IS NULL;';
   ALTER TABLE dbo.[pin_attempts] ALTER COLUMN [window_started_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -3385,7 +3385,7 @@ IF OBJECT_ID(N'dbo.pin_attempts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pin_att
 ) ALTER TABLE dbo.[pin_attempts] ADD CONSTRAINT [DF_pin_attempts_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pin_attempts') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pin_attempts] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pin_attempts] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[pin_attempts] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -3398,7 +3398,7 @@ IF OBJECT_ID(N'dbo.pin_attempts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pin_att
 ) ALTER TABLE dbo.[pin_attempts] ADD CONSTRAINT [DF_pin_attempts_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pin_attempts') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pin_attempts] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pin_attempts] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[pin_attempts] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -3463,7 +3463,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_id] DEFAULT (1) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [id]=1 WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [id]=1 WHERE [id] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [id] int NOT NULL;
 END;
 
@@ -3478,7 +3478,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_tax_percentage] DEFAULT (0) FOR [tax_percentage];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'tax_percentage' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [tax_percentage]=0 WHERE [tax_percentage] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [tax_percentage]=0 WHERE [tax_percentage] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [tax_percentage] decimal(38,12) NOT NULL;
 END;
 
@@ -3491,7 +3491,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_enable_tax] DEFAULT (1) FOR [enable_tax];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'enable_tax' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [enable_tax]=1 WHERE [enable_tax] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [enable_tax]=1 WHERE [enable_tax] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [enable_tax] bit NOT NULL;
 END;
 
@@ -3504,7 +3504,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_tax_mode] DEFAULT ('exclusive') FOR [tax_mode];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'tax_mode' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [tax_mode]='exclusive' WHERE [tax_mode] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [tax_mode]=''exclusive'' WHERE [tax_mode] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [tax_mode] nvarchar(max) NOT NULL;
 END;
 
@@ -3517,7 +3517,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_paper_size] DEFAULT ('80mm') FOR [paper_size];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'paper_size' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [paper_size]='80mm' WHERE [paper_size] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [paper_size]=''80mm'' WHERE [paper_size] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [paper_size] nvarchar(max) NOT NULL;
 END;
 
@@ -3534,7 +3534,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_show_logo] DEFAULT (1) FOR [show_logo];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'show_logo' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [show_logo]=1 WHERE [show_logo] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [show_logo]=1 WHERE [show_logo] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [show_logo] bit NOT NULL;
 END;
 
@@ -3547,7 +3547,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_show_points] DEFAULT (1) FOR [show_points];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'show_points' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [show_points]=1 WHERE [show_points] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [show_points]=1 WHERE [show_points] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [show_points] bit NOT NULL;
 END;
 
@@ -3560,7 +3560,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_show_barcode] DEFAULT (1) FOR [show_barcode];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'show_barcode' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [show_barcode]=1 WHERE [show_barcode] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [show_barcode]=1 WHERE [show_barcode] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [show_barcode] bit NOT NULL;
 END;
 
@@ -3573,7 +3573,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_show_tax_details] DEFAULT (1) FOR [show_tax_details];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'show_tax_details' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [show_tax_details]=1 WHERE [show_tax_details] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [show_tax_details]=1 WHERE [show_tax_details] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [show_tax_details] bit NOT NULL;
 END;
 
@@ -3586,7 +3586,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -3601,7 +3601,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_company_name] DEFAULT ('RETAIL') FOR [company_name];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'company_name' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [company_name]='RETAIL' WHERE [company_name] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [company_name]=''RETAIL'' WHERE [company_name] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [company_name] nvarchar(max) NOT NULL;
 END;
 
@@ -3622,7 +3622,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_fonts] DEFAULT (N'{}') FOR [fonts];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'fonts' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [fonts]=N'{}' WHERE [fonts] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [fonts]=N''{}'' WHERE [fonts] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [fonts] nvarchar(max) NOT NULL;
 END;
 
@@ -3635,7 +3635,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_custom_lines] DEFAULT (N'[]') FOR [custom_lines];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'custom_lines' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [custom_lines]=N'[]' WHERE [custom_lines] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [custom_lines]=N''[]'' WHERE [custom_lines] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [custom_lines] nvarchar(max) NOT NULL;
 END;
 
@@ -3648,7 +3648,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_qr] DEFAULT (N'{}') FOR [qr];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'qr' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [qr]=N'{}' WHERE [qr] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [qr]=N''{}'' WHERE [qr] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [qr] nvarchar(max) NOT NULL;
 END;
 
@@ -3661,7 +3661,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_review_max_voids] DEFAULT (5) FOR [review_max_voids];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'review_max_voids' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [review_max_voids]=5 WHERE [review_max_voids] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [review_max_voids]=5 WHERE [review_max_voids] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [review_max_voids] int NOT NULL;
 END;
 
@@ -3674,7 +3674,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_review_max_refunds] DEFAULT (3) FOR [review_max_refunds];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'review_max_refunds' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [review_max_refunds]=3 WHERE [review_max_refunds] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [review_max_refunds]=3 WHERE [review_max_refunds] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [review_max_refunds] int NOT NULL;
 END;
 
@@ -3687,7 +3687,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_review_max_refund_value] DEFAULT (200) FOR [review_max_refund_value];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'review_max_refund_value' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [review_max_refund_value]=200 WHERE [review_max_refund_value] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [review_max_refund_value]=200 WHERE [review_max_refund_value] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [review_max_refund_value] decimal(38,12) NOT NULL;
 END;
 
@@ -3700,7 +3700,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_review_max_nosale] DEFAULT (5) FOR [review_max_nosale];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'review_max_nosale' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [review_max_nosale]=5 WHERE [review_max_nosale] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [review_max_nosale]=5 WHERE [review_max_nosale] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [review_max_nosale] int NOT NULL;
 END;
 
@@ -3713,7 +3713,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_review_max_discount_pct] DEFAULT (15) FOR [review_max_discount_pct];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'review_max_discount_pct' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [review_max_discount_pct]=15 WHERE [review_max_discount_pct] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [review_max_discount_pct]=15 WHERE [review_max_discount_pct] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [review_max_discount_pct] decimal(38,12) NOT NULL;
 END;
 
@@ -3726,7 +3726,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_day_start_time] DEFAULT ('09:00') FOR [day_start_time];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'day_start_time' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [day_start_time]='09:00' WHERE [day_start_time] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [day_start_time]=''09:00'' WHERE [day_start_time] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [day_start_time] nvarchar(max) NOT NULL;
 END;
 
@@ -3739,7 +3739,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_day_end_time] DEFAULT ('22:00') FOR [day_end_time];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'day_end_time' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [day_end_time]='22:00' WHERE [day_end_time] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [day_end_time]=''22:00'' WHERE [day_end_time] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [day_end_time] nvarchar(max) NOT NULL;
 END;
 
@@ -3752,7 +3752,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_max_shift_hours] DEFAULT (12) FOR [max_shift_hours];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'max_shift_hours' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [max_shift_hours]=12 WHERE [max_shift_hours] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [max_shift_hours]=12 WHERE [max_shift_hours] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [max_shift_hours] decimal(38,12) NOT NULL;
 END;
 
@@ -3765,7 +3765,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_shift_reminder_minutes] DEFAULT (30) FOR [shift_reminder_minutes];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'shift_reminder_minutes' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [shift_reminder_minutes]=30 WHERE [shift_reminder_minutes] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [shift_reminder_minutes]=30 WHERE [shift_reminder_minutes] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [shift_reminder_minutes] int NOT NULL;
 END;
 
@@ -3778,7 +3778,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_ui_visibility] DEFAULT (N'{"hidden": {}}') FOR [ui_visibility];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'ui_visibility' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [ui_visibility]=N'{"hidden": {}}' WHERE [ui_visibility] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [ui_visibility]=N''{"hidden": {}}'' WHERE [ui_visibility] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [ui_visibility] nvarchar(max) NOT NULL;
 END;
 
@@ -3791,7 +3791,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_integration_settings] DEFAULT (N'{}') FOR [integration_settings];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'integration_settings' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [integration_settings]=N'{}' WHERE [integration_settings] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [integration_settings]=N''{}'' WHERE [integration_settings] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [integration_settings] nvarchar(max) NOT NULL;
 END;
 
@@ -3804,7 +3804,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_region_country] DEFAULT ('') FOR [region_country];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'region_country' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [region_country]='' WHERE [region_country] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [region_country]='''' WHERE [region_country] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [region_country] nvarchar(max) NOT NULL;
 END;
 
@@ -3817,7 +3817,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_time_zone] DEFAULT ('') FOR [time_zone];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'time_zone' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [time_zone]='' WHERE [time_zone] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [time_zone]='''' WHERE [time_zone] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [time_zone] nvarchar(max) NOT NULL;
 END;
 
@@ -3830,7 +3830,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_date_format] DEFAULT ('dd/MM/yyyy') FOR [date_format];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'date_format' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [date_format]='dd/MM/yyyy' WHERE [date_format] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [date_format]=''dd/MM/yyyy'' WHERE [date_format] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [date_format] nvarchar(max) NOT NULL;
 END;
 
@@ -3843,7 +3843,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_time_format] DEFAULT ('24h') FOR [time_format];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'time_format' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [time_format]='24h' WHERE [time_format] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [time_format]=''24h'' WHERE [time_format] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [time_format] nvarchar(max) NOT NULL;
 END;
 
@@ -3856,7 +3856,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_booking_slip] DEFAULT (N'{}') FOR [booking_slip];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'booking_slip' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [booking_slip]=N'{}' WHERE [booking_slip] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [booking_slip]=N''{}'' WHERE [booking_slip] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [booking_slip] nvarchar(max) NOT NULL;
 END;
 
@@ -3869,7 +3869,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_notification_settings] DEFAULT (N'{}') FOR [notification_settings];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'notification_settings' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [notification_settings]=N'{}' WHERE [notification_settings] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [notification_settings]=N''{}'' WHERE [notification_settings] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [notification_settings] nvarchar(max) NOT NULL;
 END;
 
@@ -3882,7 +3882,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -3897,7 +3897,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
 ) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_receipt_design] DEFAULT (N'{}') FOR [receipt_design];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'receipt_design' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_settings] SET [receipt_design]=N'{}' WHERE [receipt_design] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [receipt_design]=N''{}'' WHERE [receipt_design] IS NULL;';
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [receipt_design] nvarchar(max) NOT NULL;
 END;
 
@@ -3929,7 +3929,7 @@ IF OBJECT_ID(N'dbo.product_barcodes', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pro
 ) ALTER TABLE dbo.[product_barcodes] ADD CONSTRAINT [DF_product_barcodes_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.product_barcodes') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[product_barcodes] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[product_barcodes] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[product_barcodes] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -3954,7 +3954,7 @@ IF OBJECT_ID(N'dbo.product_barcodes', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pro
 ) ALTER TABLE dbo.[product_barcodes] ADD CONSTRAINT [DF_product_barcodes_pack_size] DEFAULT (1) FOR [pack_size];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.product_barcodes') AND name=N'pack_size' AND is_nullable=1) BEGIN
-  UPDATE dbo.[product_barcodes] SET [pack_size]=1 WHERE [pack_size] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[product_barcodes] SET [pack_size]=1 WHERE [pack_size] IS NULL;';
   ALTER TABLE dbo.[product_barcodes] ALTER COLUMN [pack_size] decimal(38,12) NOT NULL;
 END;
 
@@ -3967,7 +3967,7 @@ IF OBJECT_ID(N'dbo.product_barcodes', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pro
 ) ALTER TABLE dbo.[product_barcodes] ADD CONSTRAINT [DF_product_barcodes_is_primary] DEFAULT (0) FOR [is_primary];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.product_barcodes') AND name=N'is_primary' AND is_nullable=1) BEGIN
-  UPDATE dbo.[product_barcodes] SET [is_primary]=0 WHERE [is_primary] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[product_barcodes] SET [is_primary]=0 WHERE [is_primary] IS NULL;';
   ALTER TABLE dbo.[product_barcodes] ALTER COLUMN [is_primary] bit NOT NULL;
 END;
 
@@ -3980,7 +3980,7 @@ IF OBJECT_ID(N'dbo.product_barcodes', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pro
 ) ALTER TABLE dbo.[product_barcodes] ADD CONSTRAINT [DF_product_barcodes_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.product_barcodes') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[product_barcodes] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[product_barcodes] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[product_barcodes] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -3993,7 +3993,7 @@ IF OBJECT_ID(N'dbo.product_barcodes', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pro
 ) ALTER TABLE dbo.[product_barcodes] ADD CONSTRAINT [DF_product_barcodes_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.product_barcodes') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[product_barcodes] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[product_barcodes] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[product_barcodes] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -4008,7 +4008,7 @@ IF OBJECT_ID(N'dbo.product_barcodes', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pro
 ) ALTER TABLE dbo.[product_barcodes] ADD CONSTRAINT [DF_product_barcodes_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.product_barcodes') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[product_barcodes] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[product_barcodes] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[product_barcodes] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -4042,7 +4042,7 @@ IF OBJECT_ID(N'dbo.product_categories', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[product_categories] ADD CONSTRAINT [DF_product_categories_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.product_categories') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[product_categories] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[product_categories] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[product_categories] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -4063,7 +4063,7 @@ IF OBJECT_ID(N'dbo.product_categories', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[product_categories] ADD CONSTRAINT [DF_product_categories_sort] DEFAULT (0) FOR [sort];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.product_categories') AND name=N'sort' AND is_nullable=1) BEGIN
-  UPDATE dbo.[product_categories] SET [sort]=0 WHERE [sort] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[product_categories] SET [sort]=0 WHERE [sort] IS NULL;';
   ALTER TABLE dbo.[product_categories] ALTER COLUMN [sort] int NOT NULL;
 END;
 
@@ -4076,7 +4076,7 @@ IF OBJECT_ID(N'dbo.product_categories', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[product_categories] ADD CONSTRAINT [DF_product_categories_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.product_categories') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[product_categories] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[product_categories] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[product_categories] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -4089,7 +4089,7 @@ IF OBJECT_ID(N'dbo.product_categories', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[product_categories] ADD CONSTRAINT [DF_product_categories_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.product_categories') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[product_categories] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[product_categories] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[product_categories] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -4104,7 +4104,7 @@ IF OBJECT_ID(N'dbo.product_categories', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[product_categories] ADD CONSTRAINT [DF_product_categories_kind] DEFAULT ('category') FOR [kind];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.product_categories') AND name=N'kind' AND is_nullable=1) BEGIN
-  UPDATE dbo.[product_categories] SET [kind]='category' WHERE [kind] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[product_categories] SET [kind]=''category'' WHERE [kind] IS NULL;';
   ALTER TABLE dbo.[product_categories] ALTER COLUMN [kind] nvarchar(max) NOT NULL;
 END;
 
@@ -4117,7 +4117,7 @@ IF OBJECT_ID(N'dbo.product_categories', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[product_categories] ADD CONSTRAINT [DF_product_categories_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.product_categories') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[product_categories] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[product_categories] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[product_categories] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -4130,7 +4130,7 @@ IF OBJECT_ID(N'dbo.product_categories', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[product_categories] ADD CONSTRAINT [DF_product_categories_is_active] DEFAULT (1) FOR [is_active];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.product_categories') AND name=N'is_active' AND is_nullable=1) BEGIN
-  UPDATE dbo.[product_categories] SET [is_active]=1 WHERE [is_active] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[product_categories] SET [is_active]=1 WHERE [is_active] IS NULL;';
   ALTER TABLE dbo.[product_categories] ALTER COLUMN [is_active] bit NOT NULL;
 END;
 
@@ -4182,7 +4182,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -4205,7 +4205,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_cost_price] DEFAULT (0) FOR [cost_price];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'cost_price' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [cost_price]=0 WHERE [cost_price] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [cost_price]=0 WHERE [cost_price] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [cost_price] decimal(38,12) NOT NULL;
 END;
 
@@ -4218,7 +4218,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_selling_price] DEFAULT (0) FOR [selling_price];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'selling_price' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [selling_price]=0 WHERE [selling_price] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [selling_price]=0 WHERE [selling_price] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [selling_price] decimal(38,12) NOT NULL;
 END;
 
@@ -4233,7 +4233,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_stock_quantity] DEFAULT (0) FOR [stock_quantity];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'stock_quantity' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [stock_quantity]=0 WHERE [stock_quantity] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [stock_quantity]=0 WHERE [stock_quantity] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [stock_quantity] int NOT NULL;
 END;
 
@@ -4248,7 +4248,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_point_multiplier] DEFAULT (1.0) FOR [point_multiplier];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'point_multiplier' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [point_multiplier]=1.0 WHERE [point_multiplier] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [point_multiplier]=1.0 WHERE [point_multiplier] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [point_multiplier] decimal(38,12) NOT NULL;
 END;
 
@@ -4261,7 +4261,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -4276,7 +4276,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_reorder_level] DEFAULT (0) FOR [reorder_level];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'reorder_level' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [reorder_level]=0 WHERE [reorder_level] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [reorder_level]=0 WHERE [reorder_level] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [reorder_level] int NOT NULL;
 END;
 
@@ -4289,7 +4289,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_tax_rate] DEFAULT (0) FOR [tax_rate];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'tax_rate' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [tax_rate]=0 WHERE [tax_rate] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [tax_rate]=0 WHERE [tax_rate] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [tax_rate] decimal(38,12) NOT NULL;
 END;
 
@@ -4302,7 +4302,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_ecom_visible] DEFAULT (1) FOR [ecom_visible];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'ecom_visible' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [ecom_visible]=1 WHERE [ecom_visible] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [ecom_visible]=1 WHERE [ecom_visible] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [ecom_visible] bit NOT NULL;
 END;
 
@@ -4315,7 +4315,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_stock_by_store] DEFAULT (N'{}') FOR [stock_by_store];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'stock_by_store' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [stock_by_store]=N'{}' WHERE [stock_by_store] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [stock_by_store]=N''{}'' WHERE [stock_by_store] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [stock_by_store] nvarchar(max) NOT NULL;
 END;
 
@@ -4328,7 +4328,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -4349,7 +4349,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_packs] DEFAULT (N'[]') FOR [packs];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'packs' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [packs]=N'[]' WHERE [packs] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [packs]=N''[]'' WHERE [packs] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [packs] nvarchar(max) NOT NULL;
 END;
 
@@ -4362,7 +4362,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_barcode_aliases] DEFAULT (N'[]') FOR [barcode_aliases];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'barcode_aliases' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [barcode_aliases]=N'[]' WHERE [barcode_aliases] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [barcode_aliases]=N''[]'' WHERE [barcode_aliases] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [barcode_aliases] nvarchar(max) NOT NULL;
 END;
 
@@ -4375,7 +4375,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_is_archived] DEFAULT (0) FOR [is_archived];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'is_archived' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [is_archived]=0 WHERE [is_archived] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [is_archived]=0 WHERE [is_archived] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [is_archived] bit NOT NULL;
 END;
 
@@ -4394,7 +4394,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_barcode_variants] DEFAULT (N'[]') FOR [barcode_variants];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'barcode_variants' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [barcode_variants]=N'[]' WHERE [barcode_variants] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [barcode_variants]=N''[]'' WHERE [barcode_variants] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [barcode_variants] nvarchar(max) NOT NULL;
 END;
 
@@ -4407,7 +4407,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
 ) ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_row_version] DEFAULT (0) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[products] SET [row_version]=0 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[products] SET [row_version]=0 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[products] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -4451,7 +4451,7 @@ IF OBJECT_ID(N'dbo.promotions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.promotion
 ) ALTER TABLE dbo.[promotions] ADD CONSTRAINT [DF_promotions_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.promotions') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[promotions] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[promotions] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[promotions] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -4470,7 +4470,7 @@ IF OBJECT_ID(N'dbo.promotions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.promotion
 ) ALTER TABLE dbo.[promotions] ADD CONSTRAINT [DF_promotions_min_spend] DEFAULT (0) FOR [min_spend];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.promotions') AND name=N'min_spend' AND is_nullable=1) BEGIN
-  UPDATE dbo.[promotions] SET [min_spend]=0 WHERE [min_spend] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[promotions] SET [min_spend]=0 WHERE [min_spend] IS NULL;';
   ALTER TABLE dbo.[promotions] ALTER COLUMN [min_spend] decimal(38,12) NOT NULL;
 END;
 
@@ -4483,7 +4483,7 @@ IF OBJECT_ID(N'dbo.promotions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.promotion
 ) ALTER TABLE dbo.[promotions] ADD CONSTRAINT [DF_promotions_discount_percent] DEFAULT (0) FOR [discount_percent];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.promotions') AND name=N'discount_percent' AND is_nullable=1) BEGIN
-  UPDATE dbo.[promotions] SET [discount_percent]=0 WHERE [discount_percent] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[promotions] SET [discount_percent]=0 WHERE [discount_percent] IS NULL;';
   ALTER TABLE dbo.[promotions] ALTER COLUMN [discount_percent] decimal(38,12) NOT NULL;
 END;
 
@@ -4496,7 +4496,7 @@ IF OBJECT_ID(N'dbo.promotions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.promotion
 ) ALTER TABLE dbo.[promotions] ADD CONSTRAINT [DF_promotions_discount_amount] DEFAULT (0) FOR [discount_amount];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.promotions') AND name=N'discount_amount' AND is_nullable=1) BEGIN
-  UPDATE dbo.[promotions] SET [discount_amount]=0 WHERE [discount_amount] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[promotions] SET [discount_amount]=0 WHERE [discount_amount] IS NULL;';
   ALTER TABLE dbo.[promotions] ALTER COLUMN [discount_amount] decimal(38,12) NOT NULL;
 END;
 
@@ -4513,7 +4513,7 @@ IF OBJECT_ID(N'dbo.promotions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.promotion
 ) ALTER TABLE dbo.[promotions] ADD CONSTRAINT [DF_promotions_points_per_dollar] DEFAULT (1) FOR [points_per_dollar];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.promotions') AND name=N'points_per_dollar' AND is_nullable=1) BEGIN
-  UPDATE dbo.[promotions] SET [points_per_dollar]=1 WHERE [points_per_dollar] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[promotions] SET [points_per_dollar]=1 WHERE [points_per_dollar] IS NULL;';
   ALTER TABLE dbo.[promotions] ALTER COLUMN [points_per_dollar] decimal(38,12) NOT NULL;
 END;
 
@@ -4528,7 +4528,7 @@ IF OBJECT_ID(N'dbo.promotions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.promotion
 ) ALTER TABLE dbo.[promotions] ADD CONSTRAINT [DF_promotions_is_active] DEFAULT (1) FOR [is_active];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.promotions') AND name=N'is_active' AND is_nullable=1) BEGIN
-  UPDATE dbo.[promotions] SET [is_active]=1 WHERE [is_active] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[promotions] SET [is_active]=1 WHERE [is_active] IS NULL;';
   ALTER TABLE dbo.[promotions] ALTER COLUMN [is_active] bit NOT NULL;
 END;
 
@@ -4545,7 +4545,7 @@ IF OBJECT_ID(N'dbo.promotions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.promotion
 ) ALTER TABLE dbo.[promotions] ADD CONSTRAINT [DF_promotions_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.promotions') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[promotions] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[promotions] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[promotions] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -4558,7 +4558,7 @@ IF OBJECT_ID(N'dbo.promotions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.promotion
 ) ALTER TABLE dbo.[promotions] ADD CONSTRAINT [DF_promotions_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.promotions') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[promotions] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[promotions] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[promotions] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -4573,7 +4573,7 @@ IF OBJECT_ID(N'dbo.promotions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.promotion
 ) ALTER TABLE dbo.[promotions] ADD CONSTRAINT [DF_promotions_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.promotions') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[promotions] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[promotions] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[promotions] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -4603,7 +4603,7 @@ IF OBJECT_ID(N'dbo.public_flags', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.public_
 ) ALTER TABLE dbo.[public_flags] ADD CONSTRAINT [DF_public_flags_enabled] DEFAULT (1) FOR [enabled];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.public_flags') AND name=N'enabled' AND is_nullable=1) BEGIN
-  UPDATE dbo.[public_flags] SET [enabled]=1 WHERE [enabled] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[public_flags] SET [enabled]=1 WHERE [enabled] IS NULL;';
   ALTER TABLE dbo.[public_flags] ALTER COLUMN [enabled] bit NOT NULL;
 END;
 
@@ -4616,7 +4616,7 @@ IF OBJECT_ID(N'dbo.public_flags', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.public_
 ) ALTER TABLE dbo.[public_flags] ADD CONSTRAINT [DF_public_flags_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.public_flags') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[public_flags] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[public_flags] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[public_flags] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -4654,7 +4654,7 @@ IF OBJECT_ID(N'dbo.purchase_order_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[purchase_order_items] ADD CONSTRAINT [DF_purchase_order_items_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.purchase_order_items') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[purchase_order_items] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[purchase_order_items] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[purchase_order_items] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -4681,7 +4681,7 @@ IF OBJECT_ID(N'dbo.purchase_order_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[purchase_order_items] ADD CONSTRAINT [DF_purchase_order_items_cost_price] DEFAULT (0) FOR [cost_price];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.purchase_order_items') AND name=N'cost_price' AND is_nullable=1) BEGIN
-  UPDATE dbo.[purchase_order_items] SET [cost_price]=0 WHERE [cost_price] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[purchase_order_items] SET [cost_price]=0 WHERE [cost_price] IS NULL;';
   ALTER TABLE dbo.[purchase_order_items] ALTER COLUMN [cost_price] decimal(38,12) NOT NULL;
 END;
 
@@ -4694,7 +4694,7 @@ IF OBJECT_ID(N'dbo.purchase_order_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[purchase_order_items] ADD CONSTRAINT [DF_purchase_order_items_selling_price] DEFAULT (0) FOR [selling_price];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.purchase_order_items') AND name=N'selling_price' AND is_nullable=1) BEGIN
-  UPDATE dbo.[purchase_order_items] SET [selling_price]=0 WHERE [selling_price] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[purchase_order_items] SET [selling_price]=0 WHERE [selling_price] IS NULL;';
   ALTER TABLE dbo.[purchase_order_items] ALTER COLUMN [selling_price] decimal(38,12) NOT NULL;
 END;
 
@@ -4707,7 +4707,7 @@ IF OBJECT_ID(N'dbo.purchase_order_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[purchase_order_items] ADD CONSTRAINT [DF_purchase_order_items_quantity_received] DEFAULT (0) FOR [quantity_received];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.purchase_order_items') AND name=N'quantity_received' AND is_nullable=1) BEGIN
-  UPDATE dbo.[purchase_order_items] SET [quantity_received]=0 WHERE [quantity_received] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[purchase_order_items] SET [quantity_received]=0 WHERE [quantity_received] IS NULL;';
   ALTER TABLE dbo.[purchase_order_items] ALTER COLUMN [quantity_received] int NOT NULL;
 END;
 
@@ -4720,7 +4720,7 @@ IF OBJECT_ID(N'dbo.purchase_order_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[purchase_order_items] ADD CONSTRAINT [DF_purchase_order_items_subtotal_cost] DEFAULT (0) FOR [subtotal_cost];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.purchase_order_items') AND name=N'subtotal_cost' AND is_nullable=1) BEGIN
-  UPDATE dbo.[purchase_order_items] SET [subtotal_cost]=0 WHERE [subtotal_cost] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[purchase_order_items] SET [subtotal_cost]=0 WHERE [subtotal_cost] IS NULL;';
   ALTER TABLE dbo.[purchase_order_items] ALTER COLUMN [subtotal_cost] decimal(38,12) NOT NULL;
 END;
 
@@ -4733,7 +4733,7 @@ IF OBJECT_ID(N'dbo.purchase_order_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[purchase_order_items] ADD CONSTRAINT [DF_purchase_order_items_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.purchase_order_items') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[purchase_order_items] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[purchase_order_items] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[purchase_order_items] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -4748,7 +4748,7 @@ IF OBJECT_ID(N'dbo.purchase_order_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[purchase_order_items] ADD CONSTRAINT [DF_purchase_order_items_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.purchase_order_items') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[purchase_order_items] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[purchase_order_items] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[purchase_order_items] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -4763,7 +4763,7 @@ IF OBJECT_ID(N'dbo.purchase_order_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[purchase_order_items] ADD CONSTRAINT [DF_purchase_order_items_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.purchase_order_items') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[purchase_order_items] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[purchase_order_items] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[purchase_order_items] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -4803,7 +4803,7 @@ IF OBJECT_ID(N'dbo.purchase_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.purc
 ) ALTER TABLE dbo.[purchase_orders] ADD CONSTRAINT [DF_purchase_orders_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.purchase_orders') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[purchase_orders] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[purchase_orders] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[purchase_orders] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -4826,7 +4826,7 @@ IF OBJECT_ID(N'dbo.purchase_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.purc
 ) ALTER TABLE dbo.[purchase_orders] ADD CONSTRAINT [DF_purchase_orders_total_cost] DEFAULT (0) FOR [total_cost];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.purchase_orders') AND name=N'total_cost' AND is_nullable=1) BEGIN
-  UPDATE dbo.[purchase_orders] SET [total_cost]=0 WHERE [total_cost] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[purchase_orders] SET [total_cost]=0 WHERE [total_cost] IS NULL;';
   ALTER TABLE dbo.[purchase_orders] ALTER COLUMN [total_cost] decimal(38,12) NOT NULL;
 END;
 
@@ -4839,7 +4839,7 @@ IF OBJECT_ID(N'dbo.purchase_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.purc
 ) ALTER TABLE dbo.[purchase_orders] ADD CONSTRAINT [DF_purchase_orders_total_items_count] DEFAULT (0) FOR [total_items_count];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.purchase_orders') AND name=N'total_items_count' AND is_nullable=1) BEGIN
-  UPDATE dbo.[purchase_orders] SET [total_items_count]=0 WHERE [total_items_count] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[purchase_orders] SET [total_items_count]=0 WHERE [total_items_count] IS NULL;';
   ALTER TABLE dbo.[purchase_orders] ALTER COLUMN [total_items_count] int NOT NULL;
 END;
 
@@ -4852,7 +4852,7 @@ IF OBJECT_ID(N'dbo.purchase_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.purc
 ) ALTER TABLE dbo.[purchase_orders] ADD CONSTRAINT [DF_purchase_orders_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.purchase_orders') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[purchase_orders] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[purchase_orders] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[purchase_orders] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -4885,7 +4885,7 @@ IF OBJECT_ID(N'dbo.purchase_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.purc
 ) ALTER TABLE dbo.[purchase_orders] ADD CONSTRAINT [DF_purchase_orders_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.purchase_orders') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[purchase_orders] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[purchase_orders] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[purchase_orders] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -4900,7 +4900,7 @@ IF OBJECT_ID(N'dbo.purchase_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.purc
 ) ALTER TABLE dbo.[purchase_orders] ADD CONSTRAINT [DF_purchase_orders_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.purchase_orders') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[purchase_orders] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[purchase_orders] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[purchase_orders] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -4951,7 +4951,7 @@ IF OBJECT_ID(N'dbo.sale_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sale_item
 ) ALTER TABLE dbo.[sale_items] ADD CONSTRAINT [DF_sale_items_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sale_items') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sale_items] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sale_items] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[sale_items] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -4976,7 +4976,7 @@ IF OBJECT_ID(N'dbo.sale_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sale_item
 ) ALTER TABLE dbo.[sale_items] ADD CONSTRAINT [DF_sale_items_unit_price] DEFAULT (0) FOR [unit_price];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sale_items') AND name=N'unit_price' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sale_items] SET [unit_price]=0 WHERE [unit_price] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sale_items] SET [unit_price]=0 WHERE [unit_price] IS NULL;';
   ALTER TABLE dbo.[sale_items] ALTER COLUMN [unit_price] decimal(38,12) NOT NULL;
 END;
 
@@ -4989,7 +4989,7 @@ IF OBJECT_ID(N'dbo.sale_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sale_item
 ) ALTER TABLE dbo.[sale_items] ADD CONSTRAINT [DF_sale_items_quantity] DEFAULT (1) FOR [quantity];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sale_items') AND name=N'quantity' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sale_items] SET [quantity]=1 WHERE [quantity] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sale_items] SET [quantity]=1 WHERE [quantity] IS NULL;';
   ALTER TABLE dbo.[sale_items] ALTER COLUMN [quantity] int NOT NULL;
 END;
 
@@ -5002,7 +5002,7 @@ IF OBJECT_ID(N'dbo.sale_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sale_item
 ) ALTER TABLE dbo.[sale_items] ADD CONSTRAINT [DF_sale_items_discount_percent] DEFAULT (0) FOR [discount_percent];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sale_items') AND name=N'discount_percent' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sale_items] SET [discount_percent]=0 WHERE [discount_percent] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sale_items] SET [discount_percent]=0 WHERE [discount_percent] IS NULL;';
   ALTER TABLE dbo.[sale_items] ALTER COLUMN [discount_percent] decimal(38,12) NOT NULL;
 END;
 
@@ -5015,7 +5015,7 @@ IF OBJECT_ID(N'dbo.sale_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sale_item
 ) ALTER TABLE dbo.[sale_items] ADD CONSTRAINT [DF_sale_items_discount_amount] DEFAULT (0) FOR [discount_amount];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sale_items') AND name=N'discount_amount' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sale_items] SET [discount_amount]=0 WHERE [discount_amount] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sale_items] SET [discount_amount]=0 WHERE [discount_amount] IS NULL;';
   ALTER TABLE dbo.[sale_items] ALTER COLUMN [discount_amount] decimal(38,12) NOT NULL;
 END;
 
@@ -5028,7 +5028,7 @@ IF OBJECT_ID(N'dbo.sale_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sale_item
 ) ALTER TABLE dbo.[sale_items] ADD CONSTRAINT [DF_sale_items_is_return] DEFAULT (0) FOR [is_return];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sale_items') AND name=N'is_return' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sale_items] SET [is_return]=0 WHERE [is_return] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sale_items] SET [is_return]=0 WHERE [is_return] IS NULL;';
   ALTER TABLE dbo.[sale_items] ALTER COLUMN [is_return] bit NOT NULL;
 END;
 
@@ -5041,7 +5041,7 @@ IF OBJECT_ID(N'dbo.sale_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sale_item
 ) ALTER TABLE dbo.[sale_items] ADD CONSTRAINT [DF_sale_items_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sale_items') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sale_items] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sale_items] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[sale_items] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -5054,7 +5054,7 @@ IF OBJECT_ID(N'dbo.sale_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sale_item
 ) ALTER TABLE dbo.[sale_items] ADD CONSTRAINT [DF_sale_items_tax_rate] DEFAULT (0) FOR [tax_rate];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sale_items') AND name=N'tax_rate' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sale_items] SET [tax_rate]=0 WHERE [tax_rate] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sale_items] SET [tax_rate]=0 WHERE [tax_rate] IS NULL;';
   ALTER TABLE dbo.[sale_items] ALTER COLUMN [tax_rate] decimal(38,12) NOT NULL;
 END;
 
@@ -5067,7 +5067,7 @@ IF OBJECT_ID(N'dbo.sale_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sale_item
 ) ALTER TABLE dbo.[sale_items] ADD CONSTRAINT [DF_sale_items_is_foc] DEFAULT (0) FOR [is_foc];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sale_items') AND name=N'is_foc' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sale_items] SET [is_foc]=0 WHERE [is_foc] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sale_items] SET [is_foc]=0 WHERE [is_foc] IS NULL;';
   ALTER TABLE dbo.[sale_items] ALTER COLUMN [is_foc] bit NOT NULL;
 END;
 
@@ -5084,7 +5084,7 @@ IF OBJECT_ID(N'dbo.sale_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sale_item
 ) ALTER TABLE dbo.[sale_items] ADD CONSTRAINT [DF_sale_items_coupon_discount] DEFAULT (0) FOR [coupon_discount];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sale_items') AND name=N'coupon_discount' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sale_items] SET [coupon_discount]=0 WHERE [coupon_discount] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sale_items] SET [coupon_discount]=0 WHERE [coupon_discount] IS NULL;';
   ALTER TABLE dbo.[sale_items] ALTER COLUMN [coupon_discount] decimal(38,12) NOT NULL;
 END;
 
@@ -5097,7 +5097,7 @@ IF OBJECT_ID(N'dbo.sale_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sale_item
 ) ALTER TABLE dbo.[sale_items] ADD CONSTRAINT [DF_sale_items_unit_cost] DEFAULT (0) FOR [unit_cost];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sale_items') AND name=N'unit_cost' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sale_items] SET [unit_cost]=0 WHERE [unit_cost] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sale_items] SET [unit_cost]=0 WHERE [unit_cost] IS NULL;';
   ALTER TABLE dbo.[sale_items] ALTER COLUMN [unit_cost] decimal(38,12) NOT NULL;
 END;
 
@@ -5110,7 +5110,7 @@ IF OBJECT_ID(N'dbo.sale_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sale_item
 ) ALTER TABLE dbo.[sale_items] ADD CONSTRAINT [DF_sale_items_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sale_items') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sale_items] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sale_items] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[sale_items] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -5123,7 +5123,7 @@ IF OBJECT_ID(N'dbo.sale_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sale_item
 ) ALTER TABLE dbo.[sale_items] ADD CONSTRAINT [DF_sale_items_refunded_qty] DEFAULT (0) FOR [refunded_qty];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sale_items') AND name=N'refunded_qty' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sale_items] SET [refunded_qty]=0 WHERE [refunded_qty] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sale_items] SET [refunded_qty]=0 WHERE [refunded_qty] IS NULL;';
   ALTER TABLE dbo.[sale_items] ALTER COLUMN [refunded_qty] int NOT NULL;
 END;
 
@@ -5182,7 +5182,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'id')
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -5211,7 +5211,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'subt
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_subtotal_amount] DEFAULT (0) FOR [subtotal_amount];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'subtotal_amount' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [subtotal_amount]=0 WHERE [subtotal_amount] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [subtotal_amount]=0 WHERE [subtotal_amount] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [subtotal_amount] decimal(38,12) NOT NULL;
 END;
 
@@ -5224,7 +5224,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'tota
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_total_amount] DEFAULT (0) FOR [total_amount];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'total_amount' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [total_amount]=0 WHERE [total_amount] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [total_amount]=0 WHERE [total_amount] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [total_amount] decimal(38,12) NOT NULL;
 END;
 
@@ -5237,7 +5237,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'disc
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_discount_amount] DEFAULT (0) FOR [discount_amount];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'discount_amount' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [discount_amount]=0 WHERE [discount_amount] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [discount_amount]=0 WHERE [discount_amount] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [discount_amount] decimal(38,12) NOT NULL;
 END;
 
@@ -5250,7 +5250,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'tax_
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_tax_amount] DEFAULT (0) FOR [tax_amount];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'tax_amount' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [tax_amount]=0 WHERE [tax_amount] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [tax_amount]=0 WHERE [tax_amount] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [tax_amount] decimal(38,12) NOT NULL;
 END;
 
@@ -5263,7 +5263,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'paym
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_payment_type] DEFAULT ('cash') FOR [payment_type];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'payment_type' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [payment_type]='cash' WHERE [payment_type] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [payment_type]=''cash'' WHERE [payment_type] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [payment_type] nvarchar(max) NOT NULL;
 END;
 
@@ -5276,7 +5276,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'poin
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_points_earned] DEFAULT (0) FOR [points_earned];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'points_earned' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [points_earned]=0 WHERE [points_earned] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [points_earned]=0 WHERE [points_earned] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [points_earned] decimal(38,12) NOT NULL;
 END;
 
@@ -5289,7 +5289,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'poin
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_points_redeemed] DEFAULT (0) FOR [points_redeemed];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'points_redeemed' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [points_redeemed]=0 WHERE [points_redeemed] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [points_redeemed]=0 WHERE [points_redeemed] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [points_redeemed] decimal(38,12) NOT NULL;
 END;
 
@@ -5302,7 +5302,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'is_e
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_is_exchange] DEFAULT (0) FOR [is_exchange];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'is_exchange' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [is_exchange]=0 WHERE [is_exchange] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [is_exchange]=0 WHERE [is_exchange] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [is_exchange] bit NOT NULL;
 END;
 
@@ -5317,7 +5317,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'is_r
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_is_refunded] DEFAULT (0) FOR [is_refunded];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'is_refunded' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [is_refunded]=0 WHERE [is_refunded] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [is_refunded]=0 WHERE [is_refunded] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [is_refunded] bit NOT NULL;
 END;
 
@@ -5330,7 +5330,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'crea
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -5345,7 +5345,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'paid
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_paid_amount] DEFAULT (0) FOR [paid_amount];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'paid_amount' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [paid_amount]=0 WHERE [paid_amount] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [paid_amount]=0 WHERE [paid_amount] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [paid_amount] decimal(38,12) NOT NULL;
 END;
 
@@ -5358,7 +5358,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'chan
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_change_amount] DEFAULT (0) FOR [change_amount];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'change_amount' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [change_amount]=0 WHERE [change_amount] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [change_amount]=0 WHERE [change_amount] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [change_amount] decimal(38,12) NOT NULL;
 END;
 
@@ -5371,7 +5371,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'exch
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_exchange_credit] DEFAULT (0) FOR [exchange_credit];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'exchange_credit' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [exchange_credit]=0 WHERE [exchange_credit] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [exchange_credit]=0 WHERE [exchange_credit] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [exchange_credit] decimal(38,12) NOT NULL;
 END;
 
@@ -5392,7 +5392,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'coup
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_coupon_discount] DEFAULT (0) FOR [coupon_discount];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'coupon_discount' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [coupon_discount]=0 WHERE [coupon_discount] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [coupon_discount]=0 WHERE [coupon_discount] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [coupon_discount] decimal(38,12) NOT NULL;
 END;
 
@@ -5405,7 +5405,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'paym
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_payments] DEFAULT (N'[]') FOR [payments];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'payments' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [payments]=N'[]' WHERE [payments] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [payments]=N''[]'' WHERE [payments] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [payments] nvarchar(max) NOT NULL;
 END;
 
@@ -5428,7 +5428,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'row_
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -5451,7 +5451,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sales', N'roun
 ) ALTER TABLE dbo.[sales] ADD CONSTRAINT [DF_sales_rounding_adjustment] DEFAULT (0) FOR [rounding_adjustment];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'rounding_adjustment' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sales] SET [rounding_adjustment]=0 WHERE [rounding_adjustment] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sales] SET [rounding_adjustment]=0 WHERE [rounding_adjustment] IS NULL;';
   ALTER TABLE dbo.[sales] ALTER COLUMN [rounding_adjustment] decimal(18,4) NOT NULL;
 END;
 
@@ -5496,7 +5496,7 @@ IF OBJECT_ID(N'dbo.secure_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.secu
 ) ALTER TABLE dbo.[secure_settings] ADD CONSTRAINT [DF_secure_settings_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.secure_settings') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[secure_settings] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[secure_settings] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[secure_settings] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -5509,7 +5509,7 @@ IF OBJECT_ID(N'dbo.secure_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.secu
 ) ALTER TABLE dbo.[secure_settings] ADD CONSTRAINT [DF_secure_settings_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.secure_settings') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[secure_settings] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[secure_settings] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[secure_settings] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -5549,7 +5549,7 @@ IF OBJECT_ID(N'dbo.security_findings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.se
 ) ALTER TABLE dbo.[security_findings] ADD CONSTRAINT [DF_security_findings_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.security_findings') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[security_findings] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[security_findings] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[security_findings] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -5570,7 +5570,7 @@ IF OBJECT_ID(N'dbo.security_findings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.se
 ) ALTER TABLE dbo.[security_findings] ADD CONSTRAINT [DF_security_findings_severity] DEFAULT ('medium') FOR [severity];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.security_findings') AND name=N'severity' AND is_nullable=1) BEGIN
-  UPDATE dbo.[security_findings] SET [severity]='medium' WHERE [severity] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[security_findings] SET [severity]=''medium'' WHERE [severity] IS NULL;';
   ALTER TABLE dbo.[security_findings] ALTER COLUMN [severity] nvarchar(max) NOT NULL;
 END;
 
@@ -5585,7 +5585,7 @@ IF OBJECT_ID(N'dbo.security_findings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.se
 ) ALTER TABLE dbo.[security_findings] ADD CONSTRAINT [DF_security_findings_detail] DEFAULT ('') FOR [detail];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.security_findings') AND name=N'detail' AND is_nullable=1) BEGIN
-  UPDATE dbo.[security_findings] SET [detail]='' WHERE [detail] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[security_findings] SET [detail]='''' WHERE [detail] IS NULL;';
   ALTER TABLE dbo.[security_findings] ALTER COLUMN [detail] nvarchar(max) NOT NULL;
 END;
 
@@ -5600,7 +5600,7 @@ IF OBJECT_ID(N'dbo.security_findings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.se
 ) ALTER TABLE dbo.[security_findings] ADD CONSTRAINT [DF_security_findings_status] DEFAULT ('open') FOR [status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.security_findings') AND name=N'status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[security_findings] SET [status]='open' WHERE [status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[security_findings] SET [status]=''open'' WHERE [status] IS NULL;';
   ALTER TABLE dbo.[security_findings] ALTER COLUMN [status] nvarchar(max) NOT NULL;
 END;
 
@@ -5613,7 +5613,7 @@ IF OBJECT_ID(N'dbo.security_findings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.se
 ) ALTER TABLE dbo.[security_findings] ADD CONSTRAINT [DF_security_findings_first_seen_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [first_seen_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.security_findings') AND name=N'first_seen_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[security_findings] SET [first_seen_at]=SYSDATETIMEOFFSET() WHERE [first_seen_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[security_findings] SET [first_seen_at]=SYSDATETIMEOFFSET() WHERE [first_seen_at] IS NULL;';
   ALTER TABLE dbo.[security_findings] ALTER COLUMN [first_seen_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -5626,7 +5626,7 @@ IF OBJECT_ID(N'dbo.security_findings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.se
 ) ALTER TABLE dbo.[security_findings] ADD CONSTRAINT [DF_security_findings_last_seen_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [last_seen_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.security_findings') AND name=N'last_seen_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[security_findings] SET [last_seen_at]=SYSDATETIMEOFFSET() WHERE [last_seen_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[security_findings] SET [last_seen_at]=SYSDATETIMEOFFSET() WHERE [last_seen_at] IS NULL;';
   ALTER TABLE dbo.[security_findings] ALTER COLUMN [last_seen_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -5645,7 +5645,7 @@ IF OBJECT_ID(N'dbo.security_findings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.se
 ) ALTER TABLE dbo.[security_findings] ADD CONSTRAINT [DF_security_findings_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.security_findings') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[security_findings] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[security_findings] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[security_findings] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -5658,7 +5658,7 @@ IF OBJECT_ID(N'dbo.security_findings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.se
 ) ALTER TABLE dbo.[security_findings] ADD CONSTRAINT [DF_security_findings_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.security_findings') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[security_findings] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[security_findings] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[security_findings] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -5694,7 +5694,7 @@ IF OBJECT_ID(N'dbo.settings_locks', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.setti
 ) ALTER TABLE dbo.[settings_locks] ADD CONSTRAINT [DF_settings_locks_locked] DEFAULT (0) FOR [locked];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.settings_locks') AND name=N'locked' AND is_nullable=1) BEGIN
-  UPDATE dbo.[settings_locks] SET [locked]=0 WHERE [locked] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[settings_locks] SET [locked]=0 WHERE [locked] IS NULL;';
   ALTER TABLE dbo.[settings_locks] ALTER COLUMN [locked] bit NOT NULL;
 END;
 
@@ -5709,7 +5709,7 @@ IF OBJECT_ID(N'dbo.settings_locks', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.setti
 ) ALTER TABLE dbo.[settings_locks] ADD CONSTRAINT [DF_settings_locks_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.settings_locks') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[settings_locks] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[settings_locks] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[settings_locks] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -5722,7 +5722,7 @@ IF OBJECT_ID(N'dbo.settings_locks', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.setti
 ) ALTER TABLE dbo.[settings_locks] ADD CONSTRAINT [DF_settings_locks_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.settings_locks') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[settings_locks] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[settings_locks] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[settings_locks] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -5754,7 +5754,7 @@ IF OBJECT_ID(N'dbo.settings_overrides', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
 ) ALTER TABLE dbo.[settings_overrides] ADD CONSTRAINT [DF_settings_overrides_scope] DEFAULT ('BRANCH') FOR [scope];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.settings_overrides') AND name=N'scope' AND is_nullable=1) BEGIN
-  UPDATE dbo.[settings_overrides] SET [scope]='BRANCH' WHERE [scope] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[settings_overrides] SET [scope]=''BRANCH'' WHERE [scope] IS NULL;';
   ALTER TABLE dbo.[settings_overrides] ALTER COLUMN [scope] nvarchar(128) NOT NULL;
 END;
 
@@ -5769,7 +5769,7 @@ IF OBJECT_ID(N'dbo.settings_overrides', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
 ) ALTER TABLE dbo.[settings_overrides] ADD CONSTRAINT [DF_settings_overrides_scope_id] DEFAULT ('') FOR [scope_id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.settings_overrides') AND name=N'scope_id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[settings_overrides] SET [scope_id]='' WHERE [scope_id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[settings_overrides] SET [scope_id]='''' WHERE [scope_id] IS NULL;';
   ALTER TABLE dbo.[settings_overrides] ALTER COLUMN [scope_id] nvarchar(128) NOT NULL;
 END;
 
@@ -5788,7 +5788,7 @@ IF OBJECT_ID(N'dbo.settings_overrides', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
 ) ALTER TABLE dbo.[settings_overrides] ADD CONSTRAINT [DF_settings_overrides_patch] DEFAULT (N'{}') FOR [patch];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.settings_overrides') AND name=N'patch' AND is_nullable=1) BEGIN
-  UPDATE dbo.[settings_overrides] SET [patch]=N'{}' WHERE [patch] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[settings_overrides] SET [patch]=N''{}'' WHERE [patch] IS NULL;';
   ALTER TABLE dbo.[settings_overrides] ALTER COLUMN [patch] nvarchar(max) NOT NULL;
 END;
 
@@ -5803,7 +5803,7 @@ IF OBJECT_ID(N'dbo.settings_overrides', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
 ) ALTER TABLE dbo.[settings_overrides] ADD CONSTRAINT [DF_settings_overrides_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.settings_overrides') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[settings_overrides] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[settings_overrides] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[settings_overrides] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -5816,7 +5816,7 @@ IF OBJECT_ID(N'dbo.settings_overrides', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
 ) ALTER TABLE dbo.[settings_overrides] ADD CONSTRAINT [DF_settings_overrides_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.settings_overrides') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[settings_overrides] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[settings_overrides] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[settings_overrides] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -5854,7 +5854,7 @@ IF OBJECT_ID(N'dbo.shift_sessions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shift
 ) ALTER TABLE dbo.[shift_sessions] ADD CONSTRAINT [DF_shift_sessions_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_sessions') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_sessions] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_sessions] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[shift_sessions] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -5885,7 +5885,7 @@ IF OBJECT_ID(N'dbo.shift_sessions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shift
 ) ALTER TABLE dbo.[shift_sessions] ADD CONSTRAINT [DF_shift_sessions_signed_in_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [signed_in_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_sessions') AND name=N'signed_in_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_sessions] SET [signed_in_at]=SYSDATETIMEOFFSET() WHERE [signed_in_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_sessions] SET [signed_in_at]=SYSDATETIMEOFFSET() WHERE [signed_in_at] IS NULL;';
   ALTER TABLE dbo.[shift_sessions] ALTER COLUMN [signed_in_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -5900,7 +5900,7 @@ IF OBJECT_ID(N'dbo.shift_sessions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shift
 ) ALTER TABLE dbo.[shift_sessions] ADD CONSTRAINT [DF_shift_sessions_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_sessions') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_sessions] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_sessions] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[shift_sessions] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -5913,7 +5913,7 @@ IF OBJECT_ID(N'dbo.shift_sessions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shift
 ) ALTER TABLE dbo.[shift_sessions] ADD CONSTRAINT [DF_shift_sessions_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_sessions') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_sessions] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_sessions] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[shift_sessions] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -5928,7 +5928,7 @@ IF OBJECT_ID(N'dbo.shift_sessions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shift
 ) ALTER TABLE dbo.[shift_sessions] ADD CONSTRAINT [DF_shift_sessions_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_sessions') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_sessions] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_sessions] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[shift_sessions] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -5966,7 +5966,7 @@ IF OBJECT_ID(N'dbo.sku_audit', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sku_audit'
 ) ALTER TABLE dbo.[sku_audit] ADD CONSTRAINT [DF_sku_audit_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sku_audit') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sku_audit] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sku_audit] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[sku_audit] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -5987,7 +5987,7 @@ IF OBJECT_ID(N'dbo.sku_audit', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sku_audit'
 ) ALTER TABLE dbo.[sku_audit] ADD CONSTRAINT [DF_sku_audit_source] DEFAULT ('auto') FOR [source];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sku_audit') AND name=N'source' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sku_audit] SET [source]='auto' WHERE [source] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sku_audit] SET [source]=''auto'' WHERE [source] IS NULL;';
   ALTER TABLE dbo.[sku_audit] ALTER COLUMN [source] nvarchar(max) NOT NULL;
 END;
 
@@ -6016,7 +6016,7 @@ IF OBJECT_ID(N'dbo.sku_audit', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sku_audit'
 ) ALTER TABLE dbo.[sku_audit] ADD CONSTRAINT [DF_sku_audit_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sku_audit') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sku_audit] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sku_audit] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[sku_audit] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -6052,7 +6052,7 @@ IF OBJECT_ID(N'dbo.staff_roles', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.staff_ro
 ) ALTER TABLE dbo.[staff_roles] ADD CONSTRAINT [DF_staff_roles_base_level] DEFAULT ('cashier') FOR [base_level];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.staff_roles') AND name=N'base_level' AND is_nullable=1) BEGIN
-  UPDATE dbo.[staff_roles] SET [base_level]='cashier' WHERE [base_level] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[staff_roles] SET [base_level]=''cashier'' WHERE [base_level] IS NULL;';
   ALTER TABLE dbo.[staff_roles] ALTER COLUMN [base_level] nvarchar(max) NOT NULL;
 END;
 
@@ -6065,7 +6065,7 @@ IF OBJECT_ID(N'dbo.staff_roles', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.staff_ro
 ) ALTER TABLE dbo.[staff_roles] ADD CONSTRAINT [DF_staff_roles_permissions] DEFAULT (N'{}') FOR [permissions];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.staff_roles') AND name=N'permissions' AND is_nullable=1) BEGIN
-  UPDATE dbo.[staff_roles] SET [permissions]=N'{}' WHERE [permissions] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[staff_roles] SET [permissions]=N''{}'' WHERE [permissions] IS NULL;';
   ALTER TABLE dbo.[staff_roles] ALTER COLUMN [permissions] nvarchar(max) NOT NULL;
 END;
 
@@ -6078,7 +6078,7 @@ IF OBJECT_ID(N'dbo.staff_roles', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.staff_ro
 ) ALTER TABLE dbo.[staff_roles] ADD CONSTRAINT [DF_staff_roles_is_core] DEFAULT (0) FOR [is_core];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.staff_roles') AND name=N'is_core' AND is_nullable=1) BEGIN
-  UPDATE dbo.[staff_roles] SET [is_core]=0 WHERE [is_core] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[staff_roles] SET [is_core]=0 WHERE [is_core] IS NULL;';
   ALTER TABLE dbo.[staff_roles] ALTER COLUMN [is_core] bit NOT NULL;
 END;
 
@@ -6091,7 +6091,7 @@ IF OBJECT_ID(N'dbo.staff_roles', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.staff_ro
 ) ALTER TABLE dbo.[staff_roles] ADD CONSTRAINT [DF_staff_roles_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.staff_roles') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[staff_roles] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[staff_roles] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[staff_roles] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -6104,7 +6104,7 @@ IF OBJECT_ID(N'dbo.staff_roles', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.staff_ro
 ) ALTER TABLE dbo.[staff_roles] ADD CONSTRAINT [DF_staff_roles_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.staff_roles') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[staff_roles] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[staff_roles] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[staff_roles] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -6148,7 +6148,7 @@ IF OBJECT_ID(N'dbo.stock_adjustments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.st
 ) ALTER TABLE dbo.[stock_adjustments] ADD CONSTRAINT [DF_stock_adjustments_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_adjustments') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_adjustments] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_adjustments] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[stock_adjustments] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -6179,7 +6179,7 @@ IF OBJECT_ID(N'dbo.stock_adjustments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.st
 ) ALTER TABLE dbo.[stock_adjustments] ADD CONSTRAINT [DF_stock_adjustments_reason] DEFAULT ('manual') FOR [reason];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_adjustments') AND name=N'reason' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_adjustments] SET [reason]='manual' WHERE [reason] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_adjustments] SET [reason]=''manual'' WHERE [reason] IS NULL;';
   ALTER TABLE dbo.[stock_adjustments] ALTER COLUMN [reason] nvarchar(max) NOT NULL;
 END;
 
@@ -6192,7 +6192,7 @@ IF OBJECT_ID(N'dbo.stock_adjustments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.st
 ) ALTER TABLE dbo.[stock_adjustments] ADD CONSTRAINT [DF_stock_adjustments_note] DEFAULT ('') FOR [note];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_adjustments') AND name=N'note' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_adjustments] SET [note]='' WHERE [note] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_adjustments] SET [note]='''' WHERE [note] IS NULL;';
   ALTER TABLE dbo.[stock_adjustments] ALTER COLUMN [note] nvarchar(max) NOT NULL;
 END;
 
@@ -6205,7 +6205,7 @@ IF OBJECT_ID(N'dbo.stock_adjustments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.st
 ) ALTER TABLE dbo.[stock_adjustments] ADD CONSTRAINT [DF_stock_adjustments_previous_stock] DEFAULT (0) FOR [previous_stock];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_adjustments') AND name=N'previous_stock' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_adjustments] SET [previous_stock]=0 WHERE [previous_stock] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_adjustments] SET [previous_stock]=0 WHERE [previous_stock] IS NULL;';
   ALTER TABLE dbo.[stock_adjustments] ALTER COLUMN [previous_stock] int NOT NULL;
 END;
 
@@ -6218,7 +6218,7 @@ IF OBJECT_ID(N'dbo.stock_adjustments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.st
 ) ALTER TABLE dbo.[stock_adjustments] ADD CONSTRAINT [DF_stock_adjustments_updated_stock] DEFAULT (0) FOR [updated_stock];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_adjustments') AND name=N'updated_stock' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_adjustments] SET [updated_stock]=0 WHERE [updated_stock] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_adjustments] SET [updated_stock]=0 WHERE [updated_stock] IS NULL;';
   ALTER TABLE dbo.[stock_adjustments] ALTER COLUMN [updated_stock] int NOT NULL;
 END;
 
@@ -6231,7 +6231,7 @@ IF OBJECT_ID(N'dbo.stock_adjustments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.st
 ) ALTER TABLE dbo.[stock_adjustments] ADD CONSTRAINT [DF_stock_adjustments_delta] DEFAULT (0) FOR [delta];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_adjustments') AND name=N'delta' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_adjustments] SET [delta]=0 WHERE [delta] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_adjustments] SET [delta]=0 WHERE [delta] IS NULL;';
   ALTER TABLE dbo.[stock_adjustments] ALTER COLUMN [delta] int NOT NULL;
 END;
 
@@ -6244,7 +6244,7 @@ IF OBJECT_ID(N'dbo.stock_adjustments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.st
 ) ALTER TABLE dbo.[stock_adjustments] ADD CONSTRAINT [DF_stock_adjustments_cost_impact] DEFAULT (0) FOR [cost_impact];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_adjustments') AND name=N'cost_impact' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_adjustments] SET [cost_impact]=0 WHERE [cost_impact] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_adjustments] SET [cost_impact]=0 WHERE [cost_impact] IS NULL;';
   ALTER TABLE dbo.[stock_adjustments] ALTER COLUMN [cost_impact] decimal(38,12) NOT NULL;
 END;
 
@@ -6263,7 +6263,7 @@ IF OBJECT_ID(N'dbo.stock_adjustments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.st
 ) ALTER TABLE dbo.[stock_adjustments] ADD CONSTRAINT [DF_stock_adjustments_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_adjustments') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_adjustments] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_adjustments] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[stock_adjustments] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -6276,7 +6276,7 @@ IF OBJECT_ID(N'dbo.stock_adjustments', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.st
 ) ALTER TABLE dbo.[stock_adjustments] ADD CONSTRAINT [DF_stock_adjustments_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_adjustments') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_adjustments] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_adjustments] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[stock_adjustments] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -6316,7 +6316,7 @@ IF OBJECT_ID(N'dbo.stock_delta_applied', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.
 ) ALTER TABLE dbo.[stock_delta_applied] ADD CONSTRAINT [DF_stock_delta_applied_delta] DEFAULT (0) FOR [delta];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_delta_applied') AND name=N'delta' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_delta_applied] SET [delta]=0 WHERE [delta] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_delta_applied] SET [delta]=0 WHERE [delta] IS NULL;';
   ALTER TABLE dbo.[stock_delta_applied] ALTER COLUMN [delta] int NOT NULL;
 END;
 
@@ -6329,7 +6329,7 @@ IF OBJECT_ID(N'dbo.stock_delta_applied', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.
 ) ALTER TABLE dbo.[stock_delta_applied] ADD CONSTRAINT [DF_stock_delta_applied_applied_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [applied_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_delta_applied') AND name=N'applied_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_delta_applied] SET [applied_at]=SYSDATETIMEOFFSET() WHERE [applied_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_delta_applied] SET [applied_at]=SYSDATETIMEOFFSET() WHERE [applied_at] IS NULL;';
   ALTER TABLE dbo.[stock_delta_applied] ALTER COLUMN [applied_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -6366,7 +6366,7 @@ IF OBJECT_ID(N'dbo.stock_transfer_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[stock_transfer_items] ADD CONSTRAINT [DF_stock_transfer_items_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_transfer_items') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_transfer_items] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_transfer_items] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[stock_transfer_items] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -6395,7 +6395,7 @@ IF OBJECT_ID(N'dbo.stock_transfer_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[stock_transfer_items] ADD CONSTRAINT [DF_stock_transfer_items_quantity] DEFAULT (0) FOR [quantity];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_transfer_items') AND name=N'quantity' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_transfer_items] SET [quantity]=0 WHERE [quantity] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_transfer_items] SET [quantity]=0 WHERE [quantity] IS NULL;';
   ALTER TABLE dbo.[stock_transfer_items] ALTER COLUMN [quantity] int NOT NULL;
 END;
 
@@ -6408,7 +6408,7 @@ IF OBJECT_ID(N'dbo.stock_transfer_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[stock_transfer_items] ADD CONSTRAINT [DF_stock_transfer_items_quantity_received] DEFAULT (0) FOR [quantity_received];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_transfer_items') AND name=N'quantity_received' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_transfer_items] SET [quantity_received]=0 WHERE [quantity_received] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_transfer_items] SET [quantity_received]=0 WHERE [quantity_received] IS NULL;';
   ALTER TABLE dbo.[stock_transfer_items] ALTER COLUMN [quantity_received] int NOT NULL;
 END;
 
@@ -6421,7 +6421,7 @@ IF OBJECT_ID(N'dbo.stock_transfer_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[stock_transfer_items] ADD CONSTRAINT [DF_stock_transfer_items_unit_cost] DEFAULT (0) FOR [unit_cost];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_transfer_items') AND name=N'unit_cost' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_transfer_items] SET [unit_cost]=0 WHERE [unit_cost] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_transfer_items] SET [unit_cost]=0 WHERE [unit_cost] IS NULL;';
   ALTER TABLE dbo.[stock_transfer_items] ALTER COLUMN [unit_cost] decimal(38,12) NOT NULL;
 END;
 
@@ -6434,7 +6434,7 @@ IF OBJECT_ID(N'dbo.stock_transfer_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[stock_transfer_items] ADD CONSTRAINT [DF_stock_transfer_items_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_transfer_items') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_transfer_items] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_transfer_items] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[stock_transfer_items] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -6447,7 +6447,7 @@ IF OBJECT_ID(N'dbo.stock_transfer_items', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 ) ALTER TABLE dbo.[stock_transfer_items] ADD CONSTRAINT [DF_stock_transfer_items_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_transfer_items') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_transfer_items] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_transfer_items] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[stock_transfer_items] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -6499,7 +6499,7 @@ IF OBJECT_ID(N'dbo.stock_transfers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stoc
 ) ALTER TABLE dbo.[stock_transfers] ADD CONSTRAINT [DF_stock_transfers_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_transfers') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_transfers] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_transfers] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[stock_transfers] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -6518,7 +6518,7 @@ IF OBJECT_ID(N'dbo.stock_transfers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stoc
 ) ALTER TABLE dbo.[stock_transfers] ADD CONSTRAINT [DF_stock_transfers_kind] DEFAULT ('transfer') FOR [kind];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_transfers') AND name=N'kind' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_transfers] SET [kind]='transfer' WHERE [kind] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_transfers] SET [kind]=''transfer'' WHERE [kind] IS NULL;';
   ALTER TABLE dbo.[stock_transfers] ALTER COLUMN [kind] nvarchar(max) NOT NULL;
 END;
 
@@ -6531,7 +6531,7 @@ IF OBJECT_ID(N'dbo.stock_transfers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stoc
 ) ALTER TABLE dbo.[stock_transfers] ADD CONSTRAINT [DF_stock_transfers_transfer_scope] DEFAULT ('INTRA_GROUP') FOR [transfer_scope];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_transfers') AND name=N'transfer_scope' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_transfers] SET [transfer_scope]='INTRA_GROUP' WHERE [transfer_scope] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_transfers] SET [transfer_scope]=''INTRA_GROUP'' WHERE [transfer_scope] IS NULL;';
   ALTER TABLE dbo.[stock_transfers] ALTER COLUMN [transfer_scope] nvarchar(max) NOT NULL;
 END;
 
@@ -6556,7 +6556,7 @@ IF OBJECT_ID(N'dbo.stock_transfers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stoc
 ) ALTER TABLE dbo.[stock_transfers] ADD CONSTRAINT [DF_stock_transfers_status] DEFAULT ('pending') FOR [status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_transfers') AND name=N'status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_transfers] SET [status]='pending' WHERE [status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_transfers] SET [status]=''pending'' WHERE [status] IS NULL;';
   ALTER TABLE dbo.[stock_transfers] ALTER COLUMN [status] nvarchar(max) NOT NULL;
 END;
 
@@ -6569,7 +6569,7 @@ IF OBJECT_ID(N'dbo.stock_transfers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stoc
 ) ALTER TABLE dbo.[stock_transfers] ADD CONSTRAINT [DF_stock_transfers_note] DEFAULT ('') FOR [note];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_transfers') AND name=N'note' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_transfers] SET [note]='' WHERE [note] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_transfers] SET [note]='''' WHERE [note] IS NULL;';
   ALTER TABLE dbo.[stock_transfers] ALTER COLUMN [note] nvarchar(max) NOT NULL;
 END;
 
@@ -6594,7 +6594,7 @@ IF OBJECT_ID(N'dbo.stock_transfers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stoc
 ) ALTER TABLE dbo.[stock_transfers] ADD CONSTRAINT [DF_stock_transfers_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_transfers') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_transfers] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_transfers] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[stock_transfers] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -6607,7 +6607,7 @@ IF OBJECT_ID(N'dbo.stock_transfers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stoc
 ) ALTER TABLE dbo.[stock_transfers] ADD CONSTRAINT [DF_stock_transfers_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_transfers') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_transfers] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_transfers] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[stock_transfers] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -6622,7 +6622,7 @@ IF OBJECT_ID(N'dbo.stock_transfers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stoc
 ) ALTER TABLE dbo.[stock_transfers] ADD CONSTRAINT [DF_stock_transfers_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_transfers') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_transfers] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_transfers] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[stock_transfers] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -6685,7 +6685,7 @@ IF OBJECT_ID(N'dbo.stores', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stores', N'cr
 ) ALTER TABLE dbo.[stores] ADD CONSTRAINT [DF_stores_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stores') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stores] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stores] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[stores] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -6698,7 +6698,7 @@ IF OBJECT_ID(N'dbo.stores', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stores', N'up
 ) ALTER TABLE dbo.[stores] ADD CONSTRAINT [DF_stores_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stores') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stores] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stores] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[stores] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -6717,7 +6717,7 @@ IF OBJECT_ID(N'dbo.stores', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stores', N'ro
 ) ALTER TABLE dbo.[stores] ADD CONSTRAINT [DF_stores_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stores') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stores] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stores] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[stores] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -6730,7 +6730,7 @@ IF OBJECT_ID(N'dbo.stores', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stores', N'lo
 ) ALTER TABLE dbo.[stores] ADD CONSTRAINT [DF_stores_location_type] DEFAULT ('store') FOR [location_type];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stores') AND name=N'location_type' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stores] SET [location_type]='store' WHERE [location_type] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stores] SET [location_type]=''store'' WHERE [location_type] IS NULL;';
   ALTER TABLE dbo.[stores] ALTER COLUMN [location_type] nvarchar(max) NOT NULL;
 END;
 
@@ -6747,7 +6747,7 @@ IF OBJECT_ID(N'dbo.stores', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stores', N'is
 ) ALTER TABLE dbo.[stores] ADD CONSTRAINT [DF_stores_is_central] DEFAULT (0) FOR [is_central];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stores') AND name=N'is_central' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stores] SET [is_central]=0 WHERE [is_central] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stores] SET [is_central]=0 WHERE [is_central] IS NULL;';
   ALTER TABLE dbo.[stores] ALTER COLUMN [is_central] bit NOT NULL;
 END;
 
@@ -6764,7 +6764,7 @@ IF OBJECT_ID(N'dbo.stores', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stores', N'is
 ) ALTER TABLE dbo.[stores] ADD CONSTRAINT [DF_stores_is_active] DEFAULT (1) FOR [is_active];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stores') AND name=N'is_active' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stores] SET [is_active]=1 WHERE [is_active] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stores] SET [is_active]=1 WHERE [is_active] IS NULL;';
   ALTER TABLE dbo.[stores] ALTER COLUMN [is_active] bit NOT NULL;
 END;
 
@@ -6779,7 +6779,7 @@ IF OBJECT_ID(N'dbo.stores', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stores', N'is
 ) ALTER TABLE dbo.[stores] ADD CONSTRAINT [DF_stores_is_primary_sub] DEFAULT (0) FOR [is_primary_sub];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stores') AND name=N'is_primary_sub' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stores] SET [is_primary_sub]=0 WHERE [is_primary_sub] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stores] SET [is_primary_sub]=0 WHERE [is_primary_sub] IS NULL;';
   ALTER TABLE dbo.[stores] ALTER COLUMN [is_primary_sub] bit NOT NULL;
 END;
 
@@ -6792,7 +6792,7 @@ IF OBJECT_ID(N'dbo.stores', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.stores', N'pr
 ) ALTER TABLE dbo.[stores] ADD CONSTRAINT [DF_stores_private_catalogue] DEFAULT (0) FOR [private_catalogue];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stores') AND name=N'private_catalogue' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stores] SET [private_catalogue]=0 WHERE [private_catalogue] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stores] SET [private_catalogue]=0 WHERE [private_catalogue] IS NULL;';
   ALTER TABLE dbo.[stores] ALTER COLUMN [private_catalogue] bit NOT NULL;
 END;
 
@@ -6827,7 +6827,7 @@ IF OBJECT_ID(N'dbo.suppliers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.suppliers'
 ) ALTER TABLE dbo.[suppliers] ADD CONSTRAINT [DF_suppliers_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.suppliers') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[suppliers] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[suppliers] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[suppliers] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -6856,7 +6856,7 @@ IF OBJECT_ID(N'dbo.suppliers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.suppliers'
 ) ALTER TABLE dbo.[suppliers] ADD CONSTRAINT [DF_suppliers_is_active] DEFAULT (1) FOR [is_active];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.suppliers') AND name=N'is_active' AND is_nullable=1) BEGIN
-  UPDATE dbo.[suppliers] SET [is_active]=1 WHERE [is_active] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[suppliers] SET [is_active]=1 WHERE [is_active] IS NULL;';
   ALTER TABLE dbo.[suppliers] ALTER COLUMN [is_active] bit NOT NULL;
 END;
 
@@ -6869,7 +6869,7 @@ IF OBJECT_ID(N'dbo.suppliers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.suppliers'
 ) ALTER TABLE dbo.[suppliers] ADD CONSTRAINT [DF_suppliers_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.suppliers') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[suppliers] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[suppliers] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[suppliers] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -6882,7 +6882,7 @@ IF OBJECT_ID(N'dbo.suppliers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.suppliers'
 ) ALTER TABLE dbo.[suppliers] ADD CONSTRAINT [DF_suppliers_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.suppliers') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[suppliers] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[suppliers] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[suppliers] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -6897,7 +6897,7 @@ IF OBJECT_ID(N'dbo.suppliers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.suppliers'
 ) ALTER TABLE dbo.[suppliers] ADD CONSTRAINT [DF_suppliers_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.suppliers') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[suppliers] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[suppliers] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[suppliers] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -6930,7 +6930,7 @@ IF OBJECT_ID(N'dbo.sync_metadata', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sync_m
 ) ALTER TABLE dbo.[sync_metadata] ADD CONSTRAINT [DF_sync_metadata_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sync_metadata') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sync_metadata] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sync_metadata] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[sync_metadata] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -6961,7 +6961,7 @@ IF OBJECT_ID(N'dbo.sync_metadata', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sync_m
 ) ALTER TABLE dbo.[sync_metadata] ADD CONSTRAINT [DF_sync_metadata_rows_pushed] DEFAULT (0) FOR [rows_pushed];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sync_metadata') AND name=N'rows_pushed' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sync_metadata] SET [rows_pushed]=0 WHERE [rows_pushed] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sync_metadata] SET [rows_pushed]=0 WHERE [rows_pushed] IS NULL;';
   ALTER TABLE dbo.[sync_metadata] ALTER COLUMN [rows_pushed] int NOT NULL;
 END;
 
@@ -6976,7 +6976,7 @@ IF OBJECT_ID(N'dbo.sync_metadata', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sync_m
 ) ALTER TABLE dbo.[sync_metadata] ADD CONSTRAINT [DF_sync_metadata_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sync_metadata') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sync_metadata] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sync_metadata] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[sync_metadata] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -6989,7 +6989,7 @@ IF OBJECT_ID(N'dbo.sync_metadata', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sync_m
 ) ALTER TABLE dbo.[sync_metadata] ADD CONSTRAINT [DF_sync_metadata_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sync_metadata') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[sync_metadata] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[sync_metadata] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[sync_metadata] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -7032,7 +7032,7 @@ IF OBJECT_ID(N'dbo.system_audit_logs', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sy
 ) ALTER TABLE dbo.[system_audit_logs] ADD CONSTRAINT [DF_system_audit_logs_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.system_audit_logs') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[system_audit_logs] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[system_audit_logs] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[system_audit_logs] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -7073,7 +7073,7 @@ IF OBJECT_ID(N'dbo.system_audit_logs', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sy
 ) ALTER TABLE dbo.[system_audit_logs] ADD CONSTRAINT [DF_system_audit_logs_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.system_audit_logs') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[system_audit_logs] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[system_audit_logs] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[system_audit_logs] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -7109,7 +7109,7 @@ IF OBJECT_ID(N'dbo.terminal_commands', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.te
 ) ALTER TABLE dbo.[terminal_commands] ADD CONSTRAINT [DF_terminal_commands_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.terminal_commands') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[terminal_commands] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[terminal_commands] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[terminal_commands] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -7132,7 +7132,7 @@ IF OBJECT_ID(N'dbo.terminal_commands', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.te
 ) ALTER TABLE dbo.[terminal_commands] ADD CONSTRAINT [DF_terminal_commands_status] DEFAULT ('pending') FOR [status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.terminal_commands') AND name=N'status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[terminal_commands] SET [status]='pending' WHERE [status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[terminal_commands] SET [status]=''pending'' WHERE [status] IS NULL;';
   ALTER TABLE dbo.[terminal_commands] ALTER COLUMN [status] nvarchar(max) NOT NULL;
 END;
 
@@ -7157,7 +7157,7 @@ IF OBJECT_ID(N'dbo.terminal_commands', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.te
 ) ALTER TABLE dbo.[terminal_commands] ADD CONSTRAINT [DF_terminal_commands_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.terminal_commands') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[terminal_commands] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[terminal_commands] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[terminal_commands] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -7170,7 +7170,7 @@ IF OBJECT_ID(N'dbo.terminal_commands', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.te
 ) ALTER TABLE dbo.[terminal_commands] ADD CONSTRAINT [DF_terminal_commands_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.terminal_commands') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[terminal_commands] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[terminal_commands] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[terminal_commands] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -7214,7 +7214,7 @@ IF OBJECT_ID(N'dbo.terminal_tokens', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.term
 ) ALTER TABLE dbo.[terminal_tokens] ADD CONSTRAINT [DF_terminal_tokens_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.terminal_tokens') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[terminal_tokens] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[terminal_tokens] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[terminal_tokens] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -7237,7 +7237,7 @@ IF OBJECT_ID(N'dbo.terminal_tokens', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.term
 ) ALTER TABLE dbo.[terminal_tokens] ADD CONSTRAINT [DF_terminal_tokens_status] DEFAULT ('active') FOR [status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.terminal_tokens') AND name=N'status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[terminal_tokens] SET [status]='active' WHERE [status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[terminal_tokens] SET [status]=''active'' WHERE [status] IS NULL;';
   ALTER TABLE dbo.[terminal_tokens] ALTER COLUMN [status] nvarchar(max) NOT NULL;
 END;
 
@@ -7250,7 +7250,7 @@ IF OBJECT_ID(N'dbo.terminal_tokens', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.term
 ) ALTER TABLE dbo.[terminal_tokens] ADD CONSTRAINT [DF_terminal_tokens_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.terminal_tokens') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[terminal_tokens] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[terminal_tokens] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[terminal_tokens] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -7281,7 +7281,7 @@ IF OBJECT_ID(N'dbo.terminal_tokens', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.term
 ) ALTER TABLE dbo.[terminal_tokens] ADD CONSTRAINT [DF_terminal_tokens_platform] DEFAULT ('unknown') FOR [platform];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.terminal_tokens') AND name=N'platform' AND is_nullable=1) BEGIN
-  UPDATE dbo.[terminal_tokens] SET [platform]='unknown' WHERE [platform] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[terminal_tokens] SET [platform]=''unknown'' WHERE [platform] IS NULL;';
   ALTER TABLE dbo.[terminal_tokens] ALTER COLUMN [platform] nvarchar(max) NOT NULL;
 END;
 
@@ -7294,7 +7294,7 @@ IF OBJECT_ID(N'dbo.terminal_tokens', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.term
 ) ALTER TABLE dbo.[terminal_tokens] ADD CONSTRAINT [DF_terminal_tokens_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.terminal_tokens') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[terminal_tokens] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[terminal_tokens] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[terminal_tokens] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -7324,7 +7324,7 @@ IF OBJECT_ID(N'dbo.uom_units', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.uom_units'
 ) ALTER TABLE dbo.[uom_units] ADD CONSTRAINT [DF_uom_units_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.uom_units') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[uom_units] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[uom_units] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[uom_units] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -7345,7 +7345,7 @@ IF OBJECT_ID(N'dbo.uom_units', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.uom_units'
 ) ALTER TABLE dbo.[uom_units] ADD CONSTRAINT [DF_uom_units_allow_decimal] DEFAULT (0) FOR [allow_decimal];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.uom_units') AND name=N'allow_decimal' AND is_nullable=1) BEGIN
-  UPDATE dbo.[uom_units] SET [allow_decimal]=0 WHERE [allow_decimal] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[uom_units] SET [allow_decimal]=0 WHERE [allow_decimal] IS NULL;';
   ALTER TABLE dbo.[uom_units] ALTER COLUMN [allow_decimal] bit NOT NULL;
 END;
 
@@ -7358,7 +7358,7 @@ IF OBJECT_ID(N'dbo.uom_units', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.uom_units'
 ) ALTER TABLE dbo.[uom_units] ADD CONSTRAINT [DF_uom_units_sort] DEFAULT (0) FOR [sort];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.uom_units') AND name=N'sort' AND is_nullable=1) BEGIN
-  UPDATE dbo.[uom_units] SET [sort]=0 WHERE [sort] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[uom_units] SET [sort]=0 WHERE [sort] IS NULL;';
   ALTER TABLE dbo.[uom_units] ALTER COLUMN [sort] int NOT NULL;
 END;
 
@@ -7371,7 +7371,7 @@ IF OBJECT_ID(N'dbo.uom_units', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.uom_units'
 ) ALTER TABLE dbo.[uom_units] ADD CONSTRAINT [DF_uom_units_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.uom_units') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[uom_units] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[uom_units] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[uom_units] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -7384,7 +7384,7 @@ IF OBJECT_ID(N'dbo.uom_units', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.uom_units'
 ) ALTER TABLE dbo.[uom_units] ADD CONSTRAINT [DF_uom_units_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.uom_units') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[uom_units] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[uom_units] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[uom_units] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -7399,7 +7399,7 @@ IF OBJECT_ID(N'dbo.uom_units', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.uom_units'
 ) ALTER TABLE dbo.[uom_units] ADD CONSTRAINT [DF_uom_units_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.uom_units') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[uom_units] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[uom_units] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[uom_units] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -7412,7 +7412,7 @@ IF OBJECT_ID(N'dbo.uom_units', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.uom_units'
 ) ALTER TABLE dbo.[uom_units] ADD CONSTRAINT [DF_uom_units_is_active] DEFAULT (1) FOR [is_active];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.uom_units') AND name=N'is_active' AND is_nullable=1) BEGIN
-  UPDATE dbo.[uom_units] SET [is_active]=1 WHERE [is_active] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[uom_units] SET [is_active]=1 WHERE [is_active] IS NULL;';
   ALTER TABLE dbo.[uom_units] ALTER COLUMN [is_active] bit NOT NULL;
 END;
 
@@ -7441,7 +7441,7 @@ IF OBJECT_ID(N'dbo.user_roles', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.user_role
 ) ALTER TABLE dbo.[user_roles] ADD CONSTRAINT [DF_user_roles_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.user_roles') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[user_roles] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[user_roles] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[user_roles] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -7464,7 +7464,7 @@ IF OBJECT_ID(N'dbo.user_roles', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.user_role
 ) ALTER TABLE dbo.[user_roles] ADD CONSTRAINT [DF_user_roles_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.user_roles') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[user_roles] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[user_roles] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[user_roles] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -7499,7 +7499,7 @@ IF OBJECT_ID(N'dbo.whatsapp_queue', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.whats
 ) ALTER TABLE dbo.[whatsapp_queue] ADD CONSTRAINT [DF_whatsapp_queue_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.whatsapp_queue') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[whatsapp_queue] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[whatsapp_queue] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[whatsapp_queue] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -7514,7 +7514,7 @@ IF OBJECT_ID(N'dbo.whatsapp_queue', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.whats
 ) ALTER TABLE dbo.[whatsapp_queue] ADD CONSTRAINT [DF_whatsapp_queue_phone_number_id] DEFAULT ('') FOR [phone_number_id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.whatsapp_queue') AND name=N'phone_number_id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[whatsapp_queue] SET [phone_number_id]='' WHERE [phone_number_id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[whatsapp_queue] SET [phone_number_id]='''' WHERE [phone_number_id] IS NULL;';
   ALTER TABLE dbo.[whatsapp_queue] ALTER COLUMN [phone_number_id] nvarchar(max) NOT NULL;
 END;
 
@@ -7529,7 +7529,7 @@ IF OBJECT_ID(N'dbo.whatsapp_queue', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.whats
 ) ALTER TABLE dbo.[whatsapp_queue] ADD CONSTRAINT [DF_whatsapp_queue_body] DEFAULT ('') FOR [body];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.whatsapp_queue') AND name=N'body' AND is_nullable=1) BEGIN
-  UPDATE dbo.[whatsapp_queue] SET [body]='' WHERE [body] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[whatsapp_queue] SET [body]='''' WHERE [body] IS NULL;';
   ALTER TABLE dbo.[whatsapp_queue] ALTER COLUMN [body] nvarchar(max) NOT NULL;
 END;
 
@@ -7548,7 +7548,7 @@ IF OBJECT_ID(N'dbo.whatsapp_queue', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.whats
 ) ALTER TABLE dbo.[whatsapp_queue] ADD CONSTRAINT [DF_whatsapp_queue_status] DEFAULT ('QUEUED') FOR [status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.whatsapp_queue') AND name=N'status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[whatsapp_queue] SET [status]='QUEUED' WHERE [status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[whatsapp_queue] SET [status]=''QUEUED'' WHERE [status] IS NULL;';
   ALTER TABLE dbo.[whatsapp_queue] ALTER COLUMN [status] nvarchar(max) NOT NULL;
 END;
 
@@ -7563,7 +7563,7 @@ IF OBJECT_ID(N'dbo.whatsapp_queue', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.whats
 ) ALTER TABLE dbo.[whatsapp_queue] ADD CONSTRAINT [DF_whatsapp_queue_queued_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [queued_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.whatsapp_queue') AND name=N'queued_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[whatsapp_queue] SET [queued_at]=SYSDATETIMEOFFSET() WHERE [queued_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[whatsapp_queue] SET [queued_at]=SYSDATETIMEOFFSET() WHERE [queued_at] IS NULL;';
   ALTER TABLE dbo.[whatsapp_queue] ALTER COLUMN [queued_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -7578,7 +7578,7 @@ IF OBJECT_ID(N'dbo.whatsapp_queue', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.whats
 ) ALTER TABLE dbo.[whatsapp_queue] ADD CONSTRAINT [DF_whatsapp_queue_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.whatsapp_queue') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[whatsapp_queue] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[whatsapp_queue] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[whatsapp_queue] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -7591,7 +7591,7 @@ IF OBJECT_ID(N'dbo.whatsapp_queue', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.whats
 ) ALTER TABLE dbo.[whatsapp_queue] ADD CONSTRAINT [DF_whatsapp_queue_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.whatsapp_queue') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[whatsapp_queue] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[whatsapp_queue] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[whatsapp_queue] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -7634,7 +7634,7 @@ IF OBJECT_ID(N'dbo.terminal_recovery_secrets', N'U') IS NOT NULL AND COL_LENGTH(
 ) ALTER TABLE dbo.[terminal_recovery_secrets] ADD CONSTRAINT [DF_terminal_recovery_secrets_platform] DEFAULT ('unknown') FOR [platform];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.terminal_recovery_secrets') AND name=N'platform' AND is_nullable=1) BEGIN
-  UPDATE dbo.[terminal_recovery_secrets] SET [platform]='unknown' WHERE [platform] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[terminal_recovery_secrets] SET [platform]=''unknown'' WHERE [platform] IS NULL;';
   ALTER TABLE dbo.[terminal_recovery_secrets] ALTER COLUMN [platform] nvarchar(max) NOT NULL;
 END;
 
@@ -7649,7 +7649,7 @@ IF OBJECT_ID(N'dbo.terminal_recovery_secrets', N'U') IS NOT NULL AND COL_LENGTH(
 ) ALTER TABLE dbo.[terminal_recovery_secrets] ADD CONSTRAINT [DF_terminal_recovery_secrets_utc_offset_minutes] DEFAULT (0) FOR [utc_offset_minutes];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.terminal_recovery_secrets') AND name=N'utc_offset_minutes' AND is_nullable=1) BEGIN
-  UPDATE dbo.[terminal_recovery_secrets] SET [utc_offset_minutes]=0 WHERE [utc_offset_minutes] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[terminal_recovery_secrets] SET [utc_offset_minutes]=0 WHERE [utc_offset_minutes] IS NULL;';
   ALTER TABLE dbo.[terminal_recovery_secrets] ALTER COLUMN [utc_offset_minutes] int NOT NULL;
 END;
 
@@ -7662,7 +7662,7 @@ IF OBJECT_ID(N'dbo.terminal_recovery_secrets', N'U') IS NOT NULL AND COL_LENGTH(
 ) ALTER TABLE dbo.[terminal_recovery_secrets] ADD CONSTRAINT [DF_terminal_recovery_secrets_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.terminal_recovery_secrets') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[terminal_recovery_secrets] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[terminal_recovery_secrets] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[terminal_recovery_secrets] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -7675,7 +7675,7 @@ IF OBJECT_ID(N'dbo.terminal_recovery_secrets', N'U') IS NOT NULL AND COL_LENGTH(
 ) ALTER TABLE dbo.[terminal_recovery_secrets] ADD CONSTRAINT [DF_terminal_recovery_secrets_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.terminal_recovery_secrets') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[terminal_recovery_secrets] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[terminal_recovery_secrets] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[terminal_recovery_secrets] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -7834,7 +7834,7 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_store_settings] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
@@ -7849,7 +7849,7 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_store_settings] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -7864,7 +7864,7 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_allow_offline_approvals] DEFAULT (1) FOR [allow_offline_approvals];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'allow_offline_approvals' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_store_settings] SET [allow_offline_approvals]=1 WHERE [allow_offline_approvals] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [allow_offline_approvals]=1 WHERE [allow_offline_approvals] IS NULL;';
   ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [allow_offline_approvals] bit NOT NULL;
 END;
 
@@ -7877,7 +7877,7 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_offline_approval_requires_pin] DEFAULT (1) FOR [offline_approval_requires_pin];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'offline_approval_requires_pin' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_store_settings] SET [offline_approval_requires_pin]=1 WHERE [offline_approval_requires_pin] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [offline_approval_requires_pin]=1 WHERE [offline_approval_requires_pin] IS NULL;';
   ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [offline_approval_requires_pin] bit NOT NULL;
 END;
 
@@ -7890,7 +7890,7 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_online_only_void_cart] DEFAULT (0) FOR [online_only_void_cart];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'online_only_void_cart' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_store_settings] SET [online_only_void_cart]=0 WHERE [online_only_void_cart] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [online_only_void_cart]=0 WHERE [online_only_void_cart] IS NULL;';
   ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [online_only_void_cart] bit NOT NULL;
 END;
 
@@ -7903,7 +7903,7 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_online_only_void_line] DEFAULT (0) FOR [online_only_void_line];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'online_only_void_line' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_store_settings] SET [online_only_void_line]=0 WHERE [online_only_void_line] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [online_only_void_line]=0 WHERE [online_only_void_line] IS NULL;';
   ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [online_only_void_line] bit NOT NULL;
 END;
 
@@ -7916,7 +7916,7 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_online_only_reduce_qty] DEFAULT (0) FOR [online_only_reduce_qty];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'online_only_reduce_qty' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_store_settings] SET [online_only_reduce_qty]=0 WHERE [online_only_reduce_qty] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [online_only_reduce_qty]=0 WHERE [online_only_reduce_qty] IS NULL;';
   ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [online_only_reduce_qty] bit NOT NULL;
 END;
 
@@ -7929,7 +7929,7 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_online_only_manual_discount] DEFAULT (0) FOR [online_only_manual_discount];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'online_only_manual_discount' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_store_settings] SET [online_only_manual_discount]=0 WHERE [online_only_manual_discount] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [online_only_manual_discount]=0 WHERE [online_only_manual_discount] IS NULL;';
   ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [online_only_manual_discount] bit NOT NULL;
 END;
 
@@ -7942,7 +7942,7 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_online_only_price_override] DEFAULT (0) FOR [online_only_price_override];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'online_only_price_override' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_store_settings] SET [online_only_price_override]=0 WHERE [online_only_price_override] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [online_only_price_override]=0 WHERE [online_only_price_override] IS NULL;';
   ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [online_only_price_override] bit NOT NULL;
 END;
 
@@ -7955,7 +7955,7 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_online_only_stock_adjustment] DEFAULT (0) FOR [online_only_stock_adjustment];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'online_only_stock_adjustment' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_store_settings] SET [online_only_stock_adjustment]=0 WHERE [online_only_stock_adjustment] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [online_only_stock_adjustment]=0 WHERE [online_only_stock_adjustment] IS NULL;';
   ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [online_only_stock_adjustment] bit NOT NULL;
 END;
 
@@ -7968,7 +7968,7 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_online_only_shift_close] DEFAULT (0) FOR [online_only_shift_close];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'online_only_shift_close' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_store_settings] SET [online_only_shift_close]=0 WHERE [online_only_shift_close] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [online_only_shift_close]=0 WHERE [online_only_shift_close] IS NULL;';
   ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [online_only_shift_close] bit NOT NULL;
 END;
 
@@ -7981,7 +7981,7 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_online_only_edit_tenders] DEFAULT (0) FOR [online_only_edit_tenders];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'online_only_edit_tenders' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_store_settings] SET [online_only_edit_tenders]=0 WHERE [online_only_edit_tenders] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [online_only_edit_tenders]=0 WHERE [online_only_edit_tenders] IS NULL;';
   ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [online_only_edit_tenders] bit NOT NULL;
 END;
 
@@ -7994,7 +7994,7 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_online_only_terminal_reset] DEFAULT (0) FOR [online_only_terminal_reset];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'online_only_terminal_reset' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_store_settings] SET [online_only_terminal_reset]=0 WHERE [online_only_terminal_reset] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [online_only_terminal_reset]=0 WHERE [online_only_terminal_reset] IS NULL;';
   ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [online_only_terminal_reset] bit NOT NULL;
 END;
 
@@ -8007,7 +8007,7 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 ) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_online_only_refund] DEFAULT (0) FOR [online_only_refund];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'online_only_refund' AND is_nullable=1) BEGIN
-  UPDATE dbo.[pos_store_settings] SET [online_only_refund]=0 WHERE [online_only_refund] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [online_only_refund]=0 WHERE [online_only_refund] IS NULL;';
   ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [online_only_refund] bit NOT NULL;
 END;
 
@@ -8040,7 +8040,7 @@ IF OBJECT_ID(N'dbo.settings_scoped', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sett
 ) ALTER TABLE dbo.[settings_scoped] ADD CONSTRAINT [DF_settings_scoped_scope] DEFAULT ('GLOBAL') FOR [scope];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.settings_scoped') AND name=N'scope' AND is_nullable=1) BEGIN
-  UPDATE dbo.[settings_scoped] SET [scope]='GLOBAL' WHERE [scope] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[settings_scoped] SET [scope]=''GLOBAL'' WHERE [scope] IS NULL;';
   ALTER TABLE dbo.[settings_scoped] ALTER COLUMN [scope] nvarchar(128) NOT NULL;
 END;
 
@@ -8055,7 +8055,7 @@ IF OBJECT_ID(N'dbo.settings_scoped', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sett
 ) ALTER TABLE dbo.[settings_scoped] ADD CONSTRAINT [DF_settings_scoped_scope_id] DEFAULT ('') FOR [scope_id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.settings_scoped') AND name=N'scope_id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[settings_scoped] SET [scope_id]='' WHERE [scope_id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[settings_scoped] SET [scope_id]='''' WHERE [scope_id] IS NULL;';
   ALTER TABLE dbo.[settings_scoped] ALTER COLUMN [scope_id] nvarchar(128) NOT NULL;
 END;
 
@@ -8076,7 +8076,7 @@ IF OBJECT_ID(N'dbo.settings_scoped', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sett
 ) ALTER TABLE dbo.[settings_scoped] ADD CONSTRAINT [DF_settings_scoped_is_overridden] DEFAULT (1) FOR [is_overridden];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.settings_scoped') AND name=N'is_overridden' AND is_nullable=1) BEGIN
-  UPDATE dbo.[settings_scoped] SET [is_overridden]=1 WHERE [is_overridden] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[settings_scoped] SET [is_overridden]=1 WHERE [is_overridden] IS NULL;';
   ALTER TABLE dbo.[settings_scoped] ALTER COLUMN [is_overridden] bit NOT NULL;
 END;
 
@@ -8091,7 +8091,7 @@ IF OBJECT_ID(N'dbo.settings_scoped', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sett
 ) ALTER TABLE dbo.[settings_scoped] ADD CONSTRAINT [DF_settings_scoped_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.settings_scoped') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[settings_scoped] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[settings_scoped] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[settings_scoped] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -8104,7 +8104,7 @@ IF OBJECT_ID(N'dbo.settings_scoped', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sett
 ) ALTER TABLE dbo.[settings_scoped] ADD CONSTRAINT [DF_settings_scoped_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.settings_scoped') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[settings_scoped] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[settings_scoped] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[settings_scoped] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -8163,7 +8163,7 @@ IF OBJECT_ID(N'dbo.stock_count_drafts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
 ) ALTER TABLE dbo.[stock_count_drafts] ADD CONSTRAINT [DF_stock_count_drafts_status] DEFAULT ('draft') FOR [status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_count_drafts') AND name=N'status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_count_drafts] SET [status]='draft' WHERE [status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_count_drafts] SET [status]=''draft'' WHERE [status] IS NULL;';
   ALTER TABLE dbo.[stock_count_drafts] ALTER COLUMN [status] nvarchar(max) NOT NULL;
 END;
 
@@ -8178,7 +8178,7 @@ IF OBJECT_ID(N'dbo.stock_count_drafts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
 ) ALTER TABLE dbo.[stock_count_drafts] ADD CONSTRAINT [DF_stock_count_drafts_note] DEFAULT ('') FOR [note];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_count_drafts') AND name=N'note' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_count_drafts] SET [note]='' WHERE [note] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_count_drafts] SET [note]='''' WHERE [note] IS NULL;';
   ALTER TABLE dbo.[stock_count_drafts] ALTER COLUMN [note] nvarchar(max) NOT NULL;
 END;
 
@@ -8191,7 +8191,7 @@ IF OBJECT_ID(N'dbo.stock_count_drafts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
 ) ALTER TABLE dbo.[stock_count_drafts] ADD CONSTRAINT [DF_stock_count_drafts_lines] DEFAULT (N'[]') FOR [lines];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_count_drafts') AND name=N'lines' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_count_drafts] SET [lines]=N'[]' WHERE [lines] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_count_drafts] SET [lines]=N''[]'' WHERE [lines] IS NULL;';
   ALTER TABLE dbo.[stock_count_drafts] ALTER COLUMN [lines] nvarchar(max) NOT NULL;
 END;
 
@@ -8204,7 +8204,7 @@ IF OBJECT_ID(N'dbo.stock_count_drafts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
 ) ALTER TABLE dbo.[stock_count_drafts] ADD CONSTRAINT [DF_stock_count_drafts_line_count] DEFAULT (0) FOR [line_count];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_count_drafts') AND name=N'line_count' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_count_drafts] SET [line_count]=0 WHERE [line_count] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_count_drafts] SET [line_count]=0 WHERE [line_count] IS NULL;';
   ALTER TABLE dbo.[stock_count_drafts] ALTER COLUMN [line_count] int NOT NULL;
 END;
 
@@ -8217,7 +8217,7 @@ IF OBJECT_ID(N'dbo.stock_count_drafts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
 ) ALTER TABLE dbo.[stock_count_drafts] ADD CONSTRAINT [DF_stock_count_drafts_total_impact] DEFAULT (0) FOR [total_impact];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_count_drafts') AND name=N'total_impact' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_count_drafts] SET [total_impact]=0 WHERE [total_impact] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_count_drafts] SET [total_impact]=0 WHERE [total_impact] IS NULL;';
   ALTER TABLE dbo.[stock_count_drafts] ALTER COLUMN [total_impact] decimal(18,4) NOT NULL;
 END;
 
@@ -8234,7 +8234,7 @@ IF OBJECT_ID(N'dbo.stock_count_drafts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
 ) ALTER TABLE dbo.[stock_count_drafts] ADD CONSTRAINT [DF_stock_count_drafts_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_count_drafts') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_count_drafts] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_count_drafts] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[stock_count_drafts] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -8247,7 +8247,7 @@ IF OBJECT_ID(N'dbo.stock_count_drafts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
 ) ALTER TABLE dbo.[stock_count_drafts] ADD CONSTRAINT [DF_stock_count_drafts_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stock_count_drafts') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[stock_count_drafts] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[stock_count_drafts] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[stock_count_drafts] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -8313,7 +8313,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_scope_type] DEFAULT ('global') FOR [scope_type];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_actions') AND name=N'scope_type' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_actions] SET [scope_type]='global' WHERE [scope_type] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_actions] SET [scope_type]=''global'' WHERE [scope_type] IS NULL;';
   ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [scope_type] nvarchar(128) NOT NULL;
 END;
 
@@ -8328,7 +8328,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_scope_id] DEFAULT ('') FOR [scope_id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_actions') AND name=N'scope_id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_actions] SET [scope_id]='' WHERE [scope_id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_actions] SET [scope_id]='''' WHERE [scope_id] IS NULL;';
   ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [scope_id] nvarchar(128) NOT NULL;
 END;
 
@@ -8343,7 +8343,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_mode] DEFAULT ('none') FOR [mode];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_actions') AND name=N'mode' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_actions] SET [mode]='none' WHERE [mode] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_actions] SET [mode]=''none'' WHERE [mode] IS NULL;';
   ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [mode] nvarchar(max) NOT NULL;
 END;
 
@@ -8356,7 +8356,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_allowed_roles] DEFAULT (N'[]') FOR [allowed_roles];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_actions') AND name=N'allowed_roles' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_actions] SET [allowed_roles]=N'[]' WHERE [allowed_roles] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_actions] SET [allowed_roles]=N''[]'' WHERE [allowed_roles] IS NULL;';
   ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [allowed_roles] nvarchar(max) NOT NULL;
 END;
 
@@ -8369,7 +8369,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_allowed_user_ids] DEFAULT (N'[]') FOR [allowed_user_ids];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_actions') AND name=N'allowed_user_ids' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_actions] SET [allowed_user_ids]=N'[]' WHERE [allowed_user_ids] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_actions] SET [allowed_user_ids]=N''[]'' WHERE [allowed_user_ids] IS NULL;';
   ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [allowed_user_ids] nvarchar(max) NOT NULL;
 END;
 
@@ -8382,7 +8382,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_requester_roles] DEFAULT (N'[]') FOR [requester_roles];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_actions') AND name=N'requester_roles' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_actions] SET [requester_roles]=N'[]' WHERE [requester_roles] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_actions] SET [requester_roles]=N''[]'' WHERE [requester_roles] IS NULL;';
   ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [requester_roles] nvarchar(max) NOT NULL;
 END;
 
@@ -8395,7 +8395,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_requester_user_ids] DEFAULT (N'[]') FOR [requester_user_ids];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_actions') AND name=N'requester_user_ids' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_actions] SET [requester_user_ids]=N'[]' WHERE [requester_user_ids] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_actions] SET [requester_user_ids]=N''[]'' WHERE [requester_user_ids] IS NULL;';
   ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [requester_user_ids] nvarchar(max) NOT NULL;
 END;
 
@@ -8408,7 +8408,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_authority_limits] DEFAULT (N'{}') FOR [authority_limits];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_actions') AND name=N'authority_limits' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_actions] SET [authority_limits]=N'{}' WHERE [authority_limits] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_actions] SET [authority_limits]=N''{}'' WHERE [authority_limits] IS NULL;';
   ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [authority_limits] nvarchar(max) NOT NULL;
 END;
 
@@ -8421,7 +8421,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_extra_authority] DEFAULT (N'{}') FOR [extra_authority];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_actions') AND name=N'extra_authority' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_actions] SET [extra_authority]=N'{}' WHERE [extra_authority] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_actions] SET [extra_authority]=N''{}'' WHERE [extra_authority] IS NULL;';
   ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [extra_authority] nvarchar(max) NOT NULL;
 END;
 
@@ -8434,7 +8434,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_absolute_ceilings] DEFAULT (N'{}') FOR [absolute_ceilings];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_actions') AND name=N'absolute_ceilings' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_actions] SET [absolute_ceilings]=N'{}' WHERE [absolute_ceilings] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_actions] SET [absolute_ceilings]=N''{}'' WHERE [absolute_ceilings] IS NULL;';
   ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [absolute_ceilings] nvarchar(max) NOT NULL;
 END;
 
@@ -8447,7 +8447,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_require_reason] DEFAULT (0) FOR [require_reason];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_actions') AND name=N'require_reason' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_actions] SET [require_reason]=0 WHERE [require_reason] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_actions] SET [require_reason]=0 WHERE [require_reason] IS NULL;';
   ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [require_reason] bit NOT NULL;
 END;
 
@@ -8462,7 +8462,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_is_enabled] DEFAULT (1) FOR [is_enabled];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_actions') AND name=N'is_enabled' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_actions] SET [is_enabled]=1 WHERE [is_enabled] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_actions] SET [is_enabled]=1 WHERE [is_enabled] IS NULL;';
   ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [is_enabled] bit NOT NULL;
 END;
 
@@ -8475,7 +8475,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_actions') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_actions] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_actions] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -8488,7 +8488,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_actions') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_actions] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_actions] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[authorization_actions] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -8549,7 +8549,7 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[authorization_requests] ADD CONSTRAINT [DF_authorization_requests_requested_by_name] DEFAULT ('') FOR [requested_by_name];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_requests') AND name=N'requested_by_name' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_requests] SET [requested_by_name]='' WHERE [requested_by_name] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_requests] SET [requested_by_name]='''' WHERE [requested_by_name] IS NULL;';
   ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [requested_by_name] nvarchar(max) NOT NULL;
 END;
 
@@ -8562,7 +8562,7 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[authorization_requests] ADD CONSTRAINT [DF_authorization_requests_store_id] DEFAULT ('') FOR [store_id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_requests') AND name=N'store_id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_requests] SET [store_id]='' WHERE [store_id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_requests] SET [store_id]='''' WHERE [store_id] IS NULL;';
   ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [store_id] nvarchar(450) NOT NULL;
 END;
 
@@ -8577,7 +8577,7 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[authorization_requests] ADD CONSTRAINT [DF_authorization_requests_terminal_id] DEFAULT ('') FOR [terminal_id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_requests') AND name=N'terminal_id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_requests] SET [terminal_id]='' WHERE [terminal_id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_requests] SET [terminal_id]='''' WHERE [terminal_id] IS NULL;';
   ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [terminal_id] nvarchar(max) NOT NULL;
 END;
 
@@ -8590,7 +8590,7 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[authorization_requests] ADD CONSTRAINT [DF_authorization_requests_reason] DEFAULT ('') FOR [reason];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_requests') AND name=N'reason' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_requests] SET [reason]='' WHERE [reason] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_requests] SET [reason]='''' WHERE [reason] IS NULL;';
   ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [reason] nvarchar(max) NOT NULL;
 END;
 
@@ -8603,7 +8603,7 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[authorization_requests] ADD CONSTRAINT [DF_authorization_requests_payload] DEFAULT (N'{}') FOR [payload];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_requests') AND name=N'payload' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_requests] SET [payload]=N'{}' WHERE [payload] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_requests] SET [payload]=N''{}'' WHERE [payload] IS NULL;';
   ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [payload] nvarchar(max) NOT NULL;
 END;
 
@@ -8616,7 +8616,7 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[authorization_requests] ADD CONSTRAINT [DF_authorization_requests_status] DEFAULT ('pending') FOR [status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_requests') AND name=N'status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_requests] SET [status]='pending' WHERE [status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_requests] SET [status]=''pending'' WHERE [status] IS NULL;';
   ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [status] nvarchar(max) NOT NULL;
 END;
 
@@ -8643,7 +8643,7 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[authorization_requests] ADD CONSTRAINT [DF_authorization_requests_value_unit] DEFAULT ('number') FOR [value_unit];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_requests') AND name=N'value_unit' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_requests] SET [value_unit]='number' WHERE [value_unit] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_requests] SET [value_unit]=''number'' WHERE [value_unit] IS NULL;';
   ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [value_unit] nvarchar(max) NOT NULL;
 END;
 
@@ -8656,7 +8656,7 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[authorization_requests] ADD CONSTRAINT [DF_authorization_requests_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_requests') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_requests] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_requests] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -8669,7 +8669,7 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[authorization_requests] ADD CONSTRAINT [DF_authorization_requests_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_requests') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_requests] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_requests] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -8688,7 +8688,7 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[authorization_requests] ADD CONSTRAINT [DF_authorization_requests_approved_payload] DEFAULT (N'{}') FOR [approved_payload];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_requests') AND name=N'approved_payload' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_requests] SET [approved_payload]=N'{}' WHERE [approved_payload] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_requests] SET [approved_payload]=N''{}'' WHERE [approved_payload] IS NULL;';
   ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [approved_payload] nvarchar(max) NOT NULL;
 END;
 
@@ -8701,7 +8701,7 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[authorization_requests] ADD CONSTRAINT [DF_authorization_requests_bill_snapshot] DEFAULT (N'{}') FOR [bill_snapshot];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_requests') AND name=N'bill_snapshot' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_requests] SET [bill_snapshot]=N'{}' WHERE [bill_snapshot] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_requests] SET [bill_snapshot]=N''{}'' WHERE [bill_snapshot] IS NULL;';
   ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [bill_snapshot] nvarchar(max) NOT NULL;
 END;
 
@@ -8714,7 +8714,7 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'd
 ) ALTER TABLE dbo.[authorization_requests] ADD CONSTRAINT [DF_authorization_requests_snapshot_hash] DEFAULT ('') FOR [snapshot_hash];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_requests') AND name=N'snapshot_hash' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_requests] SET [snapshot_hash]='' WHERE [snapshot_hash] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_requests] SET [snapshot_hash]='''' WHERE [snapshot_hash] IS NULL;';
   ALTER TABLE dbo.[authorization_requests] ALTER COLUMN [snapshot_hash] nvarchar(max) NOT NULL;
 END;
 
@@ -8771,7 +8771,7 @@ IF OBJECT_ID(N'dbo.authorization_log', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.au
 ) ALTER TABLE dbo.[authorization_log] ADD CONSTRAINT [DF_authorization_log_store_id] DEFAULT ('') FOR [store_id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_log') AND name=N'store_id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_log] SET [store_id]='' WHERE [store_id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_log] SET [store_id]='''' WHERE [store_id] IS NULL;';
   ALTER TABLE dbo.[authorization_log] ALTER COLUMN [store_id] nvarchar(450) NOT NULL;
 END;
 
@@ -8786,7 +8786,7 @@ IF OBJECT_ID(N'dbo.authorization_log', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.au
 ) ALTER TABLE dbo.[authorization_log] ADD CONSTRAINT [DF_authorization_log_terminal_id] DEFAULT ('') FOR [terminal_id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_log') AND name=N'terminal_id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_log] SET [terminal_id]='' WHERE [terminal_id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_log] SET [terminal_id]='''' WHERE [terminal_id] IS NULL;';
   ALTER TABLE dbo.[authorization_log] ALTER COLUMN [terminal_id] nvarchar(max) NOT NULL;
 END;
 
@@ -8801,7 +8801,7 @@ IF OBJECT_ID(N'dbo.authorization_log', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.au
 ) ALTER TABLE dbo.[authorization_log] ADD CONSTRAINT [DF_authorization_log_detail] DEFAULT (N'{}') FOR [detail];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_log') AND name=N'detail' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_log] SET [detail]=N'{}' WHERE [detail] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_log] SET [detail]=N''{}'' WHERE [detail] IS NULL;';
   ALTER TABLE dbo.[authorization_log] ALTER COLUMN [detail] nvarchar(max) NOT NULL;
 END;
 
@@ -8814,7 +8814,7 @@ IF OBJECT_ID(N'dbo.authorization_log', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.au
 ) ALTER TABLE dbo.[authorization_log] ADD CONSTRAINT [DF_authorization_log_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.authorization_log') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[authorization_log] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[authorization_log] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[authorization_log] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -8855,7 +8855,7 @@ IF OBJECT_ID(N'dbo.record_edits', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.record_
 ) ALTER TABLE dbo.[record_edits] ADD CONSTRAINT [DF_record_edits_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.record_edits') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[record_edits] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[record_edits] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[record_edits] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -8896,7 +8896,7 @@ IF OBJECT_ID(N'dbo.record_edits', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.record_
 ) ALTER TABLE dbo.[record_edits] ADD CONSTRAINT [DF_record_edits_before_value] DEFAULT (N'{}') FOR [before_value];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.record_edits') AND name=N'before_value' AND is_nullable=1) BEGIN
-  UPDATE dbo.[record_edits] SET [before_value]=N'{}' WHERE [before_value] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[record_edits] SET [before_value]=N''{}'' WHERE [before_value] IS NULL;';
   ALTER TABLE dbo.[record_edits] ALTER COLUMN [before_value] nvarchar(max) NOT NULL;
 END;
 
@@ -8909,7 +8909,7 @@ IF OBJECT_ID(N'dbo.record_edits', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.record_
 ) ALTER TABLE dbo.[record_edits] ADD CONSTRAINT [DF_record_edits_after_value] DEFAULT (N'{}') FOR [after_value];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.record_edits') AND name=N'after_value' AND is_nullable=1) BEGIN
-  UPDATE dbo.[record_edits] SET [after_value]=N'{}' WHERE [after_value] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[record_edits] SET [after_value]=N''{}'' WHERE [after_value] IS NULL;';
   ALTER TABLE dbo.[record_edits] ALTER COLUMN [after_value] nvarchar(max) NOT NULL;
 END;
 
@@ -8922,7 +8922,7 @@ IF OBJECT_ID(N'dbo.record_edits', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.record_
 ) ALTER TABLE dbo.[record_edits] ADD CONSTRAINT [DF_record_edits_stock_deltas] DEFAULT (N'{}') FOR [stock_deltas];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.record_edits') AND name=N'stock_deltas' AND is_nullable=1) BEGIN
-  UPDATE dbo.[record_edits] SET [stock_deltas]=N'{}' WHERE [stock_deltas] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[record_edits] SET [stock_deltas]=N''{}'' WHERE [stock_deltas] IS NULL;';
   ALTER TABLE dbo.[record_edits] ALTER COLUMN [stock_deltas] nvarchar(max) NOT NULL;
 END;
 
@@ -8937,7 +8937,7 @@ IF OBJECT_ID(N'dbo.record_edits', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.record_
 ) ALTER TABLE dbo.[record_edits] ADD CONSTRAINT [DF_record_edits_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.record_edits') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[record_edits] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[record_edits] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[record_edits] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -8974,7 +8974,7 @@ IF OBJECT_ID(N'dbo.shift_cash_counts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sh
 ) ALTER TABLE dbo.[shift_cash_counts] ADD CONSTRAINT [DF_shift_cash_counts_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_cash_counts') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_cash_counts] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_cash_counts] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[shift_cash_counts] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -8999,7 +8999,7 @@ IF OBJECT_ID(N'dbo.shift_cash_counts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sh
 ) ALTER TABLE dbo.[shift_cash_counts] ADD CONSTRAINT [DF_shift_cash_counts_kind] DEFAULT ('ORIGINAL') FOR [kind];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_cash_counts') AND name=N'kind' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_cash_counts] SET [kind]='ORIGINAL' WHERE [kind] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_cash_counts] SET [kind]=''ORIGINAL'' WHERE [kind] IS NULL;';
   ALTER TABLE dbo.[shift_cash_counts] ALTER COLUMN [kind] nvarchar(max) NOT NULL;
 END;
 
@@ -9030,7 +9030,7 @@ IF OBJECT_ID(N'dbo.shift_cash_counts', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.sh
 ) ALTER TABLE dbo.[shift_cash_counts] ADD CONSTRAINT [DF_shift_cash_counts_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_cash_counts') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_cash_counts] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_cash_counts] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[shift_cash_counts] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -9069,7 +9069,7 @@ IF OBJECT_ID(N'dbo.shift_close_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
 ) ALTER TABLE dbo.[shift_close_events] ADD CONSTRAINT [DF_shift_close_events_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_close_events') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_close_events] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_close_events] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[shift_close_events] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -9100,7 +9100,7 @@ IF OBJECT_ID(N'dbo.shift_close_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
 ) ALTER TABLE dbo.[shift_close_events] ADD CONSTRAINT [DF_shift_close_events_detail] DEFAULT (N'{}') FOR [detail];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_close_events') AND name=N'detail' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_close_events] SET [detail]=N'{}' WHERE [detail] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_close_events] SET [detail]=N''{}'' WHERE [detail] IS NULL;';
   ALTER TABLE dbo.[shift_close_events] ALTER COLUMN [detail] nvarchar(max) NOT NULL;
 END;
 
@@ -9119,7 +9119,7 @@ IF OBJECT_ID(N'dbo.shift_close_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
 ) ALTER TABLE dbo.[shift_close_events] ADD CONSTRAINT [DF_shift_close_events_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_close_events') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_close_events] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_close_events] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[shift_close_events] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -9158,7 +9158,7 @@ IF OBJECT_ID(N'dbo.shift_reconciliations', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[shift_reconciliations] ADD CONSTRAINT [DF_shift_reconciliations_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_reconciliations') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_reconciliations] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_reconciliations] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[shift_reconciliations] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -9185,7 +9185,7 @@ IF OBJECT_ID(N'dbo.shift_reconciliations', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[shift_reconciliations] ADD CONSTRAINT [DF_shift_reconciliations_expected_cash] DEFAULT (0) FOR [expected_cash];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_reconciliations') AND name=N'expected_cash' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_reconciliations] SET [expected_cash]=0 WHERE [expected_cash] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_reconciliations] SET [expected_cash]=0 WHERE [expected_cash] IS NULL;';
   ALTER TABLE dbo.[shift_reconciliations] ALTER COLUMN [expected_cash] decimal(38,12) NOT NULL;
 END;
 
@@ -9198,7 +9198,7 @@ IF OBJECT_ID(N'dbo.shift_reconciliations', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[shift_reconciliations] ADD CONSTRAINT [DF_shift_reconciliations_expected_card] DEFAULT (0) FOR [expected_card];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_reconciliations') AND name=N'expected_card' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_reconciliations] SET [expected_card]=0 WHERE [expected_card] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_reconciliations] SET [expected_card]=0 WHERE [expected_card] IS NULL;';
   ALTER TABLE dbo.[shift_reconciliations] ALTER COLUMN [expected_card] decimal(38,12) NOT NULL;
 END;
 
@@ -9211,7 +9211,7 @@ IF OBJECT_ID(N'dbo.shift_reconciliations', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[shift_reconciliations] ADD CONSTRAINT [DF_shift_reconciliations_expected_digital] DEFAULT (0) FOR [expected_digital];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_reconciliations') AND name=N'expected_digital' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_reconciliations] SET [expected_digital]=0 WHERE [expected_digital] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_reconciliations] SET [expected_digital]=0 WHERE [expected_digital] IS NULL;';
   ALTER TABLE dbo.[shift_reconciliations] ALTER COLUMN [expected_digital] decimal(38,12) NOT NULL;
 END;
 
@@ -9238,7 +9238,7 @@ IF OBJECT_ID(N'dbo.shift_reconciliations', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[shift_reconciliations] ADD CONSTRAINT [DF_shift_reconciliations_variance_status] DEFAULT ('NO_VARIANCE') FOR [variance_status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_reconciliations') AND name=N'variance_status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_reconciliations] SET [variance_status]='NO_VARIANCE' WHERE [variance_status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_reconciliations] SET [variance_status]=''NO_VARIANCE'' WHERE [variance_status] IS NULL;';
   ALTER TABLE dbo.[shift_reconciliations] ALTER COLUMN [variance_status] nvarchar(max) NOT NULL;
 END;
 
@@ -9251,7 +9251,7 @@ IF OBJECT_ID(N'dbo.shift_reconciliations', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[shift_reconciliations] ADD CONSTRAINT [DF_shift_reconciliations_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_reconciliations') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_reconciliations] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_reconciliations] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[shift_reconciliations] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -9290,7 +9290,7 @@ IF OBJECT_ID(N'dbo.shift_variance_alerts', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[shift_variance_alerts] ADD CONSTRAINT [DF_shift_variance_alerts_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_variance_alerts') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_variance_alerts] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_variance_alerts] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[shift_variance_alerts] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -9321,7 +9321,7 @@ IF OBJECT_ID(N'dbo.shift_variance_alerts', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[shift_variance_alerts] ADD CONSTRAINT [DF_shift_variance_alerts_severity] DEFAULT ('warning') FOR [severity];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_variance_alerts') AND name=N'severity' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_variance_alerts] SET [severity]='warning' WHERE [severity] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_variance_alerts] SET [severity]=''warning'' WHERE [severity] IS NULL;';
   ALTER TABLE dbo.[shift_variance_alerts] ALTER COLUMN [severity] nvarchar(max) NOT NULL;
 END;
 
@@ -9336,7 +9336,7 @@ IF OBJECT_ID(N'dbo.shift_variance_alerts', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[shift_variance_alerts] ADD CONSTRAINT [DF_shift_variance_alerts_delivery_status] DEFAULT ('pending') FOR [delivery_status];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_variance_alerts') AND name=N'delivery_status' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_variance_alerts] SET [delivery_status]='pending' WHERE [delivery_status] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_variance_alerts] SET [delivery_status]=''pending'' WHERE [delivery_status] IS NULL;';
   ALTER TABLE dbo.[shift_variance_alerts] ALTER COLUMN [delivery_status] nvarchar(max) NOT NULL;
 END;
 
@@ -9349,7 +9349,7 @@ IF OBJECT_ID(N'dbo.shift_variance_alerts', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[shift_variance_alerts] ADD CONSTRAINT [DF_shift_variance_alerts_attempts] DEFAULT (0) FOR [attempts];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_variance_alerts') AND name=N'attempts' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_variance_alerts] SET [attempts]=0 WHERE [attempts] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_variance_alerts] SET [attempts]=0 WHERE [attempts] IS NULL;';
   ALTER TABLE dbo.[shift_variance_alerts] ALTER COLUMN [attempts] int NOT NULL;
 END;
 
@@ -9370,7 +9370,7 @@ IF OBJECT_ID(N'dbo.shift_variance_alerts', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[shift_variance_alerts] ADD CONSTRAINT [DF_shift_variance_alerts_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_variance_alerts') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_variance_alerts] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_variance_alerts] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[shift_variance_alerts] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -9383,7 +9383,7 @@ IF OBJECT_ID(N'dbo.shift_variance_alerts', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[shift_variance_alerts] ADD CONSTRAINT [DF_shift_variance_alerts_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.shift_variance_alerts') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[shift_variance_alerts] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[shift_variance_alerts] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[shift_variance_alerts] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -9433,7 +9433,7 @@ IF OBJECT_ID(N'dbo.entity_status_history', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[entity_status_history] ADD CONSTRAINT [DF_entity_status_history_id] DEFAULT (NEWID()) FOR [id];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.entity_status_history') AND name=N'id' AND is_nullable=1) BEGIN
-  UPDATE dbo.[entity_status_history] SET [id]=NEWID() WHERE [id] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[entity_status_history] SET [id]=NEWID() WHERE [id] IS NULL;';
   ALTER TABLE dbo.[entity_status_history] ALTER COLUMN [id] uniqueidentifier NOT NULL;
 END;
 
@@ -9452,7 +9452,7 @@ IF OBJECT_ID(N'dbo.entity_status_history', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[entity_status_history] ADD CONSTRAINT [DF_entity_status_history_status_kind] DEFAULT ('status') FOR [status_kind];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.entity_status_history') AND name=N'status_kind' AND is_nullable=1) BEGIN
-  UPDATE dbo.[entity_status_history] SET [status_kind]='status' WHERE [status_kind] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[entity_status_history] SET [status_kind]=''status'' WHERE [status_kind] IS NULL;';
   ALTER TABLE dbo.[entity_status_history] ALTER COLUMN [status_kind] nvarchar(max) NOT NULL;
 END;
 
@@ -9491,7 +9491,7 @@ IF OBJECT_ID(N'dbo.entity_status_history', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[entity_status_history] ADD CONSTRAINT [DF_entity_status_history_metadata] DEFAULT (N'{}') FOR [metadata];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.entity_status_history') AND name=N'metadata' AND is_nullable=1) BEGIN
-  UPDATE dbo.[entity_status_history] SET [metadata]=N'{}' WHERE [metadata] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[entity_status_history] SET [metadata]=N''{}'' WHERE [metadata] IS NULL;';
   ALTER TABLE dbo.[entity_status_history] ALTER COLUMN [metadata] nvarchar(max) NOT NULL;
 END;
 
@@ -9508,7 +9508,7 @@ IF OBJECT_ID(N'dbo.entity_status_history', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[entity_status_history] ADD CONSTRAINT [DF_entity_status_history_occurred_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [occurred_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.entity_status_history') AND name=N'occurred_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[entity_status_history] SET [occurred_at]=SYSDATETIMEOFFSET() WHERE [occurred_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[entity_status_history] SET [occurred_at]=SYSDATETIMEOFFSET() WHERE [occurred_at] IS NULL;';
   ALTER TABLE dbo.[entity_status_history] ALTER COLUMN [occurred_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -9521,7 +9521,7 @@ IF OBJECT_ID(N'dbo.entity_status_history', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[entity_status_history] ADD CONSTRAINT [DF_entity_status_history_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.entity_status_history') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[entity_status_history] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[entity_status_history] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[entity_status_history] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -9534,7 +9534,7 @@ IF OBJECT_ID(N'dbo.entity_status_history', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[entity_status_history] ADD CONSTRAINT [DF_entity_status_history_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.entity_status_history') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[entity_status_history] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[entity_status_history] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[entity_status_history] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -9549,7 +9549,7 @@ IF OBJECT_ID(N'dbo.entity_status_history', N'U') IS NOT NULL AND COL_LENGTH(N'db
 ) ALTER TABLE dbo.[entity_status_history] ADD CONSTRAINT [DF_entity_status_history_row_version] DEFAULT (1) FOR [row_version];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.entity_status_history') AND name=N'row_version' AND is_nullable=1) BEGIN
-  UPDATE dbo.[entity_status_history] SET [row_version]=1 WHERE [row_version] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[entity_status_history] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[entity_status_history] ALTER COLUMN [row_version] bigint NOT NULL;
 END;
 
@@ -9595,7 +9595,7 @@ IF OBJECT_ID(N'dbo.nav_pins', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.nav_pins', 
 ) ALTER TABLE dbo.[nav_pins] ADD CONSTRAINT [DF_nav_pins_sort_order] DEFAULT (0) FOR [sort_order];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.nav_pins') AND name=N'sort_order' AND is_nullable=1) BEGIN
-  UPDATE dbo.[nav_pins] SET [sort_order]=0 WHERE [sort_order] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[nav_pins] SET [sort_order]=0 WHERE [sort_order] IS NULL;';
   ALTER TABLE dbo.[nav_pins] ALTER COLUMN [sort_order] int NOT NULL;
 END;
 
@@ -9608,7 +9608,7 @@ IF OBJECT_ID(N'dbo.nav_pins', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.nav_pins', 
 ) ALTER TABLE dbo.[nav_pins] ADD CONSTRAINT [DF_nav_pins_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.nav_pins') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[nav_pins] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[nav_pins] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[nav_pins] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -9621,7 +9621,7 @@ IF OBJECT_ID(N'dbo.nav_pins', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.nav_pins', 
 ) ALTER TABLE dbo.[nav_pins] ADD CONSTRAINT [DF_nav_pins_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.nav_pins') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[nav_pins] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[nav_pins] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[nav_pins] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -9661,7 +9661,7 @@ IF OBJECT_ID(N'dbo.store_groups', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.store_g
 ) ALTER TABLE dbo.[store_groups] ADD CONSTRAINT [DF_store_groups_is_active] DEFAULT (1) FOR [is_active];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.store_groups') AND name=N'is_active' AND is_nullable=1) BEGIN
-  UPDATE dbo.[store_groups] SET [is_active]=1 WHERE [is_active] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[store_groups] SET [is_active]=1 WHERE [is_active] IS NULL;';
   ALTER TABLE dbo.[store_groups] ALTER COLUMN [is_active] bit NOT NULL;
 END;
 
@@ -9676,7 +9676,7 @@ IF OBJECT_ID(N'dbo.store_groups', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.store_g
 ) ALTER TABLE dbo.[store_groups] ADD CONSTRAINT [DF_store_groups_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.store_groups') AND name=N'created_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[store_groups] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[store_groups] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
   ALTER TABLE dbo.[store_groups] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
 END;
 
@@ -9689,7 +9689,7 @@ IF OBJECT_ID(N'dbo.store_groups', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.store_g
 ) ALTER TABLE dbo.[store_groups] ADD CONSTRAINT [DF_store_groups_updated_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [updated_at];
 
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.store_groups') AND name=N'updated_at' AND is_nullable=1) BEGIN
-  UPDATE dbo.[store_groups] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;
+  EXEC sys.sp_executesql N'UPDATE dbo.[store_groups] SET [updated_at]=SYSDATETIMEOFFSET() WHERE [updated_at] IS NULL;';
   ALTER TABLE dbo.[store_groups] ALTER COLUMN [updated_at] datetimeoffset(7) NOT NULL;
 END;
 
