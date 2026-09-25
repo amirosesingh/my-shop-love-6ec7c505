@@ -32,13 +32,15 @@ export function readLocal(key: string): string | null {
   }
 }
 
-export function writeLocal(key: string, value: string | null) {
-  if (typeof window === "undefined") return;
+export function writeLocal(key: string, value: string | null): boolean {
+  if (typeof window === "undefined") return false;
   try {
     if (value === null) window.localStorage.removeItem(key);
     else window.localStorage.setItem(key, value);
+    return true;
   } catch {
     /* storage full or blocked — the till still works, it just won't persist */
+    return false;
   }
 }
 
@@ -53,8 +55,14 @@ export async function readLayoutRaw(terminal: string): Promise<string | null> {
   return remote;
 }
 
-export async function writeLayoutRaw(terminal: string, json: string | null) {
+export async function writeLayoutRaw(terminal: string, json: string | null): Promise<boolean> {
   const key = layoutKey(terminal);
+  if (!isWindowsShell()) return writeLocal(key, json);
+  // The desktop database is the durable source. The localStorage copy is only
+  // an instant-paint cache, so do not report success when the database refused
+  // the write or leave an uncommitted value in that cache.
+  const databaseSaved = await writeLocalSetting(key, json);
+  if (!databaseSaved) return false;
   writeLocal(key, json);
-  if (isWindowsShell()) await writeLocalSetting(key, json);
+  return true;
 }

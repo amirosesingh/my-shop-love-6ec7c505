@@ -6,7 +6,7 @@
  * so a shop floor machine keeps its arrangement offline and a reinstall of the
  * software elsewhere never inherits somebody else's screen.
  */
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   LEGACY_EXPANSION,
   MODULE_BY_ID,
@@ -263,10 +263,12 @@ function readCanvas(raw: unknown): CanvasConfig {
   return { cols, rowHeight, baseWidth, aspect };
 }
 
-function sanitise(raw: unknown): RegisterLayout | null {
+/** Validate persisted JSON before it reaches react-grid-layout. */
+export function sanitiseLayout(raw: unknown): RegisterLayout | null {
   if (!raw || typeof raw !== "object") return null;
   const items = (raw as { items?: unknown }).items;
   if (!Array.isArray(items)) return null;
+  const canvas = readCanvas((raw as { canvas?: unknown }).canvas);
   const clean: LayoutBox[] = [];
   for (const it of items) {
     if (!it || typeof it !== "object") continue;
@@ -275,19 +277,19 @@ function sanitise(raw: unknown): RegisterLayout | null {
     if (clean.some((c) => c.i === id)) continue;
     if (isGroupId(id)) {
       const b = box(id, rec);
-      if (b) clean.push(b);
+      if (b) clean.push(fitBoxToCanvas(b, canvas));
       continue;
     }
     if (isCustomId(id)) {
       const custom = readCustom(rec);
       if (!custom) continue;
       const b = box(id, rec, custom);
-      if (b) clean.push(b);
+      if (b) clean.push(fitBoxToCanvas(b, canvas));
       continue;
     }
     if (!isRegisterModuleId(id)) continue;
     const b = box(id, rec);
-    if (b) clean.push(b);
+    if (b) clean.push(fitBoxToCanvas(b, canvas));
   }
   // Drop dangling group references so orphans stay draggable on their own.
   const groups = new Set(clean.filter((c) => isGroupId(c.i)).map((c) => c.i));
@@ -296,10 +298,25 @@ function sanitise(raw: unknown): RegisterLayout | null {
     ? {
         version: 4,
         platform_target: platformTarget(),
-        canvas: readCanvas((raw as { canvas?: unknown }).canvas),
+        canvas,
         items: clean,
       }
     : null;
+}
+
+function fitBoxToCanvas(item: LayoutBox, canvas: CanvasConfig): LayoutBox {
+  const spec = nodeSpec(item);
+  const finite = (value: number, fallback: number) =>
+    Number.isFinite(value) ? Math.round(value) : fallback;
+  const w = Math.max(spec?.minW ?? 1, Math.min(canvas.cols, finite(item.w, spec?.w ?? 1)));
+  const h = Math.max(spec?.minH ?? 1, Math.min(500, finite(item.h, spec?.h ?? 1)));
+  return {
+    ...item,
+    x: Math.max(0, Math.min(canvas.cols - w, finite(item.x, 0))),
+    y: Math.max(0, finite(item.y, 0)),
+    w,
+    h,
+  };
 }
 
 /** A v1 coarse layout becomes atomic nodes stacked inside the old block area. */
@@ -345,10 +362,14 @@ export async function readLayout(terminal: string): Promise<RegisterLayout | nul
   if (typeof window === "undefined") return null;
   try {
     const raw = await readLayoutRaw(terminal);
-    if (raw) return sanitise(JSON.parse(raw));
+    if (raw) return sanitiseLayout(JSON.parse(raw));
     const [v3, v2, v1] = legacyKeys(terminal).map((k) => readLocal(k));
     const legacy = v3 ?? v2;
-    const migrated = legacy ? sanitise(JSON.parse(legacy)) : v1 ? migrateV1(JSON.parse(v1)) : null;
+    const migrated = legacy
+      ? sanitiseLayout(JSON.parse(legacy))
+      : v1
+        ? migrateV1(JSON.parse(v1))
+        : null;
     if (migrated) await writeLayoutRaw(terminal, JSON.stringify(migrated));
     return migrated;
   } catch {
@@ -356,10 +377,15 @@ export async function readLayout(terminal: string): Promise<RegisterLayout | nul
   }
 }
 
-export async function writeLayout(terminal: string, layout: RegisterLayout | null) {
-  if (typeof window === "undefined") return;
-  await writeLayoutRaw(terminal, layout ? JSON.stringify(layout) : null);
+export async function writeLayout(
+  terminal: string,
+  layout: RegisterLayout | null,
+): Promise<boolean> {
+  if (typeof window === "undefined") return false;
+  const saved = await writeLayoutRaw(terminal, layout ? JSON.stringify(layout) : null);
+  if (!saved) return false;
   if (!layout) for (const k of legacyKeys(terminal)) writeLocal(k, null);
+  return true;
 }
 
 export { layoutKey };
@@ -374,22 +400,33 @@ export function useRegisterLayout(terminal: string) {
   const [draft, setDraft] = useState<RegisterLayout | null>(null);
   const [editing, setEditing] = useState(false);
   const [previewing, setPreviewing] = useState(false);
-  const [loaded, setLoaded] = useState(false);
+  const [loadedTerminal, setLoadedTerminal] = useState<string | null>(null);
+  const [saving, setSaving] = useState(false);
+  const persistenceToken = useRef(0);
 
   useEffect(() => {
     let alive = true;
-    setLoaded(false);
+    persistenceToken.current += 1;
+    setSaving(false);
+    setLoadedTerminal(null);
+    setSaved(null);
+    setDraft(null);
+    setEditing(false);
+    setPreviewing(false);
     void readLayout(terminal).then((l) => {
       if (!alive) return;
       setSaved(l);
-      setLoaded(true);
+      setLoadedTerminal(terminal);
     });
     return () => {
       alive = false;
     };
   }, [terminal]);
 
-  const active = draft ?? saved;
+  const loaded = loadedTerminal === terminal;
+  // Never expose the preceding terminal's saved or draft layout while this
+  // terminal's device-specific layout is still loading.
+  const active = loaded ? (draft ?? saved) : null;
 
   const startEdit = useCallback(() => {
     setDraft((d) => d ?? saved ?? factoryLayout());
@@ -425,7 +462,7 @@ export function useRegisterLayout(terminal: string) {
         const item: LayoutBox = {
           i: id,
           x: at ? Math.max(0, Math.min(l.canvas.cols - def.w, at.x)) : 0,
-          y: at ? at.y : nextRow(l.items),
+          y: at ? Math.max(0, at.y) : nextRow(l.items),
           w: def.w,
           h: def.h,
           pad: DEFAULT_PAD,
@@ -491,7 +528,7 @@ export function useRegisterLayout(terminal: string) {
         const item: LayoutBox = {
           i: newGroupId(),
           x: at ? Math.max(0, Math.min(l.canvas.cols - 8, at.x)) : 0,
-          y: at ? at.y : nextRow(l.items),
+          y: at ? Math.max(0, at.y) : nextRow(l.items),
           w: 8,
           h: 10,
           pad: DEFAULT_PAD,
@@ -574,6 +611,12 @@ export function useRegisterLayout(terminal: string) {
           );
         }
 
+        // The grid normally constrains these values, but touch drags, restored
+        // browser events and group offsets can still produce a negative or
+        // right-overflowing child. Keep the live draft safe, not only the next
+        // reload through sanitiseLayout.
+        items = items.map((item) => fitBoxToCanvas(item, l.canvas));
+
         const groups = items.filter((g) => isGroupId(g.i));
         const inside = (it: LayoutBox, g: LayoutBox) => {
           const cx = it.x + it.w / 2;
@@ -592,29 +635,43 @@ export function useRegisterLayout(terminal: string) {
     [update],
   );
 
-  const save = useCallback(() => {
+  const save = useCallback(async (): Promise<boolean> => {
     const next = draft ?? saved;
-    if (!next) return;
-    void writeLayout(terminal, next);
+    if (!next || saving) return false;
+    const token = ++persistenceToken.current;
+    setSaving(true);
+    const persisted = await writeLayout(terminal, next);
+    if (token !== persistenceToken.current) return false;
+    setSaving(false);
+    if (!persisted) return false;
     setSaved(next);
     setDraft(null);
     setEditing(false);
     setPreviewing(false);
-  }, [draft, saved, terminal]);
+    return true;
+  }, [draft, saved, terminal, saving]);
 
-  const reset = useCallback(() => {
-    void writeLayout(terminal, null);
+  const reset = useCallback(async (): Promise<boolean> => {
+    if (saving) return false;
+    const token = ++persistenceToken.current;
+    setSaving(true);
+    const persisted = await writeLayout(terminal, null);
+    if (token !== persistenceToken.current) return false;
+    setSaving(false);
+    if (!persisted) return false;
     setSaved(null);
     setDraft(null);
     setEditing(false);
     setPreviewing(false);
-  }, [terminal]);
+    return true;
+  }, [terminal, saving]);
 
   const placed = useMemo(() => new Set((active?.items ?? []).map((i) => i.i)), [active]);
   const palette = useMemo(() => REGISTER_MODULES.filter((m) => !placed.has(m.id)), [placed]);
 
   return {
     loaded,
+    saving,
     saved,
     draft,
     active,
