@@ -783,7 +783,17 @@ function registerIpc() {
   ipcMain.handle("database:backup", (_e, file) => guard.guarded(() => backupService.backup(guard.filePath(file,{name:"backup file",extension:"bak"}))));
   ipcMain.handle("database:restore", (_e, file) => guard.guarded(async () => { const result=await backupService.restore(guard.filePath(file,{name:"backup file",extension:"bak"})); if(result.ok)await databaseService.restore(); return result; }));
   ipcMain.handle("business:write-batch", (_e, context, ops) => guard.guarded(async() => { const result=await operationsRepository.apply(guard.text(context,{name:"operation context",max:160}), guard.writeOps(ops,{max:200}));scheduleAutomaticSync(250);return result;}));
-  ipcMain.handle("business:commit-aggregate", (_e, value) => guard.guarded(async() => { const aggregate=guard.aggregate(value);const result=await aggregateRepository.commit(aggregate.kind,aggregate);scheduleAutomaticSync(250);return result;}));
+  ipcMain.handle("business:commit-aggregate", (_e, value) => guard.guarded(async() => {
+    const aggregate=guard.aggregate(value);
+    try {
+      const result=await aggregateRepository.commit(aggregate.kind,aggregate);
+      scheduleAutomaticSync(250);
+      return result;
+    } catch(error) {
+      recordFault("business.commit-aggregate", error);
+      return {ok:false,code:error?.code??"ESQLSERVER_WRITE",error:error?.message??"The local SQL Server transaction failed.",stage:error?.stage??null,table:error?.table??null,sqlNumber:error?.sqlNumber??null};
+    }
+  }));
   ipcMain.handle("business:snapshot", () => guard.guarded(() => operationsRepository.snapshot(localBranchId())));
   ipcMain.handle("receipts:find-exact", (_e, value, branchId, proof) => guard.guarded(() => {
     const input = guard.options(proof, { name: "receipt authorization", max: 3 });
@@ -984,7 +994,7 @@ app.whenReady().then(async () => {
   // A configured till restores its SQL connection before the terminal route
   // is loaded. If SQL Server is stopped or unreachable, open the database
   // recovery screen instead of exposing a register that cannot persist sales.
-  const initialRoute = restoredDatabase.enabled && restoredDatabase.configured && !restoredDatabase.connected
+  const initialRoute = restoredDatabase.enabled && restoredDatabase.configured && !restoredDatabase.tradingReady
     ? "/database-startup"
     : "/";
   createWindows(initialRoute);
@@ -995,7 +1005,7 @@ app.whenReady().then(async () => {
   app.on("activate", () => {
     if (BrowserWindow.getAllWindows().length !== 0) return;
     const database = databaseService.snapshot();
-    createWindows(database.enabled && database.configured && !database.connected ? "/database-startup" : "/");
+    createWindows(database.enabled && database.configured && !database.tradingReady ? "/database-startup" : "/");
   });
 });
 

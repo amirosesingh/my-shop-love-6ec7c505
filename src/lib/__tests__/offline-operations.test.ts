@@ -22,7 +22,7 @@ describe("offline terminal operations", () => {
     expect(main.indexOf("await databaseService.restore()")).toBeLessThan(
       main.indexOf("createWindows(initialRoute)"),
     );
-    expect(main).toMatch(/!restoredDatabase\.connected\s*\? "\/database-startup"/);
+    expect(main).toMatch(/!restoredDatabase\.tradingReady\s*\? "\/database-startup"/);
     expect(main).toContain('function createWindows(initialRoute = "/")');
     expect(main).toContain("scheduleAutomaticSync(5_000)");
     expect(main).toContain("AUTO_SYNC_OK_MS = 15_000");

@@ -20,6 +20,8 @@ type Failure = {
   status?: number;
   statusCode?: number;
   name?: string;
+  table?: string | null;
+  sqlNumber?: number | null;
 };
 
 export type ErrorCategory =
@@ -103,6 +105,12 @@ export function describeError(error: unknown, action = "That action"): string {
   const code = String((error as Failure | null)?.code ?? "");
   const category = classifyError(error);
   const kind = actionKind(action);
+
+  if (code === "ESQLSERVER_WRITE") {
+    const table = (error as Failure | null)?.table;
+    const target = table ? ` while writing ${table}` : "";
+    return `${action} could not be saved to local SQL Server${target}. The transaction was rolled back; check Database & Cloud Connection and retry.`;
+  }
 
   if (code === "23503" || /foreign key constraint/i.test(raw))
     return `${action} is blocked because other records still point at this entry. Remove or reassign those records first.`;

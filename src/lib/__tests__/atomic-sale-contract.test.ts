@@ -10,6 +10,9 @@ describe("atomic central sale contract", () => {
     const idempotency = read(
       "supabase/migrations/20260925105919_persist_pos_sale_payment_idempotency.sql",
     );
+    const memberOrder = read(
+      "supabase/migrations/20260925130000_fix_sale_member_dependency_order.sql",
+    );
     expect(migration).toContain("FUNCTION public.pos_sale_commit");
     expect(migration).toContain("INSERT INTO public.sales");
     expect(migration).toContain("INSERT INTO public.sale_items");
@@ -24,6 +27,12 @@ describe("atomic central sale contract", () => {
     expect(hotfix).toContain("AS movement_entry(value)");
     expect(hotfix).not.toContain("DECLARE\n  s jsonb := COALESCE(_sale, '{}'::jsonb);\n  r jsonb;");
     expect(idempotency).toContain("id, client_transaction_id, source_type, sale_id");
+    expect(memberOrder.indexOf("INSERT INTO public.members")).toBeLessThan(
+      memberOrder.indexOf("INSERT INTO public.sales"),
+    );
+    expect(memberOrder).toContain(
+      "GRANT EXECUTE ON FUNCTION public.pos_sale_commit(jsonb,jsonb,jsonb,jsonb,jsonb,text)",
+    );
     expect(migration).toContain("SECURITY INVOKER");
   });
 

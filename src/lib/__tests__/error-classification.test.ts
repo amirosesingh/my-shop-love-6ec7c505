@@ -66,6 +66,19 @@ describe("action-specific safe wording", () => {
     expect(message).not.toContain("SQL insert");
   });
 
+  it("identifies the failed local SQL table without exposing raw SQL", () => {
+    const message = describeError(
+      {
+        code: "ESQLSERVER_WRITE",
+        table: "payment_transactions",
+        message: "Local SQL Server sale commit failed while writing payment_transactions.",
+      },
+      "Saving the payment",
+    );
+    expect(message).toContain("payment_transactions");
+    expect(message).toContain("rolled back");
+  });
+
   it("keeps raw SQL, paths and endpoints out of unexpected UI errors", () => {
     const secret = "SELECT * FROM users at C:\\private\\shop.db https://internal.example";
     expect(describeError(new Error(secret), "Loading reports")).not.toContain(secret);

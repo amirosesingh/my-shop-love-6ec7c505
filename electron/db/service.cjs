@@ -8,15 +8,16 @@ const STATES = new Set([
 ]);
 
 class DatabaseService {
-  constructor({ secureConfig, manager, publish = () => {} }) {
+  constructor({ secureConfig, manager, publish = () => {}, validator = validateDatabase }) {
     this.secureConfig = secureConfig; this.manager = manager; this.publish = publish;
+    this.validator = validator;
     this.state = secureConfig.enabled() ? (secureConfig.profile() ? "enabled_connecting" : "enabled_unconfigured") : "disabled";
-    this.detail = null; this.lastCheckedAt = null;
+    this.detail = null; this.lastCheckedAt = null; this.validated = false;
   }
   snapshot() {
     const locallyConnected = Boolean(this.manager.pool);
     return { state: this.state, enabled: this.secureConfig.enabled(), configured: Boolean(this.secureConfig.profile()),
-      connected: locallyConnected, tradingReady: locallyConnected, profile: this.secureConfig.profile(), detail: this.detail,
+      connected: locallyConnected, tradingReady: locallyConnected && this.validated, profile: this.secureConfig.profile(), detail: this.detail,
       lastCheckedAt: this.lastCheckedAt };
   }
   transition(state, detail = null) {
@@ -25,7 +26,7 @@ class DatabaseService {
   }
   async setEnabled(value) {
     this.secureConfig.setEnabled(value === true);
-    if (!value) { await this.manager.close(); return this.transition("disabled"); }
+    if (!value) { await this.manager.close(); this.validated = false; return this.transition("disabled"); }
     if (!this.secureConfig.profile()) return this.transition("enabled_unconfigured");
     return this.restore();
   }
@@ -42,37 +43,51 @@ class DatabaseService {
   }
   async saveAndConnect(profile) {
     try {
-      const validation = await validateDatabase(this.manager, profile);
+      await this.manager.close();
+      this.validated = false;
+      this.transition("enabled_validating");
+      const validation = await this.validator(this.manager, profile);
       if (!validation.ok || !validation.ready) {
         this.transition("enabled_error", validation);
         return validation;
       }
       this.transition("enabled_connecting");
       await this.manager.open(profile);
+      this.validated = true;
       const saved = this.secureConfig.save(profile);
       this.lastCheckedAt = new Date().toISOString();
       this.transition("enabled_bootstrapping");
       return { ok: true, profile: saved, state: this.snapshot() };
     } catch (error) {
       await this.manager.close().catch(() => undefined);
+      this.validated = false;
       const safe = safeError(error);
       this.transition("enabled_error", safe);
       return safe;
     }
   }
-  async disconnect() { await this.manager.close(); return this.transition(this.secureConfig.enabled() ? "enabled_degraded" : "disabled"); }
-  async remove() { await this.manager.close(); this.secureConfig.remove(); return this.transition("disabled"); }
+  async disconnect() { await this.manager.close(); this.validated = false; return this.transition(this.secureConfig.enabled() ? "enabled_degraded" : "disabled"); }
+  async remove() { await this.manager.close(); this.validated = false; this.secureConfig.remove(); return this.transition("disabled"); }
   async restore() {
     if (!this.secureConfig.enabled()) return this.transition("disabled");
     const profile = this.secureConfig.credentials();
     if (!profile) return this.transition("enabled_unconfigured");
     try {
+      this.validated = false;
+      this.transition("enabled_validating");
+      const validation = await this.validator(this.manager, profile);
+      if (!validation.ok || !validation.ready) {
+        await this.manager.close().catch(() => undefined);
+        return this.transition("enabled_error", validation);
+      }
       this.transition("enabled_connecting");
       await this.manager.open(profile);
+      this.validated = true;
       this.lastCheckedAt = new Date().toISOString();
       return this.transition("enabled_bootstrapping");
     } catch (error) {
       await this.manager.close().catch(() => undefined);
+      this.validated = false;
       return this.transition("enabled_error", safeError(error));
     }
   }
