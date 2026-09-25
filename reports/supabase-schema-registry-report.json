@@ -1,8 +1,8 @@
 {
   "source": "supabase/schema.sql",
-  "generatedAt": "2026-09-21T10:32:13.862Z",
+  "generatedAt": "2026-09-25T10:31:47.818Z",
   "tableCount": 67,
-  "columnCount": 1033,
+  "columnCount": 1037,
   "tables": [
     {
       "name": "coupon_campaigns",
@@ -576,7 +576,11 @@
       "primaryKey": [
         "id"
       ],
-      "uniqueKeys": [],
+      "uniqueKeys": [
+        [
+          "client_event_id"
+        ]
+      ],
       "foreignKeys": []
     },
     {
@@ -697,6 +701,9 @@
       "uniqueKeys": [
         [
           "user_id"
+        ],
+        [
+          "auth_user_id"
         ]
       ],
       "foreignKeys": []
@@ -856,7 +863,12 @@
       "primaryKey": [
         "id"
       ],
-      "uniqueKeys": [],
+      "uniqueKeys": [
+        [
+          "booking_id",
+          "client_payment_id"
+        ]
+      ],
       "foreignKeys": [
         {
           "column": "booking_id",
@@ -1172,7 +1184,11 @@
       "primaryKey": [
         "id"
       ],
-      "uniqueKeys": [],
+      "uniqueKeys": [
+        [
+          "ref"
+        ]
+      ],
       "foreignKeys": [
         {
           "column": "member_id",
@@ -1819,7 +1835,11 @@
       "primaryKey": [
         "id"
       ],
-      "uniqueKeys": [],
+      "uniqueKeys": [
+        [
+          "provider_name"
+        ]
+      ],
       "foreignKeys": []
     },
     {
@@ -2431,12 +2451,22 @@
           "declaration": "jsonb DEFAULT '{}'::jsonb",
           "nullable": true,
           "hasDefault": true
+        },
+        {
+          "name": "client_transaction_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
         "id"
       ],
-      "uniqueKeys": [],
+      "uniqueKeys": [
+        [
+          "client_transaction_id"
+        ]
+      ],
       "foreignKeys": [
         {
           "column": "booking_id",
@@ -3838,15 +3868,33 @@
         },
         {
           "name": "authorization_request_id",
-          "declaration": "uuid, ADD COLUMN IF NOT EXISTS authorized_by text, ADD COLUMN IF NOT EXISTS authorized_at timestamptz",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "authorized_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "authorized_at",
+          "declaration": "timestamp with time zone",
           "nullable": true,
           "hasDefault": false
         },
         {
           "name": "rounding_adjustment",
-          "declaration": "numeric(18,4) NOT NULL DEFAULT 0, ADD COLUMN IF NOT EXISTS rounding_label text",
+          "declaration": "numeric(18,4) DEFAULT 0 NOT NULL",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "rounding_label",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -3855,6 +3903,9 @@
       "uniqueKeys": [
         [
           "bill_number"
+        ],
+        [
+          "client_transaction_id"
         ]
       ],
       "foreignKeys": [
@@ -6017,7 +6068,11 @@
         }
       ],
       "primaryKey": [],
-      "uniqueKeys": [],
+      "uniqueKeys": [
+        [
+          "reference"
+        ]
+      ],
       "foreignKeys": []
     },
     {
@@ -6127,7 +6182,13 @@
         }
       ],
       "primaryKey": [],
-      "uniqueKeys": [],
+      "uniqueKeys": [
+        [
+          "action_key",
+          "scope_type",
+          "scope_id"
+        ]
+      ],
       "foreignKeys": []
     },
     {
@@ -6543,7 +6604,14 @@
         }
       ],
       "primaryKey": [],
-      "uniqueKeys": [],
+      "uniqueKeys": [
+        [
+          "shift_id"
+        ],
+        [
+          "client_key"
+        ]
+      ],
       "foreignKeys": []
     },
     {
@@ -6831,7 +6899,11 @@
         }
       ],
       "primaryKey": [],
-      "uniqueKeys": [],
+      "uniqueKeys": [
+        [
+          "reconciliation_id"
+        ]
+      ],
       "foreignKeys": []
     },
     {
@@ -6965,7 +7037,11 @@
         }
       ],
       "primaryKey": [],
-      "uniqueKeys": [],
+      "uniqueKeys": [
+        [
+          "client_event_id"
+        ]
+      ],
       "foreignKeys": []
     },
     {

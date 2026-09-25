@@ -183,7 +183,8 @@ export async function handleSyncRequest(request: Request): Promise<Response> {
   if (body.sqlServerBatch || body.sqlServerAggregate || body.sqlServerPull || body.sqlServerBootstrap || body.sqlServerCounts || body.oldReceipt) {
     const branchId = body.sqlServerBatch?.branchId ?? body.sqlServerAggregate?.branchId ?? body.sqlServerPull?.branchId ?? body.sqlServerBootstrap?.branchId ?? body.sqlServerCounts?.branchId ?? body.oldReceipt?.branchId ?? "";
     const mayManageOtherBranches = scope.role === "admin" || scope.roleSlug === "admin" || scope.permissions.can_manage_sync_backup === true;
-    if (branchId !== scope.storeId && !mayManageOtherBranches) return Response.json({ ok:false,code:"STORE_FORBIDDEN",error:"You can only synchronize your own branch." },{status:403});
+    const terminalBound = Boolean(body.terminalToken) || scope.kind === "terminal";
+    if (branchId !== scope.storeId && (terminalBound || !mayManageOtherBranches)) return Response.json({ ok:false,code:"STORE_FORBIDDEN",error:"You can only synchronize your own branch." },{status:403});
     if (body.oldReceipt && !(scope.role === "admin" || scope.roleSlug === "admin" || scope.permissions.can_process_refund === true))
       return Response.json({ok:false,code:"PERMISSION_DENIED",error:"Refund permission is required to retrieve historical receipts."},{status:403});
     const { serviceRest } = await import("@/core/api/pos-relay.server");

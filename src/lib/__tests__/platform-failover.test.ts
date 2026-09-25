@@ -18,13 +18,13 @@ describe("platform wording for a total failure", () => {
   beforeEach(() => vi.resetModules());
   afterEach(() => vi.resetModules());
 
-  it("uses the central database message on the Windows till", async () => {
+  it("names local transaction storage on the offline-first Windows till", async () => {
     vi.doMock("@/platform-config/platform", () => ({
       isNative: () => false,
       isElectron: () => true,
     }));
     const { unreachableMessage } = await import("@/core/local-db/db-mode");
-    expect(unreachableMessage()).toMatch(/Central database unavailable/);
+    expect(unreachableMessage()).toMatch(/Local transaction storage unavailable/);
   });
 
   it("names the server relay on the phone and in a browser", async () => {

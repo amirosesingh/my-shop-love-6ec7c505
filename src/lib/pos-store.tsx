@@ -520,7 +520,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         }
         return;
       }
-      if (typeof navigator !== "undefined" && !navigator.onLine) {
+      if (typeof navigator !== "undefined" && !navigator.onLine && isOnlineOnly()) {
         if (!cancelled) {
           setReady(true);
           setLoadPhase("ready");

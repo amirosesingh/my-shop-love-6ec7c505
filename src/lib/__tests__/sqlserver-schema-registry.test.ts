@@ -114,6 +114,34 @@ describe("SQL Server schema registry", () => {
     expect(sql).toContain("EXEC(N'CREATE INDEX IX_sync_change_journal_pending");
   });
 
+  it("mirrors nullable cloud idempotency keys as filtered unique indexes", () => {
+    const payments = registry.tables.find(
+      (table: { cloudTable: string }) => table.cloudTable === "payment_transactions",
+    );
+    const sales = registry.tables.find(
+      (table: { cloudTable: string }) => table.cloudTable === "sales",
+    );
+
+    expect(
+      payments.columns.find(
+        (column: { cloudColumn: string }) =>
+          column.cloudColumn === "client_transaction_id",
+      ).unique,
+    ).toBe(true);
+    expect(
+      sales.columns.find(
+        (column: { cloudColumn: string }) =>
+          column.cloudColumn === "client_transaction_id",
+      ).unique,
+    ).toBe(true);
+    expect(sql).toContain(
+      "CREATE UNIQUE INDEX [UX_payment_transactions_client_transaction_id] ON dbo.[payment_transactions]([client_transaction_id]) WHERE [client_transaction_id] IS NOT NULL",
+    );
+    expect(sql).toContain(
+      "CREATE UNIQUE INDEX [UX_sales_client_transaction_id] ON dbo.[sales]([client_transaction_id]) WHERE [client_transaction_id] IS NOT NULL",
+    );
+  });
+
   it("orders every foreign-key parent before its children", () => {
     const byName = new Map(registry.tables.map((table: { cloudTable: string }) => [table.cloudTable, table]));
     for (const table of registry.tables) {

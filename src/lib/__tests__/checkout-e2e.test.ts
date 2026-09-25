@@ -6,17 +6,28 @@
  * bill the customer twice.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { readFileSync } from "node:fs";
 
+const platform = vi.hoisted(() => ({ offlineFirst: false }));
 const live = vi.fn();
 const localWrite = vi.fn();
+const localAggregate = vi.fn();
 const attemptRows = vi.fn(() => ({ data: [] as unknown[] | null, error: null as unknown }));
 
 vi.mock("@/lib/sync-engine", () => ({
   runOpLive: (...a: unknown[]) => live(...a),
   drainOutbox: async () => {},
 }));
+vi.mock("@/platform-config/features", () => ({
+  hasFeature: (name: string) => name === "offlineFirst" && platform.offlineFirst,
+}));
 vi.mock("@/core/local-db/local-db", () => ({
-  localDb: () => ({ write: (...a: unknown[]) => localWrite(...a) }),
+  localDb: () => ({
+    write: (...a: unknown[]) => localWrite(...a),
+    writeBatch: (...a: unknown[]) => localWrite(...a),
+    commitAggregate: (...a: unknown[]) => localAggregate(...a),
+    database: { getState: async () => ({ enabled: true, connected: true, state: "ready" }) },
+  }),
   electronDb: () => null,
   readBranch: () => ({ branchId: null, branchName: null }),
 }));
@@ -30,7 +41,7 @@ vi.mock("@/integrations/supabase/external-client", () => ({
 
 import { db, receivingPriceOps, receivingCorrectionOps, type ReceivingInvoice } from "@/core/api/pos-db";
 import { setPreferredDatabaseMode } from "@/core/local-db/db-mode";
-import type { Sale } from "@/core/types/pos-types";
+import type { Member, Sale } from "@/core/types/pos-types";
 
 const sale = (over: Partial<Sale> = {}): Sale =>
   ({
@@ -66,11 +77,14 @@ const saleArgs = () => opsSent().find((o) => o.kind === "rpc" && o.table === "sa
 
 describe("checkout commit", () => {
   beforeEach(() => {
+    platform.offlineFirst = false;
     live.mockReset();
     localWrite.mockReset();
+    localAggregate.mockReset();
     attemptRows.mockReturnValue({ data: [], error: null });
     live.mockResolvedValue(undefined);
     localWrite.mockResolvedValue({ ok: true });
+    localAggregate.mockResolvedValue({ ok: true });
     setPreferredDatabaseMode("online");
   });
   afterEach(() => setPreferredDatabaseMode("local"));
@@ -126,6 +140,72 @@ describe("checkout commit", () => {
   it("links an exchange back to the original bill", async () => {
     await db.commitSale(sale({ exchangeOfReceiptNo: "B101-PC01-20260810-0007" } as never), [], null);
     expect(saleArgs()?.["_exchange_bill"]).toBe("B101-PC01-20260810-0007");
+  });
+
+  it("commits cash, card, member and loyalty rows to Electron SQL Server before sync", async () => {
+    platform.offlineFirst = true;
+    const member: Member = {
+      id: "11111111-1111-4111-8111-111111111111",
+      code: "MEM-1",
+      name: "Member One",
+      phone: "1234567",
+      email: "member@example.com",
+      tier: "Silver",
+      points: 25,
+      totalSpend: 500,
+      joinedAt: "2026-01-01T00:00:00.000Z",
+    };
+    const target = await db.commitSale(
+      sale({
+        memberId: member.id,
+        payments: [
+          { method: "cash", amount: 60 },
+          { method: "card", amount: 40, reference: "CARD-1" },
+        ],
+        roundingAdjustment: 0,
+        roundingLabel: "No rounding",
+      } as never),
+      [],
+      member,
+    );
+
+    expect(target).toBe("local");
+    expect(live).not.toHaveBeenCalled();
+    expect(localAggregate).toHaveBeenCalledOnce();
+    const aggregate = localAggregate.mock.calls[0][0] as {
+      kind: string;
+      operations: Array<{ table: string; rows?: Array<Record<string, unknown>> }>;
+    };
+    expect(aggregate.kind).toBe("sale");
+    const saleRow = aggregate.operations.find((op) => op.table === "sales")?.rows?.[0];
+    const paymentRows = aggregate.operations.find((op) => op.table === "payment_transactions")?.rows ?? [];
+    const memberRow = aggregate.operations.find((op) => op.table === "members")?.rows?.[0];
+    expect(saleRow).toMatchObject({ member_id: member.id, shift_id: "shift-1" });
+    expect(paymentRows).toHaveLength(2);
+    expect(paymentRows.map((row) => row.member_id)).toEqual([member.id, member.id]);
+    expect(paymentRows.map((row) => row.client_transaction_id)).toEqual([
+      "txn-1:pay:0",
+      "txn-1:pay:1",
+    ]);
+    expect(memberRow).toMatchObject({ id: member.id, loyalty_points: 25, total_spent: 500 });
+
+    const registry = JSON.parse(readFileSync("database/sqlserver/schema-registry.json", "utf8")) as {
+      tables: Array<{ cloudTable: string; columns: Array<{ cloudColumn: string }> }>;
+    };
+    const allowed = new Map(
+      registry.tables.map((table) => [
+        table.cloudTable,
+        new Set(table.columns.map((column) => column.cloudColumn)),
+      ]),
+    );
+    for (const operation of aggregate.operations) {
+      for (const row of operation.rows ?? []) {
+        expect(
+          Object.keys(row).filter((column) => !allowed.get(operation.table)?.has(column)),
+          `${operation.table} includes fields rejected by Electron SQL Server`,
+        ).toEqual([]);
+      }
+    }
   });
 
   it("marks returned lines as returns in the stock ledger", async () => {

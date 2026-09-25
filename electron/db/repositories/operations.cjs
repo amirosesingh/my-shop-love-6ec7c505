@@ -93,8 +93,10 @@ class OperationsRepository {
     const result = await request.query(query);
     return result.rowsAffected?.reduce((sum, count) => sum + count, 0) ?? 0;
   }
-  async snapshot() {
-    const names = ["products", "members", "stores", "shifts", "promotions", "member_tiers"];
+  async snapshot(branchId = null) {
+    // Branch-owned rows are loaded separately with an explicit predicate.
+    // The list below contains only shared catalogue/reference data.
+    const names = ["products", "members", "stores", "promotions", "member_tiers"];
     const output = {};
     for (const name of names) {
       if (!this.tables.has(name)) continue;
@@ -104,6 +106,18 @@ class OperationsRepository {
     if (this.tables.has("pos_settings")) {
       const result = await this.pool().request().query("SELECT TOP (1) * FROM dbo.pos_settings ORDER BY id;");
       output.settings = result.recordset?.[0] ?? null;
+    }
+    if (this.tables.has("shifts")) {
+      const result = branchId
+        ? await this.pool().request().input("branch", String(branchId)).query("SELECT TOP (2000) * FROM dbo.shifts WHERE store_id=@branch ORDER BY [id];")
+        : { recordset: [] };
+      output.shifts = result.recordset ?? [];
+    }
+    if (this.tables.has("sales")) {
+      const result = branchId
+        ? await this.pool().request().input("branch", String(branchId)).query("SELECT TOP (500) * FROM dbo.sales WHERE store_id=@branch ORDER BY created_at DESC,id;")
+        : { recordset: [] };
+      output.sales = result.recordset ?? [];
     }
     return { ok: true, ...output };
   }

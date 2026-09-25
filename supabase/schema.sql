@@ -441,6 +441,7 @@ CREATE TABLE IF NOT EXISTS public.payment_transactions (
     row_version integer DEFAULT 1 NOT NULL,
     status text DEFAULT 'completed'::text,
     metadata jsonb DEFAULT '{}'::jsonb,
+    client_transaction_id text,
     CONSTRAINT payment_transactions_kind_check CHECK ((kind = ANY (ARRAY['deposit'::text, 'payment'::text, 'settlement'::text, 'refund'::text, 'change'::text]))),
     CONSTRAINT payment_transactions_source_type_check CHECK ((source_type = ANY (ARRAY['sale'::text, 'booking'::text])))
 );
@@ -676,7 +677,12 @@ CREATE TABLE IF NOT EXISTS public.sales (
     updated_by text,
     row_version integer DEFAULT 1 NOT NULL,
     store_name_snapshot text,
-    store_address_snapshot text
+    store_address_snapshot text,
+    authorization_request_id uuid,
+    authorized_by text,
+    authorized_at timestamp with time zone,
+    rounding_adjustment numeric(18,4) DEFAULT 0 NOT NULL,
+    rounding_label text
 );
 
 CREATE TABLE IF NOT EXISTS public.secure_settings (
@@ -5158,6 +5164,8 @@ CREATE INDEX IF NOT EXISTS payment_transactions_paid_at_idx ON public.payment_tr
 CREATE INDEX IF NOT EXISTS payment_transactions_sale_idx ON public.payment_transactions USING btree (sale_id);
 
 CREATE INDEX IF NOT EXISTS payment_transactions_store_idx ON public.payment_transactions USING btree (store_id, created_at DESC);
+
+CREATE UNIQUE INDEX IF NOT EXISTS payment_transactions_client_txn_idx ON public.payment_transactions USING btree (client_transaction_id) WHERE (client_transaction_id IS NOT NULL);
 
 
 CREATE INDEX IF NOT EXISTS product_barcodes_product_idx ON public.product_barcodes USING btree (product_id);
@@ -12543,8 +12551,8 @@ CREATE OR REPLACE FUNCTION public.sync_apply_payment_transactions(p_rows jsonb) 
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   
-  INSERT INTO public."payment_transactions" ("id","source_type","sale_id","booking_id","member_id","store_id","shift_id","terminal_id","amount","method","kind","reference","cashier_id","cashier_name","note","paid_at","created_at","updated_at","row_version","status","metadata")
-  SELECT "id","source_type","sale_id","booking_id","member_id","store_id","shift_id","terminal_id","amount","method","kind","reference","cashier_id","cashier_name","note","paid_at","created_at","updated_at","row_version","status","metadata" FROM jsonb_populate_recordset(NULL::public."payment_transactions", COALESCE(p_rows,'[]'::jsonb))
+  INSERT INTO public."payment_transactions" ("id","source_type","sale_id","booking_id","member_id","store_id","shift_id","terminal_id","amount","method","kind","reference","cashier_id","cashier_name","note","paid_at","created_at","updated_at","row_version","status","metadata","client_transaction_id")
+  SELECT "id","source_type","sale_id","booking_id","member_id","store_id","shift_id","terminal_id","amount","method","kind","reference","cashier_id","cashier_name","note","paid_at","created_at","updated_at","row_version","status","metadata","client_transaction_id" FROM jsonb_populate_recordset(NULL::public."payment_transactions", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO NOTHING;
   GET DIAGNOSTICS v_count=ROW_COUNT;
   
@@ -12891,8 +12899,8 @@ CREATE OR REPLACE FUNCTION public.sync_apply_sales(p_rows jsonb) RETURNS integer
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   PERFORM set_config('pos.refunding','on',true);
-  INSERT INTO public."sales" ("id","bill_number","member_id","store_id","cashier_name","subtotal_amount","total_amount","discount_amount","tax_amount","payment_type","points_earned","points_redeemed","is_exchange","original_bill_number","is_refunded","created_at","shift_id","paid_amount","change_amount","exchange_credit","exchanged_to_bill_number","coupon_code","coupon_promo_id","coupon_scope","coupon_discount","payments","client_transaction_id","cashier_id","created_by","updated_by","row_version","store_name_snapshot","store_address_snapshot","authorization_request_id","rounding_adjustment")
-  SELECT "id","bill_number","member_id","store_id","cashier_name","subtotal_amount","total_amount","discount_amount","tax_amount","payment_type","points_earned","points_redeemed","is_exchange","original_bill_number","is_refunded","created_at","shift_id","paid_amount","change_amount","exchange_credit","exchanged_to_bill_number","coupon_code","coupon_promo_id","coupon_scope","coupon_discount","payments","client_transaction_id","cashier_id","created_by","updated_by","row_version","store_name_snapshot","store_address_snapshot","authorization_request_id","rounding_adjustment" FROM jsonb_populate_recordset(NULL::public."sales", COALESCE(p_rows,'[]'::jsonb))
+  INSERT INTO public."sales" ("id","bill_number","member_id","store_id","cashier_name","subtotal_amount","total_amount","discount_amount","tax_amount","payment_type","points_earned","points_redeemed","is_exchange","original_bill_number","is_refunded","created_at","shift_id","paid_amount","change_amount","exchange_credit","exchanged_to_bill_number","coupon_code","coupon_promo_id","coupon_scope","coupon_discount","payments","client_transaction_id","cashier_id","created_by","updated_by","row_version","store_name_snapshot","store_address_snapshot","authorization_request_id","authorized_by","authorized_at","rounding_adjustment","rounding_label")
+  SELECT "id","bill_number","member_id","store_id","cashier_name","subtotal_amount","total_amount","discount_amount","tax_amount","payment_type","points_earned","points_redeemed","is_exchange","original_bill_number","is_refunded","created_at","shift_id","paid_amount","change_amount","exchange_credit","exchanged_to_bill_number","coupon_code","coupon_promo_id","coupon_scope","coupon_discount","payments","client_transaction_id","cashier_id","created_by","updated_by","row_version","store_name_snapshot","store_address_snapshot","authorization_request_id","authorized_by","authorized_at","rounding_adjustment","rounding_label" FROM jsonb_populate_recordset(NULL::public."sales", COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT ("id") DO UPDATE SET "is_refunded"=(public."sales"."is_refunded" OR EXCLUDED."is_refunded"),"row_version"=GREATEST(public."sales"."row_version",EXCLUDED."row_version");
   GET DIAGNOSTICS v_count=ROW_COUNT;
   

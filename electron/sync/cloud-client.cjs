@@ -12,7 +12,9 @@ class CloudClient {
     if (!base) throw Object.assign(new Error("The terminal is activated, but its hosted POS backend address has not been restored. Open Database & Cloud Connection and save the hosted POS address once."),{code:"EBACKEND"});
     if (!/^https:\/\/.+/i.test(base)) throw Object.assign(new Error("The hosted POS backend must be a full HTTPS address. Open Database & Cloud Connection and save the POS website address again."),{code:"EBACKEND_HTTPS"});
     if (!terminalToken) throw Object.assign(new Error("The renderer activation has not reached the desktop synchronization service yet. Close and reopen Settings, then retry synchronization."),{code:"EACTIVATION_MIRROR"});
-    const response = await fetch(`${base}/api/v1/pos/sync`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ terminalToken, ...payload }) });
+    // The OS-sealed activation token is authoritative. Put it last so no
+    // caller-supplied payload can replace the device identity or its branch.
+    const response = await fetch(`${base}/api/v1/pos/sync`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...payload, terminalToken }) });
     const data = await response.json().catch(() => ({ ok: false, error: `HTTP ${response.status}` }));
     if (!response.ok || data?.ok === false) throw Object.assign(new Error(data?.error ?? `HTTP ${response.status}`), { code: data?.code ?? `HTTP_${response.status}` });
     return data;
