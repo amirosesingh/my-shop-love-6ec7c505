@@ -39,7 +39,12 @@ vi.mock("@/integrations/supabase/external-client", () => ({
   },
 }));
 
-import { db, receivingPriceOps, receivingCorrectionOps, type ReceivingInvoice } from "@/core/api/pos-db";
+import {
+  db,
+  receivingPriceOps,
+  receivingCorrectionOps,
+  type ReceivingInvoice,
+} from "@/core/api/pos-db";
 import { setPreferredDatabaseMode } from "@/core/local-db/db-mode";
 import type { Member, Sale } from "@/core/types/pos-types";
 
@@ -67,12 +72,16 @@ const sale = (over: Partial<Sale> = {}): Sale =>
     ...over,
   }) as Sale;
 
-const opsSent = () => live.mock.calls.map((c) => c[1] as {
-  kind: string;
-  table: string;
-  rows?: unknown[];
-  args?: Record<string, unknown>;
-});
+const opsSent = () =>
+  live.mock.calls.map(
+    (c) =>
+      c[1] as {
+        kind: string;
+        table: string;
+        rows?: unknown[];
+        args?: Record<string, unknown>;
+      },
+  );
 const saleArgs = () => opsSent().find((o) => o.kind === "rpc" && o.table === "sales")?.args;
 
 describe("checkout commit", () => {
@@ -116,7 +125,12 @@ describe("checkout commit", () => {
 
   it("skips a zero-value tender line", async () => {
     await db.commitSale(
-      sale({ payments: [{ method: "cash", amount: 100 }, { method: "card", amount: 0 }] } as never),
+      sale({
+        payments: [
+          { method: "cash", amount: 100 },
+          { method: "card", amount: 0 },
+        ],
+      } as never),
       [],
       null,
     );
@@ -138,7 +152,11 @@ describe("checkout commit", () => {
   });
 
   it("links an exchange back to the original bill", async () => {
-    await db.commitSale(sale({ exchangeOfReceiptNo: "B101-PC01-20260810-0007" } as never), [], null);
+    await db.commitSale(
+      sale({ exchangeOfReceiptNo: "B101-PC01-20260810-0007" } as never),
+      [],
+      null,
+    );
     expect(saleArgs()?.["_exchange_bill"]).toBe("B101-PC01-20260810-0007");
   });
 
@@ -178,7 +196,8 @@ describe("checkout commit", () => {
     };
     expect(aggregate.kind).toBe("sale");
     const saleRow = aggregate.operations.find((op) => op.table === "sales")?.rows?.[0];
-    const paymentRows = aggregate.operations.find((op) => op.table === "payment_transactions")?.rows ?? [];
+    const paymentRows =
+      aggregate.operations.find((op) => op.table === "payment_transactions")?.rows ?? [];
     const memberRow = aggregate.operations.find((op) => op.table === "members")?.rows?.[0];
     expect(saleRow).toMatchObject({ member_id: member.id, shift_id: "shift-1" });
     expect(paymentRows).toHaveLength(2);
@@ -189,7 +208,9 @@ describe("checkout commit", () => {
     ]);
     expect(memberRow).toMatchObject({ id: member.id, loyalty_points: 25, total_spent: 500 });
 
-    const registry = JSON.parse(readFileSync("database/sqlserver/schema-registry.json", "utf8")) as {
+    const registry = JSON.parse(
+      readFileSync("database/sqlserver/schema-registry.json", "utf8"),
+    ) as {
       tables: Array<{ cloudTable: string; columns: Array<{ cloudColumn: string }> }>;
     };
     const allowed = new Map(
@@ -208,12 +229,29 @@ describe("checkout commit", () => {
     }
   });
 
+  it("refuses checkout when the Electron SQL transaction does not commit", async () => {
+    platform.offlineFirst = true;
+    localAggregate.mockResolvedValueOnce({ ok: false, error: "payment insert failed" });
+
+    await expect(db.commitSale(sale(), [], null)).rejects.toThrow("payment insert failed");
+    expect(localAggregate).toHaveBeenCalledOnce();
+    expect(live).not.toHaveBeenCalled();
+  });
+
   it("marks returned lines as returns in the stock ledger", async () => {
     await db.commitSale(
       sale({
         lines: [
           { productId: "p1", name: "Racket", price: 100, qty: 1, taxRate: 0, discount: 0 },
-          { productId: "p2", name: "Grip", price: 40, qty: -1, taxRate: 0, discount: 0, credit: true },
+          {
+            productId: "p2",
+            name: "Grip",
+            price: 40,
+            qty: -1,
+            taxRate: 0,
+            discount: 0,
+            credit: true,
+          },
         ],
       } as never),
       [],
@@ -226,18 +264,32 @@ describe("checkout commit", () => {
 });
 
 describe("receiving stock ownership", () => {
-  const previous = { id: "aaaaaaaa-bbbb-4ccc-addd-eeeeeeeeeeee", status: "posted", storeId: "branch-1", invoiceNo: "PO-1", operator: "Manager",
-    lines: [{ productId: "product-1", name: "Item", qty: 4, cost: 2, price: 3 }] } as ReceivingInvoice;
+  const previous = {
+    id: "aaaaaaaa-bbbb-4ccc-addd-eeeeeeeeeeee",
+    status: "posted",
+    storeId: "branch-1",
+    invoiceNo: "PO-1",
+    operator: "Manager",
+    lines: [{ productId: "product-1", name: "Item", qty: 4, cost: 2, price: 3 }],
+  } as ReceivingInvoice;
   it("changes pricing without writing absolute quantities", () => {
     const ops = receivingPriceOps(previous);
-    expect(ops).toEqual([{ kind: "update", table: "products", match: { id: "product-1" }, values: { cost_price: 2, selling_price: 3 } }]);
+    expect(ops).toEqual([
+      {
+        kind: "update",
+        table: "products",
+        match: { id: "product-1" },
+        values: { cost_price: 2, selling_price: 3 },
+      },
+    ]);
   });
   it("posts only the correction delta and reuses IDs on retry", () => {
     const next = { ...previous, lines: [{ ...previous.lines[0], qty: 7 }] };
     const attempt = "bbbbbbbb-cccc-4ddd-aeee-ffffffffffff";
     const first = receivingCorrectionOps(next, previous, attempt)[0];
     const retry = receivingCorrectionOps(next, previous, attempt)[0];
-    if (first.kind !== "upsert" || retry.kind !== "upsert") throw new Error("Expected movement upsert");
+    if (first.kind !== "upsert" || retry.kind !== "upsert")
+      throw new Error("Expected movement upsert");
     expect(first.rows[0].quantity_delta).toBe(3);
     expect(first.rows[0].id).toBe(retry.rows[0].id);
     expect(first.rows[0].store_id).toBe("branch-1");
