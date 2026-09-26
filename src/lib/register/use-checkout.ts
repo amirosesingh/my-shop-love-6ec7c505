@@ -528,19 +528,52 @@ export function useCheckout(deps: CheckoutDeps) {
       setSaving(false);
     }
     attemptId.current = null;
-    if (coupon) {
-      logger.log("promotion", "Coupon redeemed on a bill", "register", {
-        receiptNo: sale.receiptNo,
-        coupon: coupon.code,
-        promotionId: coupon.promoId,
-        scope: coupon.scope,
-        product: coupon.productName ?? null,
-        discountValue: coupon.discount,
-        billTotal: sale.total,
-        storeId: sale.storeId,
-      });
+
+    // From this point the SQL transaction is complete. Restore a usable till
+    // before starting printer, drawer, messaging or audit side effects: none
+    // of those integrations may strand the cashier on a completed ticket.
+    setLastSale(sale);
+    const customerNumber = member?.phone ?? "";
+    deps.setWaNumber(customerNumber);
+    let paidDisplay: DisplaySnapshot | null = null;
+    try {
+      paidDisplay = {
+        ...deps.cartSnapshot(),
+        mode: "paid",
+        paid: sale.paid,
+        change: sale.change,
+        reference: sale.receiptNo,
+        method: sale.method,
+        transferRef: sale.transferRef ?? "",
+      };
+    } catch {
+      // The customer display is optional; sale completion is not.
     }
-    if (payments.some((p) => p.method === "cash")) openCashDrawer();
+    deps.resetCart();
+    deps.setMemberId(null);
+    deps.resetTender();
+    toast.success(
+      exchangeRef ? `Exchange ${sale.receiptNo} completed against ${exchangeRef}` : `Sale ${sale.receiptNo} completed`,
+    );
+
+    if (coupon) {
+      try {
+        logger.log("promotion", "Coupon redeemed on a bill", "register", {
+          receiptNo: sale.receiptNo,
+          coupon: coupon.code,
+          promotionId: coupon.promoId,
+          scope: coupon.scope,
+          product: coupon.productName ?? null,
+          discountValue: coupon.discount,
+          billTotal: sale.total,
+          storeId: sale.storeId,
+        });
+      } catch { /* audit recovery must not break a completed checkout */ }
+    }
+    if (payments.some((p) => p.method === "cash")) {
+      try { openCashDrawer(); }
+      catch (error) { notifyError(error, "Sale saved, but the drawer did not open"); }
+    }
     if (voucherToken) {
       void redeemVoucher({
         token: voucherToken,
@@ -551,43 +584,34 @@ export function useCheckout(deps: CheckoutDeps) {
       deps.setVoucherToken(null);
     }
     if (splitting || payments.some((p) => p.bankName)) {
-      logger.log("sale", "Split payment recorded", "register", {
-        receiptNo: sale.receiptNo,
-        total: sale.total,
-        tenders: paymentsLabel(payments),
-        storeId: sale.storeId,
-      });
+      try {
+        logger.log("sale", "Split payment recorded", "register", {
+          receiptNo: sale.receiptNo,
+          total: sale.total,
+          tenders: paymentsLabel(payments),
+          storeId: sale.storeId,
+        });
+      } catch { /* audit recovery must not break a completed checkout */ }
     }
     if (method === "bank_transfer") {
-      logger.log("sale", "Bank transfer payment recorded", "register", {
-        receiptNo: sale.receiptNo,
-        total: sale.total,
-        transferRef: sale.transferRef,
-        bank: state.settings.payment.bankName,
-      });
+      try {
+        logger.log("sale", "Bank transfer payment recorded", "register", {
+          receiptNo: sale.receiptNo,
+          total: sale.total,
+          transferRef: sale.transferRef,
+          bank: state.settings.payment.bankName,
+        });
+      } catch { /* audit recovery must not break a completed checkout */ }
     }
-    printSaleReceipt(sale, member, "sale");
-    setLastSale(sale);
-    const customerNumber = member?.phone ?? "";
-    deps.setWaNumber(customerNumber);
+    try {
+      printSaleReceipt(sale, member, "sale");
+    } catch (error) {
+      notifyError(error, "Sale saved, but printing failed");
+    }
     if (wa.enabled && wa.autoSendOnSale && customerNumber) {
       void sendSaleOnWhatsApp(sale, customerNumber);
     }
-    publishDisplay({
-      ...deps.cartSnapshot(),
-      mode: "paid",
-      paid: sale.paid,
-      change: sale.change,
-      reference: sale.receiptNo,
-      method: sale.method,
-      transferRef: sale.transferRef ?? "",
-    });
-    deps.resetCart();
-    deps.setMemberId(null);
-    deps.resetTender();
-    toast.success(
-      exchangeRef ? `Exchange ${sale.receiptNo} completed against ${exchangeRef}` : `Sale ${sale.receiptNo} completed`,
-    );
+    if (paidDisplay) publishDisplay(paidDisplay);
   }
 
   return {

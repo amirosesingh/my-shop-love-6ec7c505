@@ -189,6 +189,47 @@ function options(value, { name = "options", max = 40 } = {}) {
   return out;
 }
 
+/** A bounded, read-only renderer query. Nested filters are validated here and
+ * table/column membership is validated again against the schema registry. */
+function queryOptions(value) {
+  const raw = plainObject(value ?? {}, { name: "business query" });
+  const allowed = new Set(["columns", "match", "in", "orderBy", "limit", "offset", "cursor"]);
+  if (Object.keys(raw).some((field) => !allowed.has(field))) throw new BadArg("The business query contains an unexpected setting.");
+  const result = {};
+  if (raw.columns !== undefined) result.columns = text(raw.columns, { name: "selected columns", max: 2000 });
+  if (raw.match !== undefined) {
+    const match = plainObject(raw.match, { name: "query match" });
+    if (Object.keys(match).length > 20) throw new BadArg("The business query has too many match fields.");
+    for (const [field, item] of Object.entries(match)) {
+      key(field, { name: "match column" });
+      if (item !== null && !["string", "number", "boolean"].includes(typeof item)) throw new BadArg("The business query match has an invalid value.");
+      if (typeof item === "string" && item.length > 4000) throw new BadArg("The business query match value is too long.");
+    }
+    result.match = match;
+  }
+  if (raw.in !== undefined) {
+    const input = plainObject(raw.in, { name: "query list" });
+    const values = list(input.values, { name: "query list values", max: 2000 });
+    if (values.some((item) => !["string", "number"].includes(typeof item))) throw new BadArg("The business query list has an invalid value.");
+    result.in = { column: key(input.column, { name: "list column" }), values };
+  }
+  if (raw.orderBy !== undefined) {
+    const order = plainObject(raw.orderBy, { name: "query order" });
+    result.orderBy = { column: key(order.column, { name: "order column" }), ascending: order.ascending === undefined ? true : boolean(order.ascending, { name: "order direction" }) };
+  }
+  if (raw.cursor !== undefined) {
+    const cursor = plainObject(raw.cursor, { name: "query cursor" });
+    result.cursor = {
+      column: key(cursor.column, { name: "cursor column" }),
+      value: text(cursor.value, { name: "cursor value", max: 200 }),
+      id: text(cursor.id, { name: "cursor id", max: 200 }),
+    };
+  }
+  if (raw.limit !== undefined) result.limit = integer(raw.limit, { name: "query limit", min: 1, max: 2000 });
+  if (raw.offset !== undefined) result.offset = integer(raw.offset, { name: "query offset", min: 0, max: 10000000 });
+  return result;
+}
+
 /** Connection details for the branch database. Scalars only, size-capped. */
 function connectionConfig(value, { name = "connection details" } = {}) {
   return options(value, { name, max: 40 });
@@ -331,6 +372,7 @@ module.exports = {
   writeOps,
   aggregate,
   options,
+  queryOptions,
   connectionConfig,
   credentialProof,
   databaseProfile,

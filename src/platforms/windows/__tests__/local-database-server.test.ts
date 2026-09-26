@@ -162,6 +162,6 @@ describe("local SQL Server wizard server step", () => {
     expect(operations).toContain("Synchronization failures");
     expect(operations).toContain("failure.error_message");
     expect(operations).toContain("conflict.reason");
-    expect(operations.match(/await mirrorTerminalConfigToDesktop\(\)/g)).toHaveLength(2);
+    expect(operations.match(/await mirrorTerminalConfigToDesktop\(\)/g)).toHaveLength(4);
   });
 });

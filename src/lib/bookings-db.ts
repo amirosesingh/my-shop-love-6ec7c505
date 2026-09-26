@@ -2,13 +2,10 @@
  * Bookings (and racket stringing job cards) in the cloud database, so a job
  * raised on one till is visible from every other till and from the phone.
  */
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { supabaseExternal } from "@/integrations/supabase/external-client";
 import type { Booking, JobStatus } from "@/core/types/pos-types";
 import { commitOps, type CommitTarget } from "@/core/api/pos-db";
+import { routedQuery } from "@/core/api/db-query";
 import type { SyncOp } from "./sync-outbox";
-
-const sb = supabaseExternal as unknown as SupabaseClient;
 
 type Row = Record<string, any>;
 
@@ -189,25 +186,28 @@ export async function commitBooking(b: Booking): Promise<CommitTarget> {
   return await saveBooking(b);
 }
 
-/** Every booking raised in the company, newest first. */
+/** Branch-scoped bookings from the platform's operational database. */
 export async function loadBookings(): Promise<Booking[]> {
-  const heads = await sb
-    .from("bookings")
-    .select("*")
-    .order("created_at", { ascending: false })
-    .limit(500);
-  if (heads.error) throw new Error(heads.error.message);
-  const rows = (heads.data as Row[] | null) ?? [];
+  const rows = await routedQuery("bookings", {
+    orderBy: { column: "created_at", ascending: false },
+    limit: 500,
+  });
   if (!rows.length) return [];
-  const pays = await sb
-    .from("booking_payments")
-    .select("*")
-    .in("booking_id", rows.map((r) => r.id));
-  const byBooking = new Map<string, Row[]>();
-  for (const p of ((pays.data as Row[] | null) ?? [])) {
-    const list = byBooking.get(p.booking_id) ?? [];
-    list.push(p);
-    byBooking.set(p.booking_id, list);
+  const payments: Row[] = [];
+  const bookingIds = rows.map((r) => String(r.id));
+  for (let start = 0; start < bookingIds.length; start += 100) {
+    payments.push(...await routedQuery("booking_payments", {
+      in: { column: "booking_id", values: bookingIds.slice(start, start + 100) },
+      orderBy: { column: "created_at", ascending: true },
+      limit: 2000,
+    }) as Row[]);
   }
-  return rows.map((r) => rowToBooking(r, byBooking.get(r.id) ?? []));
+  const byBooking = new Map<string, Row[]>();
+  for (const p of payments) {
+    const bookingId = String(p.booking_id);
+    const list = byBooking.get(bookingId) ?? [];
+    list.push(p);
+    byBooking.set(bookingId, list);
+  }
+  return rows.map((r) => rowToBooking(r, byBooking.get(String(r.id)) ?? []));
 }

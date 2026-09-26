@@ -205,15 +205,23 @@ export function recordActivity(input: ActivityEventInput): void {
     createdAt: new Date().toISOString(),
   };
   void (async () => {
+    // Electron governance events enter SQL Server first and are uploaded by
+    // the same durable coordinator as the sale. Its browser queue is never an
+    // Electron outbox.
+    if (typeof window !== "undefined" && (window as unknown as { pos?: unknown }).pos) {
+      if (await park(entry)) return;
+    }
     if (await send(entry)) {
-      void flushActivityQueue();
+      void flushActivityQueue().catch(() => undefined);
       return;
     }
     // Offline: the till's own database keeps it if there is one, otherwise
     // the browser queue holds it until the line is back.
     if (await park(entry)) return;
     writeQueue([...readQueue(), entry]);
-  })();
+  })().catch(() => {
+    // Visibility events are non-critical and must never reject into checkout.
+  });
 }
 
 export const pendingActivityCount = () => readQueue().length;

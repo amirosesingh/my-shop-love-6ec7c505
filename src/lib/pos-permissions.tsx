@@ -26,6 +26,8 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { useAuth, useAuthOptional } from "@/lib/pos-auth";
+import { verifyLocalPin } from "@/core/local-db/local-staff";
+import { looksOffline } from "@/lib/governance-offline";
 import {
   PERMISSION_LABELS,
   resolvePermission,
@@ -166,12 +168,32 @@ function PermissionsInner({ children }: { children: ReactNode }) {
       return;
     }
     setBusy(true);
+    if (typeof navigator !== "undefined" && !navigator.onLine) {
+      const local = await verifyLocalPin(userId.trim(), pin);
+      setBusy(false);
+      if (!local.ok || !["admin", "manager"].includes(local.staff.roleSlug)) {
+        setError("Invalid supervisor User ID or PIN");
+        return;
+      }
+      close(true);
+      return;
+    }
     const { data, error: rpcError } = await sb.rpc("verify_terminal_pin", {
       p_user_id: userId.trim(),
       p_pin: pin,
     });
-    setBusy(false);
     const row = (Array.isArray(data) ? data[0] : data) as { role?: string } | undefined;
+    if (rpcError && looksOffline(rpcError)) {
+      const local = await verifyLocalPin(userId.trim(), pin);
+      setBusy(false);
+      if (!local.ok || !["admin", "manager"].includes(local.staff.roleSlug)) {
+        setError("Invalid supervisor User ID or PIN");
+        return;
+      }
+      close(true);
+      return;
+    }
+    setBusy(false);
     if (rpcError || !row) {
       setError("Invalid supervisor User ID or PIN");
       return;

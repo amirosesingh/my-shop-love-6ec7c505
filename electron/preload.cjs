@@ -10,14 +10,16 @@ contextBridge.exposeInMainWorld("sqlAdmin", {
 });
 
 /**
- * Online-only Electron bridge. Business data is handled by the renderer's
- * central Supabase client; this surface contains only OS integrations.
+ * Electron business bridge. Operational reads and writes use local SQL
+ * Server; Supabase synchronization stays in the main process background.
  */
 contextBridge.exposeInMainWorld("pos", {
   write: (context, op) => invoke("business:write-batch", context, [op]),
   writeBatch: (context, ops) => invoke("business:write-batch", context, ops),
   commitAggregate: (aggregate) => invoke("business:commit-aggregate", aggregate),
   snapshot: () => invoke("business:snapshot"),
+  query: (table, options) => invoke("business:query", table, options),
+  shiftExpectedTotals: (shiftId) => invoke("business:shift-expected", shiftId),
   onBusinessChanged: (cb) => {
     const handler = (_event, payload) => cb(payload);
     ipcRenderer.on("business:changed", handler);

@@ -1,5 +1,5 @@
 class SyncCoordinator {
-  constructor({ pushWorker, pullWorker, publish = () => {} }) { this.pushWorker=pushWorker; this.pullWorker=pullWorker; this.publish=publish; this.running=false; this.paused=false; this.status={ phase:"idle", pending:0, failed:0, conflicts:0, lastPushAt:null, lastPullAt:null, lastError:null }; }
+  constructor({ pushWorker, pullWorker, publish = () => {} }) { this.pushWorker=pushWorker; this.pullWorker=pullWorker; this.publish=publish; this.running=false; this.paused=false; this.status={ phase:"idle", pending:0, failed:0, conflicts:0, lastPushAt:null, lastPullAt:null, lastError:null, lastComparedAt:null, lastVerifiedAt:null, tables:[] }; }
   snapshot() { return { ...this.status, running:this.running, paused:this.paused }; }
   async runNow(options) {
     if (this.running) return { ...this.snapshot(), busy:true };
@@ -16,5 +16,6 @@ class SyncCoordinator {
   }
   pause(){this.paused=true;this.publish(this.snapshot());return this.snapshot();}
   resume(){this.paused=false;this.publish(this.snapshot());return this.snapshot();}
+  recordVerification(report){this.status.lastComparedAt=report.comparedAt??new Date().toISOString();this.status.lastVerifiedAt=report.verified?this.status.lastComparedAt:this.status.lastVerifiedAt;this.status.tables=report.tables??[];this.publish(this.snapshot());return this.snapshot();}
 }
 module.exports = { SyncCoordinator };

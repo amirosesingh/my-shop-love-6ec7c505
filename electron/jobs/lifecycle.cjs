@@ -1,6 +1,7 @@
 const { runBootstrap, refreshTable } = require("./bootstrap.cjs");
 const { runRetention } = require("./retention.cjs");
 const { localTableCounts } = require("../sync/reconciliation.cjs");
+const { verifyTables } = require("../sync/verifier.cjs");
 
 class LocalDataLifecycle {
   constructor({connectionManager,databaseService,jobManager,jobRepository,registry,cloud,syncCoordinator,checkpoints}){
@@ -38,9 +39,38 @@ class LocalDataLifecycle {
     return{ok:true,branchId,historyDays,differences:[]};
   }
   async reconcile(branchId,historyDays=90){
-    const [local,cloudRows]=await Promise.all([localTableCounts(this.connectionManager,this.registry),this.cloud.counts({branchId,historyDays})]);
-    const cloud=Object.fromEntries((Array.isArray(cloudRows)?cloudRows:[]).map(row=>[row.table_name,Number(row.row_count)]));
-    return this.registry.tables.filter(table=>cloud[table.cloudTable]!==undefined&&local[table.cloudTable]!==cloud[table.cloudTable]).map(table=>({table:table.cloudTable,local:local[table.cloudTable],cloud:cloud[table.cloudTable]}));
+    const [local,cloudRows]=await Promise.all([localTableCounts(this.connectionManager,this.registry,branchId,historyDays),this.cloud.counts({branchId,historyDays})]);
+    const cloud=Object.fromEntries((Array.isArray(cloudRows)?cloudRows:[]).map(row=>[row.table_name,String(row.row_count??"0")]));
+    const verifiedAt=new Date().toISOString();
+    const tables=this.registry.tables.filter(table=>cloud[table.cloudTable]!==undefined).map(table=>({
+      table:table.cloudTable,
+      local:String(local[table.cloudTable]??"0"),
+      cloud:String(cloud[table.cloudTable]??"0"),
+      status:String(local[table.cloudTable]??"0")===String(cloud[table.cloudTable]??"0")?"SYNCED":"DIFFERENT",
+      verified:false,
+      comparedAt:verifiedAt,
+    }));
+    this.syncCoordinator.recordVerification({comparedAt:verifiedAt,verified:false,tables});
+    return tables.filter(table=>table.status!=="SYNCED");
+  }
+  async repair(branchId,historyDays=90,tableNames=[]){
+    const allowed=new Set(this.registry.tables.map(table=>table.cloudTable));
+    const requested=[...new Set((tableNames??[]).map(String).filter(table=>allowed.has(table)))];
+    if(!requested.length)return this.reconcile(branchId,historyDays);
+    const pushed=await this.syncCoordinator.runNow({branchId,batchSize:500});
+    if(!pushed.ok)throw Object.assign(new Error(pushed.error??"Synchronization failed before repair."),{code:pushed.code??"ESYNC"});
+    for(const tableName of requested)await refreshTable({registry:this.registry,cloud:this.cloud,connectionManager:this.connectionManager,branchId,historyDays,tableName});
+    const pulled=await this.syncCoordinator.runNow({branchId,batchSize:500});
+    if(!pulled.ok)throw Object.assign(new Error(pulled.error??"Synchronization failed after repair."),{code:pulled.code??"ESYNC"});
+    return this.reconcile(branchId,historyDays);
+  }
+  async verify(branchId,historyDays=90,tableNames=[]){
+    await this.reconcile(branchId,historyDays);
+    const counts=new Map((this.syncCoordinator.snapshot().tables??[]).map(table=>[table.table,table]));
+    const report=await verifyTables({connectionManager:this.connectionManager,registry:this.registry,cloud:this.cloud,branchId,historyDays,tableNames,onTable:(_table,tables)=>this.syncCoordinator.recordVerification({comparedAt:new Date().toISOString(),verified:false,tables:tables.map(table=>({...counts.get(table.table),...table}))})});
+    report.tables=report.tables.map(table=>({...counts.get(table.table),...table}));
+    this.syncCoordinator.recordVerification({comparedAt:report.verifiedAt,verified:report.verified,tables:report.tables});
+    return report;
   }
 }
 module.exports={LocalDataLifecycle};

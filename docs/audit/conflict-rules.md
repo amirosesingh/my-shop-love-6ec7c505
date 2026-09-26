@@ -1,54 +1,75 @@
-# Conflict rules
+# Conflict and deletion rules
 
-What happens when the same record is changed centrally and at a till.
-Generated from the feature registry — do not edit by hand. Run
-`bun scripts/sync-coverage.cjs` after changing a feature.
+Generated from the packaged synchronization registry. Financial records are corrected with reversal/correction records; they are not casually overwritten.
 
-| Table | Rule | What that means |
-| --- | --- | --- |
-| activity_events | append-only | Nothing is overwritten — each entry is kept in its own right. |
-| audit_logs | append-only | Nothing is overwritten — each entry is kept in its own right. |
-| authorization_log | append-only | Nothing is overwritten — each entry is kept in its own right. |
-| authorization_requests | append-only | Nothing is overwritten — each entry is kept in its own right. |
-| booking_payments | append-only | Nothing is overwritten — each entry is kept in its own right. |
-| bookings | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
-| coupon_campaigns | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
-| coupon_events | immutable | Written once and never changed; a correction is a new record. |
-| drawer_events | immutable | Written once and never changed; a correction is a new record. |
-| entity_status_history | append-only | Nothing is overwritten — each entry is kept in its own right. |
-| held_orders | till-wins | The till wins while it holds the record; head office accepts what it sends. |
-| issued_vouchers | immutable | Written once and never changed; a correction is a new record. |
-| item_activity_logs | append-only | Nothing is overwritten — each entry is kept in its own right. |
-| member_verifications | append-only | Nothing is overwritten — each entry is kept in its own right. |
-| members | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
-| membership_tiers | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
-| payment_transactions | immutable | Written once and never changed; a correction is a new record. |
-| product_barcodes | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
-| product_categories | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
-| products | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
-| promotions | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
-| purchase_order_items | immutable | Written once and never changed; a correction is a new record. |
-| purchase_orders | immutable | Written once and never changed; a correction is a new record. |
-| record_edits | append-only | Nothing is overwritten — each entry is kept in its own right. |
-| sale_items | immutable | Written once and never changed; a correction is a new record. |
-| sales | immutable | Written once and never changed; a correction is a new record. |
-| shift_cash_counts | immutable | Written once and never changed; a correction is a new record. |
-| shift_close_events | immutable | Written once and never changed; a correction is a new record. |
-| shift_reconciliations | immutable | Written once and never changed; a correction is a new record. |
-| shift_sessions | immutable | Written once and never changed; a correction is a new record. |
-| shift_variance_alerts | append-only | Nothing is overwritten — each entry is kept in its own right. |
-| shifts | immutable | Written once and never changed; a correction is a new record. |
-| stock_adjustments | append-only | Nothing is overwritten — each entry is kept in its own right. |
-| stock_count_drafts | immutable | Written once and never changed; a correction is a new record. |
-| stock_transfer_items | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
-| stock_transfers | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
-| suppliers | cloud-wins | Head office wins. The till replaces its copy on the next pull. |
+| Table | Insert | Update | Delete | Conflict rule |
+| --- | --- | --- | --- | --- |
+| activity_events | idempotent_upsert | versioned | tombstone | highest_version |
+| app_users | idempotent_upsert | versioned | tombstone | highest_version |
+| audit_logs | idempotent_upsert | versioned | tombstone | highest_version |
+| authorization_actions | idempotent_upsert | versioned | tombstone | highest_version |
+| authorization_log | idempotent_upsert | versioned | tombstone | highest_version |
+| authorization_requests | idempotent_upsert | versioned | tombstone | highest_version |
+| branch_telemetry | idempotent_upsert | versioned | tombstone | highest_version |
+| cashiers | idempotent_upsert | versioned | tombstone | highest_version |
+| coupon_campaigns | idempotent_upsert | versioned | tombstone | highest_version |
+| drawer_events | idempotent_upsert | versioned | tombstone | highest_version |
+| entity_status_history | idempotent_upsert | versioned | tombstone | highest_version |
+| held_orders | idempotent_upsert | versioned | tombstone | highest_version |
+| integration_settings | idempotent_upsert | versioned | tombstone | highest_version |
+| membership_tiers | idempotent_upsert | versioned | tombstone | highest_version |
+| nav_pins | idempotent_upsert | versioned | tombstone | highest_version |
+| offline_sync_audit_log | idempotent_upsert | versioned | tombstone | highest_version |
+| payment_types | idempotent_upsert | versioned | tombstone | highest_version |
+| pin_attempts | idempotent_upsert | versioned | tombstone | highest_version |
+| pos_settings | idempotent_upsert | versioned | tombstone | highest_version |
+| pos_store_settings | idempotent_upsert | versioned | tombstone | highest_version |
+| product_categories | idempotent_upsert | versioned | tombstone | highest_version |
+| public_flags | idempotent_upsert | versioned | tombstone | highest_version |
+| record_edits | idempotent_upsert | versioned | tombstone | highest_version |
+| secure_settings | idempotent_upsert | versioned | tombstone | highest_version |
+| security_findings | idempotent_upsert | versioned | tombstone | highest_version |
+| settings_locks | idempotent_upsert | versioned | tombstone | highest_version |
+| settings_overrides | idempotent_upsert | versioned | tombstone | highest_version |
+| settings_scoped | idempotent_upsert | versioned | tombstone | highest_version |
+| shift_sessions | idempotent_upsert | versioned | tombstone | highest_version |
+| shifts | idempotent_upsert | versioned | tombstone | highest_version |
+| sku_audit | idempotent_upsert | versioned | tombstone | highest_version |
+| staff_roles | idempotent_upsert | versioned | tombstone | highest_version |
+| stock_count_drafts | idempotent_upsert | versioned | tombstone | highest_version |
+| stock_delta_applied | idempotent_upsert | versioned | tombstone | movement_delta |
+| stock_transfers | idempotent_upsert | versioned | tombstone | highest_version |
+| store_groups | idempotent_upsert | versioned | tombstone | highest_version |
+| suppliers | idempotent_upsert | versioned | tombstone | highest_version |
+| sync_metadata | idempotent_upsert | versioned | tombstone | highest_version |
+| system_audit_logs | idempotent_upsert | versioned | tombstone | highest_version |
+| terminal_commands | idempotent_upsert | versioned | tombstone | highest_version |
+| terminal_recovery_secrets | idempotent_upsert | versioned | tombstone | highest_version |
+| uom_units | idempotent_upsert | versioned | tombstone | highest_version |
+| user_roles | idempotent_upsert | versioned | tombstone | highest_version |
+| whatsapp_queue | idempotent_upsert | versioned | tombstone | highest_version |
+| members | idempotent_upsert | versioned | tombstone | highest_version |
+| purchase_orders | idempotent_upsert | versioned | tombstone | highest_version |
+| shift_cash_counts | idempotent_upsert | append_only | none | immutable_reversal |
+| shift_close_events | idempotent_upsert | append_only | none | immutable_reversal |
+| stores | idempotent_upsert | versioned | tombstone | highest_version |
+| bookings | idempotent_upsert | versioned | tombstone | highest_version |
+| coupon_events | idempotent_upsert | versioned | tombstone | highest_version |
+| issued_vouchers | idempotent_upsert | versioned | tombstone | highest_version |
+| member_verifications | idempotent_upsert | versioned | tombstone | highest_version |
+| products | idempotent_upsert | versioned | tombstone | highest_version |
+| sales | idempotent_upsert | versioned | tombstone | immutable_reversal |
+| shift_reconciliations | idempotent_upsert | append_only | none | immutable_reversal |
+| terminal_tokens | idempotent_upsert | versioned | tombstone | highest_version |
+| booking_payments | idempotent_upsert | versioned | tombstone | highest_version |
+| item_activity_logs | idempotent_upsert | versioned | tombstone | movement_delta |
+| payment_transactions | idempotent_upsert | versioned | tombstone | immutable_reversal |
+| product_barcodes | idempotent_upsert | versioned | tombstone | highest_version |
+| promotions | idempotent_upsert | versioned | tombstone | highest_version |
+| purchase_order_items | idempotent_upsert | versioned | tombstone | highest_version |
+| sale_items | idempotent_upsert | versioned | tombstone | immutable_reversal |
+| shift_variance_alerts | idempotent_upsert | versioned | tombstone | highest_version |
+| stock_adjustments | idempotent_upsert | versioned | tombstone | movement_delta |
+| stock_transfer_items | idempotent_upsert | versioned | tombstone | highest_version |
 
-## Deletions
-
-Reference records (products, categories, barcodes, units, suppliers,
-promotions, membership tiers, locations, members) are never erased
-centrally: they are stamped with a deletion time. The stamp travels down
-the next sync and the till removes its own copy. Where local history still
-points at the record — a product on a past bill — the stamped row stays put
-and simply reads as gone. Transactional history is never deleted at all.
+Cloud-applied SQL Server changes use `CHANGE_TRACKING_CONTEXT`, so the push worker recognizes them as remote changes and does not echo them back. Stable primary keys and server idempotency receipts make retries safe.

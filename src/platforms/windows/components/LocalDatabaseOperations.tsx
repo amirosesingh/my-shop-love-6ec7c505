@@ -8,7 +8,8 @@ import { DatabaseJobProgress, type DatabaseJob } from "./DatabaseJobProgress";
 import { mirrorTerminalConfigToDesktop } from "@/core/activation/terminal-tokens";
 
 type DatabaseState = { state?: string; enabled?: boolean; connected?: boolean; profile?: { database?: string } | null };
-type SyncState = { phase?: string; running?: boolean; paused?: boolean; pending?: number; failed?: number; conflicts?: number; lastPushAt?: string | null; lastPullAt?: string | null };
+type TableStatus = { table: string; local: string; cloud: string; status: "SYNCED" | "VERIFIED" | "DIFFERENT"; verified?: boolean; comparedAt?: string | null };
+type SyncState = { phase?: string; running?: boolean; paused?: boolean; pending?: number; failed?: number; conflicts?: number; lastPushAt?: string | null; lastPullAt?: string | null; lastComparedAt?: string | null; lastVerifiedAt?: string | null; tables?: TableStatus[] };
 type FailureRow = { job_id?: string; job_type?: string; status?: string; phase?: string; current_table?: string | null; error_code?: string | null; error_message?: string | null; updated_at?: string | null };
 type ConflictRow = { conflict_id?: string; entity_type?: string; entity_id?: string; reason?: string; created_at?: string | null };
 type Failures = { failures?: FailureRow[]; conflictRows?: ConflictRow[]; conflicts?: number };
@@ -79,6 +80,7 @@ export function LocalDatabaseOperations() {
 
   const failureCount = failures.failures?.length ?? 0;
   const conflictCount = Number(failures.conflicts ?? failures.conflictRows?.length ?? sync.conflicts ?? 0);
+  const tableDifferences = (sync.tables ?? []).filter((table) => table.status === "DIFFERENT");
   if (state.state === "disabled" || state.enabled === false) return null;
   return (
     <div className="space-y-3">
@@ -99,7 +101,26 @@ export function LocalDatabaseOperations() {
             <Button variant="outline" disabled={busy || !!sync.paused} onClick={() => run("Synchronization paused.", () => shell().sync!.pause())}>Pause</Button>
             <Button variant="outline" disabled={busy || !sync.paused} onClick={() => run("Synchronization resumed.", () => shell().sync!.resume())}>Resume</Button>
             <Button variant="outline" disabled={busy || !state.connected} onClick={() => run("Reconciliation completed.", async () => { await mirrorTerminalConfigToDesktop(); return shell().sync!.reconcile({}); })}>Reconcile</Button>
+            <Button variant="outline" disabled={busy || !state.connected} onClick={() => run("Full data verification completed.", async () => { await mirrorTerminalConfigToDesktop(); return shell().sync!.reconcile({ deep: true }); })}>Verify data</Button>
+            <Button variant="outline" disabled={busy || !state.connected || !tableDifferences.length} onClick={() => run("Targeted repair completed.", async () => { await mirrorTerminalConfigToDesktop(); return shell().sync!.reconcile({ repair: true, tables: tableDifferences.map((table) => table.table) }); })}>Repair differences</Button>
             <Button variant="ghost" disabled={busy} onClick={() => void refresh()}>Refresh</Button>
+          </div>
+          <div className="rounded-md border">
+            <div className="flex items-center justify-between border-b px-3 py-2 text-sm">
+              <span className="font-medium">Table synchronization status</span>
+              <span className="text-xs text-muted-foreground">Last compared: {when(sync.lastComparedAt)}</span>
+            </div>
+            <div className="max-h-72 overflow-auto">
+              {(sync.tables ?? []).map((table) => (
+                <div key={table.table} className="grid grid-cols-[minmax(10rem,1fr)_auto_auto_auto] gap-3 border-b px-3 py-2 text-xs last:border-b-0">
+                  <span className="font-medium">{table.table}</span>
+                  <span title="Local SQL Server rows">Local {table.local}</span>
+                  <span title="Supabase rows">Cloud {table.cloud}</span>
+                  <span className={table.status === "DIFFERENT" ? "text-destructive" : "text-emerald-700 dark:text-emerald-400"}>{table.status}</span>
+                </div>
+              ))}
+              {!sync.tables?.length ? <p className="p-3 text-xs text-muted-foreground">Run Reconcile to compare every synchronized table for this branch. A matching count is SYNCED; only a full signature check may be called VERIFIED.</p> : null}
+            </div>
           </div>
         </CardContent>
       </Card>

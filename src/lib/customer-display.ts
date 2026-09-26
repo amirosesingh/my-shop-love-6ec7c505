@@ -65,7 +65,11 @@ export function publishDisplay(snapshot: DisplaySnapshot) {
   } catch {
     /* storage full or blocked — the broadcast still works */
   }
-  chan()?.postMessage(snapshot);
+  try {
+    chan()?.postMessage(snapshot);
+  } catch {
+    /* a disconnected secondary display must never interrupt checkout */
+  }
 }
 
 /** Subscribe on the customer screen. Returns an unsubscribe function. */

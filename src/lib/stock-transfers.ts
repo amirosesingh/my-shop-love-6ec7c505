@@ -6,11 +6,12 @@
  * ("inter-group") also re-maps the item into the receiving group's catalogue,
  * which the database does atomically when the note is received.
  */
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { supabaseExternal } from "@/integrations/supabase/external-client";
 import type { Store, Transfer, TransferItem, TransferKind, TransferStatus } from "@/core/types/pos-types";
 import { commitOps } from "@/core/api/pos-db";
+import { routedQuery } from "@/core/api/db-query";
 import { describeError } from "./notify";
+import type { SupabaseClient } from "@supabase/supabase-js";
+import { supabaseExternal } from "@/integrations/supabase/external-client";
 
 const sb = supabaseExternal as unknown as SupabaseClient;
 
@@ -99,25 +100,12 @@ const rowToTransfer = (r: Row, items: Row[]): StoredTransfer => ({
 /** Every note this branch raised or is due to receive. */
 export async function loadTransfers(): Promise<StoredTransfer[]> {
   try {
-    const heads = await sb
-      .from("stock_transfers")
-      .select("*")
-      .order("created_at", { ascending: false })
-      .limit(500);
-    if (heads.error) throw new Error(heads.error.message);
-    const rows = (heads.data as Row[] | null) ?? [];
+    const rows = await routedQuery("stock_transfers", { orderBy: { column: "created_at", ascending: false }, limit: 500 }) as Row[];
     if (!rows.length) return [];
 
-    const lines = await sb
-      .from("stock_transfer_items")
-      .select("*")
-      .in(
-        "transfer_id",
-        rows.map((r) => r.id),
-      );
-    if (lines.error) throw new Error(lines.error.message);
+    const lines = await routedQuery("stock_transfer_items", { in: { column: "transfer_id", values: rows.map((r) => r.id) }, limit: 2000 }) as Row[];
     const byTransfer = new Map<string, Row[]>();
-    for (const l of (lines.data as Row[] | null) ?? []) {
+    for (const l of lines) {
       const list = byTransfer.get(l.transfer_id) ?? [];
       list.push(l);
       byTransfer.set(l.transfer_id, list);
@@ -134,13 +122,10 @@ export async function loadTransfers(): Promise<StoredTransfer[]> {
 /** One note by id, for a deep link into a page the till has not cached. */
 export async function loadTransfer(id: string): Promise<StoredTransfer | null> {
   try {
-    const head = await sb.from("stock_transfers").select("*").eq("id", id).maybeSingle();
-    if (head.error) throw new Error(head.error.message);
-    const row = head.data as Row | null;
+    const row = (await routedQuery("stock_transfers", { match: { id }, limit: 1 }) as Row[])[0] ?? null;
     if (!row) return null;
-    const lines = await sb.from("stock_transfer_items").select("*").eq("transfer_id", id);
-    if (lines.error) throw new Error(lines.error.message);
-    return rowToTransfer(row, ((lines.data as Row[] | null) ?? []) as Row[]);
+    const lines = await routedQuery("stock_transfer_items", { match: { transfer_id: id }, limit: 2000 }) as Row[];
+    return rowToTransfer(row, lines);
   } catch {
     if (import.meta.env.DEV) console.error("[transfers] detail load failed");
     return null;

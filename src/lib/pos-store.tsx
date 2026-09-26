@@ -1486,11 +1486,12 @@ export function PosProvider({ children }: { children: ReactNode }) {
           sales: [sale, ...tagged],
         };
       });
-      logger.log(
-        "sale_event",
-        sale.exchangeOfReceiptNo ? "Exchange bill created" : "Bill created",
-        "register",
-        {
+      try {
+        logger.log(
+          "sale_event",
+          sale.exchangeOfReceiptNo ? "Exchange bill created" : "Bill created",
+          "register",
+          {
           receiptNo: sale.receiptNo,
           storeId: sale.storeId,
           paymentMethod: sale.method,
@@ -1511,9 +1512,10 @@ export function PosProvider({ children }: { children: ReactNode }) {
             discountType: l.discountType,
             credit: !!l.credit,
           })),
-        },
-      );
-      recordActivity({
+          },
+        );
+      } catch { /* post-commit audit failures never change the sale result */ }
+      try { recordActivity({
         type: "sale_complete",
         title: sale.exchangeOfReceiptNo ? "Exchange bill created" : "Sale completed",
         message: `Bill ${sale.receiptNo} for ${sale.total} paid by ${sale.method}.`,
@@ -1523,7 +1525,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         entityId: sale.receiptNo,
         amount: sale.total,
         meta: { lines: sale.lines.length, discount: sale.discount },
-      });
+      }); } catch { /* post-commit activity failures never change the sale result */ }
       return sale;
     },
     [],

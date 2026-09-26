@@ -5,7 +5,8 @@
  * backoffice without a redeploy.
  */
 import { useEffect, useState } from "react";
-import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
+import { routedQuery } from "@/core/api/db-query";
+import { commitOps } from "@/core/api/pos-db";
 
 export const MEMBER_FLAG = "member_domain_enabled";
 export const REDEEM_FLAG = "redeem_domain_enabled";
@@ -28,9 +29,9 @@ export async function loadPublicFlags(force = false): Promise<PublicFlags> {
   if (loaded && !force) return cache;
   if (inflight && !force) return inflight;
   inflight = (async () => {
-    const { data, error } = await supabase.from("public_flags").select("key, enabled");
-    if (!error && data) {
-      const rows = data as { key: string; enabled: boolean }[];
+    const data = await routedQuery("public_flags", { columns: "key,enabled", orderBy: { column: "key" }, limit: 100 });
+    if (data) {
+      const rows = data as unknown as { key: string; enabled: boolean }[];
       const pick = (key: string, fallback: boolean) =>
         rows.find((r) => r.key === key)?.enabled ?? fallback;
       cache = { member: pick(MEMBER_FLAG, true), redeem: pick(REDEEM_FLAG, true) };
@@ -45,10 +46,7 @@ export async function loadPublicFlags(force = false): Promise<PublicFlags> {
 
 /** Staff-only write; the database rejects anyone else. */
 export async function setPublicFlag(key: string, enabled: boolean) {
-  const { error } = await supabase
-    .from("public_flags")
-    .upsert({ key, enabled }, { onConflict: "key" });
-  if (error) throw new Error(error.message);
+  await commitOps("Saving public flag", [{ kind: "upsert", table: "public_flags", rows: [{ key, enabled }] }]);
   cache = {
     member: key === MEMBER_FLAG ? enabled : cache.member,
     redeem: key === REDEEM_FLAG ? enabled : cache.redeem,

@@ -155,6 +155,10 @@ for (const table of tables) {
   const refundOff = ["sales", "sale_items"].includes(table.cloudTable)
     ? "PERFORM set_config('pos.refunding','off',true);"
     : "";
+  const shiftGuardOn = ["shifts", "shift_cash_counts", "shift_close_events", "shift_reconciliations"].includes(table.cloudTable)
+    ? "PERFORM set_config('pos.shift_fn','on',true);"
+    : "";
+  const shiftGuardOff = shiftGuardOn ? "PERFORM set_config('pos.shift_fn','',true);" : "";
   const applyStock =
     table.cloudTable === "item_activity_logs"
       ? `FOR v_row IN SELECT value FROM jsonb_array_elements(COALESCE(p_rows,'[]'::jsonb)) LOOP
@@ -174,6 +178,7 @@ BEGIN FOR v_row IN SELECT value FROM jsonb_array_elements(COALESCE(p_rows,'[]'::
 DECLARE v_count integer; v_row jsonb;
 BEGIN
   ${refundOn}
+  ${shiftGuardOn}
   INSERT INTO public.${q(table.cloudTable)} (${columns.join(",")})
   SELECT ${columns.join(",")} FROM jsonb_populate_recordset(NULL::public.${q(table.cloudTable)}, COALESCE(p_rows,'[]'::jsonb))
   ON CONFLICT (${primary(table)
@@ -181,6 +186,7 @@ BEGIN
     .join(",")}) DO ${conflictAction};
   GET DIAGNOSTICS v_count=ROW_COUNT;
   ${applyStock}
+  ${shiftGuardOff}
   ${refundOff}
   RETURN v_count;
 END $fn$;`);
@@ -190,11 +196,14 @@ END $fn$;`);
         `x.${q(column.cloudColumn)}::text=COALESCE(c->'key'->>'${column.cloudColumn}',(c->>'entityId')::jsonb->>'${column.cloudColumn}',(c->>'entity_id')::jsonb->>'${column.cloudColumn}')`,
     )
     .join(" AND ");
+  const deleteStatement = table.deleteRule === "none"
+    ? "BEGIN RETURN 0; END"
+    : `BEGIN DELETE FROM public.${q(table.cloudTable)} x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
+ WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (${branchPredicate(table)}) AND ${deleteWhere};
+ GET DIAGNOSTICS v_count=ROW_COUNT; RETURN v_count; END`;
   out.push(`CREATE OR REPLACE FUNCTION public.sync_delete_${table.cloudTable}(p_changes jsonb,p_branch_id text) RETURNS integer LANGUAGE plpgsql SECURITY INVOKER AS $fn$
 DECLARE v_count integer;
-BEGIN DELETE FROM public.${q(table.cloudTable)} x USING jsonb_array_elements(COALESCE(p_changes,'[]'::jsonb)) c
- WHERE upper(COALESCE(c->>'operation','')) IN ('D','DELETE') AND (${branchPredicate(table)}) AND ${deleteWhere};
- GET DIAGNOSTICS v_count=ROW_COUNT; RETURN v_count; END $fn$;
+${deleteStatement} $fn$;
 REVOKE ALL ON FUNCTION public.sync_apply_${table.cloudTable}(jsonb) FROM PUBLIC;
 REVOKE ALL ON FUNCTION public.sync_delete_${table.cloudTable}(jsonb,text) FROM PUBLIC;`);
   const names = columnNames(table);

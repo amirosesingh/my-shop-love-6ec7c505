@@ -10043,7 +10043,7 @@ IF OBJECT_ID(N'dbo.activity_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.acti
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.activity_events')
       AND c.name=N'meta'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_0 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_0_sql nvarchar(max) = N'ALTER TABLE dbo.[activity_events] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_0);
@@ -10058,7 +10058,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.bookings', 
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.bookings')
       AND c.name=N'charges'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_1 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_1_sql nvarchar(max) = N'ALTER TABLE dbo.[bookings] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_1);
@@ -10073,7 +10073,7 @@ IF OBJECT_ID(N'dbo.cashiers', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.cashiers', 
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.cashiers')
       AND c.name=N'permissions'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_2 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_2_sql nvarchar(max) = N'ALTER TABLE dbo.[cashiers] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_2);
@@ -10088,7 +10088,7 @@ IF OBJECT_ID(N'dbo.integration_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.integration_settings')
       AND c.name=N'api_keys_encrypted'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_3 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_3_sql nvarchar(max) = N'ALTER TABLE dbo.[integration_settings] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_3);
@@ -10103,7 +10103,7 @@ IF OBJECT_ID(N'dbo.payment_transactions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.payment_transactions')
       AND c.name=N'metadata'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_4 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_4_sql nvarchar(max) = N'ALTER TABLE dbo.[payment_transactions] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_4);
@@ -10118,7 +10118,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.pos_settings')
       AND c.name=N'fonts'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_5 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_5_sql nvarchar(max) = N'ALTER TABLE dbo.[pos_settings] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_5);
@@ -10133,7 +10133,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.pos_settings')
       AND c.name=N'qr'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_6 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_6_sql nvarchar(max) = N'ALTER TABLE dbo.[pos_settings] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_6);
@@ -10148,7 +10148,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.pos_settings')
       AND c.name=N'integration_settings'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_7 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_7_sql nvarchar(max) = N'ALTER TABLE dbo.[pos_settings] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_7);
@@ -10163,7 +10163,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.pos_settings')
       AND c.name=N'booking_slip'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_8 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_8_sql nvarchar(max) = N'ALTER TABLE dbo.[pos_settings] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_8);
@@ -10178,7 +10178,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.pos_settings')
       AND c.name=N'notification_settings'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_9 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_9_sql nvarchar(max) = N'ALTER TABLE dbo.[pos_settings] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_9);
@@ -10193,7 +10193,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.pos_settings')
       AND c.name=N'receipt_design'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_10 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_10_sql nvarchar(max) = N'ALTER TABLE dbo.[pos_settings] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_10);
@@ -10208,7 +10208,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.pos_settings')
       AND c.name=N'payment_details'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_11 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_11_sql nvarchar(max) = N'ALTER TABLE dbo.[pos_settings] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_11);
@@ -10223,7 +10223,7 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.pos_settings')
       AND c.name=N'whatsapp_settings'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_12 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_12_sql nvarchar(max) = N'ALTER TABLE dbo.[pos_settings] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_12);
@@ -10238,7 +10238,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', 
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.products')
       AND c.name=N'stock_by_store'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_13 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_13_sql nvarchar(max) = N'ALTER TABLE dbo.[products] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_13);
@@ -10253,7 +10253,7 @@ IF OBJECT_ID(N'dbo.settings_overrides', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.settings_overrides')
       AND c.name=N'patch'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_14 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_14_sql nvarchar(max) = N'ALTER TABLE dbo.[settings_overrides] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_14);
@@ -10268,7 +10268,7 @@ IF OBJECT_ID(N'dbo.staff_roles', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.staff_ro
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.staff_roles')
       AND c.name=N'permissions'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_15 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_15_sql nvarchar(max) = N'ALTER TABLE dbo.[staff_roles] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_15);
@@ -10283,7 +10283,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_actions')
       AND c.name=N'authority_limits'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_16 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_16_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_actions] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_16);
@@ -10298,7 +10298,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_actions')
       AND c.name=N'extra_authority'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_17 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_17_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_actions] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_17);
@@ -10313,7 +10313,7 @@ IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'db
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_actions')
       AND c.name=N'absolute_ceilings'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_18 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_18_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_actions] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_18);
@@ -10328,7 +10328,7 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'd
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_requests')
       AND c.name=N'payload'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_19 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_19_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_requests] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_19);
@@ -10343,7 +10343,7 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'd
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_requests')
       AND c.name=N'approved_payload'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_20 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_20_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_requests] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_20);
@@ -10358,7 +10358,7 @@ IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'd
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_requests')
       AND c.name=N'bill_snapshot'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_21 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_21_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_requests] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_21);
@@ -10373,7 +10373,7 @@ IF OBJECT_ID(N'dbo.authorization_log', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.au
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_log')
       AND c.name=N'detail'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_22 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_22_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_log] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_22);
@@ -10388,7 +10388,7 @@ IF OBJECT_ID(N'dbo.record_edits', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.record_
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.record_edits')
       AND c.name=N'before_value'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_23 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_23_sql nvarchar(max) = N'ALTER TABLE dbo.[record_edits] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_23);
@@ -10403,7 +10403,7 @@ IF OBJECT_ID(N'dbo.record_edits', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.record_
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.record_edits')
       AND c.name=N'after_value'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_24 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_24_sql nvarchar(max) = N'ALTER TABLE dbo.[record_edits] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_24);
@@ -10418,7 +10418,7 @@ IF OBJECT_ID(N'dbo.record_edits', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.record_
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.record_edits')
       AND c.name=N'stock_deltas'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_25 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_25_sql nvarchar(max) = N'ALTER TABLE dbo.[record_edits] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_25);
@@ -10433,7 +10433,7 @@ IF OBJECT_ID(N'dbo.shift_close_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.s
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.shift_close_events')
       AND c.name=N'detail'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_26 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_26_sql nvarchar(max) = N'ALTER TABLE dbo.[shift_close_events] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_26);
@@ -10448,7 +10448,7 @@ IF OBJECT_ID(N'dbo.entity_status_history', N'U') IS NOT NULL AND COL_LENGTH(N'db
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.entity_status_history')
       AND c.name=N'metadata'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF @legacy_json_default_27 IS NOT NULL BEGIN
     DECLARE @legacy_json_default_27_sql nvarchar(max) = N'ALTER TABLE dbo.[entity_status_history] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_27);

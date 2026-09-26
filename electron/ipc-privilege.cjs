@@ -59,6 +59,8 @@ const CHANNEL_LEVELS = {
   "business:write-batch": OPEN,
   "business:commit-aggregate": OPEN,
   "business:snapshot": OPEN,
+  "business:query": OPEN,
+  "business:shift-expected": OPEN,
   "receipts:find-exact": OPEN,
   "receipts:refund": OPEN,
   "pos:status": OPEN,

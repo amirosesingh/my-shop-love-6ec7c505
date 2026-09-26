@@ -105,7 +105,9 @@ async function prepareLocalData({force=false}={}){
 
 const AUTO_SYNC_OK_MS = 15_000;
 const AUTO_SYNC_RETRY_MS = 60_000;
+const AUTO_VERIFY_MS = 15 * 60_000;
 let automaticSyncTimer = null;
+let lastAutomaticVerification = 0;
 function scheduleAutomaticSync(delay = AUTO_SYNC_OK_MS) {
   if (quitting) return;
   if (automaticSyncTimer) clearTimeout(automaticSyncTimer);
@@ -126,6 +128,11 @@ async function runAutomaticSync() {
     } catch (error) {
       result = { ok: false, error: String(error?.message ?? error) };
     }
+  }
+  if (result.ok && Date.now() - lastAutomaticVerification >= AUTO_VERIFY_MS) {
+    lastAutomaticVerification = Date.now();
+    void localDataLifecycle.reconcile(localBranchId(), Number(databaseConfig.profile()?.retentionDays)||90)
+      .catch((error) => recordFault("sync.verify-counts", error));
   }
   scheduleAutomaticSync(result.ok ? AUTO_SYNC_OK_MS : AUTO_SYNC_RETRY_MS);
 }
@@ -803,6 +810,14 @@ function registerIpc() {
     }
   }));
   ipcMain.handle("business:snapshot", () => guard.guarded(() => operationsRepository.snapshot(localBranchId())));
+  ipcMain.handle("business:query", (_e, table, options) => guard.guarded(() => operationsRepository.query(
+    localBranchId(),
+    guard.text(table, { name: "business table", max: 80 }),
+    guard.queryOptions(options),
+  )));
+  ipcMain.handle("business:shift-expected", (_e, shiftId) => guard.guarded(() =>
+    operationsRepository.shiftExpectedTotals(localBranchId(), guard.uuid(shiftId, { name: "shift id" })),
+  ));
   ipcMain.handle("receipts:find-exact", (_e, value, branchId, proof) => guard.guarded(() => {
     const input = guard.options(proof, { name: "receipt authorization", max: 3 });
     const authorization = {
@@ -828,7 +843,7 @@ function registerIpc() {
   ipcMain.handle("sync:pause", () => syncCoordinator.pause());
   ipcMain.handle("sync:resume", () => syncCoordinator.resume());
   ipcMain.handle("sync:get-failures", async () => ({ failures:databaseManager.pool?await jobRepository.failures():[], conflictRows:databaseManager.pool?await conflictRepository.unresolved():[], conflicts:databaseManager.pool?await conflictRepository.count():0 }));
-  ipcMain.handle("sync:reconcile", () => guard.guarded(async()=>{try{const branchId=localBranchId();if(!branchId)throw Object.assign(new Error("A branch is required for reconciliation."),{code:"EBRANCH"});const differences=await localDataLifecycle.reconcile(branchId,Number(databaseConfig.profile()?.retentionDays)||90);return{ok:differences.length===0,differences};}catch(error){return{ok:false,code:error?.code??"ERECONCILE",error:String(error?.message??error)};}}));
+  ipcMain.handle("sync:reconcile", (_e, options) => guard.guarded(async()=>{try{const input=guard.options(options,{name:"reconciliation options"});const branchId=localBranchId();if(!branchId)throw Object.assign(new Error("A branch is required for reconciliation."),{code:"EBRANCH"});const historyDays=Number(databaseConfig.profile()?.retentionDays)||90;if(input.deep===true){const report=await localDataLifecycle.verify(branchId,historyDays,Array.isArray(input.tables)?input.tables:[]);return{ok:report.verified,differences:report.tables.filter(table=>!table.verified),verification:report.tables,lastVerifiedAt:report.verifiedAt};}const differences=input.repair===true?await localDataLifecycle.repair(branchId,historyDays,Array.isArray(input.tables)?input.tables:[]):await localDataLifecycle.reconcile(branchId,historyDays);return{ok:differences.length===0,differences,verification:syncCoordinator.snapshot().tables,lastComparedAt:syncCoordinator.snapshot().lastComparedAt};}catch(error){return{ok:false,code:error?.code??"ERECONCILE",error:String(error?.message??error)};}}));
   ipcMain.handle("telemetry:presence", (_e, value) => guard.guarded(() => {
     const input = guard.options(value, { name: "telemetry presence", max: 3 });
     return mainTelemetry.setPresence({
