@@ -60,4 +60,62 @@ describe("Electron sales visibility", () => {
     expect(store).toContain("bridge.onBusinessChanged");
     expect(store).toContain("loadLocalSales()");
   });
+
+  it("keeps Electron local-first and uses the nested sync bridge", async () => {
+    const { readFileSync } = await import("node:fs");
+    const store = readFileSync("src/lib/pos-store.tsx", "utf8");
+    const sync = readFileSync("src/lib/sync-engine.ts", "utf8");
+    const database = readFileSync("src/core/api/pos-db.ts", "utf8");
+
+    expect(store).toContain("const cloud = await loadPrimaryState()");
+    expect(store).toContain(".then(() => loadPrimaryState(active ?? undefined))");
+    expect(store).toContain(".then(() => loadLocalSales())");
+    expect(database).toContain("branch_id: s.storeId");
+    expect(sync).toContain("desktopBridge.sync?.auto");
+    expect(sync).toContain("desktopBridge?.sync?.subscribe");
+    expect(sync).toContain("desktopBridge.sync?.getStatus");
+  });
+
+  it("repairs only missing sale-item branches before upload", async () => {
+    const { rowsForBranch } = await import("../../../electron/sync/push-worker.cjs");
+    const rows = rowsForBranch("sale_items", [
+      { id: "missing", branch_id: null },
+      { id: "correct", branch_id: "branch-1" },
+      { id: "wrong", branch_id: "branch-2" },
+    ], "branch-1");
+
+    expect(rows).toEqual([
+      { id: "missing", branch_id: "branch-1" },
+      { id: "correct", branch_id: "branch-1" },
+      { id: "wrong", branch_id: "branch-2" },
+    ]);
+    expect(rowsForBranch("sales", [{ id: "sale" }], "branch-1")).toEqual([{ id: "sale" }]);
+  });
+
+  it("preserves the PostgREST reason behind an HTTP 400", async () => {
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = vi.fn(async () => new Response(
+      JSON.stringify({ code: "P0001", message: "SYNC_BRANCH_FORBIDDEN", details: "sale_items" }),
+      { status: 400, headers: { "content-type": "application/json" } },
+    ));
+    try {
+      const { CloudClient } = await import("../../../electron/sync/cloud-client.cjs");
+      const client = new CloudClient({
+        configStore: { get: () => "https://pos.example.test" },
+        terminalStore: { read: () => ({ tokenId: "terminal-token" }) },
+      });
+      await expect(client.pushAggregate({
+        batchId: "batch-1",
+        branchId: "branch-1",
+        operations: [],
+      })).rejects.toMatchObject({
+        message: "SYNC_BRANCH_FORBIDDEN",
+        code: "P0001",
+        status: 400,
+        detail: "sale_items",
+      });
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+  });
 });

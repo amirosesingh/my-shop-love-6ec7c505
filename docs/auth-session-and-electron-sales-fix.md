@@ -22,18 +22,27 @@ The `current_app_user()` function remains restricted to the `authenticated` role
 3. Only after that transaction succeeds, the main process broadcasts `business:changed` to open renderer windows.
 4. The renderer reloads local sales and updates the POS store immediately.
 5. The local snapshot now hydrates each receipt with its item and payment rows, including payment metadata required by receipt views.
-6. A locally committed sale is retained while cloud or Realtime snapshots are stale. It stops being protected after a direct cloud sales read contains the sale.
+6. Electron startup, focus, reconnect, and Realtime notifications all re-read the connected SQL Server snapshot. They never replace the receipt list with a cloud-only result.
+7. Browser and mobile clients remain cloud-first.
+
+The renderer now calls the actual nested preload sync interface (`pos.sync`) so foreground and network events wake the main-process coordinator. The main process remains the only Electron sync owner.
+
+## HTTP 400 aggregate repair
+
+Supabase logs identified the failed RPC as `pos_sync_push_aggregate` with `SYNC_BRANCH_FORBIDDEN`. The sale header and payment rows carried the branch, but sale-item rows did not. New checkouts now persist `sale_items.branch_id`.
+
+For receipts already queued locally, the push worker fills only an empty sale-item branch from the terminal's authoritative aggregate branch. It never overwrites a non-empty different branch, so central cross-branch validation remains intact. PostgREST `message`, `code`, status, and details are also retained in desktop diagnostics instead of being reduced to `HTTP 400`.
 
 Branch filtering remains in place for the SQL Server snapshot and renderer event handling, so a terminal refreshes only the active branch's receipts.
 
 ## Database impact
 
-No Supabase migration and no SQL Server schema upgrade are required for this fix. It changes session sequencing, SQL read composition, Electron IPC notification, and renderer reconciliation only. Existing database upgrade scripts are intentionally unchanged.
+No new Supabase migration or SQL Server schema upgrade is required for this fix. The existing idempotent SQL Server updater already creates `sale_items.branch_id`; this change populates it in new writes and repairs missing values in queued upload payloads. The strict Supabase branch validation is intentionally unchanged.
 
 ## Validation
 
 - Auth-session regression tests cover revoked sessions, offline connectivity, and near-expiry refresh.
-- Electron sales tests cover local item/payment hydration and the main/preload/renderer notification contract.
+- Electron sales tests cover local item/payment hydration, local-first renderer routing, the main/preload/renderer notification contract, queued branch repair, and detailed PostgREST errors.
 - The complete Vitest suite, TypeScript check, production build, and diff whitespace check are required before release.
 
 Real-device acceptance should complete a cash and card sale on an activated Electron till, verify immediate appearance in receipts without restarting, then reconnect and confirm the same stable sale ID appears centrally exactly once.

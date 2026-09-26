@@ -16,7 +16,17 @@ class CloudClient {
     // caller-supplied payload can replace the device identity or its branch.
     const response = await fetch(`${base}/api/v1/pos/sync`, { method: "POST", headers: { "content-type": "application/json" }, body: JSON.stringify({ ...payload, terminalToken }) });
     const data = await response.json().catch(() => ({ ok: false, error: `HTTP ${response.status}` }));
-    if (!response.ok || data?.ok === false) throw Object.assign(new Error(data?.error ?? `HTTP ${response.status}`), { code: data?.code ?? `HTTP_${response.status}` });
+    if (!response.ok || data?.ok === false) {
+      // PostgREST reports raised SQL errors in `message`, while the POS relay
+      // uses `error`. Preserve both so diagnostics show SYNC_BRANCH_FORBIDDEN
+      // instead of an unhelpful generic HTTP 400.
+      const message = data?.error ?? data?.message ?? `HTTP ${response.status}`;
+      throw Object.assign(new Error(message), {
+        code: data?.code ?? `HTTP_${response.status}`,
+        status: response.status,
+        detail: data?.details ?? data?.detail ?? null,
+      });
+    }
     return data;
   }
   pushBatch(batch) { return this.request({ sqlServerBatch: { batchId: batch.batchId, organizationId: batch.organizationId ?? "default", branchId: batch.branchId, table: batch.table, rows: batch.rows, changes: batch.changes } }); }

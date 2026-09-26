@@ -17,6 +17,19 @@ function collapseChanges(changes) {
   return [...latest.values()];
 }
 
+/**
+ * Older desktop builds wrote sale_items before branch_id was projected. The
+ * aggregate journal already fixes the authoritative branch, so fill only a
+ * missing value while preserving a non-empty mismatch for the server to
+ * reject as possible cross-branch corruption.
+ */
+function rowsForBranch(tableName, rows, branchId) {
+  if (tableName !== "sale_items") return rows;
+  return rows.map((row) => String(row?.branch_id ?? "").trim()
+    ? row
+    : { ...row, branch_id: branchId });
+}
+
 class PushWorker {
   constructor({ reader, cloud, checkpoints, registry }) {
     this.reader = reader; this.cloud = cloud; this.checkpoints = checkpoints; this.registry = registry;
@@ -42,7 +55,7 @@ class PushWorker {
         if (!table) throw new Error(`The aggregate references unregistered table ${tableName}.`);
         const live = changes.filter((change) => change.operation !== "delete");
         const removed = changes.filter((change) => change.operation === "delete");
-        if (live.length) operations.push({ table: table.cloudTable, dependencyOrder:table.dependencyOrder, deletePhase:false, changes:live, rows:await this.reader.rows(table,live) });
+        if (live.length) operations.push({ table: table.cloudTable, dependencyOrder:table.dependencyOrder, deletePhase:false, changes:live, rows:rowsForBranch(table.cloudTable,await this.reader.rows(table,live),branchId) });
         if (removed.length) operations.push({ table: table.cloudTable, dependencyOrder:table.dependencyOrder, deletePhase:true, changes:removed, rows:[] });
       }
       operations.sort((a,b)=>a.deletePhase===b.deletePhase?(a.deletePhase?b.dependencyOrder-a.dependencyOrder:a.dependencyOrder-b.dependencyOrder):(a.deletePhase?1:-1));
@@ -74,13 +87,13 @@ class PushWorker {
         let changes = window.filter((change)=>!change.remote);
         if(!changes.length){const version=Math.max(...window.map(row=>Number(row.version)));await this.checkpoints.save(branchId,table.sqlServerTable,"push",{change_tracking_version:version});checkpoint={...(checkpoint??{}),change_tracking_version:version};continue;}
         let live = changes.filter((change) => change.operation !== "D");
-        let rows = await this.reader.rows(table, live);
+        let rows = rowsForBranch(table.cloudTable, await this.reader.rows(table, live), branchId);
         while (Buffer.byteLength(JSON.stringify({ changes, rows }), "utf8") > 6 * 1024 * 1024) {
           const versions=[...new Set(changes.map(change=>Number(change.version)))];
           if(versions.length<=1)throw Object.assign(new Error(`One ${table.cloudTable} transaction exceeds the 6 MiB sync limit.`),{code:"EOVERSIZED"});
           const last=versions.at(-1);changes=changes.filter(change=>Number(change.version)!==last);
           live = changes.filter((change) => change.operation !== "D");
-          rows = await this.reader.rows(table, live);
+          rows = rowsForBranch(table.cloudTable, await this.reader.rows(table, live), branchId);
         }
         const batchId = stableUuid({
           branchId, table: table.cloudTable, from: Number(checkpoint?.change_tracking_version ?? 0),
@@ -98,4 +111,4 @@ class PushWorker {
     return { pushed };
   }
 }
-module.exports = { PushWorker, collapseChanges };
+module.exports = { PushWorker, collapseChanges, rowsForBranch };

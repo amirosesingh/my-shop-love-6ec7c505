@@ -309,6 +309,12 @@ export type LocalSyncStatus = {
   lastSuccessfulConnectionAt?: string | null;
   cloudConfigured?: boolean;
   phase?: "idle" | "pushing" | "pulling";
+  pending?: number;
+  failed?: number;
+  conflicts?: number;
+  lastError?: string | null;
+  running?: boolean;
+  paused?: boolean;
   enabled?: boolean;
   /** The central project rejected this device's keys — sync is parked. */
   credentialsInvalid?: boolean;
@@ -374,7 +380,18 @@ export type PosBridge = {
     presence: (value: { sessionStatus: "signed_in" | "idle"; staffName: string | null; staffRole: string | null }) => Promise<{ ok: boolean }>;
   };
   sync?: {
-    auto?: () => Promise<{ ok: boolean; busy?: boolean; skipped?: boolean; error?: string }>;
+    getStatus?: () => Promise<LocalSyncStatus>;
+    runNow?: (options?: { branchId?: string; batchSize?: number }) => Promise<
+      LocalSyncStatus & { ok?: boolean; busy?: boolean; pushed?: number; merged?: number }
+    >;
+    auto?: () => Promise<
+      LocalSyncStatus & { ok?: boolean; busy?: boolean; skipped?: boolean; pushed?: number; merged?: number }
+    >;
+    pause?: () => Promise<LocalSyncStatus>;
+    resume?: () => Promise<LocalSyncStatus>;
+    getFailures?: () => Promise<Record<string, unknown>>;
+    reconcile?: (options?: Record<string, unknown>) => Promise<Record<string, unknown>>;
+    subscribe?: (cb: (status: LocalSyncStatus) => void) => () => void;
   };
   /** Persist one operation to local SQL Server. Resolves once committed. */
   write: (context: string, op: SyncOp) => Promise<{ ok: boolean; error?: string; code?: string; stage?: string | null; table?: string | null; sqlNumber?: number | null }>;
