@@ -44,6 +44,80 @@ describe("SQL Server schema registry", () => {
     }
   });
 
+  it("preserves every column currently present in live Supabase", () => {
+    const liveCompatibilityColumns: Record<string, string[]> = {
+      activity_events: ["branch_id"],
+      app_users: ["auth_secret", "idle_timeout_minutes"],
+      bookings: ["booking_ref"],
+      branch_telemetry: ["device_name", "device_type", "location_name", "last_heartbeat_at"],
+      held_orders: ["bill_no"],
+      item_activity_logs: ["item_id", "sale_id", "transfer_id", "quantity", "created_by", "notes"],
+      members: ["deleted_at"],
+      membership_tiers: ["deleted_at"],
+      payment_transactions: ["order_id", "payment_method", "transaction_reference"],
+      pos_settings: ["payment_details", "whatsapp_settings", "receipt_css"],
+      pos_store_settings: ["created_at", "idle_timeout_minutes"],
+      product_barcodes: ["unit_label", "deleted_at"],
+      product_categories: ["deleted_at"],
+      products: ["deleted_at"],
+      promotions: ["deleted_at"],
+      purchase_orders: ["status", "reference"],
+      sale_items: ["branch_id"],
+      sales: ["branch_id"],
+      stock_transfers: [
+        "rejected_by",
+        "cancelled_reason",
+        "dispatched_by",
+        "dispatched_at",
+        "closed_at",
+        "fulfilment",
+        "source_request_id",
+      ],
+      stores: ["receipt_prefix", "deleted_at"],
+      suppliers: ["deleted_at"],
+      terminal_tokens: [
+        "claim_secret_hash",
+        "claim_expires_at",
+        "credentials_issued_at",
+        "device_platform",
+        "device_os",
+        "claimed_proof_hash",
+        "claimed_platform",
+        "claimed_os",
+        "is_claimed",
+        "expires_at",
+        "claim_proof",
+      ],
+      uom_units: ["deleted_at"],
+    };
+
+    for (const [tableName, expectedColumns] of Object.entries(liveCompatibilityColumns)) {
+      const table = registry.tables.find(
+        (candidate: { cloudTable: string }) => candidate.cloudTable === tableName,
+      );
+      const actualColumns = new Set(
+        table?.columns.map((column: { cloudColumn: string }) => column.cloudColumn),
+      );
+      for (const columnName of expectedColumns) {
+        expect(actualColumns.has(columnName), `${tableName}.${columnName}`).toBe(true);
+        expect(sql).toContain(`dbo.[${tableName}]`);
+        expect(sql).toContain(`[${columnName}]`);
+      }
+    }
+
+    const sourceRequest = registry.tables
+      .find((table: { cloudTable: string }) => table.cloudTable === "stock_transfers")
+      .columns.find(
+        (column: { cloudColumn: string }) => column.cloudColumn === "source_request_id",
+      );
+    expect(sourceRequest).toMatchObject({
+      sqlServerType: "uniqueidentifier",
+      nullable: true,
+      foreignKey: true,
+      foreignKeyTarget: { table: "stock_transfers", column: "id" },
+    });
+  });
+
   it("uses change tracking and metadata-only synchronization tables", () => {
     expect(sql).toContain("SET CHANGE_TRACKING = ON");
     expect(sql).toContain("dbo.sync_checkpoints");

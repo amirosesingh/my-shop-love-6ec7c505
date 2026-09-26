@@ -1,8 +1,8 @@
 {
   "source": "supabase/schema.sql",
-  "generatedAt": "2026-09-25T11:22:58.865Z",
+  "generatedAt": "2026-09-25T12:57:02.992Z",
   "tableCount": 67,
-  "columnCount": 1081,
+  "columnCount": 1137,
   "tables": [
     {
       "name": "coupon_campaigns",
@@ -613,6 +613,12 @@
           "declaration": "text[] NOT NULL DEFAULT '{}'::text[]",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "branch_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -733,6 +739,18 @@
         {
           "name": "pin_updated_by",
           "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "auth_secret",
+          "declaration": "text NOT NULL DEFAULT ''",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "idle_timeout_minutes",
+          "declaration": "integer",
           "nullable": true,
           "hasDefault": false
         }
@@ -1281,6 +1299,12 @@
           "declaration": "text",
           "nullable": true,
           "hasDefault": false
+        },
+        {
+          "name": "booking_ref",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -1478,6 +1502,30 @@
         },
         {
           "name": "last_pull_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "device_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "device_type",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "location_name",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "last_heartbeat_at",
           "declaration": "timestamp with time zone",
           "nullable": true,
           "hasDefault": false
@@ -1874,6 +1922,12 @@
           "declaration": "uuid",
           "nullable": true,
           "hasDefault": false
+        },
+        {
+          "name": "bill_no",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -2066,6 +2120,42 @@
           "declaration": "integer DEFAULT 1 NOT NULL",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "item_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "sale_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "transfer_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "quantity",
+          "declaration": "integer",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "created_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "notes",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -2272,6 +2362,12 @@
           "declaration": "text",
           "nullable": true,
           "hasDefault": false
+        },
+        {
+          "name": "deleted_at",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -2337,6 +2433,12 @@
           "declaration": "integer DEFAULT 1 NOT NULL",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "deleted_at",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -2562,6 +2664,24 @@
         },
         {
           "name": "client_transaction_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "order_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "payment_method",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "transaction_reference",
           "declaration": "text",
           "nullable": true,
           "hasDefault": false
@@ -2961,6 +3081,24 @@
           "declaration": "jsonb DEFAULT '{}'::jsonb NOT NULL",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "payment_details",
+          "declaration": "jsonb NOT NULL DEFAULT '{}'::jsonb",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "whatsapp_settings",
+          "declaration": "jsonb NOT NULL DEFAULT '{}'::jsonb",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "receipt_css",
+          "declaration": "text NOT NULL DEFAULT ''",
+          "nullable": false,
+          "hasDefault": true
         }
       ],
       "primaryKey": [
@@ -3025,6 +3163,18 @@
           "declaration": "integer DEFAULT 1 NOT NULL",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "unit_label",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "deleted_at",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -3099,6 +3249,12 @@
           "declaration": "boolean NOT NULL DEFAULT true",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "deleted_at",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -3289,6 +3445,12 @@
           "declaration": "text REFERENCES public.stores(id) ON DELETE SET NULL",
           "nullable": true,
           "hasDefault": false
+        },
+        {
+          "name": "deleted_at",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -3393,6 +3555,12 @@
           "declaration": "integer DEFAULT 1 NOT NULL",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "deleted_at",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -3638,6 +3806,18 @@
           "declaration": "timestamptz",
           "nullable": true,
           "hasDefault": false
+        },
+        {
+          "name": "status",
+          "declaration": "text NOT NULL DEFAULT 'posted'",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "reference",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -3766,6 +3946,12 @@
           "declaration": "integer NOT NULL DEFAULT 0",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "branch_id",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -4012,6 +4198,12 @@
         },
         {
           "name": "rounding_label",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "branch_id",
           "declaration": "text",
           "nullable": true,
           "hasDefault": false
@@ -4935,6 +5127,48 @@
           "declaration": "text",
           "nullable": true,
           "hasDefault": false
+        },
+        {
+          "name": "rejected_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "cancelled_reason",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "dispatched_by",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "dispatched_at",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "closed_at",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "fulfilment",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "source_request_id",
+          "declaration": "uuid",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -4945,7 +5179,13 @@
           "ref"
         ]
       ],
-      "foreignKeys": []
+      "foreignKeys": [
+        {
+          "column": "source_request_id",
+          "table": "stock_transfers",
+          "targetColumn": "id"
+        }
+      ]
     },
     {
       "name": "stores",
@@ -5057,6 +5297,18 @@
           "declaration": "boolean DEFAULT false NOT NULL",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "receipt_prefix",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "deleted_at",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -5150,6 +5402,12 @@
           "declaration": "integer DEFAULT 1 NOT NULL",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "deleted_at",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -5520,6 +5778,72 @@
           "declaration": "integer DEFAULT 1 NOT NULL",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "claim_secret_hash",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "claim_expires_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "credentials_issued_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "device_platform",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "device_os",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "claimed_proof_hash",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "claimed_platform",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "claimed_os",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "is_claimed",
+          "declaration": "boolean NOT NULL DEFAULT false",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "expires_at",
+          "declaration": "timestamp with time zone",
+          "nullable": true,
+          "hasDefault": false
+        },
+        {
+          "name": "claim_proof",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -5590,6 +5914,12 @@
           "declaration": "boolean NOT NULL DEFAULT true",
           "nullable": false,
           "hasDefault": true
+        },
+        {
+          "name": "deleted_at",
+          "declaration": "text",
+          "nullable": true,
+          "hasDefault": false
         }
       ],
       "primaryKey": [
@@ -6103,6 +6433,18 @@
         {
           "name": "online_only_refund",
           "declaration": "boolean NOT NULL DEFAULT false",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "created_at",
+          "declaration": "timestamp with time zone NOT NULL DEFAULT now()",
+          "nullable": false,
+          "hasDefault": true
+        },
+        {
+          "name": "idle_timeout_minutes",
+          "declaration": "integer NOT NULL DEFAULT 30",
           "nullable": false,
           "hasDefault": true
         }

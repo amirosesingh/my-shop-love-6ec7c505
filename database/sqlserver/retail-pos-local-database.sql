@@ -615,6 +615,7 @@ IF OBJECT_ID(N'dbo.activity_events', N'U') IS NULL BEGIN CREATE TABLE dbo.[activ
   [previous_state] nvarchar(max) NULL,
   [new_state] nvarchar(max) NULL,
   [cleared_by] nvarchar(max) NOT NULL CONSTRAINT [DF_activity_events_cleared_by] DEFAULT (N'[]'),
+  [branch_id] nvarchar(450) NULL,
   CONSTRAINT [PK_activity_events] PRIMARY KEY ([id])
 
 ); END;
@@ -748,9 +749,15 @@ IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.activity_ev
   ALTER TABLE dbo.[activity_events] ALTER COLUMN [cleared_by] nvarchar(max) NOT NULL;
 END;
 
+IF COL_LENGTH(N'dbo.activity_events', N'branch_id') IS NULL ALTER TABLE dbo.[activity_events] ADD [branch_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.activity_events') AND c.name=N'branch_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[activity_events] ALTER COLUMN [branch_id] nvarchar(450) NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.activity_events') AND name=N'UX_activity_events_client_event_id') CREATE UNIQUE INDEX [UX_activity_events_client_event_id] ON dbo.[activity_events]([client_event_id]) WHERE [client_event_id] IS NOT NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.activity_events') AND name=N'IX_activity_events_store_id') CREATE INDEX [IX_activity_events_store_id] ON dbo.[activity_events]([store_id]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.activity_events') AND name=N'IX_activity_events_branch_id') CREATE INDEX [IX_activity_events_branch_id] ON dbo.[activity_events]([branch_id]);
 
 IF OBJECT_ID(N'dbo.app_users', N'U') IS NULL BEGIN CREATE TABLE dbo.[app_users] (
 
@@ -772,6 +779,8 @@ IF OBJECT_ID(N'dbo.app_users', N'U') IS NULL BEGIN CREATE TABLE dbo.[app_users] 
   [row_version] int NOT NULL CONSTRAINT [DF_app_users_row_version] DEFAULT (1),
   [pin_set_at] datetimeoffset(7) NULL,
   [pin_updated_by] nvarchar(max) NULL,
+  [auth_secret] nvarchar(max) NOT NULL CONSTRAINT [DF_app_users_auth_secret] DEFAULT (''),
+  [idle_timeout_minutes] int NULL,
   CONSTRAINT [PK_app_users] PRIMARY KEY ([id])
 
 ); END;
@@ -900,6 +909,21 @@ END;
 IF COL_LENGTH(N'dbo.app_users', N'pin_set_at') IS NULL ALTER TABLE dbo.[app_users] ADD [pin_set_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.app_users', N'pin_updated_by') IS NULL ALTER TABLE dbo.[app_users] ADD [pin_updated_by] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.app_users', N'auth_secret') IS NULL ALTER TABLE dbo.[app_users] ADD [auth_secret] nvarchar(max) NULL;
+
+IF OBJECT_ID(N'dbo.app_users', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.app_users', N'auth_secret') IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM sys.default_constraints dc
+  JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
+  WHERE dc.parent_object_id=OBJECT_ID(N'dbo.app_users') AND c.name=N'auth_secret'
+) ALTER TABLE dbo.[app_users] ADD CONSTRAINT [DF_app_users_auth_secret] DEFAULT ('') FOR [auth_secret];
+
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.app_users') AND name=N'auth_secret' AND is_nullable=1) BEGIN
+  EXEC sys.sp_executesql N'UPDATE dbo.[app_users] SET [auth_secret]='''' WHERE [auth_secret] IS NULL;';
+  ALTER TABLE dbo.[app_users] ALTER COLUMN [auth_secret] nvarchar(max) NOT NULL;
+END;
+
+IF COL_LENGTH(N'dbo.app_users', N'idle_timeout_minutes') IS NULL ALTER TABLE dbo.[app_users] ADD [idle_timeout_minutes] int NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.app_users') AND name=N'UX_app_users_user_id') CREATE UNIQUE INDEX [UX_app_users_user_id] ON dbo.[app_users]([user_id]);
 
@@ -1205,6 +1229,7 @@ IF OBJECT_ID(N'dbo.bookings', N'U') IS NULL BEGIN CREATE TABLE dbo.[bookings] (
   [cancelled_at] datetimeoffset(7) NULL,
   [cancelled_terminal] nvarchar(max) NULL,
   [cancel_money_action] nvarchar(max) NULL,
+  [booking_ref] nvarchar(max) NULL,
   CONSTRAINT [PK_bookings] PRIMARY KEY ([id])
 
 ); END;
@@ -1547,6 +1572,8 @@ IF COL_LENGTH(N'dbo.bookings', N'cancelled_terminal') IS NULL ALTER TABLE dbo.[b
 
 IF COL_LENGTH(N'dbo.bookings', N'cancel_money_action') IS NULL ALTER TABLE dbo.[bookings] ADD [cancel_money_action] nvarchar(max) NULL;
 
+IF COL_LENGTH(N'dbo.bookings', N'booking_ref') IS NULL ALTER TABLE dbo.[bookings] ADD [booking_ref] nvarchar(max) NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'UX_bookings_ref') CREATE UNIQUE INDEX [UX_bookings_ref] ON dbo.[bookings]([ref]);
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.bookings') AND name=N'IX_bookings_store_id') CREATE INDEX [IX_bookings_store_id] ON dbo.[bookings]([store_id]);
@@ -1585,6 +1612,10 @@ IF OBJECT_ID(N'dbo.branch_telemetry', N'U') IS NULL BEGIN CREATE TABLE dbo.[bran
   [current_table] nvarchar(max) NULL,
   [last_push_at] datetimeoffset(7) NULL,
   [last_pull_at] datetimeoffset(7) NULL,
+  [device_name] nvarchar(max) NULL,
+  [device_type] nvarchar(max) NULL,
+  [location_name] nvarchar(max) NULL,
+  [last_heartbeat_at] datetimeoffset(7) NULL,
   CONSTRAINT [PK_branch_telemetry] PRIMARY KEY ([terminal_id])
 
 ); END;
@@ -1757,6 +1788,14 @@ IF COL_LENGTH(N'dbo.branch_telemetry', N'current_table') IS NULL ALTER TABLE dbo
 IF COL_LENGTH(N'dbo.branch_telemetry', N'last_push_at') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [last_push_at] datetimeoffset(7) NULL;
 
 IF COL_LENGTH(N'dbo.branch_telemetry', N'last_pull_at') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [last_pull_at] datetimeoffset(7) NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'device_name') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [device_name] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'device_type') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [device_type] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'location_name') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [location_name] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.branch_telemetry', N'last_heartbeat_at') IS NULL ALTER TABLE dbo.[branch_telemetry] ADD [last_heartbeat_at] datetimeoffset(7) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.branch_telemetry') AND name=N'IX_branch_telemetry_store_id') CREATE INDEX [IX_branch_telemetry_store_id] ON dbo.[branch_telemetry]([store_id]);
 
@@ -2055,6 +2094,7 @@ IF OBJECT_ID(N'dbo.held_orders', N'U') IS NULL BEGIN CREATE TABLE dbo.[held_orde
   [row_version] int NOT NULL CONSTRAINT [DF_held_orders_row_version] DEFAULT (1),
   [status] nvarchar(max) NOT NULL CONSTRAINT [DF_held_orders_status] DEFAULT ('held'),
   [pending_request_id] uniqueidentifier NULL,
+  [bill_no] nvarchar(max) NULL,
   CONSTRAINT [PK_held_orders] PRIMARY KEY ([id])
 
 ); END;
@@ -2241,6 +2281,8 @@ END;
 
 IF COL_LENGTH(N'dbo.held_orders', N'pending_request_id') IS NULL ALTER TABLE dbo.[held_orders] ADD [pending_request_id] uniqueidentifier NULL;
 
+IF COL_LENGTH(N'dbo.held_orders', N'bill_no') IS NULL ALTER TABLE dbo.[held_orders] ADD [bill_no] nvarchar(max) NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.held_orders') AND name=N'IX_held_orders_store_id') CREATE INDEX [IX_held_orders_store_id] ON dbo.[held_orders]([store_id]);
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.held_orders') AND name=N'IX_held_orders_updated_at') CREATE INDEX [IX_held_orders_updated_at] ON dbo.[held_orders]([updated_at]);
@@ -2388,6 +2430,12 @@ IF OBJECT_ID(N'dbo.item_activity_logs', N'U') IS NULL BEGIN CREATE TABLE dbo.[it
   [note] nvarchar(max) NOT NULL CONSTRAINT [DF_item_activity_logs_note] DEFAULT (''),
   [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_item_activity_logs_created_at] DEFAULT (SYSDATETIMEOFFSET()),
   [row_version] int NOT NULL CONSTRAINT [DF_item_activity_logs_row_version] DEFAULT (1),
+  [item_id] uniqueidentifier NULL,
+  [sale_id] uniqueidentifier NULL,
+  [transfer_id] uniqueidentifier NULL,
+  [quantity] int NULL,
+  [created_by] nvarchar(max) NULL,
+  [notes] nvarchar(max) NULL,
   CONSTRAINT [PK_item_activity_logs] PRIMARY KEY ([id])
 
 ); END;
@@ -2503,6 +2551,18 @@ IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.item_activi
   EXEC sys.sp_executesql N'UPDATE dbo.[item_activity_logs] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[item_activity_logs] ALTER COLUMN [row_version] int NOT NULL;
 END;
+
+IF COL_LENGTH(N'dbo.item_activity_logs', N'item_id') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [item_id] uniqueidentifier NULL;
+
+IF COL_LENGTH(N'dbo.item_activity_logs', N'sale_id') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [sale_id] uniqueidentifier NULL;
+
+IF COL_LENGTH(N'dbo.item_activity_logs', N'transfer_id') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [transfer_id] uniqueidentifier NULL;
+
+IF COL_LENGTH(N'dbo.item_activity_logs', N'quantity') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [quantity] int NULL;
+
+IF COL_LENGTH(N'dbo.item_activity_logs', N'created_by') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [created_by] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.item_activity_logs', N'notes') IS NULL ALTER TABLE dbo.[item_activity_logs] ADD [notes] nvarchar(max) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.item_activity_logs') AND name=N'IX_item_activity_logs_store_id') CREATE INDEX [IX_item_activity_logs_store_id] ON dbo.[item_activity_logs]([store_id]);
 
@@ -2634,6 +2694,7 @@ IF OBJECT_ID(N'dbo.members', N'U') IS NULL BEGIN CREATE TABLE dbo.[members] (
   [is_verified] bit NOT NULL CONSTRAINT [DF_members_is_verified] DEFAULT (0),
   [verified_at] datetimeoffset(7) NULL,
   [verified_channel] nvarchar(max) NULL,
+  [deleted_at] nvarchar(max) NULL,
   CONSTRAINT [PK_members] PRIMARY KEY ([id])
 
 ); END;
@@ -2759,6 +2820,8 @@ IF COL_LENGTH(N'dbo.members', N'verified_at') IS NULL ALTER TABLE dbo.[members] 
 
 IF COL_LENGTH(N'dbo.members', N'verified_channel') IS NULL ALTER TABLE dbo.[members] ADD [verified_channel] nvarchar(max) NULL;
 
+IF COL_LENGTH(N'dbo.members', N'deleted_at') IS NULL ALTER TABLE dbo.[members] ADD [deleted_at] nvarchar(max) NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.members') AND name=N'UX_members_member_code') CREATE UNIQUE INDEX [UX_members_member_code] ON dbo.[members]([member_code]);
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.members') AND name=N'UX_members_phone') CREATE UNIQUE INDEX [UX_members_phone] ON dbo.[members]([phone]);
@@ -2774,6 +2837,7 @@ IF OBJECT_ID(N'dbo.membership_tiers', N'U') IS NULL BEGIN CREATE TABLE dbo.[memb
   [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_membership_tiers_created_at] DEFAULT (SYSDATETIMEOFFSET()),
   [updated_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_membership_tiers_updated_at] DEFAULT (SYSDATETIMEOFFSET()),
   [row_version] int NOT NULL CONSTRAINT [DF_membership_tiers_row_version] DEFAULT (1),
+  [deleted_at] nvarchar(max) NULL,
   CONSTRAINT [PK_membership_tiers] PRIMARY KEY ([id])
 
 ); END;
@@ -2865,6 +2929,8 @@ IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.membership_
   EXEC sys.sp_executesql N'UPDATE dbo.[membership_tiers] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[membership_tiers] ALTER COLUMN [row_version] int NOT NULL;
 END;
+
+IF COL_LENGTH(N'dbo.membership_tiers', N'deleted_at') IS NULL ALTER TABLE dbo.[membership_tiers] ADD [deleted_at] nvarchar(max) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.membership_tiers') AND name=N'UX_membership_tiers_name') CREATE UNIQUE INDEX [UX_membership_tiers_name] ON dbo.[membership_tiers]([name]);
 
@@ -2999,6 +3065,9 @@ IF OBJECT_ID(N'dbo.payment_transactions', N'U') IS NULL BEGIN CREATE TABLE dbo.[
   [status] nvarchar(max) NULL CONSTRAINT [DF_payment_transactions_status] DEFAULT ('completed'),
   [metadata] nvarchar(max) NULL CONSTRAINT [DF_payment_transactions_metadata] DEFAULT (N'{}'),
   [client_transaction_id] nvarchar(450) NULL,
+  [order_id] uniqueidentifier NULL,
+  [payment_method] nvarchar(max) NULL,
+  [transaction_reference] nvarchar(max) NULL,
   CONSTRAINT [PK_payment_transactions] PRIMARY KEY ([id])
 
 ); END;
@@ -3173,6 +3242,12 @@ IF OBJECT_ID(N'dbo.payment_transactions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo
 IF COL_LENGTH(N'dbo.payment_transactions', N'client_transaction_id') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [client_transaction_id] nvarchar(450) NULL;
 
 IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.payment_transactions') AND c.name=N'client_transaction_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[payment_transactions] ALTER COLUMN [client_transaction_id] nvarchar(450) NULL;
+
+IF COL_LENGTH(N'dbo.payment_transactions', N'order_id') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [order_id] uniqueidentifier NULL;
+
+IF COL_LENGTH(N'dbo.payment_transactions', N'payment_method') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [payment_method] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.payment_transactions', N'transaction_reference') IS NULL ALTER TABLE dbo.[payment_transactions] ADD [transaction_reference] nvarchar(max) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.payment_transactions') AND name=N'UX_payment_transactions_client_transaction_id') CREATE UNIQUE INDEX [UX_payment_transactions_client_transaction_id] ON dbo.[payment_transactions]([client_transaction_id]) WHERE [client_transaction_id] IS NOT NULL;
 
@@ -3448,6 +3523,9 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NULL BEGIN CREATE TABLE dbo.[pos_sett
   [row_version] int NOT NULL CONSTRAINT [DF_pos_settings_row_version] DEFAULT (1),
   [logo_data_url] nvarchar(max) NULL,
   [receipt_design] nvarchar(max) NOT NULL CONSTRAINT [DF_pos_settings_receipt_design] DEFAULT (N'{}'),
+  [payment_details] nvarchar(max) NOT NULL CONSTRAINT [DF_pos_settings_payment_details] DEFAULT (N'{}'),
+  [whatsapp_settings] nvarchar(max) NOT NULL CONSTRAINT [DF_pos_settings_whatsapp_settings] DEFAULT (N'{}'),
+  [receipt_css] nvarchar(max) NOT NULL CONSTRAINT [DF_pos_settings_receipt_css] DEFAULT (''),
   CONSTRAINT [PK_pos_settings] PRIMARY KEY ([id])
 
 ); END;
@@ -3901,6 +3979,45 @@ IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_setting
   ALTER TABLE dbo.[pos_settings] ALTER COLUMN [receipt_design] nvarchar(max) NOT NULL;
 END;
 
+IF COL_LENGTH(N'dbo.pos_settings', N'payment_details') IS NULL ALTER TABLE dbo.[pos_settings] ADD [payment_details] nvarchar(max) NULL;
+
+IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_settings', N'payment_details') IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM sys.default_constraints dc
+  JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
+  WHERE dc.parent_object_id=OBJECT_ID(N'dbo.pos_settings') AND c.name=N'payment_details'
+) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_payment_details] DEFAULT (N'{}') FOR [payment_details];
+
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'payment_details' AND is_nullable=1) BEGIN
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [payment_details]=N''{}'' WHERE [payment_details] IS NULL;';
+  ALTER TABLE dbo.[pos_settings] ALTER COLUMN [payment_details] nvarchar(max) NOT NULL;
+END;
+
+IF COL_LENGTH(N'dbo.pos_settings', N'whatsapp_settings') IS NULL ALTER TABLE dbo.[pos_settings] ADD [whatsapp_settings] nvarchar(max) NULL;
+
+IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_settings', N'whatsapp_settings') IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM sys.default_constraints dc
+  JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
+  WHERE dc.parent_object_id=OBJECT_ID(N'dbo.pos_settings') AND c.name=N'whatsapp_settings'
+) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_whatsapp_settings] DEFAULT (N'{}') FOR [whatsapp_settings];
+
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'whatsapp_settings' AND is_nullable=1) BEGIN
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [whatsapp_settings]=N''{}'' WHERE [whatsapp_settings] IS NULL;';
+  ALTER TABLE dbo.[pos_settings] ALTER COLUMN [whatsapp_settings] nvarchar(max) NOT NULL;
+END;
+
+IF COL_LENGTH(N'dbo.pos_settings', N'receipt_css') IS NULL ALTER TABLE dbo.[pos_settings] ADD [receipt_css] nvarchar(max) NULL;
+
+IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_settings', N'receipt_css') IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM sys.default_constraints dc
+  JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
+  WHERE dc.parent_object_id=OBJECT_ID(N'dbo.pos_settings') AND c.name=N'receipt_css'
+) ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_receipt_css] DEFAULT ('') FOR [receipt_css];
+
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'receipt_css' AND is_nullable=1) BEGIN
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_settings] SET [receipt_css]='''' WHERE [receipt_css] IS NULL;';
+  ALTER TABLE dbo.[pos_settings] ALTER COLUMN [receipt_css] nvarchar(max) NOT NULL;
+END;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.pos_settings') AND name=N'IX_pos_settings_updated_at') CREATE INDEX [IX_pos_settings_updated_at] ON dbo.[pos_settings]([updated_at]);
 
 IF OBJECT_ID(N'dbo.product_barcodes', N'U') IS NULL BEGIN CREATE TABLE dbo.[product_barcodes] (
@@ -3914,6 +4031,8 @@ IF OBJECT_ID(N'dbo.product_barcodes', N'U') IS NULL BEGIN CREATE TABLE dbo.[prod
   [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_product_barcodes_created_at] DEFAULT (SYSDATETIMEOFFSET()),
   [updated_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_product_barcodes_updated_at] DEFAULT (SYSDATETIMEOFFSET()),
   [row_version] int NOT NULL CONSTRAINT [DF_product_barcodes_row_version] DEFAULT (1),
+  [unit_label] nvarchar(max) NULL,
+  [deleted_at] nvarchar(max) NULL,
   CONSTRAINT [PK_product_barcodes] PRIMARY KEY ([id])
 
 ); END;
@@ -4012,6 +4131,10 @@ IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.product_bar
   ALTER TABLE dbo.[product_barcodes] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
+IF COL_LENGTH(N'dbo.product_barcodes', N'unit_label') IS NULL ALTER TABLE dbo.[product_barcodes] ADD [unit_label] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.product_barcodes', N'deleted_at') IS NULL ALTER TABLE dbo.[product_barcodes] ADD [deleted_at] nvarchar(max) NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.product_barcodes') AND name=N'UX_product_barcodes_barcode') CREATE UNIQUE INDEX [UX_product_barcodes_barcode] ON dbo.[product_barcodes]([barcode]);
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.product_barcodes') AND name=N'IX_product_barcodes_updated_at') CREATE INDEX [IX_product_barcodes_updated_at] ON dbo.[product_barcodes]([updated_at]);
@@ -4027,6 +4150,7 @@ IF OBJECT_ID(N'dbo.product_categories', N'U') IS NULL BEGIN CREATE TABLE dbo.[pr
   [kind] nvarchar(max) NOT NULL CONSTRAINT [DF_product_categories_kind] DEFAULT ('category'),
   [row_version] int NOT NULL CONSTRAINT [DF_product_categories_row_version] DEFAULT (1),
   [is_active] bit NOT NULL CONSTRAINT [DF_product_categories_is_active] DEFAULT (1),
+  [deleted_at] nvarchar(max) NULL,
   CONSTRAINT [PK_product_categories] PRIMARY KEY ([id])
 
 ); END;
@@ -4134,6 +4258,8 @@ IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.product_cat
   ALTER TABLE dbo.[product_categories] ALTER COLUMN [is_active] bit NOT NULL;
 END;
 
+IF COL_LENGTH(N'dbo.product_categories', N'deleted_at') IS NULL ALTER TABLE dbo.[product_categories] ADD [deleted_at] nvarchar(max) NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.product_categories') AND name=N'IX_product_categories_updated_at') CREATE INDEX [IX_product_categories_updated_at] ON dbo.[product_categories]([updated_at]);
 
 IF OBJECT_ID(N'dbo.products', N'U') IS NULL BEGIN CREATE TABLE dbo.[products] (
@@ -4167,6 +4293,7 @@ IF OBJECT_ID(N'dbo.products', N'U') IS NULL BEGIN CREATE TABLE dbo.[products] (
   [barcode_variants] nvarchar(max) NOT NULL CONSTRAINT [DF_products_barcode_variants] DEFAULT (N'[]'),
   [row_version] int NOT NULL CONSTRAINT [DF_products_row_version] DEFAULT (0),
   [owner_store_id] nvarchar(450) NULL,
+  [deleted_at] nvarchar(max) NULL,
   CONSTRAINT [PK_products] PRIMARY KEY ([id])
 
 ); END;
@@ -4415,6 +4542,8 @@ IF COL_LENGTH(N'dbo.products', N'owner_store_id') IS NULL ALTER TABLE dbo.[produ
 
 IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.products') AND c.name=N'owner_store_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[products] ALTER COLUMN [owner_store_id] nvarchar(450) NULL;
 
+IF COL_LENGTH(N'dbo.products', N'deleted_at') IS NULL ALTER TABLE dbo.[products] ADD [deleted_at] nvarchar(max) NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'UX_products_barcode') CREATE UNIQUE INDEX [UX_products_barcode] ON dbo.[products]([barcode]);
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.products') AND name=N'IX_products_updated_at') CREATE INDEX [IX_products_updated_at] ON dbo.[products]([updated_at]);
@@ -4436,6 +4565,7 @@ IF OBJECT_ID(N'dbo.promotions', N'U') IS NULL BEGIN CREATE TABLE dbo.[promotions
   [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_promotions_created_at] DEFAULT (SYSDATETIMEOFFSET()),
   [updated_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_promotions_updated_at] DEFAULT (SYSDATETIMEOFFSET()),
   [row_version] int NOT NULL CONSTRAINT [DF_promotions_row_version] DEFAULT (1),
+  [deleted_at] nvarchar(max) NULL,
   CONSTRAINT [PK_promotions] PRIMARY KEY ([id])
 
 ); END;
@@ -4576,6 +4706,8 @@ IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.promotions'
   EXEC sys.sp_executesql N'UPDATE dbo.[promotions] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[promotions] ALTER COLUMN [row_version] int NOT NULL;
 END;
+
+IF COL_LENGTH(N'dbo.promotions', N'deleted_at') IS NULL ALTER TABLE dbo.[promotions] ADD [deleted_at] nvarchar(max) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.promotions') AND name=N'IX_promotions_updated_at') CREATE INDEX [IX_promotions_updated_at] ON dbo.[promotions]([updated_at]);
 
@@ -4788,6 +4920,8 @@ IF OBJECT_ID(N'dbo.purchase_orders', N'U') IS NULL BEGIN CREATE TABLE dbo.[purch
   [pending_edit_request_id] uniqueidentifier NULL,
   [pending_edit_by] nvarchar(max) NULL,
   [pending_edit_at] datetimeoffset(7) NULL,
+  [status] nvarchar(max) NOT NULL CONSTRAINT [DF_purchase_orders_status] DEFAULT ('posted'),
+  [reference] nvarchar(max) NULL,
   CONSTRAINT [PK_purchase_orders] PRIMARY KEY ([id])
 
 ); END;
@@ -4910,6 +5044,21 @@ IF COL_LENGTH(N'dbo.purchase_orders', N'pending_edit_by') IS NULL ALTER TABLE db
 
 IF COL_LENGTH(N'dbo.purchase_orders', N'pending_edit_at') IS NULL ALTER TABLE dbo.[purchase_orders] ADD [pending_edit_at] datetimeoffset(7) NULL;
 
+IF COL_LENGTH(N'dbo.purchase_orders', N'status') IS NULL ALTER TABLE dbo.[purchase_orders] ADD [status] nvarchar(max) NULL;
+
+IF OBJECT_ID(N'dbo.purchase_orders', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.purchase_orders', N'status') IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM sys.default_constraints dc
+  JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
+  WHERE dc.parent_object_id=OBJECT_ID(N'dbo.purchase_orders') AND c.name=N'status'
+) ALTER TABLE dbo.[purchase_orders] ADD CONSTRAINT [DF_purchase_orders_status] DEFAULT ('posted') FOR [status];
+
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.purchase_orders') AND name=N'status' AND is_nullable=1) BEGIN
+  EXEC sys.sp_executesql N'UPDATE dbo.[purchase_orders] SET [status]=''posted'' WHERE [status] IS NULL;';
+  ALTER TABLE dbo.[purchase_orders] ALTER COLUMN [status] nvarchar(max) NOT NULL;
+END;
+
+IF COL_LENGTH(N'dbo.purchase_orders', N'reference') IS NULL ALTER TABLE dbo.[purchase_orders] ADD [reference] nvarchar(max) NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.purchase_orders') AND name=N'UX_purchase_orders_po_number') CREATE UNIQUE INDEX [UX_purchase_orders_po_number] ON dbo.[purchase_orders]([po_number]);
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.purchase_orders') AND name=N'IX_purchase_orders_store_id') CREATE INDEX [IX_purchase_orders_store_id] ON dbo.[purchase_orders]([store_id]);
@@ -4936,6 +5085,7 @@ IF OBJECT_ID(N'dbo.sale_items', N'U') IS NULL BEGIN CREATE TABLE dbo.[sale_items
   [unit_cost] decimal(38,12) NOT NULL CONSTRAINT [DF_sale_items_unit_cost] DEFAULT (0),
   [row_version] int NOT NULL CONSTRAINT [DF_sale_items_row_version] DEFAULT (1),
   [refunded_qty] int NOT NULL CONSTRAINT [DF_sale_items_refunded_qty] DEFAULT (0),
+  [branch_id] nvarchar(450) NULL,
   CONSTRAINT [PK_sale_items] PRIMARY KEY ([id])
 
 ); END;
@@ -5127,6 +5277,12 @@ IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.sale_items'
   ALTER TABLE dbo.[sale_items] ALTER COLUMN [refunded_qty] int NOT NULL;
 END;
 
+IF COL_LENGTH(N'dbo.sale_items', N'branch_id') IS NULL ALTER TABLE dbo.[sale_items] ADD [branch_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sale_items') AND c.name=N'branch_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sale_items] ALTER COLUMN [branch_id] nvarchar(450) NULL;
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.sale_items') AND name=N'IX_sale_items_branch_id') CREATE INDEX [IX_sale_items_branch_id] ON dbo.[sale_items]([branch_id]);
+
 IF OBJECT_ID(N'dbo.sales', N'U') IS NULL BEGIN CREATE TABLE dbo.[sales] (
 
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_sales_id] DEFAULT (NEWID()),
@@ -5167,6 +5323,7 @@ IF OBJECT_ID(N'dbo.sales', N'U') IS NULL BEGIN CREATE TABLE dbo.[sales] (
   [authorized_at] datetimeoffset(7) NULL,
   [rounding_adjustment] decimal(18,4) NOT NULL CONSTRAINT [DF_sales_rounding_adjustment] DEFAULT (0),
   [rounding_label] nvarchar(max) NULL,
+  [branch_id] nvarchar(450) NULL,
   CONSTRAINT [PK_sales] PRIMARY KEY ([id])
 
 ); END;
@@ -5457,11 +5614,17 @@ END;
 
 IF COL_LENGTH(N'dbo.sales', N'rounding_label') IS NULL ALTER TABLE dbo.[sales] ADD [rounding_label] nvarchar(max) NULL;
 
+IF COL_LENGTH(N'dbo.sales', N'branch_id') IS NULL ALTER TABLE dbo.[sales] ADD [branch_id] nvarchar(450) NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.sales') AND c.name=N'branch_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[sales] ALTER COLUMN [branch_id] nvarchar(450) NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'UX_sales_bill_number') CREATE UNIQUE INDEX [UX_sales_bill_number] ON dbo.[sales]([bill_number]);
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'UX_sales_client_transaction_id') CREATE UNIQUE INDEX [UX_sales_client_transaction_id] ON dbo.[sales]([client_transaction_id]) WHERE [client_transaction_id] IS NOT NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'IX_sales_store_id') CREATE INDEX [IX_sales_store_id] ON dbo.[sales]([store_id]);
+
+IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.sales') AND name=N'IX_sales_branch_id') CREATE INDEX [IX_sales_branch_id] ON dbo.[sales]([branch_id]);
 
 IF OBJECT_ID(N'dbo.secure_settings', N'U') IS NULL BEGIN CREATE TABLE dbo.[secure_settings] (
 
@@ -6484,6 +6647,13 @@ IF OBJECT_ID(N'dbo.stock_transfers', N'U') IS NULL BEGIN CREATE TABLE dbo.[stock
   [verified_at] datetimeoffset(7) NULL,
   [posted_at] datetimeoffset(7) NULL,
   [discrepancy_reason] nvarchar(max) NULL,
+  [rejected_by] nvarchar(max) NULL,
+  [cancelled_reason] nvarchar(max) NULL,
+  [dispatched_by] nvarchar(max) NULL,
+  [dispatched_at] nvarchar(max) NULL,
+  [closed_at] nvarchar(max) NULL,
+  [fulfilment] nvarchar(max) NULL,
+  [source_request_id] uniqueidentifier NULL,
   CONSTRAINT [PK_stock_transfers] PRIMARY KEY ([id])
 
 ); END;
@@ -6634,6 +6804,22 @@ IF COL_LENGTH(N'dbo.stock_transfers', N'posted_at') IS NULL ALTER TABLE dbo.[sto
 
 IF COL_LENGTH(N'dbo.stock_transfers', N'discrepancy_reason') IS NULL ALTER TABLE dbo.[stock_transfers] ADD [discrepancy_reason] nvarchar(max) NULL;
 
+IF COL_LENGTH(N'dbo.stock_transfers', N'rejected_by') IS NULL ALTER TABLE dbo.[stock_transfers] ADD [rejected_by] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.stock_transfers', N'cancelled_reason') IS NULL ALTER TABLE dbo.[stock_transfers] ADD [cancelled_reason] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.stock_transfers', N'dispatched_by') IS NULL ALTER TABLE dbo.[stock_transfers] ADD [dispatched_by] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.stock_transfers', N'dispatched_at') IS NULL ALTER TABLE dbo.[stock_transfers] ADD [dispatched_at] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.stock_transfers', N'closed_at') IS NULL ALTER TABLE dbo.[stock_transfers] ADD [closed_at] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.stock_transfers', N'fulfilment') IS NULL ALTER TABLE dbo.[stock_transfers] ADD [fulfilment] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.stock_transfers', N'source_request_id') IS NULL ALTER TABLE dbo.[stock_transfers] ADD [source_request_id] uniqueidentifier NULL;
+
+IF EXISTS (SELECT 1 FROM sys.columns c JOIN sys.types t ON t.user_type_id=c.user_type_id WHERE c.object_id=OBJECT_ID(N'dbo.stock_transfers') AND c.name=N'source_request_id' AND t.name IN (N'nvarchar',N'varchar') AND c.max_length=-1) ALTER TABLE dbo.[stock_transfers] ALTER COLUMN [source_request_id] uniqueidentifier NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.stock_transfers') AND name=N'UX_stock_transfers_ref') CREATE UNIQUE INDEX [UX_stock_transfers_ref] ON dbo.[stock_transfers]([ref]);
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.stock_transfers') AND name=N'IX_stock_transfers_updated_at') CREATE INDEX [IX_stock_transfers_updated_at] ON dbo.[stock_transfers]([updated_at]);
@@ -6658,6 +6844,8 @@ IF OBJECT_ID(N'dbo.stores', N'U') IS NULL BEGIN CREATE TABLE dbo.[stores] (
   [archived_at] datetimeoffset(7) NULL,
   [is_primary_sub] bit NOT NULL CONSTRAINT [DF_stores_is_primary_sub] DEFAULT (0),
   [private_catalogue] bit NOT NULL CONSTRAINT [DF_stores_private_catalogue] DEFAULT (0),
+  [receipt_prefix] nvarchar(max) NULL,
+  [deleted_at] nvarchar(max) NULL,
   CONSTRAINT [PK_stores] PRIMARY KEY ([id])
 
 ); END;
@@ -6796,6 +6984,10 @@ IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.stores') AN
   ALTER TABLE dbo.[stores] ALTER COLUMN [private_catalogue] bit NOT NULL;
 END;
 
+IF COL_LENGTH(N'dbo.stores', N'receipt_prefix') IS NULL ALTER TABLE dbo.[stores] ADD [receipt_prefix] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.stores', N'deleted_at') IS NULL ALTER TABLE dbo.[stores] ADD [deleted_at] nvarchar(max) NULL;
+
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.stores') AND name=N'IX_stores_updated_at') CREATE INDEX [IX_stores_updated_at] ON dbo.[stores]([updated_at]);
 
 IF OBJECT_ID(N'dbo.suppliers', N'U') IS NULL BEGIN CREATE TABLE dbo.[suppliers] (
@@ -6812,6 +7004,7 @@ IF OBJECT_ID(N'dbo.suppliers', N'U') IS NULL BEGIN CREATE TABLE dbo.[suppliers] 
   [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_suppliers_created_at] DEFAULT (SYSDATETIMEOFFSET()),
   [updated_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_suppliers_updated_at] DEFAULT (SYSDATETIMEOFFSET()),
   [row_version] int NOT NULL CONSTRAINT [DF_suppliers_row_version] DEFAULT (1),
+  [deleted_at] nvarchar(max) NULL,
   CONSTRAINT [PK_suppliers] PRIMARY KEY ([id])
 
 ); END;
@@ -6900,6 +7093,8 @@ IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.suppliers')
   EXEC sys.sp_executesql N'UPDATE dbo.[suppliers] SET [row_version]=1 WHERE [row_version] IS NULL;';
   ALTER TABLE dbo.[suppliers] ALTER COLUMN [row_version] int NOT NULL;
 END;
+
+IF COL_LENGTH(N'dbo.suppliers', N'deleted_at') IS NULL ALTER TABLE dbo.[suppliers] ADD [deleted_at] nvarchar(max) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.suppliers') AND name=N'IX_suppliers_updated_at') CREATE INDEX [IX_suppliers_updated_at] ON dbo.[suppliers]([updated_at]);
 
@@ -7199,6 +7394,17 @@ IF OBJECT_ID(N'dbo.terminal_tokens', N'U') IS NULL BEGIN CREATE TABLE dbo.[termi
   [claimed_at] datetimeoffset(7) NULL,
   [platform] nvarchar(max) NOT NULL CONSTRAINT [DF_terminal_tokens_platform] DEFAULT ('unknown'),
   [row_version] int NOT NULL CONSTRAINT [DF_terminal_tokens_row_version] DEFAULT (1),
+  [claim_secret_hash] nvarchar(max) NULL,
+  [claim_expires_at] datetimeoffset(7) NULL,
+  [credentials_issued_at] datetimeoffset(7) NULL,
+  [device_platform] nvarchar(max) NULL,
+  [device_os] nvarchar(max) NULL,
+  [claimed_proof_hash] nvarchar(max) NULL,
+  [claimed_platform] nvarchar(max) NULL,
+  [claimed_os] nvarchar(max) NULL,
+  [is_claimed] bit NOT NULL CONSTRAINT [DF_terminal_tokens_is_claimed] DEFAULT (0),
+  [expires_at] datetimeoffset(7) NULL,
+  [claim_proof] nvarchar(max) NULL,
   CONSTRAINT [PK_terminal_tokens] PRIMARY KEY ([id])
 
 ); END;
@@ -7298,6 +7504,39 @@ IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.terminal_to
   ALTER TABLE dbo.[terminal_tokens] ALTER COLUMN [row_version] int NOT NULL;
 END;
 
+IF COL_LENGTH(N'dbo.terminal_tokens', N'claim_secret_hash') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [claim_secret_hash] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.terminal_tokens', N'claim_expires_at') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [claim_expires_at] datetimeoffset(7) NULL;
+
+IF COL_LENGTH(N'dbo.terminal_tokens', N'credentials_issued_at') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [credentials_issued_at] datetimeoffset(7) NULL;
+
+IF COL_LENGTH(N'dbo.terminal_tokens', N'device_platform') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [device_platform] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.terminal_tokens', N'device_os') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [device_os] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.terminal_tokens', N'claimed_proof_hash') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [claimed_proof_hash] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.terminal_tokens', N'claimed_platform') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [claimed_platform] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.terminal_tokens', N'claimed_os') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [claimed_os] nvarchar(max) NULL;
+
+IF COL_LENGTH(N'dbo.terminal_tokens', N'is_claimed') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [is_claimed] bit NULL;
+
+IF OBJECT_ID(N'dbo.terminal_tokens', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.terminal_tokens', N'is_claimed') IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM sys.default_constraints dc
+  JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
+  WHERE dc.parent_object_id=OBJECT_ID(N'dbo.terminal_tokens') AND c.name=N'is_claimed'
+) ALTER TABLE dbo.[terminal_tokens] ADD CONSTRAINT [DF_terminal_tokens_is_claimed] DEFAULT (0) FOR [is_claimed];
+
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.terminal_tokens') AND name=N'is_claimed' AND is_nullable=1) BEGIN
+  EXEC sys.sp_executesql N'UPDATE dbo.[terminal_tokens] SET [is_claimed]=0 WHERE [is_claimed] IS NULL;';
+  ALTER TABLE dbo.[terminal_tokens] ALTER COLUMN [is_claimed] bit NOT NULL;
+END;
+
+IF COL_LENGTH(N'dbo.terminal_tokens', N'expires_at') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [expires_at] datetimeoffset(7) NULL;
+
+IF COL_LENGTH(N'dbo.terminal_tokens', N'claim_proof') IS NULL ALTER TABLE dbo.[terminal_tokens] ADD [claim_proof] nvarchar(max) NULL;
+
 IF OBJECT_ID(N'dbo.uom_units', N'U') IS NULL BEGIN CREATE TABLE dbo.[uom_units] (
 
   [id] uniqueidentifier NOT NULL CONSTRAINT [DF_uom_units_id] DEFAULT (NEWID()),
@@ -7309,6 +7548,7 @@ IF OBJECT_ID(N'dbo.uom_units', N'U') IS NULL BEGIN CREATE TABLE dbo.[uom_units] 
   [updated_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_uom_units_updated_at] DEFAULT (SYSDATETIMEOFFSET()),
   [row_version] int NOT NULL CONSTRAINT [DF_uom_units_row_version] DEFAULT (1),
   [is_active] bit NOT NULL CONSTRAINT [DF_uom_units_is_active] DEFAULT (1),
+  [deleted_at] nvarchar(max) NULL,
   CONSTRAINT [PK_uom_units] PRIMARY KEY ([id])
 
 ); END;
@@ -7415,6 +7655,8 @@ IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.uom_units')
   EXEC sys.sp_executesql N'UPDATE dbo.[uom_units] SET [is_active]=1 WHERE [is_active] IS NULL;';
   ALTER TABLE dbo.[uom_units] ALTER COLUMN [is_active] bit NOT NULL;
 END;
+
+IF COL_LENGTH(N'dbo.uom_units', N'deleted_at') IS NULL ALTER TABLE dbo.[uom_units] ADD [deleted_at] nvarchar(max) NULL;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.uom_units') AND name=N'UX_uom_units_code') CREATE UNIQUE INDEX [UX_uom_units_code] ON dbo.[uom_units]([code]);
 
@@ -7739,6 +7981,8 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NULL BEGIN CREATE TABLE dbo.[po
   [online_only_edit_tenders] bit NOT NULL CONSTRAINT [DF_pos_store_settings_online_only_edit_tenders] DEFAULT (0),
   [online_only_terminal_reset] bit NOT NULL CONSTRAINT [DF_pos_store_settings_online_only_terminal_reset] DEFAULT (0),
   [online_only_refund] bit NOT NULL CONSTRAINT [DF_pos_store_settings_online_only_refund] DEFAULT (0),
+  [created_at] datetimeoffset(7) NOT NULL CONSTRAINT [DF_pos_store_settings_created_at] DEFAULT (SYSDATETIMEOFFSET()),
+  [idle_timeout_minutes] int NOT NULL CONSTRAINT [DF_pos_store_settings_idle_timeout_minutes] DEFAULT (30),
   CONSTRAINT [PK_pos_store_settings] PRIMARY KEY ([store_id])
 
 ); END;
@@ -8009,6 +8253,32 @@ IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.p
 IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'online_only_refund' AND is_nullable=1) BEGIN
   EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [online_only_refund]=0 WHERE [online_only_refund] IS NULL;';
   ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [online_only_refund] bit NOT NULL;
+END;
+
+IF COL_LENGTH(N'dbo.pos_store_settings', N'created_at') IS NULL ALTER TABLE dbo.[pos_store_settings] ADD [created_at] datetimeoffset(7) NULL;
+
+IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_store_settings', N'created_at') IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM sys.default_constraints dc
+  JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
+  WHERE dc.parent_object_id=OBJECT_ID(N'dbo.pos_store_settings') AND c.name=N'created_at'
+) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_created_at] DEFAULT (SYSDATETIMEOFFSET()) FOR [created_at];
+
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'created_at' AND is_nullable=1) BEGIN
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [created_at]=SYSDATETIMEOFFSET() WHERE [created_at] IS NULL;';
+  ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [created_at] datetimeoffset(7) NOT NULL;
+END;
+
+IF COL_LENGTH(N'dbo.pos_store_settings', N'idle_timeout_minutes') IS NULL ALTER TABLE dbo.[pos_store_settings] ADD [idle_timeout_minutes] int NULL;
+
+IF OBJECT_ID(N'dbo.pos_store_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_store_settings', N'idle_timeout_minutes') IS NOT NULL AND NOT EXISTS (
+  SELECT 1 FROM sys.default_constraints dc
+  JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
+  WHERE dc.parent_object_id=OBJECT_ID(N'dbo.pos_store_settings') AND c.name=N'idle_timeout_minutes'
+) ALTER TABLE dbo.[pos_store_settings] ADD CONSTRAINT [DF_pos_store_settings_idle_timeout_minutes] DEFAULT (30) FOR [idle_timeout_minutes];
+
+IF EXISTS (SELECT 1 FROM sys.columns WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'idle_timeout_minutes' AND is_nullable=1) BEGIN
+  EXEC sys.sp_executesql N'UPDATE dbo.[pos_store_settings] SET [idle_timeout_minutes]=30 WHERE [idle_timeout_minutes] IS NULL;';
+  ALTER TABLE dbo.[pos_store_settings] ALTER COLUMN [idle_timeout_minutes] int NOT NULL;
 END;
 
 IF NOT EXISTS (SELECT 1 FROM sys.indexes WHERE object_id=OBJECT_ID(N'dbo.pos_store_settings') AND name=N'IX_pos_store_settings_store_id') CREATE INDEX [IX_pos_store_settings_store_id] ON dbo.[pos_store_settings]([store_id]);
@@ -9747,6 +10017,8 @@ IF OBJECT_ID(N'dbo.stock_transfers',N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 F
 
 IF OBJECT_ID(N'dbo.products',N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.stock_transfer_items') AND name=N'FK_stock_transfer_items_product_id') ALTER TABLE dbo.[stock_transfer_items] ADD CONSTRAINT [FK_stock_transfer_items_product_id] FOREIGN KEY ([product_id]) REFERENCES dbo.[products]([id]);
 
+IF OBJECT_ID(N'dbo.stock_transfers',N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.stock_transfers') AND name=N'FK_stock_transfers_source_request_id') ALTER TABLE dbo.[stock_transfers] ADD CONSTRAINT [FK_stock_transfers_source_request_id] FOREIGN KEY ([source_request_id]) REFERENCES dbo.[stock_transfers]([id]);
+
 IF OBJECT_ID(N'dbo.store_groups',N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.stores') AND name=N'FK_stores_group_id') ALTER TABLE dbo.[stores] ADD CONSTRAINT [FK_stores_group_id] FOREIGN KEY ([group_id]) REFERENCES dbo.[store_groups]([id]);
 
 IF OBJECT_ID(N'dbo.stores',N'U') IS NOT NULL AND NOT EXISTS (SELECT 1 FROM sys.foreign_keys WHERE parent_object_id=OBJECT_ID(N'dbo.stores') AND name=N'FK_stores_parent_id') ALTER TABLE dbo.[stores] ADD CONSTRAINT [FK_stores_parent_id] FOREIGN KEY ([parent_id]) REFERENCES dbo.[stores]([id]);
@@ -9930,227 +10202,257 @@ IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_set
   END;
 END;
 
-IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', N'stock_by_store') IS NOT NULL BEGIN
+IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_settings', N'payment_details') IS NOT NULL BEGIN
   DECLARE @legacy_json_default_11 sysname = (
+    SELECT dc.name FROM sys.default_constraints dc
+    JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
+    WHERE dc.parent_object_id=OBJECT_ID(N'dbo.pos_settings')
+      AND c.name=N'payment_details'
+      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+  );
+  IF @legacy_json_default_11 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_11_sql nvarchar(max) = N'ALTER TABLE dbo.[pos_settings] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_11);
+    EXEC sys.sp_executesql @legacy_json_default_11_sql;
+    ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_payment_details] DEFAULT (N'{}') FOR [payment_details];
+  END;
+END;
+
+IF OBJECT_ID(N'dbo.pos_settings', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.pos_settings', N'whatsapp_settings') IS NOT NULL BEGIN
+  DECLARE @legacy_json_default_12 sysname = (
+    SELECT dc.name FROM sys.default_constraints dc
+    JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
+    WHERE dc.parent_object_id=OBJECT_ID(N'dbo.pos_settings')
+      AND c.name=N'whatsapp_settings'
+      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+  );
+  IF @legacy_json_default_12 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_12_sql nvarchar(max) = N'ALTER TABLE dbo.[pos_settings] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_12);
+    EXEC sys.sp_executesql @legacy_json_default_12_sql;
+    ALTER TABLE dbo.[pos_settings] ADD CONSTRAINT [DF_pos_settings_whatsapp_settings] DEFAULT (N'{}') FOR [whatsapp_settings];
+  END;
+END;
+
+IF OBJECT_ID(N'dbo.products', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.products', N'stock_by_store') IS NOT NULL BEGIN
+  DECLARE @legacy_json_default_13 sysname = (
     SELECT dc.name FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.products')
       AND c.name=N'stock_by_store'
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
-  IF @legacy_json_default_11 IS NOT NULL BEGIN
-    DECLARE @legacy_json_default_11_sql nvarchar(max) = N'ALTER TABLE dbo.[products] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_11);
-    EXEC sys.sp_executesql @legacy_json_default_11_sql;
+  IF @legacy_json_default_13 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_13_sql nvarchar(max) = N'ALTER TABLE dbo.[products] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_13);
+    EXEC sys.sp_executesql @legacy_json_default_13_sql;
     ALTER TABLE dbo.[products] ADD CONSTRAINT [DF_products_stock_by_store] DEFAULT (N'{}') FOR [stock_by_store];
   END;
 END;
 
 IF OBJECT_ID(N'dbo.settings_overrides', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.settings_overrides', N'patch') IS NOT NULL BEGIN
-  DECLARE @legacy_json_default_12 sysname = (
+  DECLARE @legacy_json_default_14 sysname = (
     SELECT dc.name FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.settings_overrides')
       AND c.name=N'patch'
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
-  IF @legacy_json_default_12 IS NOT NULL BEGIN
-    DECLARE @legacy_json_default_12_sql nvarchar(max) = N'ALTER TABLE dbo.[settings_overrides] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_12);
-    EXEC sys.sp_executesql @legacy_json_default_12_sql;
+  IF @legacy_json_default_14 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_14_sql nvarchar(max) = N'ALTER TABLE dbo.[settings_overrides] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_14);
+    EXEC sys.sp_executesql @legacy_json_default_14_sql;
     ALTER TABLE dbo.[settings_overrides] ADD CONSTRAINT [DF_settings_overrides_patch] DEFAULT (N'{}') FOR [patch];
   END;
 END;
 
 IF OBJECT_ID(N'dbo.staff_roles', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.staff_roles', N'permissions') IS NOT NULL BEGIN
-  DECLARE @legacy_json_default_13 sysname = (
+  DECLARE @legacy_json_default_15 sysname = (
     SELECT dc.name FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.staff_roles')
       AND c.name=N'permissions'
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
-  IF @legacy_json_default_13 IS NOT NULL BEGIN
-    DECLARE @legacy_json_default_13_sql nvarchar(max) = N'ALTER TABLE dbo.[staff_roles] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_13);
-    EXEC sys.sp_executesql @legacy_json_default_13_sql;
+  IF @legacy_json_default_15 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_15_sql nvarchar(max) = N'ALTER TABLE dbo.[staff_roles] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_15);
+    EXEC sys.sp_executesql @legacy_json_default_15_sql;
     ALTER TABLE dbo.[staff_roles] ADD CONSTRAINT [DF_staff_roles_permissions] DEFAULT (N'{}') FOR [permissions];
   END;
 END;
 
 IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.authorization_actions', N'authority_limits') IS NOT NULL BEGIN
-  DECLARE @legacy_json_default_14 sysname = (
+  DECLARE @legacy_json_default_16 sysname = (
     SELECT dc.name FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_actions')
       AND c.name=N'authority_limits'
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
-  IF @legacy_json_default_14 IS NOT NULL BEGIN
-    DECLARE @legacy_json_default_14_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_actions] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_14);
-    EXEC sys.sp_executesql @legacy_json_default_14_sql;
+  IF @legacy_json_default_16 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_16_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_actions] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_16);
+    EXEC sys.sp_executesql @legacy_json_default_16_sql;
     ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_authority_limits] DEFAULT (N'{}') FOR [authority_limits];
   END;
 END;
 
 IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.authorization_actions', N'extra_authority') IS NOT NULL BEGIN
-  DECLARE @legacy_json_default_15 sysname = (
+  DECLARE @legacy_json_default_17 sysname = (
     SELECT dc.name FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_actions')
       AND c.name=N'extra_authority'
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
-  IF @legacy_json_default_15 IS NOT NULL BEGIN
-    DECLARE @legacy_json_default_15_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_actions] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_15);
-    EXEC sys.sp_executesql @legacy_json_default_15_sql;
+  IF @legacy_json_default_17 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_17_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_actions] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_17);
+    EXEC sys.sp_executesql @legacy_json_default_17_sql;
     ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_extra_authority] DEFAULT (N'{}') FOR [extra_authority];
   END;
 END;
 
 IF OBJECT_ID(N'dbo.authorization_actions', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.authorization_actions', N'absolute_ceilings') IS NOT NULL BEGIN
-  DECLARE @legacy_json_default_16 sysname = (
+  DECLARE @legacy_json_default_18 sysname = (
     SELECT dc.name FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_actions')
       AND c.name=N'absolute_ceilings'
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
-  IF @legacy_json_default_16 IS NOT NULL BEGIN
-    DECLARE @legacy_json_default_16_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_actions] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_16);
-    EXEC sys.sp_executesql @legacy_json_default_16_sql;
+  IF @legacy_json_default_18 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_18_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_actions] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_18);
+    EXEC sys.sp_executesql @legacy_json_default_18_sql;
     ALTER TABLE dbo.[authorization_actions] ADD CONSTRAINT [DF_authorization_actions_absolute_ceilings] DEFAULT (N'{}') FOR [absolute_ceilings];
   END;
 END;
 
 IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.authorization_requests', N'payload') IS NOT NULL BEGIN
-  DECLARE @legacy_json_default_17 sysname = (
+  DECLARE @legacy_json_default_19 sysname = (
     SELECT dc.name FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_requests')
       AND c.name=N'payload'
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
-  IF @legacy_json_default_17 IS NOT NULL BEGIN
-    DECLARE @legacy_json_default_17_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_requests] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_17);
-    EXEC sys.sp_executesql @legacy_json_default_17_sql;
+  IF @legacy_json_default_19 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_19_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_requests] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_19);
+    EXEC sys.sp_executesql @legacy_json_default_19_sql;
     ALTER TABLE dbo.[authorization_requests] ADD CONSTRAINT [DF_authorization_requests_payload] DEFAULT (N'{}') FOR [payload];
   END;
 END;
 
 IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.authorization_requests', N'approved_payload') IS NOT NULL BEGIN
-  DECLARE @legacy_json_default_18 sysname = (
+  DECLARE @legacy_json_default_20 sysname = (
     SELECT dc.name FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_requests')
       AND c.name=N'approved_payload'
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
-  IF @legacy_json_default_18 IS NOT NULL BEGIN
-    DECLARE @legacy_json_default_18_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_requests] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_18);
-    EXEC sys.sp_executesql @legacy_json_default_18_sql;
+  IF @legacy_json_default_20 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_20_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_requests] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_20);
+    EXEC sys.sp_executesql @legacy_json_default_20_sql;
     ALTER TABLE dbo.[authorization_requests] ADD CONSTRAINT [DF_authorization_requests_approved_payload] DEFAULT (N'{}') FOR [approved_payload];
   END;
 END;
 
 IF OBJECT_ID(N'dbo.authorization_requests', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.authorization_requests', N'bill_snapshot') IS NOT NULL BEGIN
-  DECLARE @legacy_json_default_19 sysname = (
+  DECLARE @legacy_json_default_21 sysname = (
     SELECT dc.name FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_requests')
       AND c.name=N'bill_snapshot'
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
-  IF @legacy_json_default_19 IS NOT NULL BEGIN
-    DECLARE @legacy_json_default_19_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_requests] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_19);
-    EXEC sys.sp_executesql @legacy_json_default_19_sql;
+  IF @legacy_json_default_21 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_21_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_requests] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_21);
+    EXEC sys.sp_executesql @legacy_json_default_21_sql;
     ALTER TABLE dbo.[authorization_requests] ADD CONSTRAINT [DF_authorization_requests_bill_snapshot] DEFAULT (N'{}') FOR [bill_snapshot];
   END;
 END;
 
 IF OBJECT_ID(N'dbo.authorization_log', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.authorization_log', N'detail') IS NOT NULL BEGIN
-  DECLARE @legacy_json_default_20 sysname = (
+  DECLARE @legacy_json_default_22 sysname = (
     SELECT dc.name FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.authorization_log')
       AND c.name=N'detail'
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
-  IF @legacy_json_default_20 IS NOT NULL BEGIN
-    DECLARE @legacy_json_default_20_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_log] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_20);
-    EXEC sys.sp_executesql @legacy_json_default_20_sql;
+  IF @legacy_json_default_22 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_22_sql nvarchar(max) = N'ALTER TABLE dbo.[authorization_log] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_22);
+    EXEC sys.sp_executesql @legacy_json_default_22_sql;
     ALTER TABLE dbo.[authorization_log] ADD CONSTRAINT [DF_authorization_log_detail] DEFAULT (N'{}') FOR [detail];
   END;
 END;
 
 IF OBJECT_ID(N'dbo.record_edits', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.record_edits', N'before_value') IS NOT NULL BEGIN
-  DECLARE @legacy_json_default_21 sysname = (
+  DECLARE @legacy_json_default_23 sysname = (
     SELECT dc.name FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.record_edits')
       AND c.name=N'before_value'
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
-  IF @legacy_json_default_21 IS NOT NULL BEGIN
-    DECLARE @legacy_json_default_21_sql nvarchar(max) = N'ALTER TABLE dbo.[record_edits] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_21);
-    EXEC sys.sp_executesql @legacy_json_default_21_sql;
+  IF @legacy_json_default_23 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_23_sql nvarchar(max) = N'ALTER TABLE dbo.[record_edits] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_23);
+    EXEC sys.sp_executesql @legacy_json_default_23_sql;
     ALTER TABLE dbo.[record_edits] ADD CONSTRAINT [DF_record_edits_before_value] DEFAULT (N'{}') FOR [before_value];
   END;
 END;
 
 IF OBJECT_ID(N'dbo.record_edits', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.record_edits', N'after_value') IS NOT NULL BEGIN
-  DECLARE @legacy_json_default_22 sysname = (
+  DECLARE @legacy_json_default_24 sysname = (
     SELECT dc.name FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.record_edits')
       AND c.name=N'after_value'
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
-  IF @legacy_json_default_22 IS NOT NULL BEGIN
-    DECLARE @legacy_json_default_22_sql nvarchar(max) = N'ALTER TABLE dbo.[record_edits] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_22);
-    EXEC sys.sp_executesql @legacy_json_default_22_sql;
+  IF @legacy_json_default_24 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_24_sql nvarchar(max) = N'ALTER TABLE dbo.[record_edits] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_24);
+    EXEC sys.sp_executesql @legacy_json_default_24_sql;
     ALTER TABLE dbo.[record_edits] ADD CONSTRAINT [DF_record_edits_after_value] DEFAULT (N'{}') FOR [after_value];
   END;
 END;
 
 IF OBJECT_ID(N'dbo.record_edits', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.record_edits', N'stock_deltas') IS NOT NULL BEGIN
-  DECLARE @legacy_json_default_23 sysname = (
+  DECLARE @legacy_json_default_25 sysname = (
     SELECT dc.name FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.record_edits')
       AND c.name=N'stock_deltas'
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
-  IF @legacy_json_default_23 IS NOT NULL BEGIN
-    DECLARE @legacy_json_default_23_sql nvarchar(max) = N'ALTER TABLE dbo.[record_edits] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_23);
-    EXEC sys.sp_executesql @legacy_json_default_23_sql;
+  IF @legacy_json_default_25 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_25_sql nvarchar(max) = N'ALTER TABLE dbo.[record_edits] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_25);
+    EXEC sys.sp_executesql @legacy_json_default_25_sql;
     ALTER TABLE dbo.[record_edits] ADD CONSTRAINT [DF_record_edits_stock_deltas] DEFAULT (N'{}') FOR [stock_deltas];
   END;
 END;
 
 IF OBJECT_ID(N'dbo.shift_close_events', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.shift_close_events', N'detail') IS NOT NULL BEGIN
-  DECLARE @legacy_json_default_24 sysname = (
+  DECLARE @legacy_json_default_26 sysname = (
     SELECT dc.name FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.shift_close_events')
       AND c.name=N'detail'
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
-  IF @legacy_json_default_24 IS NOT NULL BEGIN
-    DECLARE @legacy_json_default_24_sql nvarchar(max) = N'ALTER TABLE dbo.[shift_close_events] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_24);
-    EXEC sys.sp_executesql @legacy_json_default_24_sql;
+  IF @legacy_json_default_26 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_26_sql nvarchar(max) = N'ALTER TABLE dbo.[shift_close_events] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_26);
+    EXEC sys.sp_executesql @legacy_json_default_26_sql;
     ALTER TABLE dbo.[shift_close_events] ADD CONSTRAINT [DF_shift_close_events_detail] DEFAULT (N'{}') FOR [detail];
   END;
 END;
 
 IF OBJECT_ID(N'dbo.entity_status_history', N'U') IS NOT NULL AND COL_LENGTH(N'dbo.entity_status_history', N'metadata') IS NOT NULL BEGIN
-  DECLARE @legacy_json_default_25 sysname = (
+  DECLARE @legacy_json_default_27 sysname = (
     SELECT dc.name FROM sys.default_constraints dc
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.entity_status_history')
       AND c.name=N'metadata'
       AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
   );
-  IF @legacy_json_default_25 IS NOT NULL BEGIN
-    DECLARE @legacy_json_default_25_sql nvarchar(max) = N'ALTER TABLE dbo.[entity_status_history] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_25);
-    EXEC sys.sp_executesql @legacy_json_default_25_sql;
+  IF @legacy_json_default_27 IS NOT NULL BEGIN
+    DECLARE @legacy_json_default_27_sql nvarchar(max) = N'ALTER TABLE dbo.[entity_status_history] DROP CONSTRAINT ' + QUOTENAME(@legacy_json_default_27);
+    EXEC sys.sp_executesql @legacy_json_default_27_sql;
     ALTER TABLE dbo.[entity_status_history] ADD CONSTRAINT [DF_entity_status_history_metadata] DEFAULT (N'{}') FOR [metadata];
   END;
 END;
@@ -10429,6 +10731,7 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'activity_events', N'previous_state'),
   (N'activity_events', N'new_state'),
   (N'activity_events', N'cleared_by'),
+  (N'activity_events', N'branch_id'),
   (N'app_users', N'id'),
   (N'app_users', N'user_id'),
   (N'app_users', N'full_name'),
@@ -10447,6 +10750,8 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'app_users', N'row_version'),
   (N'app_users', N'pin_set_at'),
   (N'app_users', N'pin_updated_by'),
+  (N'app_users', N'auth_secret'),
+  (N'app_users', N'idle_timeout_minutes'),
   (N'audit_logs', N'id'),
   (N'audit_logs', N'user_name'),
   (N'audit_logs', N'action_category'),
@@ -10530,6 +10835,7 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'bookings', N'cancelled_at'),
   (N'bookings', N'cancelled_terminal'),
   (N'bookings', N'cancel_money_action'),
+  (N'bookings', N'booking_ref'),
   (N'branch_telemetry', N'terminal_id'),
   (N'branch_telemetry', N'store_id'),
   (N'branch_telemetry', N'terminal_name'),
@@ -10560,6 +10866,10 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'branch_telemetry', N'current_table'),
   (N'branch_telemetry', N'last_push_at'),
   (N'branch_telemetry', N'last_pull_at'),
+  (N'branch_telemetry', N'device_name'),
+  (N'branch_telemetry', N'device_type'),
+  (N'branch_telemetry', N'location_name'),
+  (N'branch_telemetry', N'last_heartbeat_at'),
   (N'cashiers', N'id'),
   (N'cashiers', N'username'),
   (N'cashiers', N'full_name'),
@@ -10617,6 +10927,7 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'held_orders', N'row_version'),
   (N'held_orders', N'status'),
   (N'held_orders', N'pending_request_id'),
+  (N'held_orders', N'bill_no'),
   (N'integration_settings', N'id'),
   (N'integration_settings', N'provider_name'),
   (N'integration_settings', N'api_keys_encrypted'),
@@ -10645,6 +10956,12 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'item_activity_logs', N'note'),
   (N'item_activity_logs', N'created_at'),
   (N'item_activity_logs', N'row_version'),
+  (N'item_activity_logs', N'item_id'),
+  (N'item_activity_logs', N'sale_id'),
+  (N'item_activity_logs', N'transfer_id'),
+  (N'item_activity_logs', N'quantity'),
+  (N'item_activity_logs', N'created_by'),
+  (N'item_activity_logs', N'notes'),
   (N'member_verifications', N'id'),
   (N'member_verifications', N'member_id'),
   (N'member_verifications', N'phone'),
@@ -10674,6 +10991,7 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'members', N'is_verified'),
   (N'members', N'verified_at'),
   (N'members', N'verified_channel'),
+  (N'members', N'deleted_at'),
   (N'membership_tiers', N'id'),
   (N'membership_tiers', N'name'),
   (N'membership_tiers', N'discount_percentage'),
@@ -10681,6 +10999,7 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'membership_tiers', N'created_at'),
   (N'membership_tiers', N'updated_at'),
   (N'membership_tiers', N'row_version'),
+  (N'membership_tiers', N'deleted_at'),
   (N'offline_sync_audit_log', N'id'),
   (N'offline_sync_audit_log', N'terminal_id'),
   (N'offline_sync_audit_log', N'store_id'),
@@ -10715,6 +11034,9 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'payment_transactions', N'status'),
   (N'payment_transactions', N'metadata'),
   (N'payment_transactions', N'client_transaction_id'),
+  (N'payment_transactions', N'order_id'),
+  (N'payment_transactions', N'payment_method'),
+  (N'payment_transactions', N'transaction_reference'),
   (N'payment_types', N'id'),
   (N'payment_types', N'name'),
   (N'payment_types', N'type_code'),
@@ -10772,6 +11094,9 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'pos_settings', N'row_version'),
   (N'pos_settings', N'logo_data_url'),
   (N'pos_settings', N'receipt_design'),
+  (N'pos_settings', N'payment_details'),
+  (N'pos_settings', N'whatsapp_settings'),
+  (N'pos_settings', N'receipt_css'),
   (N'product_barcodes', N'id'),
   (N'product_barcodes', N'product_id'),
   (N'product_barcodes', N'barcode'),
@@ -10781,6 +11106,8 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'product_barcodes', N'created_at'),
   (N'product_barcodes', N'updated_at'),
   (N'product_barcodes', N'row_version'),
+  (N'product_barcodes', N'unit_label'),
+  (N'product_barcodes', N'deleted_at'),
   (N'product_categories', N'id'),
   (N'product_categories', N'name'),
   (N'product_categories', N'parent_id'),
@@ -10790,6 +11117,7 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'product_categories', N'kind'),
   (N'product_categories', N'row_version'),
   (N'product_categories', N'is_active'),
+  (N'product_categories', N'deleted_at'),
   (N'products', N'id'),
   (N'products', N'barcode'),
   (N'products', N'name'),
@@ -10819,6 +11147,7 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'products', N'barcode_variants'),
   (N'products', N'row_version'),
   (N'products', N'owner_store_id'),
+  (N'products', N'deleted_at'),
   (N'promotions', N'id'),
   (N'promotions', N'title'),
   (N'promotions', N'promo_type'),
@@ -10834,6 +11163,7 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'promotions', N'created_at'),
   (N'promotions', N'updated_at'),
   (N'promotions', N'row_version'),
+  (N'promotions', N'deleted_at'),
   (N'public_flags', N'key'),
   (N'public_flags', N'enabled'),
   (N'public_flags', N'updated_at'),
@@ -10867,6 +11197,8 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'purchase_orders', N'pending_edit_request_id'),
   (N'purchase_orders', N'pending_edit_by'),
   (N'purchase_orders', N'pending_edit_at'),
+  (N'purchase_orders', N'status'),
+  (N'purchase_orders', N'reference'),
   (N'sale_items', N'id'),
   (N'sale_items', N'sale_id'),
   (N'sale_items', N'product_id'),
@@ -10885,6 +11217,7 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'sale_items', N'unit_cost'),
   (N'sale_items', N'row_version'),
   (N'sale_items', N'refunded_qty'),
+  (N'sale_items', N'branch_id'),
   (N'sales', N'id'),
   (N'sales', N'bill_number'),
   (N'sales', N'member_id'),
@@ -10923,6 +11256,7 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'sales', N'authorized_at'),
   (N'sales', N'rounding_adjustment'),
   (N'sales', N'rounding_label'),
+  (N'sales', N'branch_id'),
   (N'secure_settings', N'key'),
   (N'secure_settings', N'ciphertext'),
   (N'secure_settings', N'hint'),
@@ -11052,6 +11386,13 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'stock_transfers', N'verified_at'),
   (N'stock_transfers', N'posted_at'),
   (N'stock_transfers', N'discrepancy_reason'),
+  (N'stock_transfers', N'rejected_by'),
+  (N'stock_transfers', N'cancelled_reason'),
+  (N'stock_transfers', N'dispatched_by'),
+  (N'stock_transfers', N'dispatched_at'),
+  (N'stock_transfers', N'closed_at'),
+  (N'stock_transfers', N'fulfilment'),
+  (N'stock_transfers', N'source_request_id'),
   (N'stores', N'id'),
   (N'stores', N'code'),
   (N'stores', N'name'),
@@ -11070,6 +11411,8 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'stores', N'archived_at'),
   (N'stores', N'is_primary_sub'),
   (N'stores', N'private_catalogue'),
+  (N'stores', N'receipt_prefix'),
+  (N'stores', N'deleted_at'),
   (N'suppliers', N'id'),
   (N'suppliers', N'name'),
   (N'suppliers', N'contact_name'),
@@ -11082,6 +11425,7 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'suppliers', N'created_at'),
   (N'suppliers', N'updated_at'),
   (N'suppliers', N'row_version'),
+  (N'suppliers', N'deleted_at'),
   (N'sync_metadata', N'id'),
   (N'sync_metadata', N'store_id'),
   (N'sync_metadata', N'terminal_id'),
@@ -11136,6 +11480,17 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'terminal_tokens', N'claimed_at'),
   (N'terminal_tokens', N'platform'),
   (N'terminal_tokens', N'row_version'),
+  (N'terminal_tokens', N'claim_secret_hash'),
+  (N'terminal_tokens', N'claim_expires_at'),
+  (N'terminal_tokens', N'credentials_issued_at'),
+  (N'terminal_tokens', N'device_platform'),
+  (N'terminal_tokens', N'device_os'),
+  (N'terminal_tokens', N'claimed_proof_hash'),
+  (N'terminal_tokens', N'claimed_platform'),
+  (N'terminal_tokens', N'claimed_os'),
+  (N'terminal_tokens', N'is_claimed'),
+  (N'terminal_tokens', N'expires_at'),
+  (N'terminal_tokens', N'claim_proof'),
   (N'uom_units', N'id'),
   (N'uom_units', N'code'),
   (N'uom_units', N'name'),
@@ -11145,6 +11500,7 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'uom_units', N'updated_at'),
   (N'uom_units', N'row_version'),
   (N'uom_units', N'is_active'),
+  (N'uom_units', N'deleted_at'),
   (N'user_roles', N'id'),
   (N'user_roles', N'user_id'),
   (N'user_roles', N'role'),
@@ -11223,6 +11579,8 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'pos_store_settings', N'online_only_edit_tenders'),
   (N'pos_store_settings', N'online_only_terminal_reset'),
   (N'pos_store_settings', N'online_only_refund'),
+  (N'pos_store_settings', N'created_at'),
+  (N'pos_store_settings', N'idle_timeout_minutes'),
   (N'settings_scoped', N'scope'),
   (N'settings_scoped', N'scope_id'),
   (N'settings_scoped', N'key'),
@@ -11279,7 +11637,8 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'authorization_requests', N'status'),
   (N'authorization_requests', N'decided_by'),
   (N'authorization_requests', N'decided_by_name'),
-  (N'authorization_requests', N'decided_at'),
+  (N'authorization_requests', N'decided_at');
+INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'authorization_requests', N'decision_note'),
   (N'authorization_requests', N'expires_at'),
   (N'authorization_requests', N'consumed_at'),
@@ -11335,8 +11694,7 @@ INSERT INTO @RequiredColumns (table_name, column_name) VALUES
   (N'shift_cash_counts', N'reason'),
   (N'shift_cash_counts', N'counted_by_name'),
   (N'shift_cash_counts', N'counted_by_staff_id'),
-  (N'shift_cash_counts', N'counted_by_user_id');
-INSERT INTO @RequiredColumns (table_name, column_name) VALUES
+  (N'shift_cash_counts', N'counted_by_user_id'),
   (N'shift_cash_counts', N'client_key'),
   (N'shift_cash_counts', N'created_at'),
   (N'shift_close_events', N'id'),
