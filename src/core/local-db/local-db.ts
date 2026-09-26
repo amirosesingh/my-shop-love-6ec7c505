@@ -531,6 +531,14 @@ export type PosBridge = {
     tiers?: LocalSaleRow[];
     settings?: LocalSaleRow | null;
   }>;
+  /** Main-process notification emitted after a durable local aggregate commit. */
+  onBusinessChanged?: (
+    cb: (change: {
+      kind: "sale" | "payment" | "refund" | "shift" | "receiving" | "stock" | "transfer" | "booking" | "held_order" | "general";
+      branchId?: string | null;
+      operationId?: string | null;
+    }) => void,
+  ) => () => void;
   findReceipt?: (value: string, branchId: string, proof?: { sessionToken?: string; cashierToken?: string; accessToken?: string }) => Promise<{ source: "local" | "cloud"; sale: LocalSaleRow; items?: LocalSaleRow[]; payments?: LocalSaleRow[] } | null>;
   refundReceipt?: (value: { saleId: string; refundId: string; branchId: string; reason?: string | null }) => Promise<{ ok: boolean; replayed?: boolean; error?: string; code?: string; stage?: string | null; table?: string | null; sqlNumber?: number | null }>;
   /** Device settings stored in the branch SQL database. */

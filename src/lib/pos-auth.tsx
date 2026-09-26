@@ -33,6 +33,8 @@ import {
   notifySessionExpired,
   onSessionExpired,
 } from "@/lib/session-expiry";
+import { validateStoredAuthSession } from "@/lib/auth-session-guard";
+import { setCentralAuthSessionPresent } from "@/lib/session-presence";
 import { APP_RESUME_EVENT } from "@/core/activation/connection-health";
 import { clearAutoLockActivity, markAutoLockActivity } from "@/lib/auto-lock";
 import { bumpSessionEpoch, isCurrentEpoch, sessionEpoch } from "@/lib/session-epoch";
@@ -319,25 +321,45 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     if (!authEnabled) return;
     let active = true;
+    let bootstrapped = false;
     const { data: sub } = supabase.auth.onAuthStateChange((event, next) => {
       if (!active) return;
+      // INITIAL_SESSION is only the token restored from storage. Do not expose
+      // it to the application until getUser() has proved that its server-side
+      // session still exists. This also keeps sync/telemetry quiet on boot.
+      if (event === "INITIAL_SESSION") {
+        if (!next) setCentralAuthSessionPresent(false);
+        return;
+      }
+      if (!bootstrapped) {
+        return;
+      }
       // A refreshed token is the same sign-in continuing, not a new one: only
       // a genuine sign-in starts a new generation.
       if (next && event !== "TOKEN_REFRESHED") bumpSessionEpoch();
+      setCentralAuthSessionPresent(Boolean(next));
       setSession(next);
-      if (!next) setRoles([]);
+      if (!next) {
+        setRoles([]);
+        setAppUser(null);
+      }
     });
-    void supabase.auth
-      .getSession()
-      .then(({ data }) => {
-        if (active) setSession(data.session ?? null);
-      })
-      .catch(() => {
-        if (active) setSession(null);
-      })
-      .finally(() => {
-        if (active) setReady(true);
+    void (async () => {
+      const checked = await validateStoredAuthSession(supabase.auth, {
+        online: typeof navigator === "undefined" || navigator.onLine !== false,
       });
+      if (!active) return;
+      bootstrapped = true;
+      const next = checked.session;
+      setCentralAuthSessionPresent(Boolean(next));
+      setSession(next);
+      if (!next) {
+        setRoles([]);
+        setAppUser(null);
+      }
+      setReady(true);
+      if (checked.state === "rejected") notifySessionExpired();
+    })();
     return () => {
       active = false;
       sub.subscription.unsubscribe();
@@ -371,8 +393,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setAppUser(null);
       return;
     }
-    void supabase.rpc("current_app_user" as never).then(({ data }) => {
+    void supabase.rpc("current_app_user" as never).then(({ data, error }) => {
       if (cancelled) return;
+      if (error) {
+        setAppUser(null);
+        return;
+      }
       const row = (Array.isArray(data) ? data[0] : data) as unknown as
         | AppUserProfile
         | undefined;
@@ -840,11 +866,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const endSession = useCallback(
     async (reason: "logged-out" | "locked" | "expired", startedAt = sessionEpoch()) => {
       if (!isCurrentEpoch(startedAt)) return;
+      // Quiesce the UI and every cloud background job before revoking tokens.
+      // Otherwise timers can send authenticated work at the same instant the
+      // logout request invalidates that session, producing a burst of 401/403s.
+      const sessionToken = await loadSessionToken().catch(() => null);
+      if (!isCurrentEpoch(startedAt)) return;
       // Stamp the sign-out time on this user's open shift sessions first.
       endShiftSessions({});
+      setSessionState(reason === "locked" ? "locked" : reason);
+      setCentralAuthSessionPresent(false);
+      setSession(null);
+      setRoles([]);
+      setAppUser(null);
+      setTerminalUser(null);
+      try {
+        window.sessionStorage.removeItem(TERMINAL_KEY);
+      } catch {
+        /* ignore */
+      }
+      clearAutoLockActivity();
+      clearStoredCredentials();
       // End the session record so the token stops working everywhere at once.
       try {
-        const sessionToken = await loadSessionToken();
         if (sessionToken) await endDeviceSession({ data: { sessionToken } });
       } catch {
         /* offline — the local purge below still applies */
@@ -854,22 +897,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Signing out fires an auth change; anything newer than this teardown
       // wins and the rest is skipped.
       if (!isCurrentEpoch(startedAt)) return;
-      setSessionState(reason === "locked" ? "locked" : reason);
-      setSession(null);
-      setRoles([]);
-      setTerminalUser(null);
-      try {
-        window.sessionStorage.removeItem(TERMINAL_KEY);
-      } catch {
-        /* ignore */
-      }
-      clearAutoLockActivity();
       try {
         await window.sqlAdmin?.lockAdmin?.();
       } catch {
         /* web/Android, or a desktop bridge that is already closing */
       }
-      clearStoredCredentials();
     },
     [],
   );
@@ -1011,8 +1043,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // An account switched off by a manager must lose the till straight away, not
   // at the next sign-in. Re-checked on a timer and whenever the screen is
   // brought back into view; with no connection the check simply does not run.
+  const centralUserId = session?.user?.id ?? null;
   useEffect(() => {
-    if (!user || typeof window === "undefined") return;
+    // A PIN/offline terminal user has no Supabase bearer. Its status is
+    // enforced by the signed device session, not by an authenticated-only RPC.
+    if (!centralUserId || typeof window === "undefined") return;
     let alive = true;
     const check = async () => {
       if (document.visibilityState === "hidden") return;
@@ -1044,7 +1079,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       window.clearInterval(timer);
       document.removeEventListener("visibilitychange", check);
     };
-  }, [user, endSession]);
+  }, [centralUserId, endSession]);
 
   // Boot / resume check: before the dashboard trusts what it has, ask the
   // server whether this device's token is still live and its branch still
@@ -1063,26 +1098,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         // systems suspend timers, so validate explicitly after a foreground
         // resume; a definite token refusal expires the login, while a network
         // or server failure leaves the user's work and session untouched.
-        let current = (await supabase.auth.getSession()).data.session;
-        if (current) {
-          const expiresAt = Number(current.expires_at ?? 0) * 1000;
-          if (expiresAt > 0 && expiresAt <= Date.now() + 90_000) {
-            const refreshed = await supabase.auth.refreshSession();
-            if (refreshed.error) {
-              const status = Number((refreshed.error as { status?: number }).status ?? 0);
-              if (isTokenRejection(status, refreshed.error.message)) notifySessionExpired();
-              return;
-            }
-            current = refreshed.data.session;
-          }
-        }
-        if (current) {
-          const { error } = await supabase.auth.getUser();
-          if (error) {
-            const status = Number((error as { status?: number }).status ?? 0);
-            if (isTokenRejection(status, error.message)) notifySessionExpired();
-            return;
-          }
+        const authCheck = await validateStoredAuthSession(supabase.auth, { online: true });
+        setCentralAuthSessionPresent(Boolean(authCheck.session));
+        if (authCheck.state === "rejected") {
+          notifySessionExpired();
+          return;
         }
         const creds = await readCredentials();
         if (!creds.cashierToken && !creds.terminalToken && !creds.accessToken) return;

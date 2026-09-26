@@ -4,28 +4,12 @@
  * before anyone signs in can only produce rejected requests.
  */
 import { describe, it, expect, vi, beforeEach } from "vitest";
+import { readFileSync } from "node:fs";
 
 const tokens = vi.hoisted(() => ({ session: null as string | null, cashier: null as string | null }));
-const auth = vi.hoisted(() => ({
-  session: null as unknown,
-  handler: null as null | ((event: string, session: unknown) => void),
-}));
-
 vi.mock("@/lib/pos-credentials", () => ({
   sessionTokenSync: () => tokens.session,
   cashierTokenSync: () => tokens.cashier,
-}));
-
-vi.mock("@/integrations/supabase/external-client", () => ({
-  supabaseExternal: {
-    auth: {
-      getSession: async () => ({ data: { session: auth.session } }),
-      onAuthStateChange: (fn: (event: string, session: unknown) => void) => {
-        auth.handler = fn;
-        return { data: { subscription: { unsubscribe: () => {} } } };
-      },
-    },
-  },
 }));
 
 import { hasSignedInIdentity, __setAuthSessionForTests } from "../session-presence";
@@ -56,5 +40,12 @@ describe("hasSignedInIdentity", () => {
   it("is true for a back-office account with a central session", () => {
     __setAuthSessionForTests(true);
     expect(hasSignedInIdentity()).toBe(true);
+  });
+
+  it("does not trust an initial stored token or poll account state for a local terminal user", () => {
+    const authProvider = readFileSync("src/lib/pos-auth.tsx", "utf8");
+    expect(authProvider).toContain('if (event === "INITIAL_SESSION")');
+    expect(authProvider).toContain("if (!centralUserId || typeof window");
+    expect(authProvider).not.toContain("if (!user || typeof window");
   });
 });

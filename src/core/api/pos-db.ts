@@ -641,7 +641,16 @@ const rowToSale = (r: Row): Sale => ({
   paid: num(r.paid_amount),
   change: num(r.change_amount),
   method: (r.payment_type ?? "cash") as PaymentMethod,
-  payments: Array.isArray(r.payments) ? (r.payments as Sale["payments"]) : undefined,
+  payments: (() => {
+    if (Array.isArray(r.payments)) return r.payments as Sale["payments"];
+    if (typeof r.payments !== "string" || !r.payments.trim()) return undefined;
+    try {
+      const parsed = JSON.parse(r.payments);
+      return Array.isArray(parsed) ? (parsed as Sale["payments"]) : undefined;
+    } catch {
+      return undefined;
+    }
+  })(),
   memberId: r.member_id ?? null,
   pointsEarned: num(r.points_earned),
   cashier: r.cashier_name ?? "",
@@ -1116,6 +1125,15 @@ async function loadLocalState(cause: unknown): Promise<CloudSlice> {
     stores: (result.stores ?? []).map(rowToStore),
     shifts: (result.shifts ?? []).map(rowToShift),
   };
+}
+
+/** Read the current branch's complete receipt graphs from Electron SQL Server. */
+export async function loadLocalSales(): Promise<Sale[]> {
+  const bridge = localDb();
+  if (!bridge?.snapshot) return [];
+  const result = await bridge.snapshot();
+  if (!result.ok) throw new Error(result.error ?? "Could not read local sales.");
+  return (result.sales ?? []).map(rowToSale);
 }
 
 /* ------------------------------- writers ------------------------------- */

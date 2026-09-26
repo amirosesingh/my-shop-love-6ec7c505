@@ -36,6 +36,7 @@ describe("session rejection detection", () => {
   it("expires definite authentication failures", () => {
     expect(isTokenRejection(401, "Unauthorized")).toBe(true);
     expect(isTokenRejection(403, "JWT expired")).toBe(true);
+    expect(isTokenRejection(403, "Session not found")).toBe(true);
     expect(isTokenRejection(400, "refresh_token_not_found")).toBe(true);
   });
 

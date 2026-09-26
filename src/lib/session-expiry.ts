@@ -35,7 +35,7 @@ export function notifySessionExpired(): void {
 
 /** PostgREST / GoTrue codes that mean "this token is no longer valid". */
 const JWT_HINTS =
-  /(pgrst301|pgrst303|jwt expired|invalid jwt|jwt is expired|invalid claim|bad_jwt|token is expired|session_not_found|user_not_found|invalid token|refresh[_ ]token.*(?:missing|not[_ ]found|already[_ ]used|invalid|expired))/i;
+  /(pgrst301|pgrst303|jwt expired|invalid jwt|jwt is expired|invalid claim|bad_jwt|token is expired|session[_ ]not[_ ]found|user[_ ]not[_ ]found|invalid token|refresh[_ ]token.*(?:missing|not[_ ]found|already[_ ]used|invalid|expired))/i;
 
 /**
  * True when the answer proves the caller's token is missing, stale or revoked.

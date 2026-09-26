@@ -13,29 +13,16 @@
  *   • a cashier signed in on a till (session token)
  *   • the till itself, holding a cashier token from an earlier sign-in
  */
-import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { cashierTokenSync, sessionTokenSync } from "./pos-credentials";
 
 let authSession = false;
-let watching = false;
 
-/** Start listening once, lazily, so importing this module costs nothing. */
-function watch() {
-  if (watching || typeof window === "undefined") return;
-  watching = true;
-  try {
-    void supabaseExternal.auth
-      .getSession()
-      .then(({ data }) => {
-        authSession = Boolean(data.session);
-      })
-      .catch(() => {});
-    supabaseExternal.auth.onAuthStateChange((_event, session) => {
-      authSession = Boolean(session);
-    });
-  } catch {
-    /* no central configuration yet — treated as signed out */
-  }
+/**
+ * AuthProvider is the authority for this flag. In particular, a persisted
+ * token is not counted until its server-side session has been checked.
+ */
+export function setCentralAuthSessionPresent(value: boolean): void {
+  authSession = value;
 }
 
 /**
@@ -45,12 +32,10 @@ function watch() {
  */
 export function hasSignedInIdentity(): boolean {
   if (typeof window === "undefined") return false;
-  watch();
   return authSession || Boolean(sessionTokenSync()) || Boolean(cashierTokenSync());
 }
 
 /** Test seam. */
 export function __setAuthSessionForTests(value: boolean) {
-  authSession = value;
-  watching = true;
+  setCentralAuthSessionPresent(value);
 }

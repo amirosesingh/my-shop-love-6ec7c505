@@ -73,6 +73,13 @@ const aggregateRepository = new AggregateRepository(databaseManager, operationsR
 const receiptRepository = new ReceiptRepository(databaseManager, syncCloud);
 const localStaffStore = createLocalStaffStore(configStore);
 
+function publishBusinessChange(change){
+  for(const win of BrowserWindow.getAllWindows()){
+    try{if(!win.isDestroyed()&&!win.webContents.isDestroyed())win.webContents.send("business:changed",change);}
+    catch{/* the commit remains successful if a renderer is closing */}
+  }
+}
+
 function localBranchId(){
   const terminal=terminalStore.read()??{};
   return [terminal.locationId,terminal.storeId,terminal.branchId,adminSession.branchId()]
@@ -787,6 +794,7 @@ function registerIpc() {
     const aggregate=guard.aggregate(value);
     try {
       const result=await aggregateRepository.commit(aggregate.kind,aggregate);
+      publishBusinessChange({kind:aggregate.kind,branchId:aggregate.branchId??localBranchId(),operationId:result.operationId??null});
       scheduleAutomaticSync(250);
       return result;
     } catch(error) {

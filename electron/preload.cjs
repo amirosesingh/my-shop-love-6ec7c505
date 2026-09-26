@@ -18,6 +18,11 @@ contextBridge.exposeInMainWorld("pos", {
   writeBatch: (context, ops) => invoke("business:write-batch", context, ops),
   commitAggregate: (aggregate) => invoke("business:commit-aggregate", aggregate),
   snapshot: () => invoke("business:snapshot"),
+  onBusinessChanged: (cb) => {
+    const handler = (_event, payload) => cb(payload);
+    ipcRenderer.on("business:changed", handler);
+    return () => ipcRenderer.removeListener("business:changed", handler);
+  },
   findReceipt: (value, branchId, proof) => invoke("receipts:find-exact", value, branchId, proof),
   refundReceipt: (value) => invoke("receipts:refund", value),
   database: {
