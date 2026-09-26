@@ -93,7 +93,11 @@ export function ItemActivityDrawer({
       ]);
 
       if (!live) return;
-      setSource("cloud");
+      setSource(
+        [adjustments, transfers, meta, merges, movements].some((result) => result.source === "local")
+          ? "local"
+          : "cloud",
+      );
       const list: Movement[] = [
         ...(movements.rows as LooseRow[]).map((r) => ({
           id: `mov-${r.id}`,

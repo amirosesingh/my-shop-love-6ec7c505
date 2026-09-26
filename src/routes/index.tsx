@@ -1284,6 +1284,15 @@ function Register() {
           visible("register.closeShift")
             ? async () => {
                 if (!(await requirePermission("can_close_shift"))) return;
+                const grant = await authorize({
+                  action: "shift_close",
+                  title: "Authorise shift close",
+                  reason: "Closing the shift produces the final drawer count and Z report.",
+                  storeId: currentStore.id,
+                  terminalId: terminalKey,
+                  requestedBy: user?.staffId ?? user?.name ?? null,
+                });
+                if (!grant.ok) return;
                 setCloseShiftOpen(true);
               }
             : undefined

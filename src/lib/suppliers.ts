@@ -7,11 +7,8 @@
  * connection.
  */
 import { readBusinessValue, writeBusinessValue } from "./business-storage";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { commitOps } from "@/core/api/pos-db";
-
-const sb = supabaseExternal as unknown as SupabaseClient;
+import { routedQuery } from "@/core/api/db-query";
 
 export type Supplier = {
   id: string;
@@ -75,9 +72,10 @@ export function cachedSuppliers(): Supplier[] {
 
 /** Central list, newest first. Falls back to the offline cache. */
 export async function loadSuppliers(): Promise<Supplier[]> {
-  const res = await sb.from("suppliers").select("*").is("deleted_at", null).order("name");
-  if (res.error) return cachedSuppliers();
-  const list = ((res.data as Row[] | null) ?? []).map(toSupplier);
+  let rows: Row[];
+  try { rows = await routedQuery("suppliers", { match: { deleted_at: null }, orderBy: { column: "name" }, limit: 2000 }) as Row[]; }
+  catch { return cachedSuppliers(); }
+  const list = rows.map(toSupplier);
   cache(list);
   return list;
 }

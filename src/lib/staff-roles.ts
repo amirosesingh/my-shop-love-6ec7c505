@@ -6,8 +6,8 @@
  * permission checklist on a person's record can always be tuned afterwards,
  * and doing so marks that person as holding "Custom permissions".
  */
+import { routedQuery } from "@/core/api/db-query";
 import type { SupabaseClient } from "@supabase/supabase-js";
-
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import {
   PERMISSION_KEYS,
@@ -70,10 +70,10 @@ function mapRow(r: Record<string, unknown>): RoleDef {
 }
 
 export async function listStaffRoles(): Promise<RoleDef[]> {
-  const { data, error } = await sb.from("staff_roles").select("*").order("name");
-  // Older databases have no roles table yet — the built-ins still work.
-  if (error) return CORE_ROLES;
-  const rows = ((data ?? []) as Record<string, unknown>[]).map(mapRow);
+  let data: Record<string, unknown>[];
+  try { data = await routedQuery("staff_roles", { orderBy: { column: "name" }, limit: 500 }) as Record<string, unknown>[]; }
+  catch { return CORE_ROLES; }
+  const rows = data.map(mapRow);
   const roles = rows.length ? rows : CORE_ROLES;
   // Keep the resolver working with no connection.
   cacheRoleDefinitions(roles);

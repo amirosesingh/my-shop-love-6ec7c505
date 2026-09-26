@@ -20,6 +20,7 @@ type Guard = {
     branchId?: string;
     operations: Array<Record<string, unknown>>;
   };
+  queryOptions: (value: unknown) => Record<string, unknown>;
 };
 
 let guard: Guard;
@@ -114,6 +115,20 @@ describe("desktop bridge arguments", () => {
     };
 
     expect(guard.aggregate(value)).toEqual(value);
+  });
+
+  it("accepts bounded business queries and refuses nested executable shapes", () => {
+    expect(guard.queryOptions({
+      columns: "id,created_at",
+      match: { store_id: "branch-1", status: "OPEN" },
+      in: { column: "id", values: ["one", "two"] },
+      orderBy: { column: "created_at", ascending: false },
+      limit: 200,
+      offset: 0,
+    })).toMatchObject({ limit: 200, offset: 0 });
+    expect(() => guard.queryOptions({ rawSql: "SELECT * FROM secure_settings" })).toThrow();
+    expect(() => guard.queryOptions({ match: { id: { $ne: null } } })).toThrow();
+    expect(() => guard.queryOptions({ limit: Number.MAX_SAFE_INTEGER })).toThrow();
   });
 
   it("keeps the aggregate envelope closed to unexpected fields", () => {

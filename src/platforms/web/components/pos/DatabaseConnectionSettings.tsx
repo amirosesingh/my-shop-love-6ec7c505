@@ -35,7 +35,7 @@ export function DatabaseConnectionSettings() {
           label="Central database"
           value={status.connectivity === "online" ? "Reachable" : status.label}
         />
-        <Stat label="Writing to" value="Central database" />
+        <Stat label="Writing to" value={isWindowsShell() ? "Local SQL Server" : "Central database"} />
       </div>
 
       <CloudConnectionPanel />

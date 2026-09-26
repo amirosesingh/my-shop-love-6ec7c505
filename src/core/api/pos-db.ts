@@ -494,21 +494,11 @@ const shiftToRow = (s: Shift): Row => ({
   closed_by_staff_id: s.closedByStaffId ?? null,
   closed_by_role: s.closedByRole ?? null,
   opened_at: s.openedAt,
-  closed_at: s.closedAt,
   opening_float: s.openingFloat,
-  counted_cash: s.countedCash,
-  closing_float: s.closingFloat ?? s.countedCash ?? null,
   user_id: s.userId ?? null,
-  status: s.status ?? (s.closedAt ? "CLOSED" : "OPEN"),
-  expected_cash: s.expectedCash ?? null,
-  counted_card: s.countedCard ?? null,
-  counted_digital: s.countedDigital ?? null,
-  expected_card: s.expectedCard ?? null,
-  expected_digital: s.expectedDigital ?? null,
-  variance_cash: s.varianceCash ?? null,
-  variance_card: s.varianceCard ?? null,
-  variance_digital: s.varianceDigital ?? null,
-  variance_total: s.varianceTotal ?? null,
+  // Closing lifecycle, counts, expected totals and variances belong to the
+  // controlled shift workflow. A later UI mirror must not overwrite those
+  // database-owned values with a stale in-memory null.
   note: s.note,
   overdue: s.overdue ?? false,
   updated_at: new Date().toISOString(),
@@ -1091,45 +1081,26 @@ export async function loadPrimaryState(storeId?: string | null): Promise<CloudSl
 
 /** Refresh a settings notification without downloading the whole POS state. */
 export async function loadCloudSettings(): Promise<AppSettings> {
-  const { data, error } = await supabase.from("pos_settings").select("*").eq("id", 1).maybeSingle();
-  if (error) throw error;
-  return rowToSettings(data as Row | null);
+  const rows = await routedQuery("pos_settings", { match: { id: 1 }, limit: 1 });
+  return rowToSettings((rows[0] as Row | undefined) ?? null);
 }
 
 /** Fetch one changed catalogue row after a Realtime invalidation. */
 export async function loadCloudProduct(id: string): Promise<Product | null> {
-  const { data, error } = await supabase
-    .from("products")
-    .select("*")
-    .eq("id", id)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (error) throw error;
-  return data ? rowToProduct(data as Row) : null;
+  const rows = await routedQuery("products", { match: { id, deleted_at: null }, limit: 1 });
+  return rows[0] ? rowToProduct(rows[0] as Row) : null;
 }
 
 /** Fetch one changed member without re-reading the full member directory. */
 export async function loadCloudMember(id: string): Promise<Member | null> {
-  const { data, error } = await supabase
-    .from("members")
-    .select("*")
-    .eq("id", id)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (error) throw error;
-  return data ? rowToMember(data as Row, tierName) : null;
+  const rows = await routedQuery("members", { match: { id, deleted_at: null }, limit: 1 });
+  return rows[0] ? rowToMember(rows[0] as Row, tierName) : null;
 }
 
 /** Fetch one changed promotion without re-reading the full promotion set. */
 export async function loadCloudPromotion(id: string): Promise<Promotion | null> {
-  const { data, error } = await supabase
-    .from("promotions")
-    .select("*")
-    .eq("id", id)
-    .is("deleted_at", null)
-    .maybeSingle();
-  if (error) throw error;
-  return data ? rowToPromotion(data as Row) : null;
+  const rows = await routedQuery("promotions", { match: { id, deleted_at: null }, limit: 1 });
+  return rows[0] ? rowToPromotion(rows[0] as Row) : null;
 }
 
 async function loadLocalState(cause: unknown): Promise<CloudSlice> {
@@ -1181,12 +1152,19 @@ export async function loadLocalSales(): Promise<Sale[]> {
  * The open shift according to this terminal's own copy. `undefined` means the
  * terminal has no copy to answer with, which is different from "no shift".
  */
-function localOpenShift(storeId: string): Shift | null | undefined {
-  void storeId;
-  return undefined;
+async function localOpenShift(storeId: string): Promise<Shift | null | undefined> {
+  if (!localDb()?.query) return undefined;
+  const rows = await routedQuery("shifts", {
+    match: { store_id: storeId, status: "OPEN" },
+    orderBy: { column: "opened_at", ascending: false },
+    limit: 1,
+  });
+  return rows[0] ? rowToShift(rows[0] as Row) : null;
 }
 
 export async function loadActiveShift(storeId: string): Promise<Shift | null> {
+  const local = await localOpenShift(storeId);
+  if (local !== undefined) return local;
   // A cashier signed in with a PIN has no account on the central database, so
   // the direct read is refused or filtered out. The proven server relay answers
   // for those tills — without it the register would flip back to "locked"
@@ -1219,13 +1197,13 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
   }
 
   if (!canRelay()) {
-    const local = localOpenShift(storeId);
+    const local = await localOpenShift(storeId);
     if (local !== undefined) return local;
     throw new Error("This till cannot read the central database yet");
   }
   const relayed = await relayActiveShift(storeId);
   if (!relayed.ok) {
-    const local = localOpenShift(storeId);
+    const local = await localOpenShift(storeId);
     if (local !== undefined) return local;
     throw new Error(relayed.error ?? "Could not read the open shift");
   }
@@ -1239,6 +1217,11 @@ export async function loadActiveShift(storeId: string): Promise<Shift | null> {
  * caller falls back to the usual local/offline commit path.
  */
 export async function openShiftOnServer(s: Shift): Promise<Shift | null> {
+  // A desktop till is local-first even while the network is healthy. Writing
+  // the cloud first here made shift opening depend on internet latency and
+  // bypassed SQL Server Change Tracking. The normal commit path below stores
+  // it locally and the background coordinator publishes it afterwards.
+  if (localDb()?.writeBatch) return null;
   if (!hasStaffSession()) return null;
   try {
     const res = await supabase.rpc(
@@ -1275,6 +1258,26 @@ export async function loadSalesPage(
   cursor: Cursor = null,
   limit = PAGE_SIZE,
 ): Promise<Page<Sale>> {
+  if (localDb()?.query) {
+    const heads = await routedQuery("sales", {
+      match: { store_id: storeId },
+      orderBy: { column: "created_at", ascending: false },
+      ...(cursor ? { cursor: { column: "created_at", value: cursor.ts, id: cursor.id } } : {}),
+      limit,
+    }) as Row[];
+    const items: Row[] = [];
+    const ids = heads.map((row) => String(row.id));
+    for (let start = 0; start < ids.length; start += 50) {
+      items.push(...await routedQuery("sale_items", { in: { column: "sale_id", values: ids.slice(start, start + 50) }, limit: 2000 }) as Row[]);
+    }
+    const bySale = new Map<string, Row[]>();
+    for (const item of items) {
+      const saleId = String(item.sale_id);
+      bySale.set(saleId, [...(bySale.get(saleId) ?? []), item]);
+    }
+    const complete = heads.map((row) => ({ ...row, sale_items: bySale.get(String(row.id)) ?? [] }));
+    return { rows: complete.map(rowToSale), cursor: nextCursor(complete, "created_at", limit), hasMore: complete.length >= limit };
+  }
   const query = () => {
     let q = supabase.from("sales").select(saleColumns());
     if (storeId) q = q.eq("store_id", storeId) as typeof q;
@@ -1467,9 +1470,14 @@ export async function invoiceNumberTaken(invoiceNo: string, exceptId?: string): 
 /** Latest catalogue rows for a set of products, straight from the database. */
 export async function loadProductsByIds(ids: string[]): Promise<Product[]> {
   if (!ids.length) return [];
-  const res = await supabase.from("products").select("*").in("id", ids);
-  if (res.error) throw new Error(res.error.message);
-  return ((res.data as Row[] | null) ?? []).map(rowToProduct);
+  const rows: Row[] = [];
+  for (let start = 0; start < ids.length; start += 500) {
+    rows.push(...await routedQuery("products", {
+      in: { column: "id", values: ids.slice(start, start + 500) },
+      limit: 500,
+    }) as Row[]);
+  }
+  return rows.map(rowToProduct);
 }
 
 /**
@@ -1879,6 +1887,23 @@ export const db = {
       details: Record<string, unknown>;
     }[],
   ) {
+    if (localDb()?.writeBatch) {
+      await commitOps("Saving audit logs", [{
+        kind: "upsert",
+        table: "audit_logs",
+        rows: rows.map((r) => ({
+          id: r.id,
+          user_name: r.staffName,
+          action_category: r.category,
+          action_name: r.action,
+          target_module: r.module,
+          details: r.details,
+          store_id: typeof r.details.storeId === "string" ? r.details.storeId : null,
+          created_at: r.at,
+        })),
+      }]);
+      return rows.map((r) => r.id);
+    }
     const { error } = await supabase.from("audit_logs").upsert(
       rows.map((r) => ({
         id: r.id,

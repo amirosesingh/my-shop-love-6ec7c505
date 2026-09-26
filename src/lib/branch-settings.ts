@@ -60,6 +60,7 @@ export async function loadBranchSettings(ids: ScopeIds, strict = false): Promise
           columns: "section,patch",
           match: { scope: tier, scope_id: scopeId },
           orderBy: { column: "section", ascending: true },
+          limit: 200,
         });
         return { tier, rows: rows as unknown as OverrideRow[] };
       }),
@@ -74,6 +75,7 @@ export async function loadBranchSettings(ids: ScopeIds, strict = false): Promise
     const locks = await dbRouter.query("settings_locks", {
       columns: "section,locked",
       orderBy: { column: "section", ascending: true },
+      limit: 200,
     });
     for (const row of locks as unknown as LockRow[]) {
       state.locks[row.section as SettingsSectionId] = !!row.locked;

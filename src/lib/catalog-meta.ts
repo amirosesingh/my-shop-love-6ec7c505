@@ -7,12 +7,10 @@
  */
 import { readBusinessValue, writeBusinessValue } from "./business-storage";
 import { useEffect, useState } from "react";
-import { supabaseExternal } from "@/integrations/supabase/external-client";
 import type { CatalogKind, ProductCategory, UomUnit } from "@/core/types/pos-types";
 import { tombstone } from "./tombstones";
-
-/** Table names are shared with the POS project's generated types. */
-const supabase = supabaseExternal;
+import { routedQuery } from "@/core/api/db-query";
+import { commitOps } from "@/core/api/pos-db";
 
 const CAT_KEY = "pos.catalog.categories";
 const UOM_KEY = "pos.catalog.units";
@@ -60,13 +58,13 @@ export const readUnits = () => {
 
 export async function loadCatalogMeta() {
   const [cats, units] = await Promise.all([
-    supabase.from("product_categories").select("*").is("deleted_at", null).order("sort"),
-    supabase.from("uom_units").select("*").is("deleted_at", null).order("sort"),
+    routedQuery("product_categories", { match: { deleted_at: null }, orderBy: { column: "sort" }, limit: 2000 }),
+    routedQuery("uom_units", { match: { deleted_at: null }, orderBy: { column: "sort" }, limit: 2000 }),
   ]);
-  if (!cats.error && cats.data) {
+  if (cats) {
     writeLocal(
       CAT_KEY,
-      cats.data.map((r) => ({
+      cats.map((r) => ({
         id: r.id as string,
         name: r.name as string,
         kind: ((r as { kind?: string }).kind as CatalogKind) ?? "category",
@@ -76,10 +74,10 @@ export async function loadCatalogMeta() {
       })),
     );
   }
-  if (!units.error && units.data?.length) {
+  if (units.length) {
     writeLocal(
       UOM_KEY,
-      units.data.map((r) => ({
+      units.map((r) => ({
         id: r.id as string,
         code: r.code as string,
         name: r.name as string,
@@ -92,22 +90,18 @@ export async function loadCatalogMeta() {
 }
 
 export async function saveCategory(cat: Omit<ProductCategory, "id"> & { id?: string }) {
+  const id = cat.id ?? crypto.randomUUID();
   const row = {
-    ...(cat.id ? { id: cat.id } : {}),
+    id,
     name: cat.name,
     kind: cat.kind ?? "category",
     parent_id: cat.parentId ?? null,
     sort: cat.sort ?? 0,
     is_active: cat.active !== false,
   };
-  const { data, error } = await supabase
-    .from("product_categories")
-    .upsert(row)
-    .select()
-    .maybeSingle();
-  if (error) throw error;
+  await commitOps("Saving product category", [{ kind: "upsert", table: "product_categories", rows: [row] }]);
   const saved: ProductCategory = {
-    id: (data?.id as string) ?? cat.id ?? crypto.randomUUID(),
+    id,
     name: cat.name,
     kind: cat.kind ?? "category",
     parentId: cat.parentId ?? null,
@@ -120,11 +114,7 @@ export async function saveCategory(cat: Omit<ProductCategory, "id"> & { id?: str
 }
 
 export async function deleteCategory(id: string) {
-  const { error } = await supabase
-    .from("product_categories")
-    .update(tombstone())
-    .eq("id", id);
-  if (error) throw error;
+  await commitOps("Archiving product category", [{ kind: "update", table: "product_categories", values: tombstone(), match: { id } }]);
   writeLocal(
     CAT_KEY,
     readCategories().filter((c) => c.id !== id && c.parentId !== id),
@@ -132,22 +122,18 @@ export async function deleteCategory(id: string) {
 }
 
 export async function saveUnit(unit: Omit<UomUnit, "id"> & { id?: string }) {
+  const id = unit.id?.includes("-") ? unit.id : crypto.randomUUID();
   const row = {
-    ...(unit.id && unit.id.includes("-") ? { id: unit.id } : {}),
+    id,
     code: unit.code.trim().toLowerCase(),
     name: unit.name,
     allow_decimal: unit.allowDecimal,
     sort: unit.sort ?? 0,
     is_active: unit.active !== false,
   };
-  const { data, error } = await supabase
-    .from("uom_units")
-    .upsert(row, { onConflict: "code" })
-    .select()
-    .maybeSingle();
-  if (error) throw error;
+  await commitOps("Saving unit of measure", [{ kind: "upsert", table: "uom_units", rows: [row] }]);
   const saved: UomUnit = {
-    id: (data?.id as string) ?? unit.id ?? crypto.randomUUID(),
+    id,
     code: row.code,
     name: unit.name,
     allowDecimal: unit.allowDecimal,
@@ -160,12 +146,7 @@ export async function saveUnit(unit: Omit<UomUnit, "id"> & { id?: string }) {
 }
 
 export async function deleteUnit(id: string, code: string) {
-  if (id.includes("-")) {
-    const { error } = await supabase.from("uom_units").update(tombstone()).eq("id", id);
-    if (error) throw error;
-  } else {
-    await supabase.from("uom_units").update(tombstone()).eq("code", code);
-  }
+  await commitOps("Archiving unit of measure", [{ kind: "update", table: "uom_units", values: tombstone(), match: id.includes("-") ? { id } : { code } }]);
   writeLocal(
     UOM_KEY,
     readUnits().filter((u) => u.code !== code),

@@ -28,6 +28,7 @@
     "native:rebuild": "electron-rebuild -f -w msnodesqlv8",
     "verify:sqlserver-schema": "node scripts/verify-sqlserver-schema.cjs",
     "verify:sync-registry": "node scripts/verify-sync-registry.cjs",
+    "audit:sync": "node scripts/generate-sync-audit.cjs",
     "smoke:windows": "node scripts/windows-package-smoke.cjs",
     "verify:merge": "node scripts/merge-readiness.cjs",
     "test": "vitest run",

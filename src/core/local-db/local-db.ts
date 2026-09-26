@@ -548,6 +548,28 @@ export type PosBridge = {
     tiers?: LocalSaleRow[];
     settings?: LocalSaleRow | null;
   }>;
+  /** Branch-scoped, read-only query against this Electron terminal's SQL Server. */
+  query?: (
+    table: string,
+    options?: {
+      columns?: string;
+      match?: Record<string, unknown>;
+      in?: { column: string; values: unknown[] };
+      orderBy?: { column: string; ascending?: boolean };
+      limit?: number;
+      offset?: number;
+      cursor?: { column: string; value: string; id: string };
+    },
+  ) => Promise<{ ok: boolean; rows?: LocalSaleRow[]; error?: string; code?: string }>;
+  /** Constant-memory SQL aggregation used by the blind shift-close workflow. */
+  shiftExpectedTotals?: (shiftId: string) => Promise<{
+    ok: boolean;
+    expected_cash?: number;
+    expected_card?: number;
+    expected_digital?: number;
+    error?: string;
+    code?: string;
+  }>;
   /** Main-process notification emitted after a durable local aggregate commit. */
   onBusinessChanged?: (
     cb: (change: {

@@ -647,7 +647,11 @@ function printHtml(title: string, body: string, slip = true, barcode?: string) {
       return;
     }
     if (!printed.ok) toast.error("Printing failed", { description: printed.error });
-  })();
+  })().catch((error: unknown) => {
+    toast.error("Printing failed", {
+      description: error instanceof Error ? error.message : "The printer did not accept the receipt.",
+    });
+  });
 }
 
 function browserPrint(html: string) {
@@ -1066,5 +1070,9 @@ export function openCashDrawer(reason = "Cash drawer opened") {
         `<pre style="font-size:1px;line-height:1px">${kick}</pre><div class="c muted">${esc(reason)}</div>`,
       ),
     );
+  }).catch((error: unknown) => {
+    toast.error("Drawer did not open", {
+      description: error instanceof Error ? error.message : "The printer connection failed.",
+    });
   });
 }

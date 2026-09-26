@@ -11,6 +11,9 @@ import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { r2 } from "@/core/types/pos-types";
 import { keyset, nextCursor, PAGE_SIZE, type Cursor, type Page } from "./keyset";
 import { describeError } from "./notify";
+import { routedQuery } from "@/core/api/db-query";
+import { commitOps } from "@/core/api/pos-db";
+import { localDb } from "@/core/local-db/local-db";
 
 const sb = supabaseExternal as unknown as SupabaseClient;
 
@@ -197,12 +200,8 @@ export const slugify = (s: string) =>
 
 export async function loadCampaigns(): Promise<Campaign[]> {
   try {
-    const res = await sb
-      .from("coupon_campaigns")
-      .select("*")
-      .order("created_at", { ascending: false });
-    if (res.error) throw new Error(res.error.message);
-    return ((res.data as Row[] | null) ?? []).map(toCampaign);
+    const rows = await routedQuery("coupon_campaigns", { orderBy: { column: "created_at", ascending: false }, limit: 2000 });
+    return rows.map((row) => toCampaign(row as Row));
   } catch (e) {
     logRead("loadCampaigns", e);
     return [];
@@ -211,8 +210,7 @@ export async function loadCampaigns(): Promise<Campaign[]> {
 
 export async function saveCampaign(c: Campaign): Promise<CouponResult> {
   try {
-    const res = await sb.from("coupon_campaigns").upsert(toRow(c) as never);
-    if (res.error) throw new Error(res.error.message);
+    await commitOps("Saving coupon campaign", [{ kind: "upsert", table: "coupon_campaigns", rows: [toRow(c)] }]);
     return { success: true };
   } catch (e) {
     return { success: false, error: describeError(e, "Saving the campaign") };
@@ -221,8 +219,7 @@ export async function saveCampaign(c: Campaign): Promise<CouponResult> {
 
 export async function deleteCampaign(id: string): Promise<CouponResult> {
   try {
-    const res = await sb.from("coupon_campaigns").delete().eq("id", id);
-    if (res.error) throw new Error(res.error.message);
+    await commitOps("Deleting coupon campaign", [{ kind: "delete", table: "coupon_campaigns", match: { id } }]);
     return { success: true };
   } catch (e) {
     return { success: false, error: describeError(e, "Deleting the campaign") };
@@ -231,9 +228,8 @@ export async function deleteCampaign(id: string): Promise<CouponResult> {
 
 export async function loadCampaignBySlug(slug: string): Promise<Campaign | null> {
   try {
-    const res = await sb.from("coupon_campaigns").select("*").eq("slug", slug).maybeSingle();
-    if (res.error) throw new Error(res.error.message);
-    return res.data ? toCampaign(res.data as Row) : null;
+    const rows = await routedQuery("coupon_campaigns", { match: { slug }, limit: 1 });
+    return rows[0] ? toCampaign(rows[0] as Row) : null;
   } catch (e) {
     logRead("loadCampaignBySlug", e);
     return null;
@@ -242,11 +238,8 @@ export async function loadCampaignBySlug(slug: string): Promise<Campaign | null>
 
 export async function loadVouchers(campaignId?: string): Promise<Voucher[]> {
   try {
-    let q = sb.from("issued_vouchers").select("*").order("issued_at", { ascending: false });
-    if (campaignId) q = q.eq("campaign_id", campaignId);
-    const res = await q;
-    if (res.error) throw new Error(res.error.message);
-    return ((res.data as Row[] | null) ?? []).map(toVoucher);
+    const rows = await routedQuery("issued_vouchers", { ...(campaignId ? { match: { campaign_id: campaignId } } : {}), orderBy: { column: "issued_at", ascending: false }, limit: 2000 });
+    return rows.map((row) => toVoucher(row as Row));
   } catch (e) {
     logRead("loadVouchers", e);
     return [];
@@ -269,6 +262,36 @@ export type VoucherView = {
  */
 export async function loadVoucherByToken(token: string): Promise<VoucherView | null> {
   try {
+    if (localDb()?.query) {
+      const voucherRows = await routedQuery("issued_vouchers", {
+        match: { token_slug: token },
+        limit: 1,
+      });
+      const voucherRow = voucherRows[0] as Row | undefined;
+      if (!voucherRow) return null;
+      const [campaignRows, memberRows] = await Promise.all([
+        routedQuery("coupon_campaigns", {
+          match: { id: voucherRow.campaign_id },
+          limit: 1,
+        }),
+        voucherRow.member_id
+          ? routedQuery("members", {
+              columns: "id,full_name,member_code",
+              match: { id: voucherRow.member_id },
+              limit: 1,
+            })
+          : Promise.resolve([]),
+      ]);
+      const campaignRow = campaignRows[0] as Row | undefined;
+      if (!campaignRow) return null;
+      const member = memberRows[0] as Row | undefined;
+      return {
+        voucher: toVoucher(voucherRow),
+        campaign: toCampaign(campaignRow),
+        memberName: String(member?.full_name ?? "Retail member"),
+        memberCode: String(member?.member_code ?? ""),
+      };
+    }
     const res = await sb.rpc("voucher_by_token", { _token: token });
     if (res.error) throw new Error(res.error.message);
     const row = ((res.data as Row[] | null) ?? [])[0];
@@ -288,19 +311,21 @@ export async function loadVoucherByToken(token: string): Promise<VoucherView | n
 /** Member's live vouchers, campaign included, for the register. */
 export async function loadMemberVouchers(memberId: string): Promise<VoucherView[]> {
   try {
-    const res = await sb
-      .from("issued_vouchers")
-      .select("*, coupon_campaigns(*), members(full_name, member_code)")
-      .eq("member_id", memberId)
-      .eq("status", "ISSUED");
-    if (res.error) throw new Error(res.error.message);
-    return ((res.data as Row[] | null) ?? [])
-      .filter((r) => r.coupon_campaigns)
+    const [vouchers, memberRows] = await Promise.all([
+      routedQuery("issued_vouchers", { match: { member_id: memberId, status: "ISSUED" }, orderBy: { column: "issued_at", ascending: false }, limit: 500 }),
+      routedQuery("members", { columns: "id,full_name,member_code", match: { id: memberId }, limit: 1 }),
+    ]);
+    const campaignIds = [...new Set(vouchers.map((row) => String(row.campaign_id)))];
+    const campaigns = campaignIds.length ? await routedQuery("coupon_campaigns", { in: { column: "id", values: campaignIds }, limit: 500 }) : [];
+    const byCampaign = new Map(campaigns.map((row) => [String(row.id), row]));
+    const member = memberRows[0];
+    return vouchers
+      .filter((r) => byCampaign.has(String(r.campaign_id)))
       .map((r) => ({
         voucher: toVoucher(r),
-        campaign: toCampaign(r.coupon_campaigns as Row),
-        memberName: r.members?.full_name ?? "",
-        memberCode: r.members?.member_code ?? "",
+        campaign: toCampaign(byCampaign.get(String(r.campaign_id)) as Row),
+        memberName: String(member?.full_name ?? ""),
+        memberCode: String(member?.member_code ?? ""),
       }))
       .filter((v) => !isVoucherExpired(v.voucher, v.campaign));
   } catch (e) {
@@ -324,6 +349,16 @@ export async function loadCouponEvents(
   opts: { campaignId?: string; cursor?: Cursor; limit?: number } = {},
 ): Promise<Page<CouponEvent>> {
   const limit = opts.limit ?? PAGE_SIZE;
+  if (typeof window !== "undefined" && (window as unknown as { pos?: unknown }).pos) {
+    const rows = await routedQuery("coupon_events", {
+      columns: EVENT_COLUMNS,
+      ...(opts.campaignId ? { match: { campaign_id: opts.campaignId } } : {}),
+      orderBy: { column: "created_at", ascending: false },
+      ...(opts.cursor ? { cursor: { column: "created_at", value: opts.cursor.ts, id: opts.cursor.id } } : {}),
+      limit,
+    });
+    return { rows: rows.map((row) => toEvent(row as Row)), cursor: nextCursor(rows, "created_at", limit), hasMore: rows.length >= limit };
+  }
   let q = sb.from("coupon_events").select(EVENT_COLUMNS);
   if (opts.campaignId) q = q.eq("campaign_id", opts.campaignId);
   const res = await keyset(q as never, "created_at", opts.cursor ?? null, limit);
@@ -491,6 +526,50 @@ export async function redeemVoucher(input: {
   storeId?: string;
   staff?: string;
 }): Promise<void> {
+  if (localDb()?.writeBatch) {
+    const view = await loadVoucherByToken(input.token);
+    if (!view) throw new Error(friendly.VOUCHER_NOT_FOUND);
+    if (view.voucher.status === "REDEEMED") throw new Error(friendly.VOUCHER_ALREADY_REDEEMED);
+    if (view.voucher.status === "DISABLED") throw new Error(friendly.VOUCHER_DISABLED);
+    if (isVoucherExpired(view.voucher, view.campaign)) throw new Error(friendly.VOUCHER_EXPIRED);
+
+    const now = new Date().toISOString();
+    await commitOps("Redeeming voucher", [
+      {
+        kind: "update",
+        table: "issued_vouchers",
+        values: {
+          status: "REDEEMED",
+          redeemed_at: now,
+          redeemed_by: input.staff ?? null,
+          redeemed_sale_id: input.saleId ?? null,
+          store_id: input.storeId ?? null,
+        },
+        // Including the old state prevents an already-redeemed local voucher
+        // from being changed by a retry. The whole batch is one SQL transaction.
+        match: { id: view.voucher.id, status: "ISSUED" },
+      },
+      {
+        kind: "insert",
+        table: "coupon_events",
+        rows: [
+          {
+            id: crypto.randomUUID(),
+            event_type: "REDEEMED",
+            campaign_id: view.campaign.id,
+            campaign_name: view.campaign.name,
+            voucher_token: view.voucher.tokenSlug,
+            member_id: view.voucher.memberId,
+            store_id: input.storeId ?? null,
+            staff_name: input.staff ?? null,
+            sale_id: input.saleId ?? null,
+            created_at: now,
+          },
+        ],
+      },
+    ]);
+    return;
+  }
   const res = await sb.rpc("voucher_redeem", {
     _token: input.token,
     _sale_id: input.saleId ?? null,

@@ -61,6 +61,33 @@ describe("Electron sales visibility", () => {
     expect(store).toContain("loadLocalSales()");
   });
 
+  it("keeps renderer reads branch-scoped and blocks secret tables", async () => {
+    const query = vi.fn(async (_sql: string) => ({ recordset: [{ id: "booking-1", store_id: "branch-1" }] }));
+    const inputs: Record<string, unknown> = {};
+    const request = {
+      input: vi.fn((name: string, value: unknown) => { inputs[name] = value; return request; }),
+      query,
+    };
+    const manager = { pool: { request: () => request } };
+    const registry = { tables: [{
+      cloudTable: "bookings", sqlServerTable: "bookings", scope: "branch",
+      columns: [
+        { cloudColumn: "id", sqlServerColumn: "id", primaryKey: true },
+        { cloudColumn: "store_id", sqlServerColumn: "store_id", primaryKey: false },
+      ],
+    }, {
+      cloudTable: "secure_settings", sqlServerTable: "secure_settings", scope: "organization",
+      columns: [{ cloudColumn: "id", sqlServerColumn: "id", primaryKey: true }],
+    }] };
+    const { OperationsRepository } = await import("../../../electron/db/repositories/operations.cjs");
+    const repository = new OperationsRepository(manager, registry);
+
+    await expect(repository.query("branch-1", "bookings", { limit: 25 })).resolves.toMatchObject({ ok: true });
+    expect(inputs.branch).toBe("branch-1");
+    expect(query.mock.calls[0][0]).toContain("source.[store_id]=@branch");
+    await expect(repository.query("branch-1", "secure_settings", {})).rejects.toMatchObject({ code: "EQUERY_TABLE" });
+  });
+
   it("keeps Electron local-first and uses the nested sync bridge", async () => {
     const { readFileSync } = await import("node:fs");
     const store = readFileSync("src/lib/pos-store.tsx", "utf8");

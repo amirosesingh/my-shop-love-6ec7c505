@@ -13,12 +13,13 @@
  * outbox.
  */
 import { useCallback, useEffect, useState } from "react";
-import { supabaseExternal as supabase } from "@/integrations/supabase/external-client";
-import { enqueue } from "./sync-outbox";
+import { routedQuery } from "@/core/api/db-query";
+import { commitOps } from "@/core/api/pos-db";
 
 export type PinKind = "nav" | "settings";
 
 export type Pin = {
+  id?: string;
   kind: PinKind;
   key: string;
   /** True for a pin an administrator set for everyone. */
@@ -77,19 +78,21 @@ function toPins(rows: Row[]): Pin[] {
     .sort((a, b) => (a.sort_order ?? 0) - (b.sort_order ?? 0))
     .map((r) => ({
       kind: (r.item_kind === "settings" ? "settings" : "nav") as PinKind,
+      id: r.id,
       key: r.item_key,
       company: r.owner_id === null,
     }));
 }
 
 /** Pull the central list. Falls back to the cached copy when offline. */
-export async function refreshPins(): Promise<Pin[]> {
+export async function refreshPins(ownerId: string | null = null): Promise<Pin[]> {
   try {
-    const { data, error } = await supabase
-      .from("nav_pins" as never)
-      .select("id, owner_id, item_kind, item_key, sort_order");
-    if (error || !data) throw error ?? new Error("no data");
-    const pins = toPins(data as unknown as Row[]);
+    const data = await routedQuery("nav_pins", {
+      columns: "id,owner_id,item_kind,item_key,sort_order",
+      orderBy: { column: "sort_order", ascending: true }, limit: 2000,
+    });
+    const visible = (data as unknown as Row[]).filter((row) => row.owner_id == null || (!!ownerId && row.owner_id === ownerId));
+    const pins = toPins(visible);
     publish(pins);
     return pins;
   } catch {
@@ -114,33 +117,19 @@ async function addPin(pin: Pin, ownerId: string | null) {
     item_key: pin.key,
     sort_order: next.length,
   };
-  const { error } = await supabase.from("nav_pins" as never).insert(row as never);
-  if (error) {
-    enqueue("nav-pins", {
-      kind: "upsert",
-      table: "nav_pins",
-      rows: [row],
-      onConflict: "id",
-    });
-  }
+  await commitOps("Saving navigation pin", [{ kind: "upsert", table: "nav_pins", rows: [row] }]);
 }
 
 async function removePin(pin: Pin, ownerId: string | null) {
   publish(listPins().filter((p) => !samePin(p, pin)));
-  const match = {
-    owner_id: pin.company ? null : ownerId,
-    item_kind: pin.kind,
-    item_key: pin.key,
-  };
-  const query = supabase
-    .from("nav_pins" as never)
-    .delete()
-    .eq("item_kind", pin.kind)
-    .eq("item_key", pin.key);
-  const { error } = await (pin.company
-    ? query.is("owner_id", null)
-    : query.eq("owner_id", ownerId ?? COMPANY_OWNER));
-  if (error) enqueue("nav-pins", { kind: "delete", table: "nav_pins", match });
+  let id = pin.id;
+  if (!id) {
+    const rows = await routedQuery("nav_pins", {
+      match: { item_kind: pin.kind, item_key: pin.key }, limit: 100,
+    });
+    id = String(rows.find((row) => pin.company ? row.owner_id == null : row.owner_id === (ownerId ?? COMPANY_OWNER))?.id ?? "");
+  }
+  if (id) await commitOps("Deleting navigation pin", [{ kind: "delete", table: "nav_pins", match: { id } }]);
 }
 
 export type NavPins = {
@@ -160,7 +149,7 @@ export function useNavPins(ownerId: string | null): NavPins {
   useEffect(() => {
     const sync = () => setPins(listPins());
     listeners.add(sync);
-    void refreshPins();
+    void refreshPins(ownerId);
     return () => {
       listeners.delete(sync);
     };

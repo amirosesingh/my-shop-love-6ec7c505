@@ -7,8 +7,6 @@
  * without payment buttons — and historical bills keep their stored method code
  * even after a type is removed.
  */
-import type { SupabaseClient } from "@supabase/supabase-js";
-import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { useEffect, useState } from "react";
 import {
   BadgeCheck,
@@ -27,8 +25,9 @@ import {
   type LucideIcon,
 } from "lucide-react";
 import { describeError } from "@/lib/notify";
+import { routedQuery } from "@/core/api/db-query";
+import { commitOps } from "@/core/api/pos-db";
 
-const sb = supabaseExternal as unknown as SupabaseClient;
 const CACHE_KEY = "pos.payment-types.v1";
 const TENDER_ICONS: Record<string, LucideIcon> = {
   BadgeCheck,
@@ -144,9 +143,10 @@ export const cachedPaymentTypes = (): PaymentType[] =>
 
 export async function loadPaymentTypes(): Promise<PaymentType[]> {
   try {
-    const res = await sb.from("payment_types").select("*").order("sort_order", { ascending: true });
-    if (res.error) throw new Error(res.error.message);
-    const list = ((res.data as Row[] | null) ?? []).map(toType).sort(bySort);
+    const rows = await routedQuery("payment_types", {
+      orderBy: { column: "sort_order", ascending: true }, limit: 2000,
+    });
+    const list = rows.map(toType).sort(bySort);
     if (list.length) writeCache(list);
     return list.length ? list : cachedPaymentTypes();
   } catch {
@@ -161,8 +161,9 @@ export async function savePaymentType(t: PaymentType): Promise<PaymentTypeResult
   const code = (t.code.trim() || paymentCodeFrom(name)).toLowerCase();
   if (!code) return { success: false, error: "Give the payment method a code" };
   try {
-    const res = await sb.from("payment_types").upsert(toRow({ ...t, name, code }) as never);
-    if (res.error) throw new Error(res.error.message);
+    await commitOps("Saving payment type", [{
+      kind: "upsert", table: "payment_types", rows: [toRow({ ...t, name, code })],
+    }]);
     return { success: true };
   } catch (e) {
     return { success: false, error: describeError(e, "Saving the payment method") };
@@ -171,8 +172,7 @@ export async function savePaymentType(t: PaymentType): Promise<PaymentTypeResult
 
 export async function deletePaymentType(id: string): Promise<PaymentTypeResult> {
   try {
-    const res = await sb.from("payment_types").delete().eq("id", id);
-    if (res.error) throw new Error(res.error.message);
+    await commitOps("Deleting payment type", [{ kind: "delete", table: "payment_types", match: { id } }]);
     return { success: true };
   } catch (e) {
     return { success: false, error: describeError(e, "Deleting the payment method") };

@@ -12,6 +12,7 @@
 import { supabaseExternal } from "@/integrations/supabase/external-client";
 import { noteVersions } from "@/lib/row-versions";
 import { readAllPages } from "@/lib/paged-read";
+import { localDb } from "@/core/local-db/local-db";
 
 import type { Row } from "@/lib/sync-outbox";
 
@@ -27,6 +28,7 @@ type LooseFilter = PromiseLike<{
   eq: (column: string, value: unknown) => LooseFilter;
   in: (column: string, values: unknown[]) => LooseFilter;
   order: (column: string, opts: { ascending: boolean }) => LooseFilter;
+  or: (expression: string) => LooseFilter;
   limit: (n: number) => LooseFilter;
   range: (from: number, to: number) => LooseFilter;
 };
@@ -41,10 +43,13 @@ export type QueryOptions = {
   in?: { column: string; values: unknown[] };
   orderBy?: { column: string; ascending?: boolean };
   limit?: number;
+  /** Internal local pagination offset. */
+  offset?: number;
+  cursor?: { column: string; value: string; id: string };
 };
 
 /** Where a read was actually served from. */
-export type ReadSource = "cloud";
+export type ReadSource = "local" | "cloud";
 
 /**
  * Reads already on the wire, so two screens asking for the same rows in the
@@ -59,10 +64,24 @@ async function runQuery(
   table: string,
   options: QueryOptions,
 ): Promise<{ rows: Row[]; source: ReadSource }> {
+  const bridge = localDb();
+  if (bridge?.query) {
+    // Never grow renderer memory with the size of a table. Callers page large
+    // views explicitly; point lookups and configuration reads remain bounded.
+    const result = await bridge.query(table, { ...options, limit: Math.min(options.limit ?? 1000, 2000) });
+    if (!result.ok) throw new Error(result.error ?? "The local SQL Server read failed.");
+    const rows = (result.rows ?? []) as Row[];
+    noteVersions(table, rows);
+    return { rows, source: "local" };
+  }
   const build = (start: number, end: number) => {
     let q = from(table).select(options.columns ?? "*", { count: "exact" });
     for (const [k, v] of Object.entries(options.match ?? {})) q = q.eq(k, v);
     if (options.in) q = q.in(options.in.column, options.in.values);
+    if (options.cursor) {
+      const op = options.orderBy?.ascending === true ? "gt" : "lt";
+      q = q.or(`${options.cursor.column}.${op}.${options.cursor.value},and(${options.cursor.column}.eq.${options.cursor.value},id.${op}.${options.cursor.id})`);
+    }
     if (options.orderBy)
       q = q.order(options.orderBy.column, { ascending: options.orderBy.ascending ?? true });
     // Most business tables use `id`, but scoped/configuration tables often

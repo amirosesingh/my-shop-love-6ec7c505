@@ -32,6 +32,11 @@ const PULL_ONLY = new Set([
   "terminal_recovery_secrets",
   "security_findings",
 ]);
+const APPEND_ONLY = new Set([
+  "shift_cash_counts",
+  "shift_close_events",
+  "shift_reconciliations",
+]);
 
 function sqlType(declaration) {
   const d = declaration.toLowerCase();
@@ -89,10 +94,12 @@ const tables = report.tables.map((table, tableIndex) => ({
       ? "historical"
       : "current",
   insertRule: "idempotent_upsert",
-  updateRule: "versioned",
-  deleteRule: "tombstone",
+  updateRule: APPEND_ONLY.has(table.name) ? "append_only" : "versioned",
+  deleteRule: APPEND_ONLY.has(table.name) ? "none" : "tombstone",
   conflictRule: /^(?:sales|sale_items|payment_transactions|refunds)/.test(table.name)
     ? "immutable_reversal"
+    : APPEND_ONLY.has(table.name)
+      ? "immutable_reversal"
     : /^(?:item_activity_logs|stock_adjustments|stock_delta_applied)$/.test(table.name)
       ? "movement_delta"
       : "highest_version",
@@ -288,7 +295,7 @@ for (const table of tables) {
     JOIN sys.columns c ON c.object_id=dc.parent_object_id AND c.column_id=dc.parent_column_id
     WHERE dc.parent_object_id=OBJECT_ID(N'dbo.${table.sqlServerTable}')
       AND c.name=N'${column.sqlServerColumn}'
-      AND REPLACE(REPLACE(REPLACE(dc.definition,N'(',N''),N')',N''),N' ',N'')=N'N''[]'''
+      AND dc.definition IN (N'(N''[]'')',N'N''[]''',N'(''[]'')',N'''[]''')
   );
   IF ${variable} IS NOT NULL BEGIN
     DECLARE ${commandVariable} nvarchar(max) = N'ALTER TABLE dbo.[${table.sqlServerTable}] DROP CONSTRAINT ' + QUOTENAME(${variable});

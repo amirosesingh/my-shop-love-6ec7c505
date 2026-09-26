@@ -15,7 +15,7 @@ describe("SQL Server IPC surface", () => {
       "database:remove-configuration", "database:health", "database:schema-status", "database:backup",
       "database:restore", "jobs:get-active", "jobs:get-history", "sync:get-status", "sync:run-now",
       "sync:pause", "sync:resume", "sync:get-failures", "sync:reconcile", "business:write-batch",
-      "business:snapshot", "receipts:find-exact", "receipts:refund",
+      "business:snapshot", "business:query", "receipts:find-exact", "receipts:refund",
       "telemetry:presence",
     ]) {
       expect(preload).toContain(channel);
