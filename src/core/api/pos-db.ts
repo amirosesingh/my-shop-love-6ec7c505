@@ -735,6 +735,10 @@ const saleItemRows = (s: Sale) =>
   s.lines.map((l, index) => ({
     id: stableChildId(s.id, "1", index),
     sale_id: s.id,
+    // The central sync boundary validates every child row independently.
+    // Without this field SQL Server accepts the item, but Supabase correctly
+    // rejects the aggregate as SYNC_BRANCH_FORBIDDEN.
+    branch_id: s.storeId,
     product_id: l.productId || null,
     product_name: l.name,
     unit_price: l.price,
@@ -1061,6 +1065,30 @@ export async function loadCloudState(storeId?: string | null): Promise<CloudSlic
   };
 }
 
+/**
+ * Read from the database that owns the running platform.
+ *
+ * An activated Electron till is SQL Server local-first even while the network
+ * is available. Cloud reads are reserved for browser/mobile clients and for a
+ * desktop installation whose local database is deliberately disabled. This
+ * keeps locally committed, not-yet-synced receipts visible after a restart.
+ */
+export async function loadPrimaryState(storeId?: string | null): Promise<CloudSlice> {
+  const bridge = localDb();
+  if (!isOnlineOnly() && bridge?.snapshot) {
+    const status = await bridge.database?.getState?.().catch(() => null);
+    if (status?.enabled && status.connected && (status.tradingReady ?? status.connected)) {
+      return loadLocalState(new Error("The connected local SQL Server snapshot could not be read."));
+    }
+    if (status?.enabled && status.tradingReady === false) {
+      throw new Error(
+        "Local SQL Server is enabled but not ready for trading. Open Database & Cloud Connection, restore the connection, and apply the current local database update if requested.",
+      );
+    }
+  }
+  return loadCloudState(storeId);
+}
+
 /** Refresh a settings notification without downloading the whole POS state. */
 export async function loadCloudSettings(): Promise<AppSettings> {
   const { data, error } = await supabase.from("pos_settings").select("*").eq("id", 1).maybeSingle();
@@ -1108,7 +1136,12 @@ async function loadLocalState(cause: unknown): Promise<CloudSlice> {
   const bridge = localDb();
   if (!bridge) throw cause;
   const result = await bridge.snapshot();
-  if (!result.ok) throw cause;
+  if (!result.ok) {
+    throw new Error(
+      result.error ??
+        (cause instanceof Error ? cause.message : "The local SQL Server snapshot could not be read."),
+    );
+  }
   tierIdByName = {};
   tierNameById = {};
   for (const tier of result.tiers ?? []) {

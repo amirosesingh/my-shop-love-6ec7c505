@@ -76,7 +76,7 @@ async function mirrorCloudState(state: unknown) {
   }
 }
 import { loadCloudState } from "@/core/api/pos-db";
-import { localDb } from "@/core/local-db/local-db";
+import { localDb, type LocalSyncStatus } from "@/core/local-db/local-db";
 import {
   checkHealth,
   subscribeConnectivity,
@@ -487,18 +487,20 @@ export async function runExclusive(reason: string = "timer"): Promise<void> {
     cycleRunning = true;
     setSyncState({ phase: "syncing" });
     try {
-      const cycle = desktopBridge.syncNow
-        ? await desktopBridge.syncNow()
-        : (await desktopBridge.status());
+      const cycle = desktopBridge.sync?.auto
+        ? await desktopBridge.sync.auto()
+        : desktopBridge.syncNow
+          ? await desktopBridge.syncNow()
+          : await desktopBridge.status();
       setSyncState({
         phase: cycle?.phase === "pushing" || cycle?.phase === "pulling" ? "syncing" : "idle",
-        pending: cycle?.businessBatches?.pending ?? cycle?.queue?.length ?? 0,
+        pending: cycle?.businessBatches?.pending ?? cycle?.pending ?? cycle?.queue?.length ?? 0,
         lastSyncAt: cycle?.lastPushAt ?? cycle?.lastPullAt ?? undefined,
         credentialsInvalid: cycle?.credentialsInvalid ?? false,
         lastError:
           cycle?.error === "central-config" || cycle?.lastBusinessPush?.reason === "central-config"
             ? null
-            : (cycle?.error ?? null),
+            : (cycle?.error ?? cycle?.lastError ?? null),
       });
     } catch (error) {
       const message = error instanceof Error ? error.message : String(error);
@@ -706,16 +708,7 @@ export function startSyncEngine() {
   // Push queued work first, then bring central changes down, then converge the
   // terminal's own database in both directions — one cycle at a time.
   const desktopBridge = localDb();
-  if (desktopBridge?.setSyncConfig) {
-    const cfg = syncConfig();
-    void desktopBridge.setSyncConfig({
-      intervalMs: cfg.intervalMs,
-      batchSize: cfg.batchSize,
-      maxAttempts: cfg.maxAttempts,
-      maxBackoffMs: cfg.maxBackoffMs,
-    });
-  }
-  const applyDesktopStatus = (status: Awaited<ReturnType<NonNullable<typeof desktopBridge>["status"]>>) => {
+  const applyDesktopStatus = (status: LocalSyncStatus) => {
     const batches = status.businessBatches;
     const failedRow = batches?.rows?.find((row) => row.status !== "pending");
     const centralPending =
@@ -724,15 +717,19 @@ export function startSyncEngine() {
       failedRow?.error_message === "central-config";
     setSyncState({
       phase: status.phase === "pushing" || status.phase === "pulling" ? "syncing" : "idle",
-      pending: batches ? batches.pending + batches.failed : (status.queue?.length ?? 0),
+      pending: batches ? batches.pending + batches.failed : (status.pending ?? status.queue?.length ?? 0),
       lastSyncAt: status.lastPushAt ?? status.lastPullAt ?? null,
-      lastError: centralPending ? null : (status.error ?? failedRow?.error_message ?? null),
+      lastError: centralPending ? null : (status.error ?? status.lastError ?? failedRow?.error_message ?? null),
       credentialsInvalid: status.credentialsInvalid ?? false,
       cloudConfigured: status.cloudConfigured ?? null,
     });
   };
-  const offDesktopStatus = desktopBridge?.onStatus?.(applyDesktopStatus);
-  if (desktopBridge) void desktopBridge.status().then(applyDesktopStatus).catch(() => {});
+  const offDesktopStatus = desktopBridge?.sync?.subscribe?.(applyDesktopStatus) ??
+    desktopBridge?.onStatus?.(applyDesktopStatus);
+  if (desktopBridge) {
+    const status = desktopBridge.sync?.getStatus?.() ?? desktopBridge.status();
+    void status.then(applyDesktopStatus).catch(() => {});
+  }
   const tick = () => {
     if (!desktopBridge) void runExclusive("timer");
   };
@@ -743,14 +740,6 @@ export function startSyncEngine() {
   let appliedInterval = syncConfig().intervalMs;
   const offConfig = subscribeSyncConfig(() => {
     const cfg = syncConfig();
-    if (desktopBridge?.setSyncConfig) {
-      void desktopBridge.setSyncConfig({
-        intervalMs: cfg.intervalMs,
-        batchSize: cfg.batchSize,
-        maxAttempts: cfg.maxAttempts,
-        maxBackoffMs: cfg.maxBackoffMs,
-      });
-    }
     if (cfg.intervalMs !== appliedInterval) {
       appliedInterval = cfg.intervalMs;
       if (!desktopBridge) {

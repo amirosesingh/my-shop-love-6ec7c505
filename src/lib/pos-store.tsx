@@ -52,6 +52,7 @@ import {
   isDuplicateBillNumber,
   loadActiveShift,
   loadCloudState,
+  loadPrimaryState,
   loadLocalSales,
   loadCloudMember,
   loadCloudProduct,
@@ -462,6 +463,33 @@ function applyCloud(s: PosState, cloud: CloudSlice, pendingSales?: Set<string>):
   };
 }
 
+/** Replace one branch's receipt window without hiding unsynced local sales. */
+function applySalesSnapshot(
+  current: PosState,
+  rows: Sale[],
+  active: string | null | undefined,
+  pendingSales: Set<string>,
+  confirmPending: boolean,
+): PosState {
+  const ids = new Set(rows.map((sale) => sale.id));
+  if (confirmPending) for (const id of ids) pendingSales.delete(id);
+  const pending = current.sales.filter((sale) => pendingSales.has(sale.id) && !ids.has(sale.id));
+  const otherBranches = current.sales.filter(
+    (sale) => sale.storeId !== active && !ids.has(sale.id),
+  );
+  const sales = [...pending, ...rows, ...otherBranches]
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 500);
+  return {
+    ...current,
+    sales,
+    counter: rows.reduce(
+      (max, sale) => Math.max(max, Number(sale.receiptNo.split("-").pop()) || 0),
+      current.counter,
+    ),
+  };
+}
+
 export function PosProvider({ children }: { children: ReactNode }) {
   const [state, setState] = useState<PosState>(emptyState);
   const [ready, setReady] = useState(false);
@@ -542,7 +570,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         // The PIN/session proofs live in encrypted device storage. Load them
         // before branch discovery decides whether the protected relay exists.
         await Promise.all([loadCashierToken(), loadSessionToken()]);
-        const cloud = await loadCloudState();
+        const cloud = await loadPrimaryState();
         if (cancelled) return;
         setState((s) => applyCloud(s, cloud, pendingSalesRef.current));
         // The locations question now has a real answer, empty or not.
@@ -839,13 +867,14 @@ export function PosProvider({ children }: { children: ReactNode }) {
     if (isOnlineOnly() || !signedIn) return;
     const focus = () => {
       const bridge = localDb();
-      void bridge?.sync?.auto?.();
       const active =
         activeBranchId(stateRef.current.currentStoreId) ?? stateRef.current.currentStoreId;
-      void loadCloudState(active ?? undefined)
+      void Promise.resolve(bridge?.sync?.auto?.())
+        .catch(() => undefined)
+        .then(() => loadPrimaryState(active ?? undefined))
         .then((cloud) => setState((current) => applyCloud(current, cloud, pendingSalesRef.current)))
         .catch(() => {
-          /* The Electron coordinator owns recovery while the central service is absent. */
+          /* The local snapshot remains authoritative while sync recovers. */
         });
     };
     window.addEventListener("focus", focus);
@@ -924,35 +953,28 @@ export function PosProvider({ children }: { children: ReactNode }) {
       if (timer) window.clearTimeout(timer);
       timer = window.setTimeout(() => {
         timer = undefined;
-        // A sale notification needs the canonical bill graph, not the entire
-        // catalogue, members, promotions, stores and settings again.
-        void (active
-          ? loadSalesPage(active, null, 500).then(({ rows }) => {
-              setState((current) => {
-                const ids = new Set(rows.map((sale) => sale.id));
-                for (const id of ids) pendingSalesRef.current.delete(id);
-                const pending = current.sales.filter(
-                  (sale) => pendingSalesRef.current.has(sale.id) && !ids.has(sale.id),
+        // Electron must re-read SQL Server after the main worker pulls; a
+        // cloud-only read would hide locally committed receipts still queued
+        // for upload. Browser/mobile continue to read their cloud authority.
+        const refresh = isOnlineOnly()
+          ? active
+            ? loadSalesPage(active, null, 500).then(({ rows }) => {
+                setState((current) =>
+                  applySalesSnapshot(current, rows, active, pendingSalesRef.current, true),
                 );
-                const otherBranches = current.sales.filter(
-                  (sale) => sale.storeId !== active && !ids.has(sale.id),
+              })
+            : loadCloudState().then((cloud) => {
+                setState((current) => applyCloud(current, cloud, pendingSalesRef.current));
+              })
+          : Promise.resolve(localDb()?.sync?.auto?.())
+              .catch(() => undefined)
+              .then(() => loadLocalSales())
+              .then((rows) => {
+                setState((current) =>
+                  applySalesSnapshot(current, rows, active, pendingSalesRef.current, true),
                 );
-                const sales = [...pending, ...rows, ...otherBranches]
-                  .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-                  .slice(0, 500);
-                return {
-                  ...current,
-                  sales,
-                  counter: rows.reduce(
-                    (max, sale) => Math.max(max, Number(sale.receiptNo.split("-").pop()) || 0),
-                    current.counter,
-                  ),
-                };
               });
-            })
-          : loadCloudState().then((cloud) => {
-              setState((current) => applyCloud(current, cloud, pendingSalesRef.current));
-            }))
+        void refresh
           .catch(() => {
             /* reconnect/pull remains the eventual-convergence fallback */
           });
@@ -984,21 +1006,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
         const rows = await loadLocalSales();
         if (cancelled) return;
         const active = activeBranchId(stateRef.current.currentStoreId) ?? stateRef.current.currentStoreId;
-        setState((current) => {
-          const ids = new Set(rows.map((sale) => sale.id));
-          const pending = current.sales.filter(
-            (sale) => pendingSalesRef.current.has(sale.id) && !ids.has(sale.id),
-          );
-          const otherBranches = current.sales.filter(
-            (sale) => sale.storeId !== active && !ids.has(sale.id),
-          );
-          return {
-            ...current,
-            sales: [...pending, ...rows, ...otherBranches]
-              .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
-              .slice(0, 500),
-          };
-        });
+        setState((current) =>
+          applySalesSnapshot(current, rows, active, pendingSalesRef.current, true),
+        );
       } catch {
         /* recordSale's optimistic state remains until the next confirmed read */
       } finally {
@@ -1064,11 +1074,14 @@ export function PosProvider({ children }: { children: ReactNode }) {
     const pull = () => {
       if (typeof navigator !== "undefined" && !navigator.onLine) return;
       if (typeof document !== "undefined" && document.visibilityState === "hidden") return;
-      void loadCloudState()
+      const bridge = localDb();
+      void Promise.resolve(bridge?.sync?.auto?.())
+        .catch(() => undefined)
+        .then(() => loadPrimaryState())
         .then((cloud) => {
           if (cancelled) return;
-          // Only master data is replaced; anything created on this till that
-          // has not synced yet stays untouched by applyCloud's merge.
+          // Read the converged SQL Server snapshot. Local unsynced work stays
+          // visible even when the central upload is still being retried.
           setState((s) => applyCloud(s, cloud, pendingSalesRef.current));
         })
         .catch(() => {
