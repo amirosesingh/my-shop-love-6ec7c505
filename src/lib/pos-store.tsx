@@ -52,6 +52,7 @@ import {
   isDuplicateBillNumber,
   loadActiveShift,
   loadCloudState,
+  loadLocalSales,
   loadCloudMember,
   loadCloudProduct,
   loadCloudPromotion,
@@ -418,7 +419,7 @@ function mergeCloudSettings(cloudSettings: CloudSlice["settings"]): PosState["se
   };
 }
 
-function applyCloud(s: PosState, cloud: CloudSlice): PosState {
+function applyCloud(s: PosState, cloud: CloudSlice, pendingSales?: Set<string>): PosState {
   const cloudShifts = cloud.shifts ?? [];
   const cloudProducts = cloud.products ?? [];
   const cloudMembers = cloud.members ?? [];
@@ -430,7 +431,14 @@ function applyCloud(s: PosState, cloud: CloudSlice): PosState {
     ...s,
     products: cloudProducts,
     members: cloudMembers,
-    sales: cloudSales,
+    sales: (() => {
+      if (!pendingSales?.size) return cloudSales;
+      const incoming = new Set(cloudSales.map((sale) => sale.id));
+      const preserved = s.sales.filter((sale) => pendingSales.has(sale.id) && !incoming.has(sale.id));
+      return [...preserved, ...cloudSales]
+        .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+        .slice(0, 500);
+    })(),
     // Shifts are central now so every terminal agrees on what is open.
     shifts: cloudShifts.length ? cloudShifts : s.shifts,
     promotions: cloudPromotions.length ? cloudPromotions : s.promotions,
@@ -474,6 +482,9 @@ export function PosProvider({ children }: { children: ReactNode }) {
   // Latest snapshot for audit logging without re-creating every callback.
   const stateRef = useRef(state);
   stateRef.current = state;
+  // Protect a locally committed receipt until a later local/cloud snapshot has
+  // actually observed it. Focus and Realtime refreshes may race the sync push.
+  const pendingSalesRef = useRef(new Set<string>());
   // Who is acting right now — stamped on transfer approvals and receipts.
   const actorRef = useRef("Manager");
   actorRef.current = terminalUser?.name || user?.email || "Manager";
@@ -533,7 +544,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         await Promise.all([loadCashierToken(), loadSessionToken()]);
         const cloud = await loadCloudState();
         if (cancelled) return;
-        setState((s) => applyCloud(s, cloud));
+        setState((s) => applyCloud(s, cloud, pendingSalesRef.current));
         // The locations question now has a real answer, empty or not.
         setStoresLoaded(true);
         setLoadPhase("ready");
@@ -781,7 +792,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         loading = true;
         void loadCloudState()
           .then((cloud) => {
-            if (!cancelled) setState((s) => applyCloud(s, cloud));
+            if (!cancelled) setState((s) => applyCloud(s, cloud, pendingSalesRef.current));
           })
           .catch(() => {
             /* the offline gate takes over if the connection is gone */
@@ -832,7 +843,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
       const active =
         activeBranchId(stateRef.current.currentStoreId) ?? stateRef.current.currentStoreId;
       void loadCloudState(active ?? undefined)
-        .then((cloud) => setState((current) => applyCloud(current, cloud)))
+        .then((cloud) => setState((current) => applyCloud(current, cloud, pendingSalesRef.current)))
         .catch(() => {
           /* The Electron coordinator owns recovery while the central service is absent. */
         });
@@ -919,10 +930,14 @@ export function PosProvider({ children }: { children: ReactNode }) {
           ? loadSalesPage(active, null, 500).then(({ rows }) => {
               setState((current) => {
                 const ids = new Set(rows.map((sale) => sale.id));
+                for (const id of ids) pendingSalesRef.current.delete(id);
+                const pending = current.sales.filter(
+                  (sale) => pendingSalesRef.current.has(sale.id) && !ids.has(sale.id),
+                );
                 const otherBranches = current.sales.filter(
                   (sale) => sale.storeId !== active && !ids.has(sale.id),
                 );
-                const sales = [...rows, ...otherBranches]
+                const sales = [...pending, ...rows, ...otherBranches]
                   .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
                   .slice(0, 500);
                 return {
@@ -936,7 +951,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
               });
             })
           : loadCloudState().then((cloud) => {
-              setState((current) => applyCloud(current, cloud));
+              setState((current) => applyCloud(current, cloud, pendingSalesRef.current));
             }))
           .catch(() => {
             /* reconnect/pull remains the eventual-convergence fallback */
@@ -945,6 +960,63 @@ export function PosProvider({ children }: { children: ReactNode }) {
     });
     return () => {
       if (timer) window.clearTimeout(timer);
+      unsubscribe();
+    };
+  }, [signedIn]);
+
+  // The Electron main process confirms a transaction only after SQL Server has
+  // committed it. Re-read just the local receipt set on that signal so every
+  // renderer reflects the sale without a restart or a successful cloud push.
+  useEffect(() => {
+    if (isOnlineOnly() || !signedIn) return;
+    const bridge = localDb();
+    if (!bridge?.onBusinessChanged) return;
+    let cancelled = false;
+    let loading = false;
+    let queued = false;
+    const refresh = async () => {
+      if (loading) {
+        queued = true;
+        return;
+      }
+      loading = true;
+      try {
+        const rows = await loadLocalSales();
+        if (cancelled) return;
+        const active = activeBranchId(stateRef.current.currentStoreId) ?? stateRef.current.currentStoreId;
+        setState((current) => {
+          const ids = new Set(rows.map((sale) => sale.id));
+          const pending = current.sales.filter(
+            (sale) => pendingSalesRef.current.has(sale.id) && !ids.has(sale.id),
+          );
+          const otherBranches = current.sales.filter(
+            (sale) => sale.storeId !== active && !ids.has(sale.id),
+          );
+          return {
+            ...current,
+            sales: [...pending, ...rows, ...otherBranches]
+              .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+              .slice(0, 500),
+          };
+        });
+      } catch {
+        /* recordSale's optimistic state remains until the next confirmed read */
+      } finally {
+        loading = false;
+        if (queued && !cancelled) {
+          queued = false;
+          void refresh();
+        }
+      }
+    };
+    const unsubscribe = bridge.onBusinessChanged((change) => {
+      const active = activeBranchId(stateRef.current.currentStoreId) ?? stateRef.current.currentStoreId;
+      if (change.kind !== "sale") return;
+      if (change.branchId && active && change.branchId !== active) return;
+      void refresh();
+    });
+    return () => {
+      cancelled = true;
       unsubscribe();
     };
   }, [signedIn]);
@@ -997,7 +1069,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
           if (cancelled) return;
           // Only master data is replaced; anything created on this till that
           // has not synced yet stays untouched by applyCloud's merge.
-          setState((s) => applyCloud(s, cloud));
+          setState((s) => applyCloud(s, cloud, pendingSalesRef.current));
         })
         .catch(() => {
           /* offline or refused — the local copy keeps the till trading */
@@ -1369,6 +1441,7 @@ export function PosProvider({ children }: { children: ReactNode }) {
         }
       }
 
+      pendingSalesRef.current.add(sale.id);
       setState((s) => {
         const products = s.products.map((p) => {
           const line = input.lines.find((l) => l.productId === p.id);
@@ -1384,13 +1457,14 @@ export function PosProvider({ children }: { children: ReactNode }) {
               }
             : m,
         );
+        const existingSales = s.sales.filter((existing) => existing.id !== sale.id);
         const tagged = input.exchangeOfReceiptNo
-          ? s.sales.map((x) =>
+          ? existingSales.map((x) =>
               x.receiptNo === input.exchangeOfReceiptNo
                 ? { ...x, exchangedToReceiptNo: sale.receiptNo }
                 : x,
             )
-          : s.sales;
+          : existingSales;
         return {
           ...s,
           counter: Math.max(counter, s.counter + 1),

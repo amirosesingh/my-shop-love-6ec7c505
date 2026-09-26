@@ -114,10 +114,68 @@ class OperationsRepository {
       output.shifts = result.recordset ?? [];
     }
     if (this.tables.has("sales")) {
-      const result = branchId
-        ? await this.pool().request().input("branch", String(branchId)).query("SELECT TOP (500) * FROM dbo.sales WHERE store_id=@branch ORDER BY created_at DESC,id;")
-        : { recordset: [] };
-      output.sales = result.recordset ?? [];
+      if (!branchId) {
+        output.sales = [];
+      } else {
+        // A receipt is a graph, not just its header. Return the children in the
+        // same SQL batch so the renderer can display/reprint a locally committed
+        // sale immediately, including while the cloud is unavailable.
+        const hasItems = this.tables.has("sale_items");
+        const hasPayments = this.tables.has("payment_transactions");
+        const result = await this.pool().request().input("branch", String(branchId)).query(`
+          DECLARE @recent_sales TABLE (id uniqueidentifier PRIMARY KEY);
+          INSERT @recent_sales(id)
+            SELECT TOP (500) id FROM dbo.sales WHERE store_id=@branch ORDER BY created_at DESC,id;
+          SELECT s.* FROM dbo.sales s JOIN @recent_sales r ON r.id=s.id ORDER BY s.created_at DESC,s.id;
+          ${hasItems ? "SELECT i.* FROM dbo.sale_items i JOIN @recent_sales r ON r.id=i.sale_id ORDER BY i.sale_id,i.id;" : "SELECT TOP (0) CAST(NULL AS uniqueidentifier) sale_id;"}
+          ${hasPayments ? "SELECT p.* FROM dbo.payment_transactions p JOIN @recent_sales r ON r.id=p.sale_id ORDER BY p.sale_id,p.created_at,p.id;" : "SELECT TOP (0) CAST(NULL AS uniqueidentifier) sale_id;"}
+        `);
+        const recordsets = result.recordsets ?? [result.recordset ?? [], [], []];
+        const sales = recordsets[0] ?? [];
+        const items = recordsets[1] ?? [];
+        const payments = recordsets[2] ?? [];
+        const bySale = (rows) => {
+          const grouped = new Map();
+          for (const row of rows) {
+            const key = String(row.sale_id ?? "");
+            if (!key) continue;
+            const group = grouped.get(key) ?? [];
+            group.push(row);
+            grouped.set(key, group);
+          }
+          return grouped;
+        };
+        const itemsBySale = bySale(items);
+        const paymentsBySale = bySale(payments);
+        const jsonArray = (value) => {
+          if (Array.isArray(value)) return value;
+          if (typeof value !== "string" || !value.trim()) return [];
+          try { const parsed = JSON.parse(value); return Array.isArray(parsed) ? parsed : []; }
+          catch { return []; }
+        };
+        output.sales = sales.map((sale) => {
+          const embedded = jsonArray(sale.payments);
+          const ledger = (paymentsBySale.get(String(sale.id)) ?? []).map((payment) => {
+            const metadata = (() => {
+              try { return typeof payment.metadata === "string" ? JSON.parse(payment.metadata) : (payment.metadata ?? {}); }
+              catch { return {}; }
+            })();
+            return {
+              id: String(payment.id ?? ""),
+              method: String(payment.method ?? payment.payment_method ?? "cash"),
+              amount: Number(payment.amount ?? 0),
+              reference: payment.reference ?? payment.transaction_reference ?? undefined,
+              referenceNote: metadata.reference_note ?? undefined,
+              bankName: metadata.bank ?? undefined,
+            };
+          });
+          return {
+            ...sale,
+            sale_items: itemsBySale.get(String(sale.id)) ?? [],
+            payments: embedded.length ? embedded : ledger,
+          };
+        });
+      }
     }
     return { ok: true, ...output };
   }
